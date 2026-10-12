@@ -1,0 +1,33 @@
+# Soliq bilan integratsiya
+
+ERP+POS mahsuloti O'zbekistoning barcha davlat soliq tizimlariga ulanishi kerak. Quyida to'liq ro'yxat: onlayn kassa, e-faktura, e-imzo, e-hujjatlar, hisobotlar.
+
+| Tizim | Majburiyligi/Asos | Ulanish yo'li | Sertifikatlash/ruxsat | Holat |
+| --- | --- | --- | --- | --- |
+| **Onlayn-NKM/virtual kassa** | Majburiy, VM 943-son (2019-11-23) | Davlat reyestriga kiritilgan dastur; "Yangi texnologiyalar" DUK OFD orqali | Sertifikatlash organi; Kiberxavfsizlik markazi xulosasi; OFD integratsiya shartnomasi | Amaldagi, dinamik reyestr [soliq.uz/virtual-kassa-reestri](https://www.gov.uz/oz/soliq/page/virtual-kassa-reestri) |
+| **Fiskal modul (FM)** | Majburiy, VM 943-2-ilova | OFD ("Yangi texnologiyalar" DUK) tomonidan; kripto (O'zDST 1106/1092, 3DES, AES, RSA, SHA) | Rasmiy sertifikat yo'q (davlat o'zi taqdim etadi yoki shartnoma bilan) | Amaldagi; 48 soat offlayn qoidasi ikkilamchi manba (tasdiqlanmagan) |
+| **OFD (Fiskal operatori)** | Majburiy, VM 943-son | Yagona davlat operatori: "Yangi texnologiyalar" ilmiy-axborot markazi DUK | Davlat taqdir etadi | Amaldagi; [soliq.uz tashkilot sahifasi](https://soliq.uz/about/subordinate-organizations/) |
+| **Asl belgisi (markirovka)** | Majburiy, bosqichma-bosqich (2021-2026); VM 737-son (2020-11-20); yangi: 23-son (2026-01-23) | CRPT Turon operatori; DataMatrix kod skanerlab tekshirish | CRPT ro'yxatdan o'tish; E-IMZO majburiy | Amaldagi; 2024-03 suv/ichimlik, 2022 dori/texnika, 2021 tamaki/alkogol; [help.crpt-turon.uz](https://help.crpt-turon.uz/) |
+| **E-faktura (EHF)** | Majburiy, VM 522-son (2019-06-25), 2020-01-01 dan | Akkreditlangan EDO: Didox.uz (login talab, rasmiy API yopiq), Faktura.uz (ochiq API [api.faktura.uz/help/](https://api.faktura.uz/help/)) | E-IMZO majburiy; OFD integratsiya shartnomasi | Amaldagi; AI xavf-baholash 2026-01-01 dan (PQ-830) |
+| **E-IMZO (raqamli imzo)** | Majburiy hujjatlar uchun; qonun O'RQ-793 (2022) | [e-imzo.uz](https://e-imzo.uz/) portal; lokal app + WebSocket + Java server; sandbox [testvpn.e-imzo.uz](https://testvpn.e-imzo.uz) | Sertifikat "Yangi texnologiyalar" DUK'dan; 24 oy validligi | Amaldagi; rasmiy API texnik hujjatlar yopiq, GitHub repo [qo0p/e-imzo-doc](https://github.com/qo0p/e-imzo-doc) |
+| **E-TTN (tovar-transport xati)** | Majburiy, 2024 yildan; QQ 249-son (2021-04-28) | Didox.uz, Faktura.uz yoki o'z sistemasi orqali E-IMZO bilan imzolash | E-IMZO majburiy | Amaldagi; 5 yilga saqlash kerak |
+| **E-ishonchnoma (Vakolat.uz)** | Majburiy, 2026-01-01 dan; QQ 825-son (2025-12-25) | [Vakolat.uz](https://vakolat.uz/) platforma; OneID orqali; jismoniy/yuridik shaxslar | Bepul; E-IMZO majburiy davlat xizmati uchun | 2026-01-01 dan ishga tushadi; API hujjati topilmadi |
+| **Elektron hisobotlar (QQS, profit, daromad, vosita)** | Majburiy, Soliq kodeksi 227; VM 522; 2026-01-01 dan avto-tuzish | [My.soliq.uz](https://my.soliq.uz/) portal; E-IMZO bilan; EDO operatorlar orqali | E-IMZO; QQS to'lovchi sertifikati (agar bor) | Amaldagi; 2026-01-01 dan: QQS/profit/daromad/vosita formalarini Soliq qo'mitasi tayyorlaydi |
+| **MXIK klassifikatori** | Majburiy, chek/fakturaga kod kiritish; VM 522 | [tasnif.soliq.uz](https://tasnif.soliq.uz/) (ochiq veb); GitHub SDK: [mxik-js](https://github.com/azabroflovski/mxik-js), [ikpu-mxik](https://github.com/aslbekkucharov/ikpu-mxik) | Bepul API qidiruvi | Amaldagi; 17-raqamli kod (2-3 guruhi, 4-5 sinf, 6-8 pozitsiya...) |
+| **Markaziy ma'lumotlar bazasi (soliq organlarining)** | Majburiy integratsiya; Soliq kodeksi | [my3.soliq.uz/remotes-services](https://my3.soliq.uz/remotes-services/service-taxpayer/?interactiveId=708); bepul qidiruv API | Murojaat; bepul | Amaldagi; soliq.uz orqali |
+| **To'lov tizimlari (Payme, Click, Uzum)** | Majburiy emas (ixtiyoriy); QQS/profit to'lovlari uchun ta'minot | Payme: JSON-RPC push model, [developer.help.paycom.uz](https://developer.help.paycom.uz/); Click: REST+MD5, [docs.click.uz](https://docs.click.uz/); Uzum: aralash OpenAPI/JSON-RPC, [developer.uzumbank.uz](https://developer.uzumbank.uz/en/) | Merchant hisobini tasdiqlashtirish; test: Payme [test.paycom.uz](https://test.paycom.uz) | Amaldagi; API'lar ochiq; fiskalizatsiya: to'lov tizimi yoki merchant orqali (nozikroq huquqiy talqin mavjud) |
+| **QR to'lov (statik/dinamik)** | Ixtiyoriy; 2026-01-01 dan qabulga majburiy | Payme, Click, Uzum; har birida alohida QR sahifasi | QR generatsiya avtomatik | Amaldagi; statik/dinamik qismlari API-da ko'rsatilgan |
+| **Humo/Uzcard POS** | Ixtiyoriy; o'zi majburiyligi yo'q | Acquiring bank (Kapitalbank, Ipak Yuli) yoki gateway (PaySys, Multicard) orqali; ochiq Humo/Uzcard SDK yo'q | Bank shartnomasi | Amaldagi; PaySys, Multicard gateway'larida ochiq API [docs.paysys.uz](https://docs.paysys.uz/) |
+| **Bank-klient API (ochiq banking)** | Rejalashtirilgan 2026-09-01 (PQ-359); hali majburiy emas | Rasmiy standart yo'q; Kapitalbank DiBank (1C/Didox integratsiya) alohida | Kapitalbank shartnomasi | 2026-09-01 gacha kutilmoqda; hali topilmadi |
+| **E-IMZO ta'rifnomasi va server** | Majburiy (E-IMZO uchun hujjatli jarayon) | CAPIWS interfeysi; vpn.e-imzo.uz:3443 (prod), testvpn.e-imzo.uz:2443 (test) | Sertifikat TestCA (test) yoki "Yangi texnologiyalar" (prod) | Amaldagi |
+
+## Qo'shimcha izohlar
+
+- **Davlat API'lar**: soliq.uz'ning rasmiy, ochiq dasturchi portali yoki to'liq endpoint ro'yxati **topilmadi**. Integratsiya EDO (Didox, Faktura.uz), OFD ("Yangi texnologiyalar" DUK) va to'lov tizimlari orqali.
+- **Narx**: Virtual kassa sertifikatlash, OFD integratsiya xizmatlari, CRPT Turon markirovka asosiy narxi **ochiq manbalarda topilmadi** — murojaat kerak.
+- **Test muhitlari**: Payme, E-IMZO, tasnif.soliq.uz sandbox bor; Didox, Click, My.soliq.uz uchun alohida sandbox **topilmadi**.
+- **VORIS, MOIKDD, EXIM**: Qidiruv natijalari davlat tizimlarining boshqa nomi yoki konkret API'sini ko'rsatmadi — bu tizimlarning majburiyligi **aniq emas**.
+
+## Manbalar
+
+[lex.uz/docs/4603329](https://lex.uz/docs/4603329) — VM 943-son qaror (onlayn-NKM), [lex.uz/docs/8012407](https://lex.uz/docs/8012407) — 23-son qaror (markirovka 2026), [lex.uz/uz/docs/-7962143](https://lex.uz/docs/-7962143) — VM 830-son (EHF xavf-baholash), [lex.uz/mact/-7946843](https://lex.uz/mact/-7946843) — QQ 825-son (e-ishonchnoma), [developer.help.paycom.uz](https://developer.help.paycom.uz/) — Payme API, [docs.click.uz](https://docs.click.uz/) — Click API, [api.faktura.uz/help/](https://api.faktura.uz/help/) — Faktura.uz API, [github.com/qo0p/e-imzo-doc](https://github.com/qo0p/e-imzo-doc) — E-IMZO texnik hujjat (jamoatchilik), [github.com/azabroflovski/mxik-js](https://github.com/azabroflovski/mxik-js) — MXIK API wrapper.

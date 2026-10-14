@@ -35,7 +35,7 @@
 
 - Posting xizmati (`09-…`, 2-bo'lim): hujjat → `stock_moves`, `stock_lots`, `ledger_entries`, `vat_moves` bitta tranzaksiyada; teskari hujjat.
 - M07 kirim (naqd va nasiyaga), yetkazib beruvchilar; M04 qoldiq, FIFO/AVECO (US-M04-05), qayta hisoblash ishi.
-- M06 ko'chirish, M05 inventarizatsiya (Should bo'lsa ham posting sinovi uchun foydali).
+- M06 ko'chirish, M05 inventarizatsiya (Must — US-M05-01…03; posting sinovi uchun ham foydali).
 - **Mezon:** `02-provodka-qoidalari.md` dagi raqamli misollar avtomatik testlarda o'tadi.
 
 ## 3-sprint: veb-kassa
@@ -47,7 +47,7 @@
 
 ## 4-sprint: qarz daftari, xarajatlar, hisobotlar, Telegram
 
-- M08 qarz daftari: tez qarz yozish (offline), mijoz daftari, boshlang'ich qarzlar, to'lov (eng eski qarzdan), va'da sanasi, qarzlar hisoboti, yetkazib beruvchiga qarz.
+- M08 qarz daftari: tez qarz yozish (offline), mijoz daftari, boshlang'ich qarzlar, to'lov (eng eski qarzdan), va'da sanasi, qarzlar hisoboti, yetkazib beruvchiga qarz va unga to'lov (US-M08-11, US-M07-04 — `supplier_payments`, bank/naqd).
 - M15 xarajatlar (+ takrorlanuvchi), sof foyda.
 - M12 Egasi dashboard va asosiy hisobotlar; M18 Telegram bot: ulash va kunlik hisobot.
 - **Mezon:** pilot do'kon qog'oz daftarsiz bir hafta ishlaydi.
@@ -56,12 +56,13 @@
 
 - OFD/virtual kassa (0-bosqich qaroriga ko'ra: o'z modulimiz yoki hamkor adapteri), 48 soat nazorati, fiskal chek holatlari.
 - E-faktura (Faktura.uz va/yoki Didox) + E-IMZO brauzerda imzolash; kiruvchi faktura → kirim; VM 830 xavf belgisi.
-- M10 ichki QQS registri; M11 buxgalteriya hisobotlari (tasdiqlangan hisoblar rejasi bilan).
+- M10 ichki QQS registri, qizil faktura bo'yicha QQS krediti faqat to'lovdan keyin (US-M07-04 ikkinchi mezoni, US-M10-03); M11 buxgalteriya hisobotlari (tasdiqlangan hisoblar rejasi bilan).
 - **Mezon:** test muhitida chek fiskallashadi; kiruvchi e-faktura qabul qilinib imzolanadi.
 
 ## 6-sprint: to'lov, AI, pilot
 
 - M17 obuna to'lovi (Payme/Click), tarif limitlari, kechikkan to'lov siyosati (huquqiy tasdiqdan keyin).
+- M17 ichki admin panel (ADM-01, US-M17-04): tenantlar, obuna holati, to'lov tarixi, AI sarfi, faol kassalar; pilot do'konlar uchun muddatni qo'lda uzaytirish; `platform_admins` alohida autentifikatsiya, har kirish audit'da (`05-xavfsizlik-va-audit.md` §3.4).
 - AI-01 (savol-javob, whitelisted tool'lar) va AI-06 (qarz eslatma matni) — `07-ai-qatlami.md`; AI limiti va xarajat hisobi.
 - M10 davlat hisobotini solishtirish (fayl yuklash) + AI-05 tushuntirish + 5 kalendar kunlik taymer.
 - M09 yorliq chop etish; M18 ogohlantirishlar.

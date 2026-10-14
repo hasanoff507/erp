@@ -507,7 +507,7 @@ class PaymentAdapter(Protocol):
 
 **Yo'nalish va trigger**: chiquvchi, `outbox_jobs(kind=sms)`.
 
-**API holati**: **Tanlanmagan — ochiq savol.** Tadqiqot fayllarida (`spec/01-mahsulot/05-ai-funksiyalar.md`, 97-qator) aniq qayd etilgan: "14 MVP modul va integratsiyalar ro'yxatida SMS/messenjer gateway yo'q". O'zbekiston bozorida SMS gateway xizmatlari mavjudligi umumiy ma'lum, lekin **konkret provayder, narx va API tadqiqot fayllarida tasdiqlanmagan/tekshirilmagan** — shuning uchun bu yerda hech qanday nom "fakt" sifatida keltirilmaydi.
+**API holati**: **Tanlanmagan — ochiq savol.** Tadqiqot fayllarida SMS provayder tanlanmagan (`spec/01-mahsulot/05-ai-funksiyalar.md`, AI-06 "Kanal" bandi). O'zbekiston bozorida SMS gateway xizmatlari mavjudligi umumiy ma'lum, lekin **konkret provayder, narx va API tadqiqot fayllarida tasdiqlanmagan/tekshirilmagan** — shuning uchun bu yerda hech qanday nom "fakt" sifatida keltirilmaydi.
 
 **Adapter interfeysi** (provayder tanlanmaguncha umumiy):
 ```python

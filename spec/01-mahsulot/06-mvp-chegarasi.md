@@ -2,13 +2,13 @@
 
 ## Asosiy xulosalar
 
-1. **14 modulning (M01-M14) hammasi MVP chegarasida (Must)** — bu `spec/README.md` va `research_notes/texnik/00-xulosa-va-ochiq-savollar.md` (Asosiy xulosa #2) orqali allaqachon qabul qilingan qaror, bu hujjatda o'zgartirilmaydi. Har bir modulda kamida bitta Must-darajali foydalanuvchi hikoyasi bor.
+1. **18 modulning (M01-M18) hammasi MVP chegarasida** — M01-M14 `spec/README.md` va `research_notes/texnik/00-xulosa-va-ochiq-savollar.md` (Asosiy xulosa #2) orqali qabul qilingan, M15-M18 2026-10-14 da foydalanuvchi qarori bilan qo'shilgan (`07-tuzatishlar-va-yechimlar.md`, #12, #13, #15, #16). Har bir modulda kamida bitta Must-darajali hikoya bor; modul ichidagi ayrim hikoyalar Should/Could (1.1-jadval).
 2. **4 ta AI funksiya** (AI-01, AI-03, AI-05, AI-06) MVP ichida, lekin ularning o'zi Must emas — ular deterministik ("kod hisoblaydi") asosiy jarayonning ustiga qo'yilgan tushuntirish/matn qatlami, shuning uchun Should/Could darajasida (`spec/01-mahsulot/05-ai-funksiyalar.md`).
 3. **Won't ro'yxati** aniq: kadrlar/ish haqi, CRM/sodiqlik (shu jumladan M03'dagi loyallik bonusi), ishlab chiqarish, boshqa tizimlardan ma'lumot ko'chirish konnektorlari, 7 ta AI funksiya (AI-02, 04, 07-11) — barchasi tadqiqot bilan tasdiqlangan qarorlar (`spec/README.md`, `00-xulosa-va-ochiq-savollar.md`) *(2026-10-14: neytral ifodalandi — koordinator direktivasi)*.
 4. Raqobatchilardan eng aniq manbali farq — **AI funksiyasi**: tekshirilgan 9 mahsulotdan faqat 2 tasida (REGOS, Smartup) bor, qolgan 7 tasida rasmiy sahifada AI haqida da'vo yo'q (`research_notes/texnik/06-raqobatchilar-texnik-va-uskunalar.md`, 2-bo'lim).
 5. **Muvaffaqiyat o'lchovlarining aksariyati "taxmin"** — mahsulot hali ishga tushmagan, O'zbekiston SaaS bozorida churn/retention/pilot-konversiya bo'yicha ochiq ma'lumot yo'q (`research_notes/texnik/00-xulosa-va-ochiq-savollar.md`, 1.1-bo'lim, 4-band). Faqat offline-sync va fiskal muddatlar kabi **qonuniy majburiy** ko'rsatkichlar (masalan 48 soat) manbali.
 6. **Eng katta bloklovchi tashqi omillar** — barchasi tadqiqotning "Eng katta 5 texnik xavf" ro'yxatidan: Asl belgisi integrator API yopiq, my.soliq.uz rasmiy API yo'q, virtual kassa reyestr narxi/muddati noma'lum, ЗРУ-764 sertifikatlash noaniqligi, E-IMZO rasmiy dasturchi hujjati yo'q (`research_notes/texnik/00-xulosa-va-ochiq-savollar.md`, "Eng katta 5 texnik xavf" bo'limi).
-7. MoSCoW'dagi **hikoya darajasidagi** taqsimot (Must/Should/Could) — modul darajasidagi "14 modul MVP" qarorining ichidagi ustuvorlik — bu hujjatda **loyihaviy tavsiya** sifatida berilgan (jamoat tadqiqot fayllarida tayyor shaklda topilmagan), arxitektura/sprint rejalashtirish bosqichida qayta ko'rib chiqilishi mumkin.
+7. MoSCoW'dagi **hikoya darajasidagi** taqsimot (Must/Should/Could) — modul darajasidagi "18 modul MVP" qarorining ichidagi ustuvorlik — bu hujjatda **loyihaviy tavsiya** sifatida berilgan (jamoat tadqiqot fayllarida tayyor shaklda topilmagan), arxitektura/sprint rejalashtirish bosqichida qayta ko'rib chiqilishi mumkin.
 
 ---
 
@@ -16,7 +16,7 @@
 
 ### 1.1 Modullar va foydalanuvchi hikoyalari (US-Mxx-nn)
 
-Barcha 14 modul **Must** (MVP qarori, `spec/README.md`). Quyida har bir modulning hikoyalari (`spec/01-mahsulot/02-modullar-talablari.md`dan) ustuvorlik bo'yicha ajratilgan.
+Barcha 18 modul MVP ichida (MVP qarori, `spec/README.md`); har birida kamida bitta Must hikoya bor, qolganlari Should/Could. Quyida har bir modulning hikoyalari (`spec/01-mahsulot/02-modullar-talablari.md`dan) ustuvorlik bo'yicha ajratilgan.
 
 | Modul | Must | Should | Could |
 |---|---|---|---|
@@ -39,7 +39,7 @@ Barcha 14 modul **Must** (MVP qarori, `spec/README.md`). Quyida har bir modulnin
 | M17 Obuna va ro'yxatdan o'tish *(2026-10-14)* | US-M17-01 (ro'yxatdan o'tish + sinov), US-M17-02 (tarif va to'lov), US-M17-03 (kechikkan to'lov siyosati), US-M17-04 (ichki admin) | — | — |
 | M18 Bildirishnomalar / Telegram bot *(2026-10-14)* | US-M18-01 (ulash), US-M18-02 (kunlik hisobot) | US-M18-03 (ogohlantirishlar) | US-M18-04 (botda AI savol) |
 
-*Izoh: bu jadvaldagi Should/Could ajratmasi modulning MVP'da bo'lish-bo'lmasligiga ta'sir qilmaydi (hammasi MVP ichida) — faqat qaysi hikoya birinchi, qaysi biri ikkinchi navbatda qurilishini ko'rsatadi. Qabul mezoni ("Must ro'yxati 14 modulni qoplaydi") bajarilgan — jadvaldagi har bir modulda kamida bitta Must band bor.*
+*Izoh: bu jadvaldagi Should/Could ajratmasi modulning MVP'da bo'lish-bo'lmasligiga ta'sir qilmaydi (hammasi MVP ichida) — faqat qaysi hikoya birinchi, qaysi biri ikkinchi navbatda qurilishini ko'rsatadi. Qabul mezoni ("Must ro'yxati 18 modulni qoplaydi") bajarilgan — jadvaldagi har bir modulda kamida bitta Must band bor.*
 
 *US-M10-04 (aylanma solig'i solishtirish) va US-M07-04 (yetkazib beruvchiga to'lov) Must'ga ko'tarildi (dastlabki loyihada Should edi): (a) aylanma solig'i — maqsadli kichik do'konlarning qaysi ulushi QQS to'lovchi, qaysi ulushi aylanma solig'i to'lovchi ekani manbada aniqlanmagan (**taxmin/ochiq savol** — pastda), shuning uchun ikkisini ham Must deb olish xavfsizroq, aks holda aylanma solig'i to'lovchi mijozlar uchun markaziy qiymat taklifi ishlamay qoladi; (b) yetkazib beruvchiga to'lov — US-M10-03 (qizil faktura QQS krediti to'lovdan keyin) va US-M11-02 (oy yopish, Must) to'g'ridan-to'g'ri shu to'lov holatiga bog'liq, to'lovsiz bu ikkisi to'liq ishlay olmaydi.*
 
@@ -59,7 +59,7 @@ Barcha 14 modul **Must** (MVP qarori, `spec/README.md`). Quyida har bir modulnin
 
 | Band | Sabab/manba |
 |---|---|
-| Kadrlar/ish haqi moduli | MVP 14 modul ro'yxatida yo'q (`spec/README.md`); JShDS/ijtimoiy soliq hisobotini solishtirish shu sababli ham MVP'dan tashqari (`02-modullar-talablari.md`, M10 qamrov eslatmasi) |
+| Kadrlar/ish haqi moduli | MVP 18 modul ro'yxatida yo'q (`spec/README.md`; M15 faqat "ish haqi to'landi" summasini xarajat sifatida yozadi, ish haqi hisoblanmaydi); JShDS/ijtimoiy soliq hisobotini solishtirish shu sababli ham MVP'dan tashqari (`02-modullar-talablari.md`, M10 qamrov eslatmasi) |
 | CRM/sodiqlik (mijozlar bazasi, loyallik/bonus karta dasturi) | `00-xulosa-va-ochiq-savollar.md`, Asosiy xulosa #2; M03'dagi loyallik bonusi ham shu sababli olib tashlangan (`02-modullar-talablari.md`, M03) |
 | Ishlab chiqarish (retsept, ishlab chiqarish buyurtmasi) | `00-xulosa-va-ochiq-savollar.md`, Asosiy xulosa #2 |
 | Boshqa tizimlardan ma'lumot ko'chirish konnektorlari | MVP'dan tashqarida — AIOS noldan (from-scratch) qurilgan, mustaqil mahsulot; hech qanday tashqi buxgalteriya/ERP tizimi bilan integratsiya, migratsiya, import, eksport yoki sinxronizatsiya qilinmaydi va ular hech qachon ma'lumot manbai bo'lmaydi; mavjud tizimlar faqat ma'lumotlar modelini loyihalashda **struktura namunasi/benchmark** sifatida ishlatilgan (`01-erp-modullar-va-malumot-modeli.md`, 7-band; `spec/README.md`). Boshlang'ich ma'lumot kiritish (onboarding) faqat uch yo'l bilan: (1) qo'lda kiritish, (2) Excel/CSV shablon orqali import, (3) AI-03 yordamida qog'oz hujjat/fotosidan kiritish *(2026-10-14: aniqlashtirildi — koordinator direktivasi, `07-tuzatishlar-va-yechimlar.md`)* |

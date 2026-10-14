@@ -138,8 +138,13 @@ Quyidagi jadval `01-rollar-va-ssenariylar.md` (6-bo'lim) dagi K/Y/T matritsasi b
 | `settings.users` | ✓ | – | – | – | – |
 | `settings.branches` | ✓ | – | – | – | – |
 | `expenses.create` | ✓ | ✓ | – | – | ✓ (kiritish) |
+| `expenses.approve` | ✓ | – | – | – | – |
 | `cash.withdraw` | ✓ | ✓(limit) | ✓(limit, past) | – | – |
+| `cash.deposit` | ✓ | ✓ | ✓ | – | – |
+| `cash.count.shift` | – | ✓ | ✓ | – | – |
 | `billing.manage` | ✓ | – | – | – | – |
+| `notifications.manage` | ✓ | – | – | – | – |
+| `telegram.link` | ✓ | ✓ | – | – | – |
 
 *Izoh: kichik do'konda bir xodim bir nechta rolga ega bo'lishi mumkin (`memberships.role_ids[]`) — ruxsatlar jamlanadi, ziddiyatda yuqori huquq ustun bo'ladi (`02-modullar-talablari.md`, M13, chekka holat).*
 

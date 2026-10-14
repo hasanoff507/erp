@@ -94,7 +94,7 @@
 - **Chegaralar**: Risk balli qoidasi sodda (kechikkan kun/marta soni) bo'lishi kerak — murakkab ML skorlash tarixiy ma'lumot yetarli bo'lmagani uchun MVP'da yo'q. Xato narxi — past: eng yomon holatda matn uslubi noqulay chiqadi, lekin risk balli va summa har doim kod natijasi.
 - **Xavf va himoya**: Eslatma matni avtomatik yuborilishidan oldin Menejer/Kassir tasdig'idan o'tishi **majburiy** (Asosiy xulosa #3: AI hujjat/xabarni o'zi yubormaydi) — AI faqat loyiha matnini tayyorlaydi, yuborishni odam amalga oshiradi.
 - **Ulangan modul**: M08 (nasiya).
-- **Ochiq savol**: Eslatmani qaysi kanal (SMS, messenjer) orqali yuborish — 14 MVP modul va integratsiyalar ro'yxatida SMS/messenjer gateway yo'q (`spec/README.md`); MVP'da eslatma ekranda ko'rsatilishi (nusxalab yuborish) yoki alohida integratsiya kerakligi aniqlashtirilishi kerak.
+- **Kanal** *(2026-10-14: yangilandi)*: Telegram (M18, US-M08-08) va SMS (`02-arxitektura/03-integratsiyalar.md` §10) endi spec'da bor; MVP'da eslatma Telegram + ekranda ko'rsatish orqali, SMS provayder tanlangach qo'shiladi. **Ochiq savol**: SMS provayder va narxi tanlanmagan.
 - **Model/xarajat**: **Claude Haiku 5.5** ($0,10–0,50/$0,50–2,50, hajmga qarab) yoki Gemini 2.5 Flash-Lite ($0,10/$0,40) — oddiy matn generatsiyasi, eng arzon model yetarli *(2026-10-14: tuzatildi — avval Haiku 4.5 ($1/$5) ko'rsatilgan edi, endi legacy va qimmatroq)*.
 
 ### AI-07: POS/o'g'irlik anomaliya aniqlash (behavioral + video)
@@ -193,4 +193,4 @@ CLI+obuna adapteri faqat **ishlab chiqish/demo** muhitida ixtiyoriy qoladi (`fak
 - `research_notes/texnik/00-xulosa-va-ochiq-savollar.md` — markaziy oqim (davlat hisobotini solishtirish), Asl belgisi jarima xavfi, ochiq savollar.
 - `research_notes/texnik/03-efaktura-va-tolov.md` — e-faktura/e-TTN majburiyligi (qog'oz shakl faqat texnik uzilishda), ochiq banking holati (AI-03, AI-08 uchun).
 - `research_notes/AI ERP startap Ozbekistonda/05_ai_funksiyalar.md` — global ERP AI funksiyalari, "code computes, AI explains" tamoyili, Uzbek SME og'riq-feature jadvali.
-- `spec/README.md` — asosiy qarorlar (noldan qurilgan, tashqi buxgalteriya/ERP tizimiga bog'liq emas, 14 modul, davlat hisobotini solishtirish 5 kalendar kun).
+- `spec/README.md` — asosiy qarorlar (noldan qurilgan, tashqi buxgalteriya/ERP tizimiga bog'liq emas, 18 modul, davlat hisobotini solishtirish 5 kalendar kun).

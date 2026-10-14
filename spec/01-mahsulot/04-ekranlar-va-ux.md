@@ -5,7 +5,7 @@
 ## Asosiy xulosalar
 
 1. Ikki platforma: **Android-native POS** (asosan Kassir, qisman Omborchi — skanerlash vazifalari) va **back-office PWA** (Egasi, Menejer, Buxgalter, qisman Omborchi) — arxitektura qarori bo'yicha (`research_notes/texnik/04-arxitektura-va-stack.md`, 3-bo'lim).
-2. **Jami 28 ekran** (12 ta POS-nn, 16 ta BO-nn) — 14 MVP modulning har biri kamida bitta ekranga ega (pastdagi 3- va 4-bo'lim jadvallari); reviewdan keyin kiruvchi/chiquvchi e-faktura markazi (BO-15) va limitdan oshgan so'rovlar tasdiqlash navbati (BO-16) qo'shildi (7-band, quyida).
+2. **Jami 37 ekran** (15 ta POS-nn, 21 ta BO-nn, 1 ta ADM-nn) — 18 MVP modulning har biri kamida bitta ekranga ega *(2026-10-14: M15–M18 ekranlari qo'shilgach qayta sanaldi)* (pastdagi 3- va 4-bo'lim jadvallari); reviewdan keyin kiruvchi/chiquvchi e-faktura markazi (BO-15) va limitdan oshgan so'rovlar tasdiqlash navbati (BO-16) qo'shildi (7-band, quyida).
 3. **Offline indikatori majburiy va har bir POS ekranining status panelida bir xil joyda** turadi — offline holatda birinchi chek 48 soat ichida OFD'ga yetishi shart bo'lgani uchun (`research_notes/texnik/02-kassa-ofd-markirovka.md`, 1-bo'lim: 943-son qaror, 1-ilova, 31-band), kassir doim qancha chek sinxronlanmaganini va vaqt chegarasigacha necha soat qolganini ko'rishi kerak.
 4. **Bir qo'l bilan ishlash** — POS asosiy ekranlarida barcha harakat tugmalari ekranning pastki yarmida, katta (taxmin: kamida 56×56 dp) teginish maydoni bilan joylashtiriladi; raqamli summa kiritish va to'lov tasdiqlash bosh barmoq zonasida. Aniq o'lcham standarti manbada yo'q — **taxmin**.
 5. **Asl belgisi markirovkasi skanerlash xatosi — yuqori ehtimolli muammo**: manba (`research_notes/texnik/00-xulosa-va-ochiq-savollar.md`, 6-band) bu raqamni **yetkazib berish zanjiridagi yuklarning 80–90%i skanerlash xatosi bilan qaytishi** sifatida beradi (yuk/partiya darajasida — har bir kassadagi yakka skanerlash urinishining xato ehtimoli emas). Shunga qaramay, bu umumiy nosog'lom holatni ko'rsatadi, shuning uchun har bir skanerlash ekranida majburiy "qayta urinish" va eskalatsiya yo'li UX darajasida ko'zda tutiladi (1.7-bo'lim) — qo'lda **MXIK** (tovar klassifikator kodi) kiritish mumkin, lekin **DataMatrix (markirovka) kodini** qo'lda kiritish huquqiy/texnik jihatdan ruxsat etilganmi — **ochiq savol**.
@@ -466,7 +466,7 @@ tasdiqlaydi
 - `research_notes/texnik/03-efaktura-va-tolov.md` — Payme/Click/Uzum protokollari (onlayn tasdiq talabi), fiskal chekni kim chiqarishi ziddiyati (2.5-bo'lim), VM Qarori №830-son (e-faktura xavf-baholash)
 - `research_notes/texnik/04-arxitektura-va-stack.md` — Android POS / PWA platforma qarori, offline-first event-log, davlat hisobotini solishtirish oqimi (6-bo'lim), offlayn markirovka xavfi (10-bo'lim)
 - `research_notes/texnik/06-raqobatchilar-texnik-va-uskunalar.md` — skaner (USB HID keyboard-wedge), chek printeri (ESC/POS), tarozi protokoli noaniqligi
-- `research_notes/texnik/08-mahsulot-modullari.md` — 14 MVP modul ro'yxati
+- `research_notes/texnik/08-mahsulot-modullari.md` — dastlabki 14 MVP modul ro'yxati (tarixiy; 2026-10-14 dan 18 modul — `spec/README.md`, `02-modullar-talablari.md`)
 - `spec/README.md` — umumiy qoidalar va asosiy qarorlar
 - `spec/01-mahsulot/01-rollar-va-ssenariylar.md` — rollar, huquqlar matritsasi, limitdan oshganda Menejer tasdig'i
 - `spec/01-mahsulot/03-biznes-jarayonlar.md` — BP-01…BP-12, davlat tizimlari × jarayon matritsasi, BO-10'ning jarayon asosi

@@ -8,7 +8,7 @@
 4. Eng katta umumiy og'riq — **mavjud buxgalteriya/ERP tizimlarining narxi va murakkabligi** (litsenziya millionlab so'm, joriy etish narxi litsenziyadan oshishi mumkin, qo'shimcha foydalanuvchi uchun alohida to'lov) va **qog'oz/Excel/WhatsApp orqali qo'lda yuritiladigan hisob** (`research_notes/AI ERP startap Ozbekistonda/04_sohalar.md`) *(2026-10-14: neytral ifodalandi — koordinator direktivasi)*.
 5. Ikkinchi katta og'riq — **davlat tizimlaridagi texnik xatolar va jarima xavfi**: markirovkalangan yuklarning qabul qilinishida 80–90%i skanerlash xatosi bilan qaytadi — bu ko'rsatkich **bitta yirik ishlab chiqaruvchining tajribasi** (gazeta.uz, 2026-04-14), tizim bo'yicha umumiy statistika sifatida tasdiqlanmagan *(2026-10-14: tuzatildi)* (`research_notes/texnik/tekshiruv-2026-10-14/1-fiskal-kassa-markirovka.md`); jarima **birinchi buzilishda** choraklik aylanmaning 2%i, **takroriy buzilishda** 20%igacha *(2026-10-14: tuzatildi)*. Bu ayniqsa Omborchi (tovar qabulida) va Egasi (jarima javobgarligi) uchun kundalik xavf; kassada esa skanerlarning umuman ishlamay qolishi muammosi bor (11-fayl).
 6. 2026-yildan boshlangan yangi markaziy jarayon — davlat QQS, aylanma, mol-mulk, yer, JShDS va ijtimoiy soliq hisobotlarini **o'zi tuzadi** (Soliq kodeksi 81-moddasi, O'RQ-1108-son Qonun, 2025-12-25, 2026-01-01 dan kuchda — lex.uz/docs/-7944527), korxonaga **5 kalendar kun** (hisobot topshirish muddatidan kechiktirmay) ichida tuzatish kiritish imkoni beriladi; javobsiz qolsa, davlat shakllantirgan ko'rinishda topshirilgan hisoblanadi. **Foyda solig'i bu ro'yxatga kirmaydi** — u korxonaning o'z mas'uliyatida qoladi *(2026-10-14: tuzatildi — avval "5 ish kuni" va manba sifatida ikkinchi darajali OAV ko'rsatilgan edi; endi birlamchi qonun manbasi topildi)*. Bu **Buxgalter** rolining markaziy kundalik/haftalik vazifasiga aylanadi.
-7. Huquqlar matritsasi 14 modulning (M01–M14) barchasini qamrab oladi; har bir katakda rol shu modulda **ko'rish (K) / yaratish (Y) / tasdiqlash (T)** huquqlaridan qaysilariga ega ekani ko'rsatilgan.
+7. Huquqlar matritsasi 18 modulning (M01–M18) barchasini qamrab oladi *(2026-10-14: M15–M18 qo'shildi, `02-arxitektura/05-xavfsizlik-va-audit.md` §2 bilan izchil)*; har bir katakda rol shu modulda **ko'rish (K) / yaratish (Y) / tasdiqlash (T)** huquqlaridan qaysilariga ega ekani ko'rsatilgan.
 8. Rollar va ssenariylar bo'yicha raqamli ma'lumot (masalan aniq limit summalari, eslatma vaqti) tadqiqot fayllarida yo'q — bular **taxmin** deb belgilangan va "Ochiq savollar"da qayd etilgan; keyingi bosqichda biznes-qoida sifatida sozlanishi tavsiya etiladi.
 
 ---
@@ -213,8 +213,14 @@ Belgilar: **K** = ko'rish, **Y** = yaratish, **T** = tasdiqlash. "–" = huquq y
 | M12 Hisobotlar | K | K | K (faqat o'z smenasi) | K (faqat ombor) | Y, K |
 | M13 Huquqlar | Y, T | K | – | – | K |
 | M14 Filiallar | K, Y, T | K | – | K | K |
+| M15 Xarajatlar | K, Y, T | K, Y | – | – | K, Y |
+| M16 Kassa pul harakati | K, Y, T | K, Y, T | Y (K faqat o'z smenasi) | – | K |
+| M17 Obuna va ro'yxatdan o'tish | K, Y, T | – | – | – | – |
+| M18 Bildirishnomalar / Telegram | K, Y, T | K (o'z Telegram'ini ulash, Egasi ruxsati bilan) | – | – | – |
 
 *Izoh: jadvaldagi aniq huquq taqsimoti (masalan, Kassir M08'ga Y huquqiga ega) bozor/texnik tadqiqotda tayyor matritsa sifatida topilmagan — bu hujjat ERP ma'lumotlar modeli namunasi (`01-erp-modullar-va-malumot-modeli.md`) va modul funksiyalari (`08-mahsulot-modullari.md`) asosida, odatiy chakana savdo amaliyotidan kelib chiqib **loyihalashtirilgan**; MVP oldidan Egasi/arxitektor bilan tasdiqlanishi tavsiya etiladi (pastda, ochiq savol 1).*
+
+*M15–M18 izohi (2026-10-14): Kassir xarajatni faqat M16 "Pul olish → Xarajat to'lovi" orqali yozadi (M15'ga avtomatik tushadi); M17 `billing.manage` faqat Egasi; platforma admini (ADM-01, `platform.admin`) tenant rollariga kirmaydi — `05-xavfsizlik-va-audit.md` §3.4.*
 
 ---
 

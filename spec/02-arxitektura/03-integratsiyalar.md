@@ -487,7 +487,7 @@ class PaymentAdapter(Protocol):
 
 **Xato UX**:
 - Do'kon sotuvida: to'lov muvaffaqiyatsiz bo'lsa kassir boshqa usul (naqd/karta) taklif qiladi — sotuv to'xtamaydi.
-- Bizning billingda: to'lov o'tmasa — 7 kunlik ogohlantirish davridan keyin back-office **cheklangan rejimga** o'tadi, lekin **kassa va fiskal chek ishlashda davom etadi** (US-M17-03, huquqiy tasdiq kerak — ochiq savol).
+- Bizning billingda: to'lov o'tmasa — 24 soatlik imtiyozdan keyin (US-M17-03) back-office **cheklangan rejimga** o'tadi, lekin **kassa va fiskal chek ishlashda davom etadi** (US-M17-03, huquqiy tasdiq kerak — ochiq savol).
 
 **Offline**: yo'q — QR/karta to'lovi online amal; offline paytda faqat naqd/nasiya ishlaydi.
 

@@ -573,8 +573,12 @@ To'liq offline ishlaydi (M01 bilan bir xil append-only jurnal).
 - Given sinov tugayapti yoki Egasi "Tarif" ni ochadi, When Start / Biznes / Pro (`06-mvp-chegarasi.md`, 3.3) va oylik/yillik (−20%) tanlanadi, Then to'lov Click yoki Payme orqali amalga oshiriladi va obuna muddati uzayadi; to'lov uchun hujjat beriladi.
 - Tarif limitlari tizimda qo'llanadi: kassa soni, filiallar, AI oylik limiti.
 
-**US-M17-03**: Egasi sifatida to'lov kechiksa ham do'konim to'xtab qolmasligini istayman.
-- Given obuna muddati o'tdi, When 7 kunlik ogohlantirish davri tugaydi, Then back-office cheklangan rejimga o'tadi (yangi tovar, hisobotlar, AI yopiladi), lekin **kassa sotuvi va fiskal chek ishlashda davom etadi** — kassani to'xtatish do'konni fiskal qoidabuzarlikka olib kelishi mumkin (**taklif**, huquqiy tasdiq kerak — ochiq savol).
+**US-M17-03**: Egasi sifatida to'lov muddatini unutmasligim va muddat o'tsa ham darhol to'xtab qolmasligimni istayman *(2026-10-14: foydalanuvchi qarori — 24 soatlik imtiyoz)*.
+- **Eslatmalar (muddatdan oldin):** to'lov sanasidan **3 kun**, **1 kun** oldin va **to'lov kuni ertalab** — Egasiga Telegram (M18), ilova ichida banner va SMS (Telegram ulanmagan bo'lsa). Xabarda: summa, tarif, "To'lash" havolasi (Click/Payme).
+- **Muddat o'tganda — 24 soatlik imtiyoz:** Given to'lov muddati o'tdi va to'lov kelmadi, Then tenant `grace` holatiga o'tadi va **24 soat davomida hamma narsa odatdagidek ishlaydi**; barcha ekranlarda qizil banner: "Obuna muddati o'tdi. 24 soat ichida to'lang, aks holda imkoniyatlar cheklanadi" + qolgan vaqt hisoblagichi.
+- **Imtiyoz davomidagi eslatmalar:** muddat o'tishi bilan darhol, **12 soat qolganda** va **2 soat qolganda** — Telegram + banner + SMS.
+- **24 soat o'tgach:** Then tenant `restricted` holatiga o'tadi — back-office cheklanadi (yangi tovar, hisobotlar, AI yopiladi); **kassa sotuvi va fiskal chek ishlashda davom etadi** (kassani to'xtatish fiskal qoidabuzarlikka olib kelishi mumkin — **taklif**, huquqiy tasdiq kerak). Egasiga "Imkoniyatlar cheklandi" xabari.
+- To'lov kelishi bilan darhol `active` holatiga qaytadi va "To'lov qabul qilindi, rahmat" xabari ketadi.
 - Ma'lumotlarni eksport qilish (Excel) huquqi har doim saqlanadi.
 
 **US-M17-04**: Platforma admini sifatida (bizning jamoa) tenantlar, obunalar, to'lovlar va limitlarni ko'rishni istayman.
@@ -605,7 +609,7 @@ Ro'yxatdan o'tish va to'lov — faqat online. Kassa offline paytda obuna holatin
 - Given kun yopildi (yoki belgilangan soat keldi), Then bot yuboradi: bugungi savdo, sof foyda (M15 hisobga olingan), naqd (M16), yangi va qaytgan qarzlar, ertaga to'lashi kerak bo'lgan qarzdorlar (M08).
 
 **US-M18-03**: Egasi sifatida muhim hodisalar haqida darhol xabar olishni istayman.
-- Ogohlantirishlar (har birini yoqish/o'chirish mumkin): kam qolgan tovar (M04), smena kassa farqi (M16), limitdan katta qaytarish/chegirma (M02/M03), davlat hisobotidagi farq va **5 kalendar kunlik** muddat (M10), offline 48 soat chegarasiga yaqinlashish (M01), obuna to'lovi (M17).
+- Ogohlantirishlar (har birini yoqish/o'chirish mumkin): kam qolgan tovar (M04), smena kassa farqi (M16), limitdan katta qaytarish/chegirma (M02/M03), davlat hisobotidagi farq va **5 kalendar kunlik** muddat (M10), offline 48 soat chegarasiga yaqinlashish (M01), obuna to'lovi: muddatdan 3 kun va 1 kun oldin, to'lov kuni, muddat o'tganda va 24 soatlik imtiyozning 12 va 2 soati qolganda (M17, US-M17-03).
 
 **US-M18-04**: Egasi sifatida botdan oddiy savol so'rashni istayman.
 - Given bot ulangan, When Egasi "Bugun qancha sotdik?" deb yozadi, Then javob AI-01 orqali beriladi (raqamni kod hisoblaydi) va tarifning AI oylik limitidan hisoblanadi.

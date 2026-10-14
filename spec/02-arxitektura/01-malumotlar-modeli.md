@@ -119,7 +119,7 @@ Qo'shimcha: `expense_categories`, `recurring_expenses` (rule: summa, kun, davr),
 | Smena | `open` → `closing` (naqd sanalmoqda) → `closed` (Z-hisobot) |
 | E-faktura | `draft` → `signed` → `sent` → `accepted` / `rejected` / `cancelled`; xavf belgisi `green`/`red` (VM 830) |
 | Davlat hisoboti (`state_reports`) | `uploaded` → `compared` → `match` / `diff_found` → `correction_sent` / `auto_accepted` (5 kalendar kun o'tdi) |
-| Obuna | `trial` → `active` → `grace` (7 kun) → `restricted` (kassa ishlaydi) → `active` (to'lov) / `closed` |
+| Obuna | `trial` → `active` → `grace` (**24 soat**, eslatmalar: −3 kun, −1 kun, to'lov kuni, 0 / 12 / 2 soat qolganda) → `restricted` (kassa ishlaydi) → `active` (to'lov) / `closed` |
 | Integratsiya ishi (`outbox_jobs`) | `queued` → `running` → `done` / `retry` (backoff) → `failed` (qo'lda ko'rish) |
 
 ## 9. Fiskal, markirovka, e-hujjatlar, davlat hisoboti

@@ -17,13 +17,14 @@
 
 ## 1. `AiProvider` interfeysi
 
-Butun tizim AI bilan **bitta** portga murojaat qiladi — `AiProvider` (Python `Protocol`, `aios`dagi `ClaudePort`/`TextCompletionPort` naqshiga asoslangan, lekin ERP ehtiyojiga moslashtirilgan: raqamli tushuntirish, tuzilgan chiqish, vision). Uch metod:
+Butun tizim AI bilan **bitta** portga murojaat qiladi — `AiProvider` (Python `Protocol`, `aios`dagi `ClaudePort`/`TextCompletionPort` naqshiga asoslangan, lekin ERP ehtiyojiga moslashtirilgan: raqamli tushuntirish, tuzilgan chiqish, vision). To'rt metod: *(2026-10-14: tekshiruv — `submit_batch` qo'shildi)*
 
 | Metod | Imzo (konseptual) | Vazifa | Kim chaqiradi |
 |---|---|---|---|
 | `complete` | `complete(system, user, *, model=None, stream=False) -> str \| AsyncIterator[str]` | Erkin matn generatsiyasi (tushuntirish, eslatma matni); `stream=True` — AI-01 chat UI uchun token-oqim | AI-01, AI-06 |
 | `complete_structured` | `complete_structured(system, user, schema: BaseModel, *, model=None) -> BaseModel` | Tuzilgan JSON chiqish (Anthropic "structured outputs"/tool-use orqali) — javobni frontend to'g'ridan-to'g'ri render qiladi, erkin matnni parse qilish kerak emas | AI-05 (tafovut tushuntirish + manba hujjat ro'yxati), AI-01 (tool-chaqiruv formati) |
 | `vision_extract` | `vision_extract(image: bytes, schema: BaseModel, instructions, *, model=None) -> BaseModel` | Rasmdan tuzilgan maydon chiqarish, har maydon uchun ishonch (confidence) darajasi bilan | AI-03 (OCR) |
+| `submit_batch` | `submit_batch(items: list[AiBatchItem]) -> batch_id`; natija `get_batch_results(batch_id)` | Shoshilinch bo'lmagan so'rovlarni Batch API orqali (−50% narx); `FakeProvider`/`CliProvider`da oddiy `complete`ga tushadi | AI-05, AI-06 (MVP'dan keyin, ixtiyoriy) *(2026-10-14: tekshiruv)* |
 
 Qo'shimcha: har metod `AiRequestContext` (tenant_id, user_id, feature kodi `AI-01`…, til) qabul qiladi — bu `ai_requests` yozuviga va budjet/rate-limit tekshiruviga ishlatiladi (8-bo'lim). Xato holatlari bitta umumiy `AiProviderUnavailable` (yoki `aios`dagi `SourceUnavailable` naqshiga o'xshash) istisno orqali ko'tariladi — chaqiruvchi tomon (worker) buni "AI vaqtincha ishlamaydi" holatiga aylantiradi, foydalanuvchiga xato chiqmaydi, faqat AI javobi kutilmoqda/mavjud emas ko'rinadi.
 
@@ -110,7 +111,7 @@ Bu mexanizm AI-05 va AI-06 uchun ham xuddi shunday ishlaydi: ularda "tool natija
 - Joylashuv (tavsiya): `backend/ai/prompts/<feature_id>/v<N>/system.md` (masalan `backend/ai/prompts/ai01_qna/v3/system.md`), har versiyada o'zgarmas matn + o'zgaruvchi joylar uchun aniq belgilangan placeholder'lar (tenant nomi, tenant_glossary atamalari, joriy sana).
 - Har prompt versiyasi **eval suite'dan o'tgandan keyin** (10-bo'lim) productionga chiqadi — versiya raqami oshirilganda eski versiya kodda saqlanadi (A/B yoki tezkor rollback uchun), hech qachon joyida tahrirlanmaydi.
 - `tenant_glossary` (`01-malumotlar-modeli.md`, 10-bo'lim: "kola" → mahsulot kabi tenant-xos atamalar) promptning alohida, tez-tez o'zgaruvchi bo'lagi — prompt caching chegarasida **boshqa** segmentga joylashtiriladi (asosiy tizim prompti — statik, uzoq TTL keshlanadi; glossary — tenant-xos, qisqaroq keshlanadi) — xarajatni pasaytirish uchun (9-bo'lim).
-- **Ochiq savol/tavsiya**: joriy `ai_requests` jadvalida (`01-malumotlar-modeli.md`) `prompt_version` ustuni yo'q — qaysi prompt versiyasi javobni berganini audit qilish uchun bu ustunni qo'shish tavsiya etiladi; ma'lumotlar modeli jamoasi bilan kelishilishi kerak (bu hujjat boshqa faylni tahrirlamaydi).
+- `ai_requests.prompt_version` (`01-malumotlar-modeli.md` 10-bo'lim) — har javob qaysi prompt versiyasidan kelganini qayd etadi (format: `ai01_qna/v3`). *(2026-10-14: tekshiruv)*
 
 ---
 
@@ -133,11 +134,11 @@ Bu mexanizm AI-05 va AI-06 uchun ham xuddi shunday ishlaydi: ularda "tool natija
 
 ## 6. Xarajat hisobi (`ai_requests`, USD→UZS)
 
-Har AI chaqiruvi (`usage.py`dagi `AiCallUsage` naqshiga mos) quyidagicha `ai_requests`ga yoziladi (mavjud maydonlar: `tenant_id, user_id, feature, model, input_tokens, output_tokens, cost_usd, latency_ms, status`):
+Har AI chaqiruvi (`usage.py`dagi `AiCallUsage` naqshiga mos) quyidagicha `ai_requests`ga yoziladi (maydonlar `01-malumotlar-modeli.md` 10-bo'limda: `tenant_id, user_id, feature, model, prompt_version, input_tokens, output_tokens, cache_read_tokens, cost_usd, fx_rate_used, cost_uzs, latency_ms, guard_result, status`): *(2026-10-14: tekshiruv)*
 
 1. Claude API javobi `usage.input_tokens`, `usage.output_tokens` (va kesh bo'lsa `cache_read_input_tokens`/`cache_creation_input_tokens`) qaytaradi.
 2. `cost_usd = (input_tokens × price_in + output_tokens × price_out) / 1_000_000` — narx jadvali model nomiga qarab (2-bo'lim narxlari), kesh o'qish ~0,1×, kesh yozish ~1,25× kirish narxida hisoblanadi (`usage.py`dagi `_CACHE_READ_MULT`/`_CACHE_WRITE_MULT` konstantalariga mos nisbat).
-3. So'mga ko'rsatish uchun: `cost_uzs = cost_usd × FX_USD_UZS` (`FX_USD_UZS = 12 500`, **taxmin**, sozlanadigan konfiguratsiya — real vaqtda kursi o'zgarishi mumkin). **Tavsiya/ochiq savol**: `ai_requests`da `cost_uzs` ustuni yo'q — amalda `cost_usd` saqlanib, so'mga ko'rsatish hisobot darajasida joriy kurs bilan hisoblanishi mumkin, yoki tarixiy aniqlik uchun yozuv vaqtidagi kursni ham saqlash tavsiya etiladi (ma'lumotlar modeli jamoasi bilan kelishiladi).
+3. So'mga ko'rsatish uchun: `cost_uzs = cost_usd × FX_USD_UZS` (`FX_USD_UZS = 12 500`, **taxmin**, sozlanadigan konfiguratsiya — real vaqtda kursi o'zgarishi mumkin). Yozuv vaqtidagi kurs `fx_rate_used`, natija `cost_uzs` ustunida saqlanadi (tarixiy aniqlik). *(2026-10-14: tekshiruv)*
 4. Bir foydalanuvchi so'rovida bir nechta AI chaqiruvi bo'lsa (masalan AI-01'ning tool-tanlash + yakuniy javob, ikki chaqiruv) — `usage.py`dagi `TurnUsage` naqshiga mos, bitta "turn" ichida yig'iladi, lekin **har chaqiruv** alohida `ai_requests` qatori sifatida ham saqlanishi mumkin (audit uchun to'liqlik) — aniq granularlik backend arxitekturasi bosqichida (`09-backend-arxitekturasi.md`) belgilanadi.
 5. Platform admin paneli va tenant hisobotida (M12 ichida yoki alohida AI-xarajat widget) oylik AI xarajati (USD va so'm) ko'rinadi — bu bir vaqtning o'zida budjet sarfini kuzatish vositasi (5-bo'lim).
 
@@ -190,7 +191,7 @@ O'zbek tili uchun rasmiy LLM/OCR benchmark yo'qligi (`05-ai-funksiyalar.md`, Aso
 ## 9. Kelajakdagi fine-tuning uchun ma'lumot to'plash
 
 - **Opt-in, tenant darajasida** (`tenants.settings.ai_training_consent`, 7-bo'lim) — standart holatda **o'chiq**.
-- Rozilik berilgan tenantlar uchun: har `ai_feedback` yozuvi (ayniqsa foydalanuvchi tuzatgan javoblar — eng qiymatli signal) anonimlashtirish bosqichidan o'tadi (mijoz ismi/telefon/STIR kabi maydonlar olib tashlanadi yoki sintetik qiymat bilan almashtiriladi) va alohida saqlash joyiga (tavsiya: yangi jadval, masalan `ai_training_samples` — **hozircha ma'lumotlar modelida yo'q, kelajakdagi qo'shimcha**) ko'chiriladi.
+- Rozilik berilgan tenantlar uchun: har `ai_feedback` yozuvi (ayniqsa foydalanuvchi tuzatgan javoblar — eng qiymatli signal) anonimlashtirish bosqichidan o'tadi (mijoz ismi/telefon/STIR kabi maydonlar olib tashlanadi yoki sintetik qiymat bilan almashtiriladi) va alohida saqlash joyiga (`ai_training_samples`, `01-malumotlar-modeli.md` 10-bo'lim) ko'chiriladi. *(2026-10-14: tekshiruv)*
 - Yig'ilgan namunalar davriy ravishda (masalan choraklik) ko'rib chiqiladi/tasdiqlanadi (inson nazorati) va faqat shundan keyin markaziy GPU serverdagi fine-tuning jarayoniga kiritiladi — bu bosqich `05-ai-funksiyalar.md` 5-bo'limidagi "Lokal modelni o'zimiz o'qitish — hozir yo'q, keyin ko'rib chiqiladi" qarori bilan mos.
 - Maqsad — tor vazifalar (masalan tovar nomini toifaga ajratish, eslatma matnining tenant ohangiga moslashuvi), umumiy suhbat qobiliyatini almashtirish emas.
 
@@ -277,12 +278,11 @@ Oylik so'rovlar soni (taxmin, tarif profiliga mos: Start — AI-05/AI-03 odatda 
 ## Ochiq savollar
 
 1. Vision-LLM (AI-03) uchun aniq narx (rasm-boshiga yoki token-ekvivalenti) — rasmiy manbada yo'q (meros: `05-ai-funksiyalar.md`, Ochiq savol 1); 13-bo'limdagi hisob shu sababli taxmin.
-2. `ai_requests` jadvaliga `prompt_version` va (ixtiyoriy) `cost_uzs`/`fx_rate_used` ustunlarini qo'shish kerakligi — ma'lumotlar modeli jamoasi bilan kelishilishi kerak (4 va 8-bo'limlar).
-3. Oylik AI token budjeti qiymatlari (5-bo'lim jadvali) — taxmin, unit-iqtisod hisobi va pilot ma'lumoti bilan tasdiqlanishi shart.
-4. Limit tugagandan keyin "overage" (qo'shimcha to'lov bilan limitni oshirish) imkoniyati kerakmi — hal qilinmagan (5-bo'lim).
-5. LLM-judge uslub/tabiiylik bahosi uchun metodologiya (qaysi model, qaysi mezon) — aniqlashtirilmagan, pilotgacha ochiq (8.2-bo'lim).
-6. `ai_training_samples` jadvalining to'liq sxemasi (anonimlashtirish darajasi, saqlash muddati) — kelajakdagi ma'lumotlar modeli qo'shimchasi, bu hujjatda faqat tavsiya darajasida (9-bo'lim).
-7. Raqamli nazorat (numeric guard) ikki marta muvaffaqiyatsiz bo'lgan holatlarning tenant-ko'rinadigan chastotasi qanday bo'lishi — agar tez-tez bo'lsa, bu prompt/tool dizayni muammosini bildiradi; pilotda kuzatilishi kerak (3.2-bo'lim).
+2. Oylik AI token budjeti qiymatlari (5-bo'lim jadvali) — taxmin, unit-iqtisod hisobi va pilot ma'lumoti bilan tasdiqlanishi shart.
+3. Limit tugagandan keyin "overage" (qo'shimcha to'lov bilan limitni oshirish) imkoniyati kerakmi — hal qilinmagan (5-bo'lim).
+4. LLM-judge uslub/tabiiylik bahosi uchun metodologiya (qaysi model, qaysi mezon) — aniqlashtirilmagan, pilotgacha ochiq (8.2-bo'lim).
+5. `ai_training_samples` uchun saqlash muddati va anonimlashtirish darajasi (sxema 01'da bor) — aniqlanmagan (9-bo'lim). *(2026-10-14: tekshiruv)*
+6. Raqamli nazorat (numeric guard) ikki marta muvaffaqiyatsiz bo'lgan holatlarning tenant-ko'rinadigan chastotasi qanday bo'lishi — agar tez-tez bo'lsa, bu prompt/tool dizayni muammosini bildiradi; pilotda kuzatilishi kerak (3.2-bo'lim).
 
 ## Manbalar
 

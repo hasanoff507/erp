@@ -108,9 +108,9 @@ Qoidalar:
 
 ## 3. API qatlami
 
-- **Generatsiya:** FastAPI `/openapi.json` → **orval** (axios mutator bilan) → `@shared/api/generated` (funksiyalar) va `@shared/models/generated` (tiplar). `npm run api:gen` buyrug'i; CI'da sxema o'zgarsa generatsiya qayta tekshiriladi. Shu bilan backend va frontend tiplari doim mos.
-- **Instance** (namunadagi `_base` kabi): `withCredentials: true` (HttpOnly sessiya cookie), interceptorlar: CSRF tokeni (POST/PUT/PATCH/DELETE), `X-Tenant-Id` emas — tenant sessiyadan olinadi, `X-Branch-Id` (tanlangan filial), `Idempotency-Key` (barcha yozuvchi so'rovlarda — offline qayta yuborishda takror yozuvdan himoya), `Accept-Language`.
-- **Xatolar:** 401 → login; 403 → "huquq yo'q"; 409/422 → forma maydonlariga xato (zod bilan bir xil format); tarmoq xatosi → `$isOnline=false` va kassa offline rejimga o'tadi. Foydalanuvchiga xom JSON ko'rsatilmaydi — backend xato kodi i18n kalitiga tarjima qilinadi.
+- **Generatsiya:** FastAPI `/openapi.json` → **orval** (axios mutator bilan) → `@shared/api/generated` (funksiyalar) va `@shared/models/generated` (tiplar). `npm run api:gen` buyrug'i; CI'da sxema o'zgarsa generatsiya qayta tekshiriladi. Shu bilan backend va frontend tiplari doim mos. orval: `client: "axios-functions"`, `mode: "tags-split"`, `mutator` — umumiy axios instance; `override.operationName` `operation_id`dagi teg prefiksini olib tashlaydi (`debts_list_debtors` → `listDebtors`). `@shared/api/index.ts`: `export * as debts from "./generated/debts/debts";` — bundan `api.debts.listDebtors(...)` kelib chiqadi (qo'lda o'ram kodi yo'q, faqat ESM namespace re-export). *(2026-10-14: tekshiruv)*
+- **Instance** (namunadagi `_base` kabi): `withCredentials: true` (HttpOnly sessiya cookie), interceptorlar: CSRF tokeni (`GET /auth/csrf` dan, xotirada keshlanadi — namunadagi `getCsrfToken`) (POST/PUT/PATCH/DELETE), `X-Tenant-Id` emas — tenant sessiyadan olinadi, `X-Branch-Id` (tanlangan filial), `Idempotency-Key` (barcha yozuvchi so'rovlarda — offline qayta yuborishda takror yozuvdan himoya), `Accept-Language`. *(2026-10-14: tekshiruv)*
+- **Xatolar:** 401 → qayta autentifikatsiya oynasi (POS'da outbox/Dexie saqlanadi; to'liq logout faqat foydalanuvchi tanlovi bilan); 403 → "huquq yo'q"; 409/422 → forma maydonlariga xato (zod bilan bir xil format); tarmoq xatosi → `$isOnline=false` va kassa offline rejimga o'tadi. `409 IDEMPOTENCY_IN_PROGRESS` — forma xatosi emas: effekt `Retry-After`dan keyin xuddi shu kalit bilan avtomatik takrorlanadi (maks. 3 marta). `422 IDEMPOTENCY_KEY_REUSED` — dasturiy xato, Sentry'ga. Foydalanuvchiga xom JSON ko'rsatilmaydi — backend xato kodi i18n kalitiga tarjima qilinadi. *(2026-10-14: tekshiruv)*
 - Runtime konfiguratsiya: `window.__ERP_CONFIG__` (namunadagi `window.metadataApiConfig` kabi) — bitta build turli muhitlarda ishlaydi.
 
 ## 4. Kutubxonalar (qo'lda yozish o'rniga)
@@ -130,13 +130,14 @@ Qoidalar:
 | Raqam/pul formatlash | `Intl.NumberFormat("uz-UZ")` + kichik `formatMoney` | pul hisob-kitobi frontendda qilinmaydi — backend beradi |
 | Xabarlar (toast) | sonner (shadcn) | |
 | Grafiklar | recharts (shadcn charts) | dashboard, hisobotlar |
-| Sana tanlash | react-day-picker (shadcn calendar) | |
+| Sana tanlash | react-day-picker **^9.14** (shadcn calendar; v10 — `@daypicker/react`, v9 moslik API'lari olib tashlangan, alohida sinovdan keyin) | shadcn calendar `date-fns` ni tranzitiv olib keladi — UI formatlash baribir dayjs *(2026-10-14: tekshiruv)* |
+| UUIDv7 (`client_event_id`, lokal hujjat ID) | uuid (`v7()`, ≥10) | `crypto.randomUUID()` faqat v4 beradi — ishlatilmaydi *(2026-10-14: tekshiruv)* |
 | Buyruq paneli / tez qidiruv | cmdk (shadcn command) | kassada tovar qidiruvi |
 | Tarjima | i18next + react-i18next | uz (lotin) asosiy, ru |
 | Offline baza | Dexie (IndexedDB) | veb-kassa, outbox |
 | PWA / offline yuklash | vite-plugin-pwa (Workbox) | |
-| Shtrix-kod chizish | bwip-js (yoki JsBarcode) | yorliqlar, ichki kodlar |
-| Shtrix-kod skaner | keyboard-wedge: `onScan.js` (yoki kichik hook) | USB HID skanerlar klaviatura kabi |
+| Shtrix-kod chizish | bwip-js (MIT; EAN-13, Code128, GS1 DataMatrix — asosiy yorliq renderer) | yorliqlar, ichki kodlar *(2026-10-14: tekshiruv)* |
+| Shtrix-kod skaner | o'z kichik hook'i `useBarcodeWedge` (`shared/lib/scanner`: belgilar orasidagi interval < ~30 ms + Enter suffiksi, input fokusidan mustaqil) | onScan.js 2020 dan beri yangilanmagan — ishlatilmaydi *(2026-10-14: tekshiruv)* |
 | Kamera orqali skaner/foto | @zxing/browser | telefon kamerasi bilan kod o'qish; AI-03 foto |
 | Excel eksport/import | exceljs (yoki SheetJS) | boshlang'ich tovar/qarz importi (US-M04-04, US-M08-07) |
 | Chop etish (A4, yorliq) | react-to-print | chek printeri (ESC/POS) — `shared/lib/printer` adapteri, ochiq savol 2 |
@@ -147,14 +148,14 @@ Qoidalar:
 
 - Kassa sahifasi (`@pages/pos`) — to'liq ekran, klaviatura/skaner bilan ishlaydi (F-tugmalar, Enter, Esc), sichqonchasiz ham.
 - Ma'lumot manbai: Dexie'dagi lokal katalog (tovarlar, narxlar, mijozlar, qarzlar) — server bilan fon rejimida sinxronlanadi.
-- Har bir amal (chek, qaytarish, qarz, kassa pul harakati) — avval Dexie outbox'ga yoziladi, keyin serverga yuboriladi (`Idempotency-Key` = mahalliy event ID). Internet holati `$isOnline` da, UI'da doimiy ko'rsatkich.
-- Fiskal chek: veb-kassa uchun fiskal modul (virtual kassa) server orqali ishlaydi — offline paytda 48 soat qoidasi (`04-offline-sync.md`).
+- Har bir amal (chek, qaytarish, qarz, kassa pul harakati) — avval Dexie outbox'ga yoziladi, keyin serverga yuboriladi (har voqeada `client_event_id` (UUIDv7) — server `sync_receipts` bilan dedupe qiladi; POS hujjatlari uchun alohida REST endpoint yo'q). Internet holati `$isOnline` da, UI'da doimiy ko'rsatkich. *(2026-10-14: tekshiruv)*
+- Fiskal chek: veb-kassa uchun fiskal modul (virtual kassa) server orqali ishlaydi — offline paytda 48 soat qoidasi (`04-offline-sync.md`). Fiskal chek raqami (`receipt_seq`) qurilmada, outbox yozuvi bilan bir Web Lock ichida beriladi. *(2026-10-14: tekshiruv)*
 - Android POS (Kotlin) keyingi bosqichda xuddi shu backend API va sync protokolidan foydalanadi (`10-android-pos.md`).
 
 ## Ochiq savollar
 
-1. Brauzerdan chek printeriga (ESC/POS) chop etish usuli: WebUSB/Web Serial (faqat Chrome), mahalliy yordamchi dastur (masalan QZ Tray), yoki tizim printeri orqali — pilot uskunalarida sinab tanlanadi.
-2. Brauzer IndexedDB hajmi va tozalanishi (Safari/iOS cheklovlari) — veb-kassa uchun qo'llab-quvvatlanadigan brauzerlar ro'yxati (taklif: Chrome/Edge, Android Chrome).
+1. Chromium-only sababli WebUSB/Web Serial asosiy yo'l; QZ Tray/tizim printeri — zaxira. Pilot uskunasida sinab tasdiqlanadi. *(2026-10-14: tekshiruv)*
+2. **Veb-kassa faqat Chromium**: Chrome/Edge (desktop) va Android Chrome, o'rnatilgan PWA sifatida; ishga tushganda `navigator.storage.persist()` so'raladi. Safari/iOS veb-kassa uchun qo'llab-quvvatlanmaydi (IndexedDB tozalanish xavfi, WebUSB/Web Serial yo'q). Back-office — barcha zamonaviy brauzerlar. *(2026-10-14: tekshiruv)*
 3. orval vs openapi-typescript + openapi-fetch — birinchi sprintda sinab tanlanadi (orval axios bilan namunaga yaqinroq).
 
 ## Manbalar

@@ -86,7 +86,7 @@ class FiscalAdapter(Protocol):
 
 **Xato UX**: kassir chekni normal chop etadi/ko'rsatadi ("offline" belgisi bilan) — **sotuv to'xtamaydi**. Fiskal modul texnik xatosi huquqiy javobgarlik keltirishi mumkin (`11-raqobatchilar-kamchiliklari.md`), shuning uchun xato faqat orqa fonda, foydalanuvchiga bloklovchi xato ko'rsatilmaydi.
 
-**Offline**: to'liq qo'llab-quvvatlanadi — bu integratsiyaning asosiy loyihalash sharti (`00-umumiy-arxitektura.md`, append-only event-log). Offline chek `fiscal_pending`, `offline_since` belgilanadi; internet qaytganda worker avtomatik yuboradi.
+**Offline**: to'liq qo'llab-quvvatlanadi — bu integratsiyaning asosiy loyihalash sharti (`00-umumiy-arxitektura.md`, append-only event-log). Offline chek `fiscal_receipts.status=pending`, `offline_since` belgilanadi; internet qaytganda worker avtomatik yuboradi.
 
 **SLA**: **48 soat** (VMQ-943, 1-ilova, 31-band, [lex.uz/docs/4603329](https://lex.uz/docs/4603329)) — birlamchi manbadan tasdiqlangan.
 
@@ -108,9 +108,9 @@ sequenceDiagram
     participant OFD as OFD ("Yangi texnologiyalar" DUK)
 
     POS->>POS: Lokal yozuv (Dexie/IndexedDB), client_event_id yaratiladi
-    POS->>API: POST /sales (Idempotency-Key = client_event_id)
+    POS->>API: POST /sync/push {events:[sale.created]}
     API->>DB: Hujjat + registrlar + provodka (1 tranzaksiya) + outbox_jobs(kind=ofd_send, status=queued)
-    API-->>POS: 201 Created (sale_id, status=fiscal_pending)
+    API-->>POS: results:[{status: accepted, server:{id, number}}] (fiscal_receipts.status=pending)
     API->>Q: enqueue ofd_send
 
     alt Internet bor
@@ -119,13 +119,13 @@ sequenceDiagram
         alt OFD tasdiqladi
             OFD-->>W: fiscal_sign, qr_url
             W->>DB: fiscal_receipts.status=fiscalized, outbox_jobs.status=done
-            W-->>POS: fiskal belgi/QR (poll yoki websocket)
+            Note over DB,POS: fiskal belgi/QR keyingi GET /sync/pull'da
         else Xato/vaqt tugadi
             OFD--xW: timeout/5xx
             W->>DB: outbox_jobs.status=retry, attempts+=1, next_run_at=+backoff
         end
     else Internet yo'q
-        Note over POS,DB: Chek offline: fiscal_pending, offline_since=now()
+        Note over POS,DB: Chek offline: fiscal_receipts.status=pending, offline_since=now()
         Note over Q,W: Internet qaytganda worker ishga tushadi;<br/>44–48 soat oralig'ida ogohlantirish kuchayadi (M18)
     end
 ```
@@ -232,7 +232,7 @@ class ETtnAdapter(Protocol):
 
 **Offline**: yo'q (ofis/ombor sharoitida).
 
-**SLA**: aniq muddat topilmadi; 5 yil saqlash talabi (tasdiqlanmagan).
+**SLA**: aniq muddat topilmadi; 5 yil saqlash (buxgalteriya hujjati sifatida — O'RQ-404, 29-modda). *(2026-10-14: tekshiruv)*
 
 **Xavfsizlik/Monitoring**: e-faktura bilan bir xil kanal/kredensial.
 
@@ -262,13 +262,13 @@ class MarkingAdapter(Protocol):
 
 **Idempotentlik kaliti**: `code` (DataMatrix, global noyob) + `doc_id` — bir xil kod bitta hujjatga ikki marta "chiqarilmaydi".
 
-**Qayta urinish/backoff**: `verify` — sinxron, foydalanuvchi kutadi, **retry yo'q** (darhol natija kerak, kassir kutib turolmaydi, `base=yo'q, max_attempts=1-2, timeout=3s`); `sell`/`return`/`transfer` (yakuniy "chiqarish" qaydi) — asinxron outbox, `base=1 daqiqa, cap=30 daqiqa, max_attempts` — ko'chirish uchun **72 soat** oynasida.
+**Qayta urinish/backoff**: `verify` — sinxron, foydalanuvchi kutadi, **retry yo'q** (darhol natija kerak, kassir kutib turolmaydi, `base=yo'q, max_attempts=1-2, timeout=3s`); `sell`/`return`/`transfer` (yakuniy "chiqarish" qaydi) — asinxron outbox, `base=1 daqiqa, cap=30 daqiqa, max_attempts` — ko'chirish uchun **72 soat** oynasida (pilot normasi, ichki siyosat sifatida qabul qilindi). *(2026-10-14: tekshiruv)*
 
 **Xato UX**: `verify` muvaffaqiyatsiz (noto'g'ri/takroriy/muddati o'tgan kod) — MVP standart siyosat **sotuvni rad etish** (kassir markirovkasiz tovar bilan davom etishi/almashtirishi mumkin) — bu **taxmin**, rasmiy talab tasdiqlanmagan (`spec/01-mahsulot/02-modullar-talablari.md`, US-M01-03).
 
 **Offline**: **ishlay olmaydi** — CRPT markaziy tizimga real-time bog'liq. Internetsiz do'konda markirovkalangan tovar sotish siyosati (ruxsat/taqiq) **ochiq savol**; taqiq bo'lsa jarima xavfi (aylanmaning 2–20%i, `00-xulosa-va-ochiq-savollar.md`, bonus-xavf).
 
-**SLA**: ko'chirish **72 soat** (23-son qaror, 2026-01-23); 2026-07-01'dan elektron hisob-fakturada kod avtomatik tekshirish va kassada avtomatik kiritish majburiy.
+**SLA**: ko'chirish **72 soat** — faqat tajriba loyihasi ishtirokchilari uchun (VMQ 23-son, 23.01.2026, 1-ilova Nizom; hozircha o'simlik yog'i pilot loyihasi), umumiy majburiy muddat sifatida tasdiqlanmagan; 2026-07-01'dan elektron hisob-fakturada kod avtomatik tekshirish va kassada avtomatik kiritish majburiy. *(2026-10-14: tekshiruv)*
 
 **Xavfsizlik**: CRPT integratsiya shartnomasi/kaliti (agar bo'lsa) tenant emas, **platforma darajasida** shifrlangan saqlanadi (bizning yagona integratsiya shartnomamiz — barcha tenantlar shu orqali ishlaydi).
 
@@ -288,7 +288,8 @@ sequenceDiagram
     participant CRPT as CRPT Turon (Asl belgisi)
 
     K->>K: DataMatrix kodni skanerlaydi
-    K->>API: POST /sales/lines (marking_code bilan)
+    K->>API: POST /marking/verify {code}
+    Note over K,API: (faqat tekshiruv, hech narsa yozmaydi; savatcha lokal)
     alt Internet bor
         API->>CRPT: verify_code(code) — sinxron, qisqa timeout
         alt Kod yaroqli
@@ -454,9 +455,9 @@ class StateReportAdapter(Protocol):
 
 ---
 
-## 9. Click, Payme, Uzum — do'kon QR to'lovlari VA bizning obuna billing'imiz (M17)
+## 9. Click, Payme, Uzum, UzQR — do'kon QR to'lovlari VA bizning obuna billing'imiz (M17)
 
-**Maqsad va modullar**: (a) mijozning do'konga QR/ilova orqali to'lovi (M01, to'lov turi `click`/`payme`/`uzum`), **2026-07-01'dan to'liq majburiy** (PF-246-son); (b) bizning platformamizning obuna to'lovi — do'kon Egasi bizga oylik/yillik to'laydi (M17, `billing_payments`).
+**Maqsad va modullar**: (a) mijozning do'konga to'lovi (M01, to'lov turi `click`/`payme`/`uzum` — **ixtiyoriy kanallar**). Alohida: 2026-07-01'dan barcha savdo va xizmat ko'rsatuvchi **yuridik shaxslar** uchun banklarda generatsiya qilingan **yagona QR kod** (UzQR) orqali to'lov qabul qilish ham majburiy, undan foydalanmaslik savdo qoidalarini buzish hisoblanadi (PF-246-son, 10.12.2025, 3-band "b"); PF-246 Click/Payme/Uzum'ni nomma-nom majburiy qilmaydi, YTT'lar bu bandda tilga olinmagan (9.1-bo'lim); (b) bizning platformamizning obuna to'lovi — do'kon Egasi bizga oylik/yillik to'laydi (M17, `billing_payments`). *(2026-10-14: tekshiruv)*
 
 **Muhim ajratish**: bular **ikki butunlay alohida merchant hisobi**: (a) — har bir tenant (do'kon) **o'z** Click/Payme/Uzum merchant hisobiga ega (tenant kredensiali); (b) — **bizning** kompaniyamizning bitta umumiy merchant hisobi (platforma kredensiali). Adapter interfeysi bir xil, lekin konfiguratsiya kontekst (`tenant` vs `platform`) orqali ajratiladi.
 
@@ -465,7 +466,7 @@ class StateReportAdapter(Protocol):
 **API holati**:
 - **Payme**: rasmiy hujjat (`developer.help.paycom.uz`), protokol JSON-RPC uslubida (rasmiy hujjat "2.0" deb atamaydi), metodlar `CheckPerformTransaction/CreateTransaction/PerformTransaction/CancelTransaction/CheckTransaction/GetStatement/SetFiscalData`. **Sandbox bor**: `test.paycom.uz`. Komissiya: 1–2% (kanalga qarab).
 - **Click**: REST + MD5 imzo, ikki bosqichli Prepare/Complete ("Shop API"). Rasmiy sandbox hujjati **topilmadi**. Komissiya: 1–5% (kanal/karta turiga qarab, `business.click.uz`).
-- **Uzum**: dasturchi portali bor (`developer.uzumbank.uz`), protokol aralash (OpenAPI + ba'zi qismda JSON-RPC), to'liq aniqlanmagan. Sandbox **topilmadi**. Komissiya: Uzum karta 0%, boshqa karta 0,4%.
+- **Uzum**: dasturchi portali bor (`developer.uzumbank.uz`), protokol aralash (OpenAPI + ba'zi qismda JSON-RPC), to'liq aniqlanmagan. Test muhiti: **Uzum Checkout** uchun rasmiy test muhiti va test kartalari bor (HUMO/UzCard, 3-DS 777777; API kalit Uzum tomonidan beriladi — developer.uzumbank.uz/checkout, "Тестирование"); **Merchant API** (ilova orqali, vebxuk) hujjatida sandbox ko'rsatilmagan — Uzum menejeridan so'raladi. Komissiya: Uzum karta 0%, boshqa karta 0,4%. *(2026-10-14: tekshiruv)*
 - Uchtasida ham **fiskal chekni kim chiqarishi** (to'lov tizimi "komissioner" sifatida, yoki merchant o'zi) huquqiy jihatdan ziddiyatli — ikki talqin bor (`03-efaktura-va-tolov.md`, 2.5-bo'lim). AIOS bu ikkisini ham zahira sifatida qo'llab-quvvatlashi kerak (konfiguratsiya bilan).
 
 **Adapter interfeysi**:
@@ -491,13 +492,47 @@ class PaymentAdapter(Protocol):
 
 **Offline**: yo'q — QR/karta to'lovi online amal; offline paytda faqat naqd/nasiya ishlaydi.
 
-**SLA**: QR to'lov qabul qilish 2026-07-01'dan to'liq majburiy (PF-246-son) — bu "muddat" emas, "doimiy majburiyat" boshlanish sanasi.
+**SLA**: yagona (bank) QR kod orqali to'lov qabul qilish yuridik shaxslar uchun 2026-07-01'dan majburiy (PF-246-son, 3-band "b") — bu "muddat" emas, "doimiy majburiyat" boshlanish sanasi. *(2026-10-14: tekshiruv)*
 
 **Xavfsizlik**: har tenant o'z Click/Payme/Uzum `merchant_id`/`secret_key`ni shifrlangan saqlaydi (`tenant_secrets`); bizning platforma kaliti alohida, yuqori maxfiylik darajasida (faqat billing worker'ga ko'rinadi). Webhook imzosi (Click MD5, Payme Basic Auth) har safar tekshiriladi — soxta webhook rad etiladi.
 
 **Monitoring**: BO-14 (do'kon darajasida — qaysi to'lov usuli ulangan) + ADM-01 (platforma darajasida — bizning billing holati, muvaffaqiyatsiz to'lovlar).
 
 **MVP bosqichi**: MVP — majburiy ikkisi uchun ham (do'kon QR to'lovi va bizning billing). **Zaxira yo'l**: Click sandbox topilmasa — birinchi navbatda Payme (sandbox tasdiqlangan) bilan boshlash, Click/Uzum'ni parallel ravishda merchant hisobi ochib sinov qilish.
+
+### 9.1 UzQR (bank yagona QR) *(2026-10-14: tekshiruv)*
+
+**Maqsad va modullar**: 2026-07-01'dan barcha savdo va xizmat ko'rsatuvchi **yuridik shaxslar** uchun banklarda generatsiya qilingan yagona QR kod (UzQR) orqali to'lov qabul qilish majburiy (PF-246-son, 10.12.2025, 3-band "b", [lex.uz/uz/docs/-7897630](https://lex.uz/uz/docs/-7897630)); YTT'lar uchun ixtiyoriy (PF-246 3-band "b" faqat yuridik shaxslarni nomlaydi). Yagona QR Click/Payme/Uzum'ning o'rnini bosmaydi — ular ixtiyoriy kanal sifatida qoladi ("ham majburiy"). M01, `sale_payments.method=uzqr`.
+
+**Yo'nalish va trigger**: chiquvchi (checkout/QR generatsiyasi — statik yoki dinamik) + kiruvchi (bank tasdig'i — webhook yoki poll, aniqlanmagan).
+
+**API holati**: **Ochiq savol (tasdiqlanmagan)**: UzQR'ni banklar qanday API/vebxuk orqali tasdiqlashi va Markaziy bank yagona QR standarti texnik hujjati — bu tekshiruvda topilmadi. PF-246 faqat majburiyatni belgilaydi, texnik protokolni emas (Ochiq savollar, 13-band).
+
+**Adapter interfeysi** (Click/Payme/Uzum adapteri bilan bir xil shaklda, kontekst `uzqr`):
+```python
+class UzqrAdapter(Protocol):
+    async def create_checkout(self, amount: Money, order_id: str, qr_type: Literal["static", "dynamic"]) -> CheckoutResult: ...
+    async def handle_webhook(self, payload: dict, headers: dict) -> WebhookResult: ...
+    async def check_transaction(self, provider_tx_id: str) -> TransactionStatus: ...
+```
+
+**Ma'lumot moslashtirish**: `sale_payments(method: ...`uzqr`..., qr_type: `static`/`dynamic`/null)` — `uzqr` = bank tomonidan generatsiya qilingan yagona QR (`01-malumotlar-modeli.md`).
+
+**Idempotentlik kaliti**: `provider_tx_id` — Click/Payme/Uzum bilan bir xil naqsh.
+
+**Qayta urinish/backoff**: checkout yaratish — foydalanuvchi kutadi, retry yo'q; webhook — Click/Payme/Uzum bilan bir xil (yuqoridagi asosiy bo'lim).
+
+**Xato UX**: bank tasdig'i kelmay qolsa (internet uzilishi yoki to'lov kechikishi) — chek "to'lov kutilmoqda" holatida qoladi, kassir boshqa to'lov usuliga o'tishi yoki bekor qilishi mumkin; ikki marta to'lov tushishining oldini olish uchun `provider_tx_id` bo'yicha idempotentlik.
+
+**Offline**: yo'q — bank QR online amal; offline paytda faqat naqd/nasiya ishlaydi.
+
+**SLA**: yuridik shaxslar uchun 2026-07-01'dan majburiy (PF-246-son, 3-band "b").
+
+**Xavfsizlik**: filial/tenant darajasida bank tomonidan berilgan QR rekvizitlari shifrlangan saqlanadi (`tenant_secrets`, Click/Payme bilan bir xil naqsh).
+
+**Monitoring**: BO-14, Click/Payme/Uzum bilan bitta qatorda.
+
+**MVP bosqichi**: MVP — yuridik shaxslar uchun majburiy. **Zaxira yo'l**: texnik protokol aniqlanmaguncha — statik QR (bosma) bilan boshlash, dinamik (summaga mos) QR keyinroq.
 
 ---
 
@@ -622,13 +657,14 @@ class AiProvider(Protocol):
 | my.soliq.uz (davlat hisobotlari) | Yo'q — API umuman topilmadi | Yo'q | API mavjudligi, yarim-rasmiy yo'l (E-IMZO orqali?) | **Xat 1** |
 | Payme | **Bor** — `test.paycom.uz`, TEST_KEY | ✅ Bor | Prod merchant hisobi (har tenant + platforma) | — (merchant.payme.uz orqali o'z-o'zidan) |
 | Click | Topilmadi — rasmiy sandbox hujjati yo'q | Noma'lum | Sandbox mavjudligi, rasmiy tasdiq | Yangi so'rov/xat kerak |
-| Uzum | Topilmadi | Noma'lum | Sandbox, aniq protokol (OpenAPI/JSON-RPC) | Yangi so'rov/xat kerak |
+| Uzum | Qisman — Uzum Checkout test muhiti tasdiqlandi, Merchant API sandbox yo'q | ✅ (Uzum Checkout) / ❌ (Merchant API) | Merchant API sandbox, aniq protokol (OpenAPI/JSON-RPC) | Yangi so'rov/xat kerak |
+| UzQR (bank yagona QR) | Yo'q — texnik protokol aniqlanmagan | Topilmadi | Bank API/vebxuk formati, Markaziy bank yagona QR standarti hujjati | Yangi xat kerak — hali yozilmagan |
 | SMS provayder | Tanlanmagan | — | Provayder tanlovi (narx, API, OTP tezligi) | Ochiq savol — tadqiqotda yo'q |
 | Telegram Bot API | **Bor** — ochiq, token bilan bepul | ✅ (cheklovsiz) | — | — |
 | Claude API | **Bor** — tijorat shartlari, API kalit mavjud | ✅ | Tenant limit/xarajat siyosati (`07-ai-qatlami.md`) | — |
 | Kiberxavfsizlik sertifikatlash (ЗРУ-764) | Majburiyligi noaniq — integratsiya emas, lekin loyiha jadvaliga ta'sir qiladi | — | Oddiy SaaS ERP'ga tegishliligi | **Xat 3** (csec.uz) |
 
-**Jami**: 16 band ichidan **5 tasida** (E-IMZO, MXIK, Payme, Telegram, Claude API) ishlaydigan test/prod kirish bor; qolgan 11 tasida yo'q yoki noma'lum. Uch rasmiy xat loyihasi (`12-taxminlar-va-murojaatlar.md`) mavjud — Didox, Faktura.uz, Vakolat.uz, Click, Uzum uchun **yangi xat loyihalari hali yozilmagan**, bu o'zi ochiq ish sifatida qayd etiladi.
+**Jami**: 17 band ichidan **5 tasida to'liq** (E-IMZO, MXIK, Payme, Telegram, Claude API) va **1 tasida qisman** (Uzum — Checkout test muhiti bor, Merchant API yo'q) ishlaydigan test/prod kirish bor; qolgan 11 tasida (shu jumladan UzQR) yo'q yoki noma'lum. Uch rasmiy xat loyihasi (`12-taxminlar-va-murojaatlar.md`) mavjud — Didox, Faktura.uz, Vakolat.uz, Click, Uzum (Merchant API) va UzQR uchun **yangi xat loyihalari hali yozilmagan**, bu o'zi ochiq ish sifatida qayd etiladi. *(2026-10-14: tekshiruv)*
 
 ---
 
@@ -665,6 +701,7 @@ Tanlov mezoni: (a) ochiq/tasdiqlangan API/sandbox birinchi, (b) qonuniy SLA bosi
 10. `outbox_jobs.kind` ro'yxatini bu hujjatda ko'rsatilgan qo'shimcha qiymatlar (`einvoice_accept`, `ettn_send`, `marking_verify` va h.k.) bilan kengaytirish — `01-malumotlar-modeli.md`ga tegishli, ushbu fayl faqat talabni qayd etadi.
 11. Davlat xavf-baholash natijasi (yashil/qizil belgi, VM 830) AIOS'ga qaysi kanal orqali (operator maydon sifatida, yoki alohida so'rov) yetib kelishi — aniqlashtirish kerak.
 12. Bizning billing (M17) uchun Click/Uzum sandbox topilmaguncha, test rejimi qanday simulyatsiya qilinadi (masalan qo'lda "to'landi" belgilash) — implementatsiya bosqichida hal qilinadi.
+13. UzQR'ni banklar qanday API/vebxuk orqali tasdiqlashi va Markaziy bank yagona QR standarti texnik hujjati — bu tekshiruvda topilmadi (9.1-bo'lim). *(2026-10-14: tekshiruv)*
 
 ## Manbalar
 
@@ -681,7 +718,7 @@ Tanlov mezoni: (a) ochiq/tasdiqlangan API/sandbox birinchi, (b) qonuniy SLA bosi
 - [lex.uz/docs/8012407](https://www.lex.uz/docs/8012407) — 23-son qaror (markirovka, 72 soat)
 - [lex.uz/docs/-7962143](https://lex.uz/docs/-7962143) — VM 830-son (e-faktura xavf-baholash)
 - [lex.uz/docs/-7944527](https://lex.uz/docs/-7944527) — O'RQ-1108-son (davlat hisobotlari, 5 kalendar kun)
-- [lex.uz/uz/docs/-7897630](https://lex.uz/uz/docs/-7897630) — PF-246-son (QR to'lov majburiyligi)
+- [lex.uz/uz/docs/-7897630](https://lex.uz/uz/docs/-7897630) — PF-246-son (yagona QR kod orqali to'lov qabul qilish majburiyligi, yuridik shaxslar) *(2026-10-14: tekshiruv)*
 - [lex.uz/docs/-6234904](https://lex.uz/docs/-6234904) — O'RQ-793-son (E-IMZO qonuni)
 - [api.faktura.uz/help/](https://api.faktura.uz/help/), [developer.help.paycom.uz](https://developer.help.paycom.uz/), [docs.click.uz](https://docs.click.uz/), [developer.uzumbank.uz](https://developer.uzumbank.uz/en/)
 - [github.com/qo0p/e-imzo-doc](https://github.com/qo0p/e-imzo-doc), [tasnif.soliq.uz](https://tasnif.soliq.uz/)

@@ -158,6 +158,7 @@ flowchart TD
 | Naqd | Kassir | M01 | Fiskal chek | Virtual kassa/OFD | Kassadagi naqd pul ortadi |
 | Karta | Kassir | M01 | Terminal cheki + fiskal chek | Virtual kassa/OFD (acquiring bank orqali) | Bank hisobidagi mablag' ortadi (kechikish muddati manbada ko'rsatilmagan — taxmin qilinmaydi) |
 | QR/Click/Payme | Kassir/mijoz | M01 | To'lov tasdiqlash + fiskal chek | Virtual kassa/OFD, (Click/Payme/Uzum API) | Mablag' vositachi orqali tushadi, komissiya ushlab qolinadi |
+| *(2026-10-14: tekshiruv)* Yagona QR (UzQR, bank) | Kassir/mijoz | M01 | To'lov tasdiqlash + fiskal chek | Virtual kassa/OFD, bank (yagona QR) | Mablag' bank orqali tushadi; yuridik shaxslar uchun 2026-07-01'dan majburiy (PF-246-son, 3-band "b"), YTT uchun ixtiyoriy, Click/Payme/Uzum'ning o'rnini bosmaydi |
 
 Manba: `03-efaktura-va-tolov.md` (Payme/Click/Uzum protokollari, komissiya jadvali, 2.5-band — chekni kim chiqarishi haqidagi huquqiy ziddiyat). *Ochiq savol: QR/Click/Payme orqali to'lovda fiskal chekni to'lov tizimi yoki merchant kassasi chiqarishi — ikki huquqiy talqin mavjud, aniqlashtirish kerak (quyidagi "Ochiq savollar"ga qarang).*
 

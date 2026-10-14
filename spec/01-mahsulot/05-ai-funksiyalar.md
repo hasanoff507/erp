@@ -2,7 +2,7 @@
 
 ## Asosiy xulosalar
 
-1. MVP uchun **4 ta AI funksiya real**: AI-01 (umumiy biznes savol-javob chat, "bugun qancha foyda?"), AI-03 (qog'oz faktura/yuk xati fotosidan OCR, pilot bilan, torroq qamrovda — 2-band), AI-05 (davlat hisoboti tafovutini tushuntirish) va AI-06 (debitorlik/nasiya eslatma matni) — barchasi "kod hisoblaydi, AI tushuntiradi" tamoyili bilan (`research_notes/texnik/05-ozbek-tilidagi-ai.md`, 4-bo'lim).
+1. *(2026-10-14: tekshiruv)* MVP uchun **3 ta AI funksiya real**: AI-01 (umumiy biznes savol-javob chat, "bugun qancha foyda?"), AI-05 (davlat hisoboti tafovutini tushuntirish) va AI-06 (debitorlik/nasiya eslatma matni) — barchasi "kod hisoblaydi, AI tushuntiradi" tamoyili bilan (`research_notes/texnik/05-ozbek-tilidagi-ai.md`, 4-bo'lim). **AI-03** (qog'oz faktura/yuk xati fotosidan OCR, pilot bilan, torroq qamrovda — 2-band) — **MVP'dan keyin** (`02-arxitektura/11-backlog.md`), pilotdan keyin backlog sifatida rejalashtirilgan.
 2. **Arxitektura qoidasi — har bir funksiyada majburiy**: raqamni (foyda, qoldiq, tafovut summasi, risk balli) doim kod/SQL hisoblaydi; AI/LLM faqat o'zbek tilida tushuntiradi, matn yozadi yoki tavsiya beradi — hech qachon raqamni o'zi "o'ylab topmaydi" (`texnik/05-ozbek-tilidagi-ai.md`, Xulosa #8; `AI ERP startap Ozbekistonda/05_ai_funksiyalar.md`, "Architecture principle").
 3. **AI hech qachon davlat tizimiga (OFD, Soliq, CRPT Turon, Didox/Faktura.uz) hujjatni o'zi yubormaydi** — faqat loyiha/tavsiya tayyorlaydi, yuborishni odam (Buxgalter/Menejer) tasdiqlaydi. Sabab: AI xatosi bo'lsa ham, yuridik javobgarlik va jarima xavfi (masalan Asl belgisi skanerlash xatosi aylanmaning 20%igacha jarima) odam nazoratisiz oshadi (`texnik/00-xulosa-va-ochiq-savollar.md`, Asosiy xulosa #6).
 4. **Hozircha real emas**: AI-04 (qo'lda yozilgan "nasiya daftari" OCR) — kirill qo'lyozma uchun hech qanday benchmark yo'q (`texnik/05-ozbek-tilidagi-ai.md`, 4-bo'lim).
@@ -44,7 +44,7 @@
 
 ### AI-03: Qog'oz hujjat (yuk xati/faktura/chek) fotosidan ma'lumot chiqarish
 
-- **Hukm**: **MVP (pilot bilan, qog'oz hujjatlar bilan cheklangan qamrov)**.
+- **Hukm**: **MVP'dan keyin** (pilot bilan, qog'oz hujjatlar bilan cheklangan qamrov) *(2026-10-14: tekshiruv — T2, `02-arxitektura/11-backlog.md`)*.
 - **Qamrov toraytirildi**: Soliq kodeksiga ko'ra (2019-12-30) QQS to'lovchilar o'rtasidagi fakturalar faqat elektron axborot tizimida tuziladi, saqlanadi va hisobga olinadi; qog'oz shakli faqat **texnik uzilish** holatida ruxsat etiladi (`texnik/03-efaktura-va-tolov.md`, 26-qator). Shuning uchun QQS to'lovchi yetkazib beruvchidan kelgan standart e-faktura/e-TTN **OCR orqali emas**, EDO operatori (Didox/Faktura.uz) orqali tuzilgan ma'lumot sifatida tizimga import qilinadi. AI-03 faqat quyidagi qog'oz holatlar bilan cheklanadi: (a) QQS to'lovchi bo'lmagan yoki norasmiy yetkazib beruvchining qog'oz yuk xati, (b) texnik uzilish davridagi qog'oz faktura, (c) mijozga berilgan/qaytarish uchun qog'oz chek.
 - **Sabab**: Multimodal vision-LLM (Gemini, GPT-5) toza chop etilgan hujjat rasmidan tuzilgan maydonlarni (summa, sana, MXIK kodi) 87–97% aniqlik bilan chiqaradi — bu klassik shablonli OCR'dan ko'ra amaliy MVP yo'li, lekin kirill/o'zbek-specific aniqlik tasdiqlanmagan, shuning uchun pilot bilan cheklanadi (`texnik/05-ozbek-tilidagi-ai.md`, 3 va 4-bo'limlar).
 - **Misollar**:

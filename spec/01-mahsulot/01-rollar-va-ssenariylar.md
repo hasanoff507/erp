@@ -115,7 +115,7 @@ Android POS (asosiy va yagona ish quroli) — bir qo'l bilan, tez, offline-bardo
 
 **Kundalik**
 1. Smena boshida boshlang'ich naqd summani kiritib, smenani ochadi (**M01**).
-2. Mijozga tovar sotadi: skanerlash → chek → to'lov (naqd/karta/Payme/Click/Uzum QR) (**M01**).
+2. Mijozga tovar sotadi: skanerlash → chek → to'lov (naqd/karta/yagona QR (UzQR, bank)/Payme/Click/Uzum) *(2026-10-14: tekshiruv)* (**M01**).
 3. Markirovkalangan tovar sotganda kod avtomatik tekshiriladi (online bo'lsa); xato chiqsa, belgilangan siyosatga ko'ra harakat qiladi (**M01**).
 4. Mijoz tovarni qaytarganda, asl chek bo'yicha qaytarish amalga oshiradi; limitdan oshsa Menejerdan tasdiq so'raydi (**M02**).
 5. Kichik chegirma (limit ichida) berishi mumkin; kattaroq chegirma uchun Menejer PIN kodi kerak (**M03**).

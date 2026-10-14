@@ -98,7 +98,7 @@ Farq faqat **klient tomonidagi saqlash mexanizmi** (Room o'rniga Dexie) va **UI 
 ### 4.3 Shtrix-kod/markirovka skaneri
 
 - **Ichki kamera**: CameraX + ML Kit Barcode Scanning yoki ZXing (veb'dagi `@zxing/browser` tanloviga mos, `08-frontend-arxitekturasi.md` §4).
-- **Tashqi USB/Bluetooth HID skaner**: "keyboard wedge" rejimida ishlaydi — Android tizim darajasida klaviatura kiritish sifatida qabul qiladi, fokusda turgan matn maydoniga kod tushadi (veb'dagi `onScan.js` yondashuviga mos, `06-fayl` §3).
+- **Tashqi USB/Bluetooth HID skaner**: "keyboard wedge" rejimida ishlaydi — Android tizim darajasida klaviatura kiritish sifatida qabul qiladi, fokusda turgan matn maydoniga kod tushadi (veb'dagi `useBarcodeWedge` hook yondashuviga mos, `06-fayl` §3).
 - Markirovka (DataMatrix) skanerlash xatosi yuqori bo'lgani uchun (`04-ekranlar-va-ux.md` §1.7) — avtomatik qayta urinish + qo'lda MXIK kiritish zahirasi shu modulda ham amalga oshiriladi.
 
 ### 4.4 Tarozi

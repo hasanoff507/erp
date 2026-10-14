@@ -10,7 +10,7 @@
 4. **Mavjudlik maqsadi uchun rasmiy shartnoma SLA raqami yo'q** — UzCloud faqat infratuzilma darajasidagi da'vo (**99,982%**, <1,5 soat/yil) beradi, bu rasmiy oferta SLA'si emas (`07-fayl`, 2.1-bo'lim); MVP maqsadi shu sababli **taxmin**.
 5. **Uskunalar narxi va protokollari manbali**: shtrix-kod skaner (USB HID/keyboard-wedge), chek printeri (ESC/POS), Android POS terminal (UZKASSA N5/P100, A-Pay P10) — barchasi narx bilan `06-raqobatchilar-texnik-va-uskunalar.md`dan; **tarozi protokoli va yorliq printeri protokoli tadqiqotda topilmadi — ochiq savol**.
 6. **Lokalizatsiya**: o'zbek (lotin) — asosiy, rus — ikkinchi til (allaqachon qaror, `08-frontend-arxitekturasi.md`); kirill qidiruv `pg_trgm` indeks orqali (`01-malumotlar-modeli.md`, 1-bo'lim) — bu allaqachon qabul qilingan texnik yechim.
-7. **Ma'lumot saqlash muddati**: buxgalteriya hujjatlari kamida **3 yil** (Buxgalteriya hisobi to'g'risidagi qonun, 23-modda), soliq hujjatlari **3 yil** (2024-01-01'dan, ba'zi holatda 13 yilgacha) — bu ikkinchisi qonuniy, manbali (`07-fayl`, 3.3-bo'lim); audit log va backup muddatlari shularga tenglashtirilgan ichki siyosat (`05-xavfsizlik-va-audit.md`, 6.3 va 7.1-bo'lim).
+7. **Ma'lumot saqlash muddati**: buxgalteriya hujjatlari hisobot yilidan keyin kamida **5 yil** (Buxgalteriya hisobi to'g'risidagi qonun, O'RQ-404, 29-modda), soliq hujjatlari **3 yil** (2024-01-01'dan) — bu ikkinchisi qonuniy, manbali (`07-fayl`, 3.3-bo'lim); audit log va backup muddatlari buxgalteriya muddatiga tenglashtirilgan ichki siyosat (`05-xavfsizlik-va-audit.md`, 6.3 va 7.1-bo'lim). *(2026-10-14: tekshiruv)*
 8. **Tenant-boshiga xarajat jadvali — hisoblanadi, lekin to'liq taxmin zanjiri**: hosting (UzCloud narxlaridan hisoblangan, manbali kirish narxlari + taxmin sig'im), AI (`05-ai-funksiyalar.md`, 5-bo'lim: ~2-5 ming so'm/oy/do'kon, Haiku 5.5 asosida), SMS (manbada narx yo'q — **to'liq taxmin**); bu jadval `06-mvp-chegarasi.md` (3.3-bo'lim)dagi "unit-iqtisod hisobi hali yo'q" bo'shlig'ini to'ldiradi.
 9. **Observability (log, metrika, tracing, alerting) va qo'llab-quvvatlanadigan brauzerlar ro'yxati manbada yo'q** — ikkala band ham sanoat amaliyoti/ichki arxitektura qarori sifatida **taxmin** taklif qilinadi.
 10. **Accessibility** uchun faqat UX darajasidagi umumiy tamoyillar bor (katta shrift, yuqori kontrast, 56×56dp teginish maydoni — hammasi taxmin, `04-ekranlar-va-ux.md`, 1.4-1.5-bo'lim); rasmiy WCAG audit **tadqiqotda yo'q — ochiq savol**.
@@ -86,7 +86,7 @@ UzCloud birlik narxlari (`07-hosting-lokalizatsiya-xavfsizlik.md`, 2.1-bo'lim, 2
 1. **Multi-tenant model**: MVP — umumiy baza + `tenant_id` + RLS (past xarajat, tez ishga tushirish, `04-arxitektura-va-stack.md`, 1-bo'lim). Yirik/nozik mijozlar uchun **schema-per-tenant**ga o'tish yo'li ochiq qoldiriladi (PostgreSQL'da schema qo'shish downtime'siz).
 2. **API/worker**: statelesness tufayli gorizontal masshtablash (ko'proq VM nusxasi, Managed Kubernetes'ga o'tish) — yuklama oshganda birinchi qadam.
 3. **Baza**: vertikal kattalashtirish (ko'proq vCPU/RAM) birinchi, keyin o'qish replikalari (hisobotlar/AI so'rovlari uchun) — yozuvchi tranzaksiyalar asosiy DBaaS'da qoladi (bitta tranzaksiya qoidasi, `01-malumotlar-modeli.md`, Asosiy xulosa #4 buzilmasligi uchun).
-4. **Navbat/fon ishlari**: Redis asosidagi navbat (`arq` — `09-backend-arxitekturasi.md`) workerlar sonini mustaqil masshtablashga imkon beradi.
+4. **Navbat/fon ishlari**: Redis asosidagi navbat (**SAQ** — `09-backend-arxitekturasi.md`) workerlar sonini mustaqil masshtablashga imkon beradi. *(2026-10-14: tekshiruv)*
 5. **Fayl ombori**: S3-mos, chegarasiz masshtablanadi (UzCloud S3, `07-fayl`, 2.1-bo'lim).
 
 ---
@@ -189,11 +189,11 @@ Rasmiy WCAG audit tadqiqotda yo'q — faqat UX darajasidagi umumiy tamoyillar (`
 
 | Ma'lumot turi | Muddat | Manba/holat |
 |---|---|---|
-| Buxgalteriya birlamchi hujjatlari va registrlari | **Kamida 3 yil** | Buxgalteriya hisobi to'g'risidagi qonun, 279-I-son, 23-modda — qonuniy, manbali (`07-fayl`, 3.3-bo'lim) |
-| Soliq hujjatlari | **3 yil** (2024-01-01'dan), shartli holatlarda 13 yilgacha (masalan 10 yildan ortiq asosiy vositalar) | Soliq kodeksi, 22/84/270/306-moddalar — qonuniy, qisman ikkinchi darajali manba orqali (`07-fayl`, 3.3-bo'lim) |
-| `audit_log` | **Kamida 3 yil** (ichki siyosat) | Qonuniy minimum topilmadi — buxgalteriya hujjat muddatiga tenglashtirildi (`05-xavfsizlik-va-audit.md`, 6.3-bo'lim) |
+| Buxgalteriya birlamchi hujjatlari va registrlari | **Kamida 5 yil** (hisobot yilidan keyin) | "Buxgalteriya hisobi to'g'risida"gi Qonun (O'RQ-404, 13.04.2016, yangi tahrir), 29-modda (O'RQ-683 tahririda) — birlamchi manba [lex.uz/docs/-2931253](https://lex.uz/docs/-2931253) *(2026-10-14: tekshiruv)* |
+| Soliq hujjatlari | **3 yil** (2024-01-01'dan) | Soliq kodeksi 22-modda (1-qism, 7-xatboshi) va 84-modda (saqlash, kamida 3 yil), 88-modda (3 yillik da'vo muddati; 84-moddaning 2-qismidagi shartli imtiyozlarda uzayadi) — birlamchi manba [lex.uz/docs/4674902](https://lex.uz/docs/4674902). "13 yilgacha" — tasdiqlanmagan (270/306-moddalarda saqlash qoidasi yo'q) *(2026-10-14: tekshiruv)* |
+| `audit_log` | **Kamida 5 yil** (ichki siyosat) | Qonuniy minimum topilmadi — buxgalteriya hujjat muddatiga tenglashtirildi (`05-xavfsizlik-va-audit.md`, 6.3-bo'lim) *(2026-10-14: tekshiruv)* |
 | Operatsion backup | **30 kun** (taxmin) | `05-xavfsizlik-va-audit.md`, 7.1-bo'lim |
-| Arxiv backup | **≥ 3 yil** (buxgalteriya muddatiga mos) | `04-arxitektura-va-stack.md`, 7-bo'lim tavsiyasi |
+| Arxiv backup | **≥ 5 yil** (buxgalteriya muddatiga mos) | `04-arxitektura-va-stack.md`, 7-bo'lim tavsiyasi *(2026-10-14: tekshiruv)* |
 | `ai_requests` (AI so'rov jurnali) | **Taxmin — 1 yil** | Manbada yo'q, xarajat audit/billing nazorati uchun ichki qaror |
 | `notifications_log` (SMS/Telegram) | **Taxmin — 1 yil** | Manbada yo'q |
 

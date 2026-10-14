@@ -29,6 +29,7 @@
 | Huquqlar (`role_permissions`, `memberships`) | `permissions` | Login paytida to'liq | Delta; o'zgarsa darhol pull (login session yangilanishi) |
 | Joriy smena (`shifts`) | `shift` | Smena ochilganda yaratiladi (lokal) | Push orqali serverga, server tasdiqlagandan keyin doimiy holatga o'tadi |
 | Outbox (chek, qaytarish, qarz to'lovi, kassa harakati) | `outbox` | — | Faqat push (2-bo'lim) |
+| Do'kon sozlamalari va qoidalar (`tenants.settings`: tarozi shtrix-kod formati va uning versiyasi; faol `discount_rules`; obuna holati `subscriptions.status`) | `settings` | Login/snapshot bilan | Delta; tarozi formati versiyasi o'zgarsa majburiy pull *(2026-10-14: tekshiruv)* |
 
 **Dastlabki to'liq nusxa (snapshot)**: qurilma birinchi marta ro'yxatdan o'tganda (`devices` yozuvi yaratilganda) yoki lokal baza tozalanganda (`GET /sync/pull?scope=all&cursor=` bo'sh kursor bilan) — sahifalab (`page_size`, **taxmin: 500 qator/sahifa**) yuklanadi, `has_more=true` bo'lsa davom etiladi.
 
@@ -45,6 +46,7 @@
   "seq": 142,
   "type": "sale.created",
   "created_at": "2026-10-14T09:12:03.482+05:00",
+  "actor_user_id": "018f2c3a-aa11-7b00-9c3d-aa11bb22cc33",
   "payload": { "...": "hujjat turiga mos tuzilma, quyida" }
 }
 ```
@@ -54,9 +56,10 @@
 | `client_event_id` | UUIDv7 | Qurilmada yaratiladi (`01-malumotlar-modeli.md` §2 — vaqt bo'yicha tartiblangan); `sync_receipts.client_event_id` bilan idempotentlik ta'minlanadi |
 | `device_id` | UUIDv7 | `devices` jadvaliga mos, ro'yxatdan o'tgan qurilma |
 | `seq` | integer | Qurilma ichidagi lokal monoton ketma-ket raqam (restart/qayta ishga tushirishda ham davom etadi, lokal bazada saqlanadi) — server global tartib emas, faqat shu qurilma ichidagi nisbiy tartibni tasdiqlash uchun ishlatadi |
-| `type` | enum | `shift.opened`, `shift.closed`, `sale.created`, `return.created`, `debt_payment.created`, `cash_movement.created`, `stock_count.line_recorded` (M05, mobil rejim) — to'liq ro'yxat `09-backend-arxitekturasi.md`da yakunlanadi (**ochiq savol**) |
+| `type` | enum | `shift.opened`, `shift.closed`, `sale.created`, `sale.draft_voided` (to'lovdan oldin chek/qator bekor qilish — audit, registrga ta'sir yo'q), `receipt.reprinted` (chekni qayta chop etish — audit), `return.created`, `debt_payment.created`, `cash_movement.created`, `stock_count.line_recorded` (M05, mobil rejim) — to'liq ro'yxat `09-backend-arxitekturasi.md`da yakunlanadi (**ochiq savol**) *(2026-10-14: tekshiruv)* |
 | `created_at` | ISO 8601, qurilma soati | Fiskal 48-soat hisobi va buxgalteriya sanasi shu maydondan olinadi (8-bo'lim, soat farqi) |
-| `payload` | object | Hujjat turiga mos (masalan `sale.created` uchun `sales` + `sale_lines` + `sale_payments`, `01-malumotlar-modeli.md` §6 tuzilishiga mos) |
+| `actor_user_id` | UUID | Amalni bajargan kassir (offline PIN bilan kirgan); server uning `created_at` paytida faol membership'ini tekshiradi; push qilgan sessiya foydalanuvchisi farq qilsa, ikkalasi audit'ga yoziladi *(2026-10-14: tekshiruv)* |
+| `payload` | object | Hujjat turiga mos (masalan `sale.created` uchun `sales` + `sale_lines` + `sale_payments`, `01-malumotlar-modeli.md` §6 tuzilishiga mos); `sale.created`da `fiscal.receipt_seq` — qurilma beradi (3.3-bo'lim) *(2026-10-14: tekshiruv)* |
 
 Qarzga sotish alohida voqea turi emas — `sale.created` ichida `sale_payments.method = "debt"` sifatida yuboriladi (US-M08-01, US-M08-05); qarz daftaridagi tezkor yozuv (POS-13) ham shu yo'l bilan amalga oshadi.
 
@@ -81,7 +84,7 @@ Qarzga sotish alohida voqea turi emas — `sale.created` ichida `sale_payments.m
 // Javob
 {
   "results": [
-    { "client_event_id": "...", "status": "accepted", "server": { "id": "...", "number": "K-01-2026-000154", "receipt_seq": 182 } },
+    { "client_event_id": "...", "status": "accepted", "server": { "id": "...", "number": "K-01-2026-000154" } },
     { "client_event_id": "...", "status": "rejected", "error_code": "SALE_NOT_FOUND", "message": "Asl chek hali sinxronlanmagan", "retryable": true }
   ]
 }
@@ -89,6 +92,7 @@ Qarzga sotish alohida voqea turi emas — `sale.created` ichida `sale_payments.m
 
 - **Partiya hajmi**: taxmin — 50 voqea/so'rov (katta hujjat ro'yxatlari uchun kam, tarmoq kechikishi uchun ko'p emas); aniq raqam yuklama sinovida tasdiqlanadi.
 - **Idempotentlik**: server har bir `client_event_id`ni `sync_receipts`da tekshiradi (`01-malumotlar-modeli.md` §10). Oldin qabul qilingan voqea qayta yuborilsa — `status: "duplicate"`, bir xil natija (server raqami) qaytariladi, ikkinchi marta yozilmaydi.
+- **Fiskal raqam**: `receipt_seq` qurilmadan keladi; server uni o'zgartirmaydi, faqat `UNIQUE (tenant_id, cash_register_id, shift_id, receipt_seq)` bilan tekshiradi. Takror — `rejected`, `error_code: RECEIPT_SEQ_CONFLICT`, `retryable: false` (eskalatsiya). *(2026-10-14: tekshiruv)*
 - **Partiya "hammasi yoki hech narsa" emas** — har voqea alohida tranzaksiyada qayta ishlanadi; bittasi rad etilsa, qolganlari (bog'liq bo'lmasa) baribir qabul qilinadi (`results` massivi buni ko'rsatadi).
 
 ### 3.2 `GET /sync/pull?cursor=<token>&scope=catalog,prices,customers,permissions&page_size=500`
@@ -99,22 +103,26 @@ Qarzga sotish alohida voqea turi emas — `sale.created` ichida `sale_payments.m
   "has_more": false,
   "catalog": [ { "id": "...", "name": "...", "updated_at": "..." } ],
   "prices": [ ... ],
-  "customers": [ { "id": "...", "name": "...", "debt_balance": 350000, "credit_limit": 500000, "version": 4 } ]
+  "customers": [ { "id": "...", "name": "...", "receivable_balance": 350000, "credit_limit": 500000, "version": 4 } ]
 }
 ```
+
+`receivable_balance` = `debt_balances.balance WHERE direction='receivable'` (yozuv bo'lmasa 0; musbat son mijoz bizga qarzdor ekanini bildiradi). `payable` kassaga yuborilmaydi. *(2026-10-14: tekshiruv)*
 
 ### 3.3 Tartib kafolatlari
 
 - Bitta qurilma ichida voqealar **har doim `seq` tartibida** yuboriladi va shu tartibda serverga yetib boradi (bir partiya ichida massiv tartibi saqlanadi).
 - **Bog'liq voqealar** (masalan `return.created` o'zi tegishli `sale.created`ga bog'liq, agar asl chek hali sinxronlanmagan bo'lsa): server `SALE_NOT_FOUND` + `retryable: true` qaytaradi; qurilma bu voqeani keyingi push'da qayta yuboradi, lekin undan **keyingi, bog'liq bo'lmagan** voqealarni bloklamaydi.
 - Qoldiq/qarz kabi **delta-asosida** registrlar (`stock_moves`, `debt_moves`) uchun qat'iy global tartib shart emas — harakatlar qo'shiladi, tartib natijaga ta'sir qilmaydi (`04-arxitektura-va-stack.md`, §2.3).
-- Fiskal chek raqami (`fiscal_receipts.receipt_seq`) — smena + kassa ichida ketma-ket; amalda bir smenada bitta qurilma ishlaydi, shuning uchun qurilmalararo tartib muammosi kam uchraydi; agar ikki qurilma bitta smenani baham ko'rsa — bu **ochiq savol** (pastda).
+- Fiskal chek raqami (`fiscal_receipts.receipt_seq`) — **qurilma beradi** (offline ham), outbox `seq` bilan bir Web Lock ichida; kassa + smena ichida ketma-ket. **Bitta smena — bitta qurilma** (`shifts.device_id`): boshqa qurilmadan shu smenaga voqea `rejected SHIFT_DEVICE_MISMATCH`. *(2026-10-14: tekshiruv)*
 
 ### 3.4 Server validatsiyasi va rad etish
 
 Server har bir voqeani: (1) sxema (JSON shakli, majburiy maydonlar), (2) qurilma/tenant autentifikatsiyasi (`device_id` faol va shu tenant'ga tegishlimi), (3) idempotentlik (`sync_receipts`), (4) biznes qoidalari (5-bo'lim to'qnashuv jadvali) bo'yicha tekshiradi.
 
 **Rad etilganda**: voqea serverga yozilmaydi, lekin **qurilmadagi outbox'dan o'chirilmaydi** — `rejected` holatida, xato kodi va xabar bilan saqlanadi. POS-12 ekranida ("Sinxronlanmagan hujjatlar") bu voqea qizil belgi va aniq xato matni bilan ko'rinadi. Foydalanuvchi amali: (a) `retryable: true` bo'lsa — avtomatik/qo'lda qayta urinish, (b) `retryable: false` (masalan doimiy validatsiya xatosi) — qo'lda tuzatish yoki Menejerga/qo'llab-quvvatlashga eskalatsiya; hujjat hech qachon jim o'chirilmaydi (audit yaxlitligi uchun).
+
+**401 (sessiya tugagan)** — rad etish emas: voqealar `pending` holatida qoladi, `rejected` bo'lmaydi; push to'xtatiladi. POS ustida qayta kirish oynasi (parol yoki PIN) ochiladi, bunda **Dexie tozalanmaydi** — bu logout emas. Qayta kirishda server yangi sessiyani avvalgi `device_id`ga bog'laydi (boshqa tenant/qurilma bo'lsa push'ga ruxsat yo'q), keyin push `seq` tartibida davom etadi. `403 device_revoked` — 9-bo'lim. Veb-kassa uchun alohida qurilma tokeni/cookie yo'q — offline davr server autentifikatsiyasini talab qilmaydi (lokal PIN, 12-bo'lim), sessiya mutlaq muddati (7 kun) 48 soatdan uzun. Qurilma tokeni (Bearer) faqat Android uchun (`05-xavfsizlik-va-audit.md` §1.3). Veb-kassaning cookie-autentifikatsiyali so'rovlari (shu jumladan `/sync/push`/`/sync/pull`) `X-CSRF-Token` talab qiladi (`05-xavfsizlik-va-audit.md` §1.3). *(2026-10-14: tekshiruv)*
 
 ---
 
@@ -135,8 +143,8 @@ sequenceDiagram
     L->>L: Outbox'ga yozish (seq+1, type=sale.created)
     L->>API: POST /sync/push {events:[sale.created]}
     API->>DB: Bitta tranzaksiya: hujjat + stock_moves + debt_moves + ledger_entries
-    DB-->>API: OK (number, receipt_seq)
-    API-->>L: results: [{status: accepted, server:{number, receipt_seq}}]
+    DB-->>API: OK (id, number)
+    API-->>L: results: [{status: accepted, server:{id, number}}]
     API->>WK: outbox_jobs: ofd_send navbatga qo'yiladi
     WK->>OFD: Fiskal chekni yuborish
     OFD-->>WK: Fiskal belgi + QR
@@ -161,7 +169,7 @@ sequenceDiagram
     L->>API: POST /sync/push {events: seq 141..147, xronologik tartibda}
     API->>DB: Har voqea: sync_receipts tekshiruvi → tranzaksiya
     DB-->>API: natijalar
-    API-->>L: results[7] — hammasi "accepted", server number/receipt_seq
+    API-->>L: results[7] — hammasi "accepted", server id/number
     L->>L: "accepted" voqealar outbox'da 7 kun saqlanadi (taxmin), keyin tozalanadi
     API->>API: outbox_jobs: ofd_send (48 soatlik deadline bilan)
 ```
@@ -197,6 +205,7 @@ sequenceDiagram
 | Bir xil mijoz ikki joyda tahrirlangan (ism/telefon/izoh) | **Last-writer-wins**, `counterparties.version` bilan optimistik qulflash; kech kelgan `client_event_id` server qabul vaqti bo'yicha g'olib, eski qiymat `audit_log`ga | `01-malumotlar-modeli.md` §1 (`version INT`) |
 | Mijoz qarz balansi/kredit limiti | **Hech qachon LWW emas** — balans faqat `debt_moves` delta sifatida qo'shiladi (konflikt yo'q, hisoblanadigan registr); limit maydoni (reference) — LWW + version | `01-malumotlar-modeli.md` §7 |
 | Smena bir vaqtda ikki joyda yopilmoqchi (nazariy) | Server tomonida `shifts.status` optimistik tekshiruv bilan himoyalanadi — ikkinchisi "smena allaqachon yopilgan" xatosi oladi | Amaliyotda kam uchraydi (bitta smena — bitta qurilma) |
+| Qaytarish yoki chegirma limiti offline oshgan | Sotuvdan farqli — **lokal Menejer/Egasi PIN'isiz yakunlanmaydi** (BO-16 offline ishlamaydi); PIN bilan tasdiqlangan bo'lsa server qabul qiladi va qayta tekshiradi, `limit_exceeded=true` bayrog'i + M18 xabar *(2026-10-14: tekshiruv)* | `05-xavfsizlik-va-audit.md` §2.3 |
 
 ---
 
@@ -235,6 +244,7 @@ Ishchi taxmin (`research_notes/texnik/12-taxminlar-va-murojaatlar.md`, 6-band; `
 - Qurilma birinchi marta login qilganda `devices` yozuvi avtomatik yaratiladi (`tenant_id`, `cash_register_id`, `kind`, `app_version`) — kichik do'kon uchun qo'shimcha tasdiqlash qadam qo'shilmaydi (tezkor ishga tushirish).
 - Egasi/Menejer qurilmalar ro'yxatini ko'radi va kerak bo'lsa **bekor qiladi** (masalan o'g'irlangan/eskirgan qurilma) — aniq ekran hozircha `04-ekranlar-va-ux.md`da yo'q, **ochiq savol** (pastda).
 - **Bekor qilingan qurilma**: keyingi `POST /sync/push` va `GET /sync/pull` so'rovlari `403 device_revoked` bilan rad etiladi. Lokal outbox'dagi hali yuborilmagan hujjatlar **jim yo'qolmaydi** — UI "Qurilma bloklandi, ma'lumotlarni eksport qiling" xabarini ko'rsatadi va Excel eksport imkoniyatini beradi (qog'oz chekka tushgan savdoni yo'qotmaslik uchun), shundan keyingina lokal baza tozalanadi. Aniq UX oqimi **ochiq savol**.
+- Qurilma bekor qilinganda shu qurilmada oxirgi 30 kun (taxmin) ichida PIN bilan kirgan barcha xodimlarning PIN'i serverda bekor qilinadi va keyingi kirishda yangi PIN majburiy (lokal 4 raqamli PIN hashlari offline buzilishi oson). Ro'yxat va "Bekor qilish" — BO-11 "Qurilmalar" tabi. Ochiq savol 3 qisman hal qilindi. *(2026-10-14: tekshiruv)*
 
 ---
 
@@ -243,7 +253,7 @@ Ishchi taxmin (`research_notes/texnik/12-taxminlar-va-murojaatlar.md`, 6-band; `
 - Katalog/narx/mijoz keshlari — delta-sync bilan doimiy yangilanadi, qo'lda tozalash shart emas (hajm tenant ma'lumot hajmiga bog'liq).
 - Outbox voqealari — `accepted`/`duplicate` natija olgandan keyin darhol o'chirilmaydi, **taxmin: 7 kun** xavfsizlik buferi bilan saqlanadi (foydalanuvchi ko'rib chiqishi/eksport qilishi uchun), keyin avtomatik tozalanadi.
 - Sotuv/chek tarixi (UI ko'rsatish uchun lokal kesh) — **taxmin: 90 kunlik** aylanma oyna; eskisi serverdan talab bo'yicha olinadi (online bo'lganda).
-- Brauzer IndexedDB hajmi/tozalanishi (ayniqsa Safari/iOS'da ITP agressiv tozalashi) — `08-frontend-arxitekturasi.md` Ochiq savol #2 bilan bir xil, bu yerda takrorlanadi: qo'llab-quvvatlanadigan brauzerlar ro'yxati pilotdan keyin aniqlanadi.
+- Brauzer IndexedDB hajmi/tozalanishi (ayniqsa Safari/iOS'da ITP agressiv tozalashi) sababli **veb-kassa faqat Chromium**: Chrome/Edge (desktop) va Android Chrome, o'rnatilgan PWA sifatida; ishga tushganda `navigator.storage.persist()` so'raladi. Safari/iOS veb-kassa uchun qo'llab-quvvatlanmaydi (IndexedDB tozalanish xavfi, WebUSB/Web Serial yo'q). Back-office — barcha zamonaviy brauzerlar (`08-frontend-arxitekturasi.md` Ochiq savol #2 qarori). *(2026-10-14: tekshiruv)*
 
 ---
 
@@ -288,7 +298,7 @@ Backend tomonida `/sync/push` va `/sync/pull` uchun OpenAPI sxemasiga mos kontra
 1. 48 soatda yangi sotuvni bloklash yoki faqat ogohlantirish — qonunda aniq topilmadi, taklif (6-bo'lim) huquqiy maslahat bilan tasdiqlanishi kerak.
 2. Markirovkalangan tovarni offline sotish siyosati (cheklash/ogohlantirish) — rasmiy manbada tasdiqlanmagan taxmin (7-bo'lim, `12-taxminlar-va-murojaatlar.md` 6-band).
 3. Qurilmani bekor qilish UX oqimi (qaysi ekranda, kim bekor qiladi, eksport jarayoni) — mahsulot ekranlarida hali yo'q (9-bo'lim).
-4. Bitta smenani ikki qurilma baham ko'rganda fiskal chek raqamlash tartibi — amaliyotda kam uchraydi, lekin texnik yechim aniqlanmagan (3.3-bo'lim).
+4. ~~Bitta smenani ikki qurilma baham ko'rganda fiskal chek raqamlash tartibi.~~ **Yopildi**: bitta smena — bitta qurilma (`shifts.device_id`, 3.3-bo'lim). *(2026-10-14: tekshiruv)*
 5. Aniq partiya hajmi (`/sync/push` necha voqea), `page_size` (`/sync/pull`), delta-sync chastotasi, outbox saqlash muddati (7 kun), chek tarixi oynasi (90 kun), PIN urinish soni (5) — barchasi **taxmin**, yuklama sinovida/pilotda aniqlanadi.
 6. Chekdagi narx yoki arxivlangan tovar istisnolarini Buxgalter qanday "yopish" (tasdiqlash) jarayoni — UI darajasida hali loyihalashtirilmagan.
 

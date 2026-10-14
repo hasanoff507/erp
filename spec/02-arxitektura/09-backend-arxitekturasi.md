@@ -6,9 +6,9 @@
 
 1. **Modulli monolit**: `backend/app/modules/<modul>/` — 19 modul papkasi (18 mahsulot moduliga + kesishuvchi `integrations`/`sync`/`ai` ga mos), har biri bir xil ichki qatlam: `domain/` → `application/` → `infrastructure/` → `api/`. Umumiy infratuzilma — `app/core` (DB sessiya + tenant kontekst, auth, huquq dependency, idempotentlik, xatolar, sozlamalar, logging) va `app/workers` (navbat ishlari, cron).
 2. **"Posting service" naqshi** — har bir hujjat turi uchun bitta xizmat, bitta DB tranzaksiyada hujjat holatini **va** barcha registrlarni (`stock_moves`/`stock_lots`, `debt_moves`, `cash_moves`, `ledger_entries`, `vat_moves`) birga yozadi; bekor qilish — faqat teskari yozuv, `UPDATE`/`DELETE` yo'q.
-3. **Navbat kutubxonasi — `arq`** (ochiq savol hal qilindi, 4.1-band): to'liq asinxron, `asyncpg`/SQLAlchemy 2 async stack bilan bir xil event loop, Redis'ga tayanadi (allaqachon stack'da bor), ichki cron qo'llab-quvvatlaydi — alohida Celery/RabbitMQ infratuzilmasi kerak emas.
-4. **Tenant izolyatsiyasi kod darajasida ikki marta**: (a) har so'rovda `SET LOCAL app.tenant_id` (DB sessiya dependency) + (b) PostgreSQL RLS siyosati (`05-xavfsizlik-va-audit.md`) — ikkinchisi birinchisi buzilsa ham (kod xatosi) himoya qiladi.
-5. **Kutubxona birinchi, qo'lda kod oxirgi**: pagination — `fastapi-pagination`, filtrlash — `fastapi-filter`, retry — `tenacity`, UUIDv7 — `uuid-utils`, muddat arifmetikasi (5 kalendar kun, 48/72 soat, qarz eskirish guruhlari) — `pendulum`, Excel — `openpyxl`, shtrix-kod/yorliq — `python-barcode` + `treepoem`. To'liq jadval 5-bo'limda.
+3. **Navbat kutubxonasi — `SAQ`** (4-bo'lim): asyncio, Redis broker (stack'da bor), ichki `CronJob`, o'rnatilgan monitoring UI. `arq` 2025-10 dan beri faqat texnik xizmat rejimida (python-arq/arq#510) — yangi loyiha uchun tanlanmaydi. *(2026-10-14: tekshiruv)*
+4. **Tenant izolyatsiyasi kod darajasida ikki marta**: (a) ilova qatlami — `TenantMixin` modellariga SQLAlchemy `with_loader_criteria` orqali global `tenant_id` filtri; (b) PostgreSQL RLS (`set_config('app.tenant_id', …, true)` + siyosat, `05-xavfsizlik-va-audit.md`) — (b) (a) buzilsa ham himoya qiladi va aksincha (09 §6 RLS-o'chirilgan testi shu (a)ni tekshiradi). *(2026-10-14: tekshiruv)*
+5. **Kutubxona birinchi, qo'lda kod oxirgi**: pagination — `fastapi-pagination`, filtrlash — `fastapi-filter`, retry — `tenacity`, UUIDv7 — `uuid-utils`, muddat arifmetikasi (5 kalendar kun, 48/72 soat, qarz eskirish guruhlari) — `pendulum`, Excel — `openpyxl`, shtrix-kod/yorliq — `python-barcode` + `zxing-cpp` (Ghostscript/AGPL'siz). To'liq jadval 5-bo'limda. *(2026-10-14: tekshiruv)*
 6. **AI — port naqshi** (`AiProvider`, README qarori): `fake` (test) | `cli` (lokal dev, Claude Code CLI) | `api` (staging/prod, `anthropic` SDK) — namuna loyihadagi `ClaudePort`/`CliClaudeClient`/`FakeClaudeClient` naqshining aynan takrorlanishi, faqat `cli` o'rniga prodda `api`.
 7. **Namuna loyihadan nusxa olinadi**: qatlamli papka tuzilmasi, `pydantic-settings` + `lru_cache get_settings()` + prod-da xavfsizlik guard (`model_validator` — auth yoqilmagan/standart sir/sqlite bo'lsa ishga tushmaydi), composition-root'dagi `_build_*` factory funksiyalar, Alembic'ning asinxron `env.py`'si, `ReadinessProbe`'ning "gating vs reported" bo'linishi, ko'p bosqichli Dockerfile (non-root user, `HEALTHCHECK`).
 8. **Namuna loyihadan farqlanadi**: u — har mijoz uchun alohida stack (bitta tenant); bu loyiha — **bitta umumiy stack, ko'p tenant, RLS bilan**: `api`/`worker` gorizontal ko'payadi, `scheduler` yagona nusxa bo'lishi kerak (Postgres advisory lock bilan) (adapterlar: OFD/e-faktura/Asl belgisi/Click-Payme adapterlari).
@@ -25,7 +25,7 @@ backend/
 │   ├── core/                        # kesishuvchi infratuzilma (hech qaysi modulga tegishli emas)
 │   │   ├── config.py                 # Settings (pydantic-settings), get_settings()
 │   │   ├── db/
-│   │   │   ├── session.py            # async engine, AsyncSession, SET LOCAL app.tenant_id
+│   │   │   ├── session.py            # async engine, AsyncSession, tenant_transaction() + set_config('app.tenant_id', …, true)
 │   │   │   └── base.py               # DeclarativeBase, umumiy mixin'lar (TenantMixin, TimestampMixin)
 │   │   ├── auth/                     # sessiya cookie, CSRF, JWT (ichki admin), parol hash
 │   │   ├── permissions.py            # require_permission("sales.create") dependency
@@ -55,10 +55,10 @@ backend/
 │   │   ├── ai/                       # AiProvider porti, AI-xx funksiyalar, ai_requests/feedback
 │   │   └── sync/                     # offline outbox qabul qilish, client_event_id dedupe, qurilma holati
 │   └── workers/
-│       ├── jobs/                      # arq task funksiyalari (bitta modulga tegishli bo'lsa ham shu yerda
+│       ├── jobs/                      # SAQ task funksiyalari (bitta modulga tegishli bo'lsa ham shu yerda
 │       │                               # ro'yxatga olinadi — modul papkasidagi `tasks.py` dan import qilib)
-│       ├── cron.py                    # arq cron_jobs ro'yxati (davlat hisoboti eslatmasi, qarz eslatmasi, recost)
-│       └── worker_settings.py         # arq WorkerSettings (navbatlar, concurrency, Sentry/OTel init)
+│       ├── cron.py                    # SAQ CronJob ro'yxati (davlat hisoboti eslatmasi, qarz eslatmasi, recost, kam qoldiq, yaroqlilik muddati, obuna eslatmasi, kunlik Telegram hisobot)
+│       └── worker_settings.py         # SAQ worker sozlamalari (navbatlar, concurrency, Sentry/OTel init)
 ├── alembic/
 │   ├── env.py                         # asinxron, namuna loyihadagidek
 │   └── versions/
@@ -83,7 +83,7 @@ sales/
 ├── infrastructure/
 │   ├── models.py         # SQLAlchemy ORM model (jadval ta'rifi)
 │   ├── repositories.py   # SaleRepository — faqat SQLAlchemy so'rovlari
-│   └── tasks.py          # arq job'lar (masalan "ofd_send") — workers/jobs ro'yxatiga shu yerdan import qilinadi
+│   └── tasks.py          # SAQ job'lar (masalan "ofd_send") — workers/jobs ro'yxatiga shu yerdan import qilinadi
 └── api/
     ├── router.py          # APIRouter(prefix="/sales", tags=["sales"])
     ├── schemas.py          # Pydantic v2 request/response (OpenAPI → orval manbasi)
@@ -95,12 +95,21 @@ sales/
 ### `app/core/db` — tenant kontekst
 
 ```python
-# app/core/db/session.py (konventsiya, kod emas — spec bosqichi qoidasi)
-async def get_session(tenant_id: UUID = Depends(current_tenant_id)) -> AsyncIterator[AsyncSession]:
+# app/core/db/session.py (konventsiya)
+async_session_factory = async_sessionmaker(engine, expire_on_commit=False, autobegin=False)
+
+@asynccontextmanager
+async def tenant_transaction(session: AsyncSession, tenant_id: UUID):
+    async with session.begin():
+        await session.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
+        yield session
+
+async def get_session() -> AsyncIterator[AsyncSession]:
     async with async_session_factory() as session:
-        await session.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
         yield session
 ```
+
+Tranzaksiya faqat `tenant_transaction()` orqali ochiladi. `autobegin=False` sababli undan tashqarida `execute` xato beradi, shuning uchun tenant kontekstisiz so'rov jismonan mumkin emas. `SET LOCAL ... = :param` ishlatilmaydi, chunki PostgreSQL `SET` parametr qabul qilmaydi; o'rniga `set_config(..., true)` ishlatiladi (tranzaksiya-lokal). Posting xizmati, `/sync/push` (har voqea uchun alohida `tenant_transaction`) va worker job'lari ham aynan shu helper'dan foydalanadi. Ichki savepoint kerak bo'lsa — `session.begin_nested()`. *(2026-10-14: tekshiruv)*
 
 `current_tenant_id` — auth dependency sessiya cookie'dan (yoki ichki admin uchun JWT'dan) tenant ID'ni oladi; **hech qachon so'rov tanasi/query parametridan emas** (frontend arxitekturasi, 3-bo'lim: `X-Tenant-Id` header yo'q, aynan shu sababdan). `X-Branch-Id` header bo'lsa, `current_branch_id` dependency uni tasdiqlaydi (foydalanuvchi shu filialga `membership`i bormi) va `app/core/permissions.py` orqali filial-darajasidagi ruxsatlarga uzatiladi.
 
@@ -118,13 +127,13 @@ class DocumentPostingService(Protocol):
 
 ### 2.1. Bitta tranzaksiya — nima yoziladi
 
-`post()` ichida **bitta** `async with session.begin():` bloki:
+`post()` ichida **bitta** `async with tenant_transaction(session, tenant_id):` bloki: *(2026-10-14: tekshiruv)*
 
 1. Hujjat qatorlarini tekshiradi (biznes qoida — `domain/rules.py`): limit, manfiy qoldiq siyosati, davr yopilmaganligi (`period_closings`, 2.4-band).
-2. Kerakli qatorlarni **qulflab o'qiydi** (`SELECT … FOR UPDATE`) — bitta ombordagi bitta tovarning `stock_lots`/`stock_balances` qatori, bitta mijozning `debt_balances` qatori, bitta smenaning `cash_moves` jamlanmasi — shu orqali ikki parallel so'rov (ikki kassa bitta oxirgi tovarni sotishi) DB darajasida ketma-ketlashtiriladi, ilova darajasida qo'shimcha qulf kerak emas.
+2. **Qulflash** — serializatsiya nuqtasi `stock_balances (warehouse_id, product_id)` qatori: avval `INSERT … ON CONFLICT DO NOTHING`, so'ng `SELECT … FOR UPDATE`. Shu qulf ostida `stock_lots` qulfsiz o'qiladi va o'zgartiriladi; partiyaga tegadigan **barcha** yo'llar (sotuv, qaytarish, kirim, ko'chirish, inventarizatsiya, hisobdan chiqarish, recost) aynan shu qulfni oladi. Kerak bo'lsa `debt_balances (counterparty_id, direction)` ham `FOR UPDATE`. Deadlock'ga qarshi tartib: avval `stock_balances` — `(warehouse_id, product_id)` o'sish tartibida, so'ng `debt_balances` — `counterparty_id` bo'yicha. `cash_moves` qulflanmaydi (tekshiriladigan invariant yo'q). *(2026-10-14: tekshiruv)*
 3. Barcha registrlarga append-only yozadi: `stock_moves` (+ FIFO/AVECO bo'yicha `stock_lots.qty_left`ni kamaytirish), `debt_moves`, `cash_moves`, `ledger_entries`, `vat_moves` — qaysi biri hujjat turiga tegishli bo'lsa.
-4. Hujjat holatini `posted`ga o'tkazadi, `posted_at`ni yozadi.
-5. Tranzaksiya commit bo'lgach (`after_commit` hook), tashqi integratsiya ishlarini **navbatga** qo'yadi (`outbox_jobs` qatori + `arq.enqueue_job`) — OFD'ga yuborish, e-faktura, Telegram xabar. **Hech qachon tashqi tizim tranzaksiya ichida chaqirilmaydi** (`00-umumiy-arxitektura.md`, 7-xulosa: API tashqi tizimni kutib turmaydi).
+4. Hujjat holatini `posted`ga o'tkazadi, `posted_at`ni yozadi (fiskal holat — alohida `fiscal_receipts.status=pending`, `01-malumotlar-modeli.md` 8-bo'lim). *(2026-10-14: tekshiruv)*
+5. Tranzaksiya commit bo'lgach (`after_commit` hook), tashqi integratsiya ishlarini **navbatga** qo'yadi (`outbox_jobs` qatori + `JobQueue.enqueue(...)`, SAQ ortida, 4-bo'lim) — OFD'ga yuborish, e-faktura, Telegram xabar. **Hech qachon tashqi tizim tranzaksiya ichida chaqirilmaydi** (`00-umumiy-arxitektura.md`, 7-xulosa: API tashqi tizimni kutib turmaydi). *(2026-10-14: tekshiruv)*
 
 Bitta tranzaksiyada yozilishi kerakligi sababi — `01-malumotlar-modeli.md` 4-xulosasi: hujjat holati va registrlar birga yoziladi yoki birga bekor bo'ladi (DB darajasidagi atomiklik, ilova darajasida "deyarli atomik" emas).
 
@@ -132,58 +141,63 @@ Bitta tranzaksiyada yozilishi kerakligi sababi — `01-malumotlar-modeli.md` 4-x
 
 *Quyidagi raqamlar faqat posting mantiqini ko'rsatish uchun shartli misol — tadqiqot/talab hujjatidan olingan raqam emas.*
 
-Ombordagi "Shakar" partiyalari (FIFO, eng eski birinchi):
+Ombordagi "Shakar" partiyalari (FIFO; `unit_cost` — QQS'siz, 2.6-provodkaga mos):
 
 | Partiya | `qty_left` | `unit_cost` |
 |---|---|---|
 | Lot-1 (eski) | 5 kg | 9 500 so'm |
 | Lot-2 | 8 kg | 9 800 so'm |
 
-Sotuv: 10 kg, QQS'siz sotuv narxi 12 000 so'm/kg.
+Sotuv: 10 kg × 12 000 so'm/kg, **narx QQS bilan** (`02-provodka-qoidalari.md` 2-bo'lim), QQS 12%, naqd.
 
-FIFO iste'moli: Lot-1'dan 5 kg (5 × 9 500 = 47 500 so'm) + Lot-2'dan 5 kg (5 × 9 800 = 49 000 so'm) → `sale_lines.lot_allocations = [{lot: 1, qty: 5, cost: 47500}, {lot: 2, qty: 5, cost: 49000}]`, jami tannarx (COGS) = **96 500 so'm**; Lot-2'da 3 kg qoladi.
+- Chek summasi = 120 000,00; QQS = 120 000 × 12/112 = 12 857,142857… → **12 857,14**; sof daromad = **107 142,86**.
+- FIFO: Lot-1'dan 5 kg (47 500) + Lot-2'dan 5 kg (49 000) → `lot_allocations = [{lot: 1, qty: 5, cost: 47500}, {lot: 2, qty: 5, cost: 49000}]`, COGS = **96 500**; Lot-2'da 3 kg qoladi. Yalpi foyda = 107 142,86 − 96 500 = 10 642,86.
 
-Shu bitta postingda yoziladigan qatorlar (soddalashtirilgan):
+Shu bitta postingda yoziladigan qatorlar:
 
-- `stock_moves`: −10 kg (sotuv), cost_amount = −96 500.
+- `stock_moves`: −10 kg, cost_amount = −96 500,00.
 - `stock_lots`: Lot-1.qty_left = 0, Lot-2.qty_left = 3.
-- `ledger_entries`: Dt "Tovar-moddiy zaxira (chiqim)/Sotilgan tovar tannarxi" — Kt "Tovar-moddiy zaxira" = 96 500 (aniq hisob raqamlari `02-provodka-qoidalari.md`da).
-- `ledger_entries`: Dt "Kassa naqd" — Kt "Sotuv daromadi" = 120 000 (10 × 12 000).
-- `vat_moves`: output, base_amount = 120 000, vat_amount = 14 400 (12%) — agar tovar standart QQS stavkasida bo'lsa.
-- `cash_moves`: +120 000 (to'lov turi "naqd" bo'lsa) yoki `debt_moves`: +134 400 (to'lov turi "nasiya" bo'lsa, QQS bilan).
+- `ledger_entries`: Dt 9120 / Kt 2910 = 96 500,00.
+- `ledger_entries`: Dt 5010 / Kt 9020 = 107 142,86.
+- `ledger_entries`: Dt 5010 / Kt 6410 = 12 857,14 (Dt 5010 jami = 120 000,00).
+- `vat_moves`: output, base_amount = 107 142,86, vat_amount = 12 857,14.
+- `cash_moves`: +120 000,00 (naqd). Nasiya bo'lsa: `debt_moves` +120 000,00, Dt 5010 o'rniga Dt 4010 — summalar bir xil.
 
-Bitlik test shu jadvaldagi kirish/chiqish qiymatlarini aynan tekshiradi (5-bo'lim).
+Bitlik test shu jadvaldagi kirish/chiqish qiymatlarini aynan tekshiradi (5-bo'lim). *(2026-10-14: tekshiruv — FIFO misoli QQS bilan to'g'irlandi)*
 
 ### 2.3. Bekor qilish (reversal)
 
-`reverse()` yangi hujjat yaratmaydi — original hujjatning holatini `cancelled`ga o'tkazadi va **har bir yozilgan registr qatoriga teskari belgili nusxa** qo'shadi (`doc_type`/`doc_id` original hujjatga ishora qiladi, lekin yangi qator — hech qachon `UPDATE`). `stock_lots.qty_left` FIFO bo'yicha **teskari tartibda** (oxirgi iste'mol qilingan partiyadan) qaytariladi, shunda partiya tarixi davomiy qoladi. Original hujjat `reversed_by_id` orqali teskari hujjatga bog'lanadi (`01-malumotlar-modeli.md`, umumiy sarlavha maydonlari).
+`reverse()` yangi hujjat yaratmaydi — original hujjat `cancelled` bo'ladi (`cancelled_at`, `cancelled_by`, `cancel_reason`) va **har bir yozilgan registr qatoriga teskari belgili nusxa** qo'shiladi (`doc_type`/`doc_id` — original hujjat, `reversal_of_id` — teskari qilinayotgan asl registr qatori; hech qachon `UPDATE`). `stock_lots.qty_left` `lot_allocations` bo'yicha teskari tartibda qaytariladi (2.1 qulfi ostida). *(2026-10-14: tekshiruv)*
 
 ### 2.4. Recost ishlari va davr yopish
 
-- **Recost** (`recost_jobs: tenant, warehouse, product, from_date`): o'tgan sanali hujjat (kech sinxron, kech kirim) kelganda navbatga qo'yiladi (arq job `recost_product`); job shu sanadan keyingi barcha chiqim postinglarini **FIFO/AVECO bo'yicha qayta hisoblaydi** va `ledger_entries`/`stock_moves`ga **tuzatish yozuvi** qo'shadi (asl yozuvni o'zgartirmaydi — append-only tamoyili shu yerda ham amal qiladi). `period_closings`ga tegadigan sana bo'lsa, job **rad etiladi** va `notifications` moduliga ogohlantirish yuboradi (`01-malumotlar-modeli.md`, 7-bo'lim).
-- **Davr yopish** (`accounting` moduli, `period_closings` jadvali): yopishdan oldin tekshiradi — hech qanday `draft`/`fiscal_pending` hujjat yo'qligini, barcha `recost_jobs` tugaganini; yopilgandan keyin shu sanagacha bo'lgan **yangi posting rad etiladi** (`PERIOD_CLOSED` xato kodi, 3-bo'lim).
+- **Recost** (`recost_jobs`, `01-malumotlar-modeli.md` 10-bo'lim): o'tgan sanali hujjat (kech sinxron, kech kirim) kelganda navbatga qo'yiladi (SAQ job `recost_product`); job shu sanadan keyingi barcha chiqim postinglarini **FIFO/AVECO bo'yicha qayta hisoblaydi** va `ledger_entries`/`stock_moves`ga **tuzatish yozuvi** qo'shadi (asl yozuvni o'zgartirmaydi — append-only tamoyili shu yerda ham amal qiladi). `period_closings`ga tegadigan sana bo'lsa, job **rad etiladi** va `notifications` moduliga ogohlantirish yuboradi (`01-malumotlar-modeli.md`, 7-bo'lim). Job `queued → running → done/failed`; davr yopiq bo'lsa `rejected_period_closed`. Job 2.1 dagi `stock_balances` qulfini oladi.
+- **Davr yopish** (`accounting` moduli, `period_closings` jadvali): yopishdan oldin tekshiradi — davr ichida `fiscal_receipts.status IN ('pending','sent','failed')` yo'qligini, barcha `recost_jobs` tugaganini; yopilgandan keyin shu sanagacha bo'lgan **yangi posting rad etiladi** (`PERIOD_CLOSED` xato kodi, 3-bo'lim). *(2026-10-14: tekshiruv)*
 
 ```mermaid
 sequenceDiagram
     participant C as Veb-kassa
-    participant API as FastAPI /sales
+    participant API as FastAPI /sync/push
     participant PS as SalePostingService
     participant DB as PostgreSQL
-    participant Q as Redis (arq)
+    participant Q as Redis (SAQ)
     participant W as Worker
 
-    C->>API: POST /sales (Idempotency-Key, X-Branch-Id)
-    API->>DB: idempotency qaytarilgan javob bormi?
+    C->>API: POST /sync/push (voqea: sale.created)
+    API->>DB: sync_receipts: client_event_id oldin bormi?
     API->>PS: post(sale)
-    PS->>DB: BEGIN; FOR UPDATE qatorlar
+    PS->>DB: BEGIN tenant_transaction; FOR UPDATE qatorlar
     PS->>DB: stock_moves + stock_lots + debt/cash_moves + ledger_entries + vat_moves + status=posted
     PS->>DB: COMMIT
-    PS->>Q: enqueue "ofd_send", "einvoice_check" (agar kerak bo'lsa)
-    API-->>C: 201 Created (chek, fiskal kutilmoqda)
+    PS->>Q: enqueue "ofd_send", "einvoice_send" (agar kerak bo'lsa)
+    API-->>C: results:[{status: accepted, server:{id, number}}] (fiscal_receipts.status=pending)
     Q->>W: job navbatdan olinadi
     W->>W: OFD'ga yuborish (httpx + tenacity retry)
     W->>DB: fiscal_receipts.status = fiscalized
+    Note over C: fiskal belgi/QR keyingi GET /sync/pull'da
 ```
+
+*(2026-10-14: tekshiruv — POS uchun alohida `POST /sales` yo'q, yagona yo'l `/sync/push`; `einvoice_check` → `einvoice_send`; navbat SAQ)*
 
 ---
 
@@ -196,28 +210,33 @@ sequenceDiagram
 | Pagination | Hujjat/registr ro'yxatlari — **cursor-based** (`fastapi-pagination`'ning `CursorPage`, UUIDv7 `id` bo'yicha — vaqt tartibi tabiiy keladi): `?cursor=...&limit=50`. Ma'lumotnoma ro'yxatlari (katalog, kontragent) — `Page` (page/size + `total`), chunki UI'da sahifalash ko'rsatiladi |
 | Filtrlash | `fastapi-filter` — SQLAlchemy modeliga bog'langan deklarativ filtr sinfi (`?status=posted&doc_date__gte=2026-10-01`), qo'lda `if`/`WHERE` zanjiri yozilmaydi |
 | Xato formati | `{"code": "DEBT_LIMIT_EXCEEDED", "message_key": "errors.debt_limit_exceeded", "details": {...}}` — `code` barqaror mashina kaliti, `message_key` frontend i18next kaliti (`08-frontend-arxitekturasi.md`, "xato backend kodidan i18n kalitiga tarjima qilinadi"), `details` — maydon darajasidagi xabarlar (422'da react-hook-form/zod bilan bir xil shaklda: `{"field": "qty", "message_key": "..."}` ro'yxati) |
-| Idempotency-Key | Yozuvchi so'rovlarda majburiy (frontend har doim yuboradi). Redis `SETNX idem:{tenant}:{key}` — bir lahzali qulf (parallel takror so'rovni kutish/425); Postgres `idempotency_keys(tenant_id, key UNIQUE, request_hash, response_status, response_body, created_at)` — **doimiy** javob jurnali, qayta so'rov bo'lsa saqlangan javob qaytariladi (qayta bajarilmaydi). Offline kassa qayta yuborganda `key = client_event_id` |
+| Idempotency-Key | Yozuvchi so'rovlarda majburiy (frontend har doim yuboradi). Redis `SETNX idem:{tenant}:{key}` — bir lahzali qulf (parallel takror → `409 {code: IDEMPOTENCY_IN_PROGRESS}` + `Retry-After: 1`; bir xil kalit, boshqa `request_hash` → `422 {code: IDEMPOTENCY_KEY_REUSED}`); Postgres `idempotency_keys(tenant_id, key, request_hash, response_status, response_body, created_at, UNIQUE (tenant_id, key))` — **doimiy** javob jurnali (30 kundan keyin tozalanadi, buxgalteriya yozuvi emas), qayta so'rov bo'lsa saqlangan javob qaytariladi (qayta bajarilmaydi). `/sync/push` bundan mustasno: dedupe har voqea bo'yicha `sync_receipts.client_event_id` orqali (`04-offline-sync.md` §3.1). `Idempotency-Key` faqat back-office REST yozuvchi so'rovlariga tegishli. *(2026-10-14: tekshiruv)* |
 | Optimistik qulflash | Ma'lumotnomalarda (`products`, `product_prices`, …) `version INT`. `PATCH` so'rovi `version`ni tanada talab qiladi; mos kelmasa `409 {code: VERSION_CONFLICT}`. Hujjatlarda kerak emas — ular `posted`dan keyin umuman o'zgarmaydi (faqat teskari hujjat) |
 | OpenAPI teglari | Har modul — bitta tag (`sales`, `returns`, `debts`, …), router `tags=[...]` orqali; `operation_id` qo'lda beriladi (`sales_create`, `sales_list`) — orval generatsiya qilgan funksiya nomi shundan keladi (`08-frontend-arxitekturasi.md`, 3-bo'lim) |
 | Davr yopilgan | `409 {code: PERIOD_CLOSED}` — yopilgan davrga yozishga urinish |
-| Auth | HttpOnly sessiya cookie (`08-frontend-arxitekturasi.md`), CSRF — `itsdangerous` bilan imzolangan token (double-submit: cookie + `X-CSRF-Token` header), yozuvchi metodlarda tekshiriladi |
+| Auth | HttpOnly, Secure, SameSite=Lax sessiya cookie. CSRF — sessiya ID'ga bog'langan, `itsdangerous` bilan imzolangan token: `GET /api/v1/auth/csrf` → klient xotirada saqlaydi → yozuvchi metodlarda `X-CSRF-Token` header. CSRF cookie yo'q (double-submit emas). Noto'g'ri yoki eskirgan token → `403 {code: CSRF_INVALID}` → klient tokenni bir marta qayta oladi va so'rovni takrorlaydi. Bearer qurilma tokeni (Android) CSRF tekshiruvidan ozod. *(2026-10-14: tekshiruv)* |
 | Rate limit | `slowapi` — login va AI endpoint'larda qattiqroq limit (brute-force/AI xarajat nazorati) |
 
 ---
 
-## 4. Navbat kutubxonasi: `arq` tanlovi
+## 4. Navbat kutubxonasi: `SAQ` tanlovi
 
-`00-umumiy-arxitektura.md` ochiq savol 1'ini hal qilish:
+`00-umumiy-arxitektura.md` ochiq savol 1'ini hal qilish. `arq` 2025-10 dan beri faqat texnik xizmat rejimida (python-arq/arq#510: "maintenance only mode", faqat xavfsizlik tuzatishlari, oxirgi reliz 0.28.0 — 2026-04-16) — yangi loyiha uchun tanlanmaydi. *(2026-10-14: tekshiruv)*
 
-| Mezon | `arq` | `dramatiq` | `celery` |
-|---|---|---|---|
-| Asinxron (async def task) | Tabiiy (asyncio) | Yo'q (sync worker, asyncio uchun alohida event loop kerak) | Qisman (`asgiref`/qo'shimcha sozlash) |
-| Broker | Redis (stack'da allaqachon bor) | RabbitMQ/Redis (kengaytma kerak) | RabbitMQ/Redis, lekin og'ir konfiguratsiya |
-| Cron | Ichida (`cron_jobs`) | Yo'q (APScheduler qo'shimcha kerak) | `celery beat` — alohida jarayon |
-| SQLAlchemy async sessiyasi bilan moslik | To'g'ridan-to'g'ri (bir xil event loop, bir xil `asyncpg` pool) | Noqulay | Noqulay |
-| Jamoat hajmi/texnik xizmat | O'rta (FastAPI ekotizimida tanilgan), bitta muallif tomonidan faol qo'llab-quvvatlanadi | O'rta | Katta, lekin ortiqcha murakkablik kichik jamoa uchun |
+| Mezon | `SAQ` | `arq` | `dramatiq` | `celery` |
+|---|---|---|---|---|
+| Asinxron (async def task) | Tabiiy (asyncio) | Tabiiy (asyncio) | Yo'q (sync worker, asyncio uchun alohida event loop kerak) | Qisman (`asgiref`/qo'shimcha sozlash) |
+| Broker | Redis yoki Postgres (stack'da allaqachon bor) | Redis (stack'da allaqachon bor) | RabbitMQ/Redis (kengaytma kerak) | RabbitMQ/Redis, lekin og'ir konfiguratsiya |
+| Cron | Ichida (`CronJob`) | Ichida (`cron_jobs`) | Yo'q (APScheduler qo'shimcha kerak) | `celery beat` — alohida jarayon |
+| SQLAlchemy async sessiyasi bilan moslik | To'g'ridan-to'g'ri (bir xil event loop, bir xil `asyncpg` pool) | To'g'ridan-to'g'ri | Noqulay | Noqulay |
+| Monitoring | O'rnatilgan monitoring UI | Rasmiy UI yo'q | Yo'q | Flower (alohida xizmat) |
+| Jamoat hajmi/texnik xizmat | MIT, 0.26.4 (2026-05-21), faol | Faqat xavfsizlik tuzatishlari (2025-10, #510) | O'rta | Katta, lekin ortiqcha murakkablik kichik jamoa uchun |
 
-**Qaror: `arq`.** Butun backend stack asinxron (`FastAPI` + `SQLAlchemy 2 async` + `asyncpg`); `arq` worker'ning o'zi ham asinxron funksiya sifatida ishlaydi — bir xil DB pool, bir xil HTTP klient (`httpx.AsyncClient`) qayta ishlatiladi, ikkinchi concurrency modelini (threads/gevent) o'rganish shart emas. Cron (`workers/cron.py`) — davlat hisobotini kunlik tekshirish, qarz eslatmasi, takrorlanuvchi xarajat eslatmasi, 48/72 soat chegarasi monitoringi — `arq`ning o'z `cron_jobs`i bilan, alohida `scheduler` konteyneri sifatida ishga tushadi (`00-umumiy-arxitektura.md`dagi "Rejalashtiruvchi" komponenti). Kamchilik: `arq`da ishlab chiqaruvchi tomonidan rasmiy "task retry with backoff" UI/monitoring paneli yo'q (Celery Flower kabi) — buning o'rniga `outbox_jobs` jadvali + oddiy ichki admin ro'yxati orqali kuzatiladi (allaqachon ma'lumotlar modelida bor).
+**Qaror: `SAQ`.** Butun backend stack asinxron (`FastAPI` + `SQLAlchemy 2 async` + `asyncpg`); `SAQ` worker'ning o'zi ham asinxron funksiya sifatida ishlaydi — bir xil DB pool, bir xil HTTP klient (`httpx.AsyncClient`) qayta ishlatiladi, ikkinchi concurrency modelini (threads/gevent) o'rganish shart emas. Navbat `app/core/queue.py`dagi `JobQueue` porti ortida; `outbox_jobs` holat manbai bo'lgani uchun kutubxona almashtirish arzon. arq'dagi "monitoring paneli yo'q" kamchiligi SAQ UI bilan yopiladi — bundan tashqari `outbox_jobs` jadvali + oddiy ichki admin ro'yxati orqali ham kuzatiladi (allaqachon ma'lumotlar modelida bor).
+
+Cron (`workers/cron.py`) ro'yxati: davlat hisobotini kunlik tekshirish, qarz eslatmasi, takrorlanuvchi xarajat eslatmasi, 48/72 soat chegarasi monitoringi, **kam qoldiq tekshiruvi** (US-M04-02: `stock_balances.qty <= products.min_stock`, kuniga 1 marta; bir tovar uchun kuniga bitta xabar), **yaroqlilik muddati** (US-M04-06), **obuna eslatmalari va `grace` → `restricted` o'tishi** (US-M17-03), **kunlik Telegram hisobot** (US-M18-02) — `SAQ`ning o'z `CronJob`i bilan, alohida `scheduler` konteyneri sifatida ishga tushadi (`00-umumiy-arxitektura.md`dagi "Rejalashtiruvchi" komponenti). *(2026-10-14: tekshiruv)*
+
+**Worker/scheduler'da tenant konteksti**: har job'ning birinchi argumenti — majburiy `tenant_id` (`outbox_jobs.tenant_id`dan); job tanasi `async with tenant_transaction(session, tenant_id):` ichida bajariladi, `tenant_id`'siz job darhol xato bilan tugaydi. Scheduler (cron) biznes so'rovi bajarmaydi: `SECURITY DEFINER` funksiyasi `list_active_tenant_ids()` orqali tenantlarni olib, **har tenant uchun alohida job** navbatga qo'yadi. Platformaviy job'lar (obuna holati, billing) ham shu fan-out orqali tenant kontekstida ishlaydi; RLS'ni chetlab o'tadigan worker roli yo'q. *(2026-10-14: tekshiruv)*
 
 ---
 
@@ -231,23 +250,23 @@ sequenceDiagram
 | ORM | **SQLAlchemy 2 (async) + asyncpg** | Namuna loyihada sinalgan; 2.0 stili (`Mapped[...]`) tip xavfsizligini beradi |
 | Migratsiya | **Alembic** (asinxron `env.py`, namunadagidek) | Zero-downtime siyosati (13-bo'lim) uchun standart vosita |
 | UUID | **uuid-utils** (Rust bog'lovchi, UUIDv7) | `01-malumotlar-modeli.md` UUIDv7 qarorini qo'lda implementatsiya qilmasdan tez generatsiya qiladi |
-| Navbat/worker | **arq** | 4-bo'lim — asinxron stack bilan tabiiy mos |
-| Kesh/navbat broker | **redis** (`redis-py` asinxron klient) | arq broker + sessiya/kesh/rate-limit (`00-umumiy-arxitektura.md`) |
+| Navbat/worker | **SAQ** | 4-bo'lim — asinxron stack bilan tabiiy mos, o'rnatilgan monitoring UI *(2026-10-14: tekshiruv)* |
+| Kesh/navbat broker | **redis** (`redis-py` asinxron klient) | SAQ broker + sessiya/kesh/rate-limit (`00-umumiy-arxitektura.md`) |
 | Tashqi HTTP | **httpx** (async) | OFD/e-faktura/Click/Payme/SMS/Telegram/Claude API — bitta klient, async |
 | Qayta urinish | **tenacity** | Har integratsiya adapterida exponential backoff + jitter — qo'lda `for`/`sleep` yozilmaydi |
 | Pagination | **fastapi-pagination** | Cursor va page/size — qo'lda offset/limit hisoblanmaydi (3-bo'lim) |
-| Filtrlash | **fastapi-filter** | Deklarativ query filtr, SQLAlchemy modeliga bog'langan |
+| Filtrlash | **fastapi-filter** | Deklarativ query filtr, SQLAlchemy modeliga bog'langan. `filter.sort(filter.filter(select(Model)))` → `await session.execute(...)` yoki `fastapi_pagination.ext.sqlalchemy.paginate(session, stmt)` (AsyncSession qo'llab-quvvatlanadi). Versiya: ≥3.0 (SQLAlchemy 2.0). *(2026-10-14: tekshiruv)* |
 | Logging | **structlog** | JSON struktura log, tenant/so'rov ID context — namuna loyihadagi JSONL log yondashuvi |
 | Trace | **OpenTelemetry** (FastAPI + SQLAlchemy instrumentatsiyasi) | So'rov → posting → worker zanjirini kuzatish |
 | Metrika | **prometheus-client** | `/metrics`; posting latensiyasi, navbat chuqurligi, AI xarajati |
 | Xato kuzatish | **sentry-sdk** | FastAPI/Starlette integratsiyasi tayyor |
 | Parol/PIN hash | **passlib[argon2]** (argon2-cffi) | Argon2 — zamonaviy standart, OWASP tavsiyasi |
-| CSRF | **itsdangerous** | Django/Flask'da sinalgan imzolash primitiv; cookie-based sessiyada double-submit token uchun yetarli, `fastapi-csrf-protect`ka nisbatan ko'proq qo'llab-quvvatlanadi |
+| CSRF | **itsdangerous** | Django/Flask'da sinalgan imzolash primitiv; cookie-based sessiyada sessiyaga bog'langan sinxronizator-token uchun yetarli, `fastapi-csrf-protect`ka nisbatan ko'proq qo'llab-quvvatlanadi |
 | Rate limit | **slowapi** | `limits` kutubxonasini o'raydi, Redis backend, FastAPI dependency sifatida |
 | Fayl yuklash | **python-multipart** | FastAPI'ga fayl/forma qabul qilish uchun shart (xarajat cheki fotosi, Excel import) |
 | S3 | **aioboto3** | Async stack bilan bir xil event loop (sync `boto3` emas) |
 | Excel | **openpyxl** | Boshlang'ich katalog/qoldiq/qarz importi (US-M04-04, US-M08-07), hisobot eksporti (M12) |
-| Shtrix-kod/yorliq | **python-barcode** (EAN-13, ichki kod) + **treepoem** (Ghostscript orqali DataMatrix/boshqa format — markirovka kodini yorliqda chop etish uchun rasmga aylantirish) | Ikkisi birga MVP kerak bo'lgan barcha format turini qamrab oladi |
+| Shtrix-kod/yorliq | **python-barcode** (MIT; EAN-13, Code128) + **zxing-cpp** (Apache-2.0; DataMatrix/QR server PDF uchun) | Yorliqlar asosan brauzerda `bwip-js` (MIT, GS1 DataMatrix ham) bilan chiziladi. `treepoem` **taqiqlangan**: Ghostscript AGPL/tijoriy — SaaS'da manba kodini ochish yoki Artifex litsenziyasini talab qiladi *(2026-10-14: tekshiruv)* |
 | Telegram bot | **aiogram** | Asinxron, FastAPI bilan bir xil stack; `00-umumiy-arxitektura.md`da allaqachon tanlangan |
 | AI | **anthropic** (rasmiy SDK), `api` rejimida | README qarori: Claude API (Haiku 5.5), `AiProvider` porti — `fake`/`cli` (dev) / `api` (prod) |
 | Vaqt/muddat | **pendulum** | 5 kalendar kun (M10), 48/72 soat (M01/M06), qarz eskirish guruhlari (0-30/31-60/60+, M08) — qo'lda `timedelta` arifmetikasi o'rniga o'qiladigan davr hisob-kitobi; saqlash — `TIMESTAMPTZ`/stdlib `zoneinfo` (Asia/Tashkent) |
@@ -266,7 +285,7 @@ sequenceDiagram
 |---|---|---|
 | Domain/bitlik | `pytest` + `factory-boy` (fixture factory, SQLAlchemy'siz) | Posting qoidalari — 2.2-bandidagi kabi **sonli misollar**: FIFO/AVECO hisob-kitobi, QQS summasi, qarz limiti chegarasi, chegirma manfiy narxga olib kelmasligi. Har holat — Given/When/Then (mahsulot hujjatlaridagi US formatiga mos) |
 | Integratsiya | `pytest-asyncio` + `testcontainers[postgres]` | Haqiqiy PostgreSQL konteynerida: posting tranzaksiyasi, parallel ikki sotuv bitta oxirgi tovarga (`FOR UPDATE` ishlayotganini tekshirish), recost job, Alembic migratsiyalarini oxirigacha ishga tushirish |
-| RLS izolyatsiya | `testcontainers[postgres]` | Ikki tenant yaratiladi, `tenant_id=A` kontekstida yozilgan qator `tenant_id=B` kontekstidan **ko'rinmasligi** tasdiqlanadi (RLS siyosati + `SET LOCAL` ikkisi birga); RLS siyosati ataylab o'chirilgan holat ham testlanadi (kod xatosi RLS'siz ham xavfsiz qolishini tekshirish uchun — ikkinchi himoya qatlami, Asosiy xulosa 4) |
+| RLS izolyatsiya | `testcontainers[postgres]` | Ikki tenant yaratiladi, `tenant_id=A` kontekstida yozilgan qator `tenant_id=B` kontekstidan **ko'rinmasligi** tasdiqlanadi (RLS siyosati + `set_config('app.tenant_id', …, true)` ikkisi birga, `tenant_transaction()` ichida); RLS siyosati ataylab o'chirilgan holat ham testlanadi (kod xatosi RLS'siz ham xavfsiz qolishini tekshirish uchun — ikkinchi himoya qatlami, Asosiy xulosa 4). Worker: tenant A job'i B'ni ko'rmasligi, `tenant_id`'siz job rad etilishi, bitta ulanishda ketma-ket job'lar orasida kontekst qolmasligi (`05-xavfsizlik-va-audit.md` §3.3). *(2026-10-14: tekshiruv)* |
 | Kontrakt | `schemathesis` | Ishga tushirilgan API'ning `/openapi.json`'idan avtomatik so'rov generatsiyasi — frontend orval generatsiyasi bilan backend sxemasi mos kelishini kafolatlaydi (CI'da `api:gen` tekshiruvi bilan birga) |
 | E2E (tanlab) | `httpx.AsyncClient` + `pytest-asyncio` | Bitta hujjat oqimi boshidan oxirigacha: sotuv → qaytarish → buxgalteriya yozuvi → hisobot |
 
@@ -294,8 +313,8 @@ services:
   migrate:    # bir martalik: alembic upgrade head (profile: tools)
   seed:       # bir martalik: python -m app.cli seed (profile: tools)
   api:        # uvicorn --reload, host portga chiqarilgan, AI_MODE=fake|cli
-  worker:     # arq app.workers.worker_settings.WorkerSettings
-  scheduler:  # arq --watch yoki cron rejimi
+  worker:     # SAQ app.workers.worker_settings orqali
+  scheduler:  # SAQ CronJob rejimi
   bot:        # aiogram polling (dev'da webhook shart emas)
 ```
 
@@ -345,6 +364,7 @@ Namuna loyihadan **farqlanadi** (chunki u — bitta tenant/bitta stack, bu loyih
 | `scheduler` | Bitta nusxa, muammosiz | **Yagona nusxa bo'lishi shart** (cron ikki marta ishlamasligi uchun) — Postgres advisory lock (`pg_try_advisory_lock`) bilan yetakchi tanlanadi, bir nechta `scheduler` konteyneri ishga tushsa ham faqat biri faol bo'ladi |
 | Baza | Konteynerdagi Postgres | **UzCloud boshqariladigan DBaaS** (managed Postgres) — konteyner emas |
 | Fayl ombori | Yo'q | S3-mos ombor (UzCloud'da mavjudligi — `00-umumiy-arxitektura.md` ochiq savol 2) |
+| Ulanish pool'i | — | MVP: tashqi pooler yo'q — SQLAlchemy `AsyncAdaptedQueuePool` (asyncpg), `pool_size`/`max_overflow` × api+worker nusxalari soni DBaaS `max_connections` dan kichik. Pooler qo'shilsa (PgBouncer, **transaction** rejimi): PgBouncer ≥1.21 `max_prepared_statements` yoqiladi, yoki asyncpg `prepared_statement_cache_size=0` + `prepared_statement_name_func` (uuid nomlar). Session darajasidagi `SET` taqiqlanadi — tenant faqat `set_config(..., true)` bilan tranzaksiya ichida (1-bo'lim). UzCloud DBaaS'da o'rnatilgan pooler bor-yo'qligi — ochiq savol *(2026-10-14: tekshiruv)* |
 
 ---
 
@@ -381,9 +401,10 @@ Seed — Alembic "data migration" emas (bazani versiyalash bilan aralashtirmasli
 2. **CI vositasi**: quvur bosqichlari (7.1-band) tasdiqlangan, lekin aniq platforma (GitHub Actions/GitLab CI/boshqa) — ochiq.
 3. **OpenTelemetry eksport nuqtasi**: UzCloud'da Grafana Tempo/Jaeger kabi xizmat bormi — tekshirish kerak (`00-umumiy-arxitektura.md` ochiq savol 2 bilan bog'liq, S3-mos ombor savoli ham hali ochiq).
 4. **`scheduler`ning yagona nusxa kafolati**: Postgres advisory lock taklif qilindi (9-bo'lim) — Redis-based lock (`redis-py` + `SET NX` TTL bilan) muqobil variant, ikkisidan biri tasdiqlanishi kerak.
-5. **CSRF kutubxonasi**: `itsdangerous` tanlandi (xavfsizlik jamoasi/`05-xavfsizlik-va-audit.md` bilan yakuniy tasdiq kerak — ayniqsa Telegram bot va mobil (keyingi Android) klient uchun cookie-based CSRF qanday ishlashi).
+5. ~~CSRF kutubxonasi~~ — Yopildi: sinxronizator-token (`GET /api/v1/auth/csrf`), CSRF cookie yo'q; Android Bearer CSRF tekshiruvidan ozod (3-bo'lim). *(2026-10-14: tekshiruv)*
 6. **Aniq ruxsat kodlari ro'yxati** (`permissions`) va **NSBU №21 hisob raqamlari** (`ledger_entries.account_dt/kt`) — bu hujjatda ataylab keltirilmadi, `05-xavfsizlik-va-audit.md` va `02-provodka-qoidalari.md`da (buxgalter tasdig'i shart) aniqlanadi.
 7. **`recost_jobs` va davr yopish orasidagi aniq biznes qoida** (kim davrni qayta ocha oladi, qanday audit bilan) — `02-provodka-qoidalari.md`da batafsil.
+8. **`zxing-cpp`ning GS1 DataMatrix (FNC1) chiqishi** Asl belgisi talabiga mosligi birinchi sprintda sinab ko'riladi; mos kelmasa server yorlig'i ham `bwip-js` (Node) orqali. *(2026-10-14: tekshiruv)*
 
 ## Manbalar
 

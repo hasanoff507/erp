@@ -57,8 +57,8 @@ flowchart LR
 | Veb ilova | React + Vite + TS, FSD, Effector, shadcn/ui, PWA | Back-office va veb-kassa (`08-frontend-arxitekturasi.md`) |
 | Android POS | Kotlin, SQLite (Room) | Keyingi bosqich (`10-android-pos.md`) |
 | API | Python 3.13, FastAPI, Pydantic v2, SQLAlchemy 2 + Alembic | Barcha biznes amallar, autentifikatsiya, huquqlar |
-| Worker'lar | Python, `arq` (Redis navbati; `09-backend-arxitekturasi.md`) | Tashqi tizimlarga yuborish, qayta urinish, AI, xabarlar |
-| Rejalashtiruvchi | worker ichida cron (masalan `arq` cron) | Kunlik hisobot, eslatmalar, obuna muddati, davlat hisobotini tekshirish |
+| Worker'lar | Python, `SAQ` (Redis navbati; `09-backend-arxitekturasi.md`) *(2026-10-14: tekshiruv — arq o'rniga SAQ)* | Tashqi tizimlarga yuborish, qayta urinish, AI, xabarlar |
+| Rejalashtiruvchi | worker ichida cron (masalan `SAQ` cron) | Kunlik hisobot, eslatmalar, obuna muddati, davlat hisobotini tekshirish |
 | Baza | PostgreSQL 16+ (UzCloud DBaaS) | Hamma ma'lumot, RLS bilan tenant ajratish |
 | Kesh/navbat | Redis | Navbat, rate-limit, sessiya keshi |
 | Fayllar | S3-mos ombor | Xarajat cheki fotosi, OCR rasmlari, PDF hisobotlar |
@@ -68,7 +68,7 @@ flowchart LR
 
 ## 2. Asosiy oqimlar
 
-**Kassa sotuvi (onlayn):** veb-kassa → lokal yozuv (Dexie) → `POST /sales` (Idempotency-Key) → backend: hujjat + qoldiq registri + qarz/kassa harakati + buxgalteriya provodkasi **bitta tranzaksiyada** → navbatga "OFD'ga yuborish" ishi → worker → OFD → fiskal belgi chekka yoziladi → veb-kassaga qaytadi.
+**Kassa sotuvi (onlayn):** veb-kassa → lokal yozuv (Dexie outbox, `client_event_id`) → `POST /sync/push` (darhol, bitta voqea) → backend: hujjat + qoldiq registri + qarz/kassa harakati + buxgalteriya provodkasi **bitta tranzaksiyada** → navbatga "OFD'ga yuborish" ishi → worker → OFD → fiskal belgi keyingi pull'da veb-kassaga qaytadi. POS uchun alohida `POST /sales` yo'q — onlayn va offline yo'l bitta (`04-offline-sync.md` §4.1). *(2026-10-14: tekshiruv)*
 
 **Kassa sotuvi (offline):** lokal yozuv → outbox kutadi → internet qaytgach yuboriladi; 48 soat chegarasi kuzatiladi (`04-offline-sync.md`).
 
@@ -103,7 +103,7 @@ Deploy: Docker konteynerlar (api, worker, scheduler, web statik, bot) + boshqari
 
 ## Ochiq savollar
 
-1. ~~Navbat kutubxonasi~~ — hal qilindi: `arq` (`09-backend-arxitekturasi.md`, 4.1).
+1. ~~Navbat kutubxonasi~~ — hal qilindi: `SAQ` (`09-backend-arxitekturasi.md`, 4-bo'lim). *(2026-10-14: tekshiruv — arq o'rniga SAQ, python-arq/arq#510 texnik xizmat rejimi)*
 2. Fayl ombori: UzCloud'da S3-mos xizmat bormi va narxi — tekshirish kerak (`07-hosting-...md`).
 3. Ma'lumotlarni O'zbekistonda saqlash majburiy emas (faqat biometrik/genetik/telekom), lekin Claude API'ga yuboriladigan ma'lumot hajmini cheklash siyosati — `07-ai-qatlami.md`.
 

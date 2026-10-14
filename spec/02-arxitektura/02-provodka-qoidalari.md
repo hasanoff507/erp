@@ -14,8 +14,10 @@
 > 6. Karta/Click/Payme/Uzum to'lovlari uchun **klirinig (vositachi) hisobi** — bu hujjatda to'g'ridan-to'g'ri **5110 (bank)**ga yozilgan, lekin komissiya va kechikish tufayli alohida oraliq sub-hisob kerak bo'lishi mumkin.
 > 7. Boshlang'ich qarz balansini kiritishda qarshi hisob (**8720**) to'g'riligi.
 > 8. QQS yaxlitlash qoidasi (qator bo'yicha tiyingacha, so'ng yig'indi) — OFD/soliq.uz rasmiy talablari bilan.
-> 9. Aylanma solig'i stavkasi (4% / 1%) — aniq Soliq kodeksi moddasi raqami bilan.
+> 9. ~~Aylanma solig'i stavkasi (4% / 1%) — aniq Soliq kodeksi moddasi raqami bilan.~~ **Hal qilindi**: Soliq kodeksi 467-moddasi, O'RQ-1108 tahririda — pastdagi Asosiy xulosalar 5-band va 4.3-bo'lim *(2026-10-14: tekshiruv)*.
 > 10. Ish haqi to'lovini **6710** orqali ikki bosqichli (hisoblash + to'lash) yozish kerakligi — yoki MVP'da to'g'ridan-to'g'ri xarajat sifatida yetarli ekanligi.
+> 11. Yetkazib beruvchiga qaytarish (2.20) va bepul olingan/berilgan tovar (bonus, sovg'a, "2+1") ning QQS va hisob tartibi *(2026-10-14: tekshiruv)*.
+> 12. Boshlang'ich tovar qoldig'ida (2.21) qarshi hisob sifatida 8720 to'g'riligi *(2026-10-14: tekshiruv)*.
 
 ## Asosiy xulosalar
 
@@ -23,7 +25,7 @@
 2. MVP buxgalteriyasi faqat **savdo/ombor/kassa/qarz/xarajat** operatsiyalaridan kelib chiqadigan asosiy hisoblarni avtomatlashtiradi (tovar, kassa, bank, hisob-kitob, QQS, daromad/xarajat) — asosiy vositalar, ish haqi hisoblash (faqat to'lov), to'liq kapital harakati MVP'dan tashqarida.
 3. Har bir hujjat o'tkazilganda **bitta tranzaksiyada** `ledger_entries` (Dt/Kt/summa/analitika) yoziladi; hujjat bekor qilinganda yangi, teskari (storno) yozuv qo'shiladi — hech qachon tahrirlanmaydi (`01-malumotlar-modeli.md`, 1-band).
 4. Tannarx (COGS, 9120-hisob) **FIFO** yoki **AVECO** (tenant sozlamasi, US-M04-05) bo'yicha `stock_lots`dan hisoblanadi; o'tgan sanali hujjat kelsa — qayta hisoblash (`recost_jobs`), yopilgan davrga tegmaydi.
-5. QQS (12% standart, 0% imtiyozli, 6% ixtiyoriy) har sotuv/xaridda ajratiladi; ichki QQS yig'indisi (`vat_moves`) 2026-01-01'dan davlat tuzgan hisobot bilan **5 kalendar kun** ichida solishtiriladi (Soliq kodeksi 81-moddasi, O'RQ-1108). QQS to'lamaydigan biznes uchun **aylanma solig'i** (4% standart 2026, ba'zi holatlarda 1% — O'RQ-1108) muqobil.
+5. QQS (12% standart, 0% imtiyozli, 6% ixtiyoriy) har sotuv/xaridda ajratiladi; ichki QQS yig'indisi (`vat_moves`) 2026-01-01'dan davlat tuzgan hisobot bilan **5 kalendar kun** ichida solishtiriladi (Soliq kodeksi 81-moddasi, O'RQ-1108). QQS to'lamaydigan biznes uchun **aylanma solig'i** (Soliq kodeksi 467-moddasi, O'RQ-1108 tahririda: umumiy 4%; chakana savdo — 100 ming+ aholili shaharda 4%, boshqa aholi punktida 2%, borish qiyin/tog'li tumanda 1%; YTT va o'zini o'zi band qilganlar 1%) muqobil *(2026-10-14: tekshiruv)*.
 6. Oy yopish (`period_closings`) — shundan keyingi sanaga yozish/qayta hisoblash taqiqlanadi; yillik yopishda daromad/xarajat hisoblari (9000-guruh) yakuniy natija hisobiga (9910) va undan kapitalga (8710) yopiladi.
 7. Ko'p filial: har `ledger_entry`da `branch_id` analitika; filiallararo ko'chirish **2970 (yo'ldagi tovarlar)** oraliq hisobi orqali o'tadi.
 
@@ -123,7 +125,7 @@ Umumiy: `Kt 6010` = faktura summasi (QQS bilan) = qatorlar 1+2 yig'indisi.
 
 2.6/2.7 bilan bir xil, faqat `Kt 6010` o'rniga `Kt 5010` yoki `Kt 5110` to'g'ridan-to'g'ri (kreditorlik qarzi umuman ochilmaydi).
 
-**"Qizil" e-faktura qoidasi** (VM Qarori №830): agar faktura yuqori xavfli deb belgilansa, 2-qator (`Dt 4410`) **to'lov amalga oshirilgunga qadar yozilmaydi** — QQS krediti faqat `supplier_payment` o'tkazilganda (2.12-bo'lim) qo'shiladi (US-M07-04, US-M10-03).
+**"Qizil" e-faktura qoidasi** (VM Qarori №830): agar faktura yuqori xavfli deb belgilansa, 2-qator (`Dt 4410`) **to'lov amalga oshirilgunga qadar yozilmaydi** — QQS krediti faqat `supplier_payment` o'tkazilganda (2.16-bo'lim) qo'shiladi (US-M07-04, US-M10-03). `vat_moves(kind=input)` ham shu paytgacha yozilmaydi (4.1). *(2026-10-14: tekshiruv)*
 
 ### 2.9 Ko'chirish — jo'natish (filiallararo)
 
@@ -151,6 +153,8 @@ Umumiy: `Kt 6010` = faktura summasi (QQS bilan) = qatorlar 1+2 yig'indisi.
 | # | Dt | Kt | Summa |
 |---|---|---|---|
 | 1 | 9430 (javobgar shaxs yo'q) yoki 4730 (javobgar shaxs bor) | 2910 | Tannarx |
+
+Sabab `gift` (bepul berish): QQS oqibati — ogohlantirish 11-band. *(2026-10-14: tekshiruv)*
 
 ### 2.13 Boshlang'ich qarz balansi (debt_openings)
 
@@ -181,7 +185,7 @@ Faqat Egasi tasdig'i bilan (US-M08-10), audit jurnaliga yoziladi.
 |---|---|---|---|
 | 1 | 6010 | 5010/5110 | To'langan summa (`allocations`) |
 
-Agar faktura "qizil" bo'lsa — shu tranzaksiyada 2.8'dagi kechiktirilgan `Dt 4410 / Kt 6010` QQS yozuvi ham qo'shiladi (QQS krediti endi ochiladi).
+Agar faktura "qizil" bo'lsa — shu tranzaksiyada 2.8'dagi kechiktirilgan `Dt 4410 / Kt 6010` QQS yozuvi ham qo'shiladi (QQS krediti endi ochiladi). Qisman to'lovda QQS krediti `allocations` summasiga proporsional ochiladi (**taxmin**, buxgalter tasdig'i kerak); bir vaqtning o'zida `vat_moves(kind=input)` yoziladi. *(2026-10-14: tekshiruv)*
 
 ### 2.17 Xarajat (expense, manba bo'yicha)
 
@@ -190,6 +194,8 @@ Agar faktura "qizil" bo'lsa — shu tranzaksiyada 2.8'dagi kechiktirilgan `Dt 44
 | Kassa naqdi | 9410 yoki 9420 (toifaga qarab — band 3) | 5010 | Xarajat summasi |
 | Bank | 9410 yoki 9420 | 5110 | Xarajat summasi |
 | Karta | 9410 yoki 9420 | 5110 | Xarajat summasi |
+
+*Kassa naqdi*: `ExpensePostingService` shu tranzaksiyada `cash_moves(−, doc_type=expense, cash_register_id, shift_id)` ham yozadi; `cash_movements` hujjati yaratilmaydi. *(2026-10-14: tekshiruv)*
 
 Toifa → hisob moslashuvi (**taxmin**, buxgalter tasdig'i kerak): Ijara/Transport/Boshqa → odatda 9410 (savdo maydoni bilan bog'liq) yoki 9420 (umumiy boshqaruv) — do'kon tipiga qarab; Ish haqi → 9420 (yoki 6710 orqali ikki bosqichli, agar kelajakda ish haqi hisoblash moduli qo'shilsa); Kommunal → 9410/9420; Ta'mirlash → 9420; Soliq va yig'imlar (ish haqiga bog'liq bo'lmagan) → 6410/9420.
 
@@ -200,11 +206,30 @@ Toifa → hisob moslashuvi (**taxmin**, buxgalter tasdig'i kerak): Ijara/Transpo
 | Inkasso (bankka topshirish) | 5110 | 5010 | Oddiy kassa→bank o'tkazmasi |
 | Pul qo'yish (bankdan/maydalash puli) | 5010 | 5110 | Teskarisi |
 | Egasi oldi (shaxsiy ehtiyoj) | 8720 (**taxmin**) | 5010 | Aniq "Egasi bilan hisob-kitob" hisobi tasdiqlanmagan |
-| Xarajat to'lovi | — (provodka yaratilmaydi) | — | M15 xarajat hujjatining o'zi 2.17-bandidagi yozuvni yaratadi; M16 faqat `cash_moves` registrini yuritadi, ikki marta yozilmasligi uchun |
+
+Kassadan to'langan xarajat — M16 hujjati emas, M15 `expenses` (source=`cash`); `cash_moves` va provodkani `ExpensePostingService` yozadi (2.17). *(2026-10-14: tekshiruv)*
 
 ### 2.19 Smena ochilishi/yopilishi (shift)
 
 Buxgalteriya provodkasi **yaratilmaydi** — faqat boshlang'ich/sanalgan naqd `cash_moves`/holat sifatida qayd etiladi. Smena yopilganda aniqlangan farq (US-M16-02) 2.11-bandidagi kamomad/ortiqcha qoidasi bo'yicha yoziladi (`Dt 4730`/`5910` yoki `Kt 9300-oilasi`).
+
+### 2.20 Yetkazib beruvchiga qaytarish (`supplier_return`) *(2026-10-14: tekshiruv)*
+
+| # | Dt | Kt | Summa | Analitika |
+|---|---|---|---|---|
+| 1 | 6010 | 2910 | Qaytarilgan tovar tannarxi (FIFO — asl partiya; AVECO — joriy `avg_cost`) | yetkazib beruvchi, mahsulot, partiya |
+| 2 | 6010 | 4410 | Shu qismga to'g'ri keladigan kiritiladigan QQS (asl kirim QQS bilan bo'lsa) | tax_type=QQS, yetkazib beruvchi |
+| 3 (farq bo'lsa) | 6010 yoki 9430 | 9430 yoki 6010 | Faktura narxi bilan tannarx farqi (AVECO'da) — **taxmin** | hujjat |
+
+*Izoh:* kirim allaqachon to'langan bo'lsa, 6010 debet qoldig'i hosil bo'ladi (yetkazib beruvchi bizga qarzdor); pul qaytarilganda `Dt 5010/5110 / Kt 6010`. Asl faktura "qizil" va QQS hali yozilmagan bo'lsa (2.8, 4.1), 2-qator yozilmaydi va tegishli `vat_moves` yaratilmaydi. `vat_moves(kind=input)` manfiy summa bilan.
+
+### 2.21 Boshlang'ich tovar qoldig'i (`stock_openings`) *(2026-10-14: tekshiruv)*
+
+| # | Dt | Kt | Summa |
+|---|---|---|---|
+| 1 | 2910 | 8720 | Kiritilgan tannarx (yangi partiya) |
+
+*QQS yozilmaydi. 8720 — taxmin, 2.13 bilan bir xil (ogohlantirish 12-band).*
 
 ---
 
@@ -214,7 +239,7 @@ Buxgalteriya provodkasi **yaratilmaydi** — faqat boshlang'ich/sanalgan naqd `c
 
 - **FIFO**: chiqimda eng eski `stock_lot`dan boshlab yechiladi (`qty_left > 0` tartib bo'yicha); bitta chek bir nechta partiyaga bo'linishi mumkin.
 - **AVECO**: har kirimda `avg_cost = (eski_qty_left × eski_avg_cost + yangi_qty_in × yangi_narx) / (eski_qty_left + yangi_qty_in)` qayta hisoblanadi (ombor+mahsulot bo'yicha); chiqim joriy `avg_cost`da yechiladi.
-- Ikkalasi ham BHMS №4 (Moliya vaziri buyrug'i №24, 28.05.2020, 7-bob 62-band, [lex.uz/docs/-4890446](https://lex.uz/docs/-4890446)) ga mos — LIFO taqiqlangan.
+- Ikkalasi ham BHMS №4 (Moliya vaziri buyrug'i №24, 28.05.2020, AV 30.06.2020 №3259 bilan ro'yxatdan o'tgan, 7-bob 62-band, [lex.uz/docs/-4890446](https://lex.uz/docs/-4890446)) ga mos — LIFO taqiqlangan. *(2026-10-14: tekshiruv)*
 
 ### 3.2 Misol (ikki kirim, turli narxda + bitta sotuv)
 
@@ -226,15 +251,23 @@ Buxgalteriya provodkasi **yaratilmaydi** — faqat boshlang'ich/sanalgan naqd `c
 
 **FIFO**: 100 dona × 8 000 = 800 000 (Kirim 1 to'liq) + 20 dona × 9 000 = 180 000 (Kirim 2'dan) → **COGS = 980 000 so'm**; qoldiq = 30 dona × 9 000 = 270 000 so'm (Kirim 2'dan qolgan).
 
-**AVECO**: kirim 2'dan keyin `avg_cost = (100×8 000 + 50×9 000) / 150 = (800 000+450 000)/150 = 8 333,33 so'm`. Sotuv 120 dona × 8 333,33 = **COGS = 999 999,60 ≈ 1 000 000 so'm** (tiyingacha yaxlitlab); qoldiq = 30 dona × 8 333,33 ≈ 250 000 so'm.
+**AVECO**: kirim 2'dan keyin `avg_cost = (100×8 000 + 50×9 000) / 150 = 1 250 000/150 = 8 333,3333 so'm` (`NUMERIC(18,4)`, 5.3). Sotuv: 120 × 8 333,3333 = 999 999,996 → **COGS = 1 000 000,00 so'm** (tiyingacha). Qoldiq qiymati = 1 250 000,00 − 1 000 000,00 = **250 000,00 so'm** (30 dona; tekshiruv: 30 × 8 333,3333 = 249 999,999 ≈ 250 000,00). Qoldiq qiymati har doim `eski qiymat − COGS` sifatida yuritiladi (`qty × avg` emas) — yaxlitlash qoldig'i to'planmasligi uchun. *(2026-10-14: tekshiruv)*
 
 Provodka (ikkala usulda bir xil shaklda, faqat summasi farqli): `Dt 9120 / Kt 2910` = yuqoridagi COGS summasi.
+
+### 3.2a Qaytarish tannarxi *(2026-10-14: tekshiruv)*
+
+- Qaytarish **asl chek qatoridagi tannarxda** qabul qilinadi (`sale_lines.cost_amount / qty`), joriy `avg_cost` yoki joriy FIFO partiya narxida **emas**.
+- **FIFO**: `lot_allocations` bo'yicha asl partiyalarga teskari tartibda qaytariladi — `qty_left` ortadi, `unit_cost` o'zgarmaydi.
+- **AVECO**: qaytarish kirim kabi o'rtacha narxga qo'shiladi: `avg_cost = (qty_left × avg_cost + ret_qty × asl_birlik_tannarx) / (qty_left + ret_qty)` (3.1 formulasi bilan bir xil mantiq).
+- Ko'chirishda qabul qiluvchi ombor ham shu formulani qo'llaydi: unit cost sifatida jo'natuvchining tannarxi olinadi (2.10-band).
 
 ### 3.3 O'tgan sanali hujjat va qayta hisoblash
 
 - Kech kirim yoki kech sinxronlangan offline sotuv kelganda — shu sanadan keyingi barcha chiqimlar uchun `recost_jobs` navbatga qo'yiladi (tenant, warehouse, product, from_date); tegishli `ledger_entries` (9120/2910) yangi tuzatish yozuvi bilan qayta hisoblanadi (eski yozuv o'chirilmaydi, storno + yangi).
 - **Yopilgan davrga (`period_closings`) tegsa — qayta hisoblash rad etiladi**, buxgalter qo'lda keyingi ochiq davrda tuzatish kiritishi kerak (band 3.4).
 - Manfiy qoldiqda sotuv (offline to'qnashuv): tannarx vaqtincha oxirgi ma'lum narxda (`pending_cost`) yoziladi, keyingi kirimda `recost_jobs` orqali tuzatiladi.
+- **Qaytarish tannarxi**: FIFO — asl `lot_allocations` partiyalariga, asl tannarxda; AVECO — asl chek qatoridagi birlik tannarxida kirim sifatida, `avg_cost` 3.1 formulasi bilan qayta hisoblanadi (joriy `avg_cost` bilan emas) — tafsilot 3.2a. *(2026-10-14: tekshiruv)*
 
 ### 3.4 Davr yopish va COGS
 
@@ -258,18 +291,18 @@ flowchart LR
 ```
 
 - Har sotuv/qaytarish `ledger_entries`dagi 6410-yozuvi bilan bir vaqtda `vat_moves(kind=output, base_amount, vat_amount, doc_type, doc_id, einvoice_id)` yoziladi.
-- Har xarid (QQS bilan) `ledger_entries`dagi 4410-yozuvi bilan bir vaqtda `vat_moves(kind=input, ...)` yoziladi; agar faktura "qizil" bo'lsa, `vat_moves` yozuvi `pending` holatda saqlanadi (to'lovgacha ichki hisobga kirmaydi, VM Qarori №830).
+- Har xarid (QQS bilan) `ledger_entries`dagi 4410-yozuvi bilan bir vaqtda `vat_moves(kind=input, ...)` yoziladi; agar faktura "qizil" bo'lsa, `vat_moves` yozuvi **to'lov o'tkazilmaguncha yozilmaydi** (4410 bilan bir xil, 2.8/2.16, VM Qarori №830). Kutilayotgan kiruvchi QQS `einvoices` dan hisoblanadi (`risk_flag=red`, to'liq to'lanmagan) — alohida holat ustuni yo'q (append-only). *(2026-10-14: tekshiruv)*
 - E-faktura bilan bog'lanish: `einvoices.id` → `vat_moves.einvoice_id` (chiquvchi — B2B sotuv, kiruvchi — xarid fakturasi).
 
 ### 4.2 Ichki QQS figurasi (davlat hisoboti bilan solishtirish uchun, M10)
 
-`Ichki_QQS = SUM(vat_moves.vat_amount WHERE kind=output, period) − SUM(vat_moves.vat_amount WHERE kind=input, period, status != 'pending')`
+`Ichki_QQS = SUM(vat_moves.vat_amount WHERE kind=output, period) − SUM(vat_moves.vat_amount WHERE kind=input, period)` *(2026-10-14: tekshiruv — `status` ustuni yo'q, 4.1)*
 
 Bu summa 2026-01-01'dan davlat (Soliq qo'mitasi) o'zi tuzgan QQS hisoboti bilan solishtiriladi; farq topilsa, hisobot e'lon qilingan kundan **5 kalendar kun** ichida (lekin qonuniy topshirish muddatidan oshmay) tuzatish kiritiladi (Soliq kodeksi 81-moddasi, O'RQ-1108-son Qonun, 25.12.2025, [lex.uz/docs/-7944527](https://lex.uz/docs/-7944527)); muddat o'tsa — davlat shakllantirgan ko'rinishda avtomatik qabul qilinadi (`state_reports` holat mashinasi, `01-malumotlar-modeli.md` 8-bo'lim).
 
 ### 4.3 Aylanma solig'i (QQS to'lamaydigan biznes uchun)
 
-QQS to'lamaydigan tenant uchun 4410/6410(QQS)/`vat_moves` yozuvlari yaratilmaydi; o'rniga oy yakunida: `Aylanma_solig'i = Davr_aylanmasi (9020 netto + 9040/9050 tuzatilgan) × stavka`. 2026-yil standart stavka **4%** (3%'dan oshirilgan), yillik aylanmasi 1 mlrd so'mgacha bo'lgan yakka tartibdagi tadbirkor/o'zini-o'zi band qilganlar uchun **1%** — manba: O'RQ-1108-son Qonun (25.12.2025) asosidagi 2026-yil o'zgarishlari sharhi ([spot.uz, 2025-11-26](https://www.spot.uz/oz/2025/11/26/taxes-for-2026), [azma.uz](https://azma.uz/tpost/7ux0mbzis1-aylanmadan-olinadigan-soliq-2026-stavkal)) — **Soliq kodeksining aniq modda raqami bu tadqiqotda topilmadi, ochiq savol** (pastda). Ichki aylanma solig'i summasi ham xuddi QQS kabi davlat hisoboti bilan 5 kalendar kunlik tartibda solishtiriladi (US-M10-04).
+QQS to'lamaydigan tenant uchun 4410/6410(QQS)/`vat_moves` yozuvlari yaratilmaydi; o'rniga oy yakunida: `Aylanma_solig'i = Davr_aylanmasi (9020 netto + 9040/9050 tuzatilgan) × stavka`. 2026-yil stavkalari — Soliq kodeksi **467-moddasi** (66-bob; O'RQ-1108 tahririda, 2026-01-01'dan): umumiy **4%**; chakana savdo joylashuvga qarab **4% / 2% / 1%** (100 ming+ aholili shahar / boshqa aholi punkti / borish qiyin va tog'li tuman — `branches.settlement_category`, `01-malumotlar-modeli.md` 3-bo'lim), tamaki **4%**; YTT va o'zini o'zi band qilganlar **1%**. Aylanma solig'i to'lovchisi bo'lish chegarasi (jami daromad 1 mlrd so'mgacha) — 461-modda ([lex.uz/docs/4674902](https://lex.uz/docs/4674902)). Shuning uchun tenant/filial sozlamasida "aholi punkti toifasi" maydoni kerak. Ichki aylanma solig'i summasi ham xuddi QQS kabi davlat hisoboti bilan 5 kalendar kunlik tartibda solishtiriladi (US-M10-04). *(2026-10-14: tekshiruv)*
 
 ---
 
@@ -295,7 +328,7 @@ flowchart TD
 
 ### 5.2 Teskari (storno) qoidasi
 
-Hujjat bekor qilinganda (`status=cancelled`, `reversal_of_id`): asl `ledger_entries` qatorlari **o'zgartirilmaydi**; har bir asl qator uchun **Dt/Kt o'rni almashtirilgan** (yoki manfiy summali) yangi qator qo'shiladi, `doc_id` = bekor qiluvchi hujjat, `reversal_of_id` = asl hujjat. Bu qoida `stock_moves`, `debt_moves`, `cash_moves`, `vat_moves` uchun ham bir xil (append-only, hech qachon UPDATE/DELETE).
+Hujjat bekor qilinganda (`status=cancelled`, `cancelled_at`, `cancelled_by`, `cancel_reason`): asl `ledger_entries` qatorlari **o'zgartirilmaydi**; har bir asl qator uchun Dt/Kt o'rni almashtirilgan yangi qator qo'shiladi: `doc_id` = **asl** hujjat, `reversal_of_id` = teskari qilinayotgan asl registr qatori, sana = bekor qilish sanasi (joriy ochiq davr). Alohida teskari hujjat yaratilmaydi. Bu qoida `stock_moves`, `debt_moves`, `cash_moves`, `vat_moves` uchun ham bir xil (append-only, hech qachon UPDATE/DELETE). *(2026-10-14: tekshiruv)*
 
 ### 5.3 Yaxlitlash
 
@@ -315,13 +348,14 @@ Hujjat bekor qilinganda (`status=cancelled`, `reversal_of_id`): asl `ledger_entr
 
 1. Yuqoridagi "Buxgalter tasdiqlanishi shart" bandidagi barcha 10 punkt — eng muhimi, to'liq rasmiy hisoblar ro'yxati (191-son buyruq to'liq ilovasi, 0870-hisob bilan) hali o'qilmadi.
 2. QQS yaxlitlash qoidasi (qator-bo'yicha tiyingacha) — rasmiy OFD/soliq.uz hujjatida tasdiqlanmagan, **taxmin**.
-3. Aylanma solig'ining aniq Soliq kodeksi moddasi raqami — faqat ikkinchi darajali manbalarda (spot.uz, azma.uz) 4%/1% stavkasi topildi, birlamchi modda raqami yo'q.
-4. Karta/Click/Payme/Uzum uchun alohida klirinig (oraliq) hisobi kerakligi — MVP'da to'g'ridan-to'g'ri 5110'ga yozilgan, **taxmin**.
-5. Ortiqcha (inventarizatsiya, 2.11-band) uchun aniq daromad hisob kodi topilmadi.
-6. Boshlang'ich qarz balansini kiritishda qarshi hisob (8720) to'g'riligi tasdiqlanmagan.
-7. Ish haqi to'lovini 6710 orqali ikki bosqichli yozish yoki MVP'da to'g'ridan-to'g'ri xarajat (9420) sifatida qolishi — biznes/buxgalter qarori kerak.
-8. Ko'p yuridik shaxsli (filiallar turli STIR/QQS holatida) tenant — MVP modelida yo'q, kelajakda kerak bo'lishi mumkin.
-9. M16'dagi "Egasi oldi" operatsiyasi uchun aniq qarshi hisob (8720 taxmin qilindi, aslida "Egasi bilan hisob-kitoblar" alohida sub-hisob kerak bo'lishi mumkin).
+3. Karta/Click/Payme/Uzum uchun alohida klirinig (oraliq) hisobi kerakligi — MVP'da to'g'ridan-to'g'ri 5110'ga yozilgan, **taxmin**.
+4. Ortiqcha (inventarizatsiya, 2.11-band) uchun aniq daromad hisob kodi topilmadi.
+5. Boshlang'ich qarz balansini kiritishda qarshi hisob (8720) to'g'riligi tasdiqlanmagan.
+6. Ish haqi to'lovini 6710 orqali ikki bosqichli yozish yoki MVP'da to'g'ridan-to'g'ri xarajat (9420) sifatida qolishi — biznes/buxgalter qarori kerak.
+7. Ko'p yuridik shaxsli (filiallar turli STIR/QQS holatida) tenant — MVP modelida yo'q, kelajakda kerak bo'lishi mumkin.
+8. M16'dagi "Egasi oldi" operatsiyasi uchun aniq qarshi hisob (8720 taxmin qilindi, aslida "Egasi bilan hisob-kitoblar" alohida sub-hisob kerak bo'lishi mumkin).
+
+*(2026-10-14: tekshiruv — eski 3-band ("aylanma solig'i moddasi raqami noaniq") o'chirildi: Soliq kodeksi 467-moddasi aniqlandi, Asosiy xulosalar 5-band va 4.3-bo'lim.)*
 
 ## Manbalar
 

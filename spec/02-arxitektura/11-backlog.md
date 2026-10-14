@@ -16,19 +16,21 @@
 
 | Ish | Natija |
 |---|---|
-| Backend skeleti (`09-backend-arxitekturasi.md`): FastAPI, `app/core` (tenant konteksti, RLS, auth, xatolar, idempotentlik), Alembic, arq worker, docker compose, CI | `GET /health`, RLS izolyatsiya testi yashil |
+| Backend skeleti (`09-backend-arxitekturasi.md`): FastAPI, `app/core` (tenant konteksti, RLS, auth, xatolar, idempotentlik), Alembic, SAQ worker, docker compose, CI | `GET /health`, RLS izolyatsiya testi yashil |
 | Veb skeleti (`08-frontend-arxitekturasi.md`): Turborepo, `apps/shell`, `@shared/api` (orval), `@shared/ui` (shadcn), `@shared/state`, i18n uz/ru, PWA | Login sahifasi va layout, generatsiya qilingan API klient |
 | Seed: rollar, ruxsatlar, o'lchov birliklari, xarajat toifalari, tariflar | `05-xavfsizlik-va-audit.md` matritsasi bazada |
 | **Tashqi:** rasmiy xatlarni yuborish (`research_notes/texnik/12-taxminlar-va-murojaatlar.md` + Didox, Faktura.uz, Click, Payme, Uzum uchun yangi xatlar) | Yuborilgan xatlar ro'yxati |
-| **Tashqi:** buxgalter bilan `02-provodka-qoidalari.md` ni tekshirish | Tasdiqlangan hisoblar rejasi |
+| **Tashqi:** buxgalter bilan `02-provodka-qoidalari.md` ni tekshirish | Tasdiqlangan hisoblar rejasi + `02-provodka-qoidalari.md` ogohlantirish blokidagi 12 band bo'yicha yozma javoblar jadvali *(2026-10-14: tekshiruv)* |
 | **Tashqi:** fiskal yo'l qarori (o'z reyestr yo'li va/yoki hamkor), SMS provayder tanlash | Qaror hujjati |
 | **Tashqi:** 15–20 do'kon egasi bilan suhbat, 5–10 pilot do'kon | Suhbat xulosasi, pilot ro'yxati |
+| **Tashqi:** huquqiy maslahat — (a) obuna kechikkanda kassani to'xtatmaslik (US-M17-03), (b) 48 soatdan keyin yangi sotuvni bloklamaslik (`04-offline-sync.md` §6), (c) markirovkalangan tovarni offline sotish (§7), (d) chekdan keyin e-faktura berish | Yozma huquqiy xulosa (5-sprintdan oldin) *(2026-10-14: tekshiruv)* |
 
 ## 1-sprint: ro'yxatdan o'tish va katalog
 
-- M17: telefon + SMS kod bilan ro'yxatdan o'tish, 30 kunlik sinov, do'kon sozlamalari (BO-21, BO-14).
-- M13/M14: xodim qo'shish, standart rollar, bitta filial va ombor avtomatik.
-- M09: tovarlar, shtrix-kodlar, MXIK kodi, narx va narx tarixi; US-M04-04 Excel import.
+- M17: telefon + SMS kod bilan ro'yxatdan o'tish, 30 kunlik sinov, do'kon sozlamalari (BO-21, BO-14); filial sozlamasida `branches.settlement_category` (`city_100k_plus`/`other`/`remote_mountain`, aylanma solig'i stavkasi uchun, SK 467-modda). *(2026-10-14: tekshiruv)*
+- M13/M14: xodim qo'shish, standart rollar, bitta filial va ombor avtomatik; US-M14-03 yangi filial qo'shish. *(2026-10-14: tekshiruv)*
+- M09: tovarlar, shtrix-kodlar, MXIK kodi, narx va narx tarixi; US-M04-04 import `import_jobs` orqali (yuklash → tekshirish/xatolar ro'yxati → tasdiqlash) va boshlang'ich qoldiq (`stock_openings`). *(2026-10-14: tekshiruv)*
+- SMS adapter (OTP, `03-integratsiyalar.md` §10) — 0-bosqichda tanlangan provayder bilan; tanlanmaguncha dev/staging'da `FakeSms`. *(2026-10-14: tekshiruv)*
 - **Tayyor bo'lish mezoni:** yangi do'kon 10 daqiqada ro'yxatdan o'tib, 500 ta tovarni Excel'dan yuklay oladi.
 
 ## 2-sprint: ombor va hujjat o'tkazish yadrosi
@@ -36,13 +38,15 @@
 - Posting xizmati (`09-…`, 2-bo'lim): hujjat → `stock_moves`, `stock_lots`, `ledger_entries`, `vat_moves` bitta tranzaksiyada; teskari hujjat.
 - M07 kirim (naqd va nasiyaga), yetkazib beruvchilar; M04 qoldiq, FIFO/AVECO (US-M04-05), qayta hisoblash ishi.
 - M06 ko'chirish, M05 inventarizatsiya (Must — US-M05-01…03; posting sinovi uchun ham foydali).
+- US-M07-05 yetkazib beruvchiga qaytarish; US-M04-06 hisobdan chiqarish + yaroqlilik muddati maydoni; BO-03 'Ko'chirishlar' tabi (US-M06-03). *(2026-10-14: tekshiruv)*
 - **Mezon:** `02-provodka-qoidalari.md` dagi raqamli misollar avtomatik testlarda o'tadi.
 
 ## 3-sprint: veb-kassa
 
-- M01 kassa (onlayn): qidiruv/skaner, chek, to'lov (naqd, karta, aralash), smena va Z-hisobot; chek chop etish (brauzer/printer — ochiq savol yechimi).
+- M01 kassa (onlayn): qidiruv/skaner, chek, to'lov (naqd, karta, aralash, **UzQR** — yuridik shaxslar uchun 2026-07-01'dan majburiy, PF-246 3-b; Click/Payme ixtiyoriy), smena va Z-hisobot; chek chop etish (brauzer/printer — ochiq savol yechimi). *(2026-10-14: tekshiruv — UzQR qo'shildi)*
 - M16 kassa pul harakati, smena oxirida naqdni sanash; M02 qaytarish; M03 chegirma (limit + PIN tasdiq).
 - Offline: Dexie keshi, outbox, `/sync/push`/`/sync/pull` (`04-offline-sync.md`).
+- BO-16 (M02/M03/M08/M16 turlari); BO-11 qurilmalar va bekor qilish; `sale.draft_voided`, qayta chop etish auditi. *(2026-10-14: tekshiruv)*
 - **Mezon:** internet o'chirilganda 2 soat savdo, keyin barcha cheklar yo'qotishsiz va takrorsiz sinxronlanadi.
 
 ## 4-sprint: qarz daftari, xarajatlar, hisobotlar, Telegram
@@ -50,6 +54,7 @@
 - M08 qarz daftari: tez qarz yozish (offline), mijoz daftari, boshlang'ich qarzlar, to'lov (eng eski qarzdan), va'da sanasi, qarzlar hisoboti, yetkazib beruvchiga qarz va unga to'lov (US-M08-11, US-M07-04 — `supplier_payments`, bank/naqd).
 - M15 xarajatlar (+ takrorlanuvchi), sof foyda.
 - M12 Egasi dashboard va asosiy hisobotlar; M18 Telegram bot: ulash va kunlik hisobot.
+- Filiallar bo'yicha va jami ko'rinish (US-M14-01, US-M04-03); kam qoldiq ogohlantirishi (US-M04-02). *(2026-10-14: tekshiruv)*
 - **Mezon:** pilot do'kon qog'oz daftarsiz bir hafta ishlaydi.
 
 ## 5-sprint: fiskal va e-faktura
@@ -57,6 +62,7 @@
 - OFD/virtual kassa (0-bosqich qaroriga ko'ra: o'z modulimiz yoki hamkor adapteri), 48 soat nazorati, fiskal chek holatlari.
 - E-faktura (Faktura.uz va/yoki Didox) + E-IMZO brauzerda imzolash; kiruvchi faktura → kirim; VM 830 xavf belgisi.
 - M10 ichki QQS registri, qizil faktura bo'yicha QQS krediti faqat to'lovdan keyin (US-M07-04 ikkinchi mezoni, US-M10-03); M11 buxgalteriya hisobotlari (tasdiqlangan hisoblar rejasi bilan).
+- US-M10-03 kutilayotgan QQS krediti (BO-07/BO-10). *(2026-10-14: tekshiruv)*
 - **Mezon:** test muhitida chek fiskallashadi; kiruvchi e-faktura qabul qilinib imzolanadi.
 
 ## 6-sprint: to'lov, AI, pilot
@@ -66,15 +72,17 @@
 - AI-01 (savol-javob, whitelisted tool'lar) va AI-06 (qarz eslatma matni) — `07-ai-qatlami.md`; AI limiti va xarajat hisobi.
 - M10 davlat hisobotini solishtirish (fayl yuklash) + AI-05 tushuntirish + 5 kalendar kunlik taymer.
 - M09 yorliq chop etish; M18 ogohlantirishlar.
+- US-M09-02 narx tasdiqlash (BO-16); yaroqlilik muddati ogohlantirishi (M18). *(2026-10-14: tekshiruv)*
 - **Pilot:** 5–10 do'kon, xarajat va AI sarfini o'lchash (unit-iqtisod).
 
 ## MVP'dan keyin (tartib taxminiy)
 
 1. Asl belgisi (CRPT Turon) — API ochilgach; e-TTN; e-ishonchnoma (Vakolat.uz).
-2. AI-03 (qog'oz hujjat OCR), mijozlarga SMS/Telegram qarz xabarlari (US-M08-08).
+2. AI-03 (US-M04-04 (3)-yo'l) — qog'oz hujjat OCR, mijozlarga SMS/Telegram qarz xabarlari (US-M08-08). *(2026-10-14: tekshiruv)*
 3. Android POS (Kotlin) — `10-android-pos.md` 1–4 bosqichlari.
-4. Uzum to'lovi, ko'p ombor, filiallar konsolidatsiyasi, talab bashorati (AI-09) — 2–3 oylik savdo tarixidan keyin.
+4. Uzum to'lovi, ko'p ombor, talab bashorati (AI-09) — 2–3 oylik savdo tarixidan keyin. *(2026-10-14: tekshiruv — "filiallar konsolidatsiyasi" olib tashlandi, 4-sprintga ko'chirildi)*
 5. O'z AI modelimiz (markaziy GPU server) — yig'ilgan ma'lumot va eval natijalariga qarab.
+6. US-M03-02 avtomatik chegirma qoidalari; US-M14-02 nusxalash; US-M17-05 to'liq eksport (birinchi pullik mijoz chiqib ketishidan oldin); ochiq smena ichida kassir topshirish; bitta egasining bir nechta tenanti uchun umumiy ko'rinish; AI Batch (`submit_batch`). *(2026-10-14: tekshiruv)*
 
 ## Har bir vazifa uchun "tayyor" ta'rifi
 
@@ -88,7 +96,7 @@
 1. Jamoa tarkibi va muddat — sprint hajmlari shunga qarab qayta baholanadi.
 2. Fiskal yo'l (o'z reyestr yo'li vs hamkor) — 5-sprint shunga bog'liq.
 3. Rasmiy xatlarga javob muddati noma'lum — integratsiya sprintlari surilishi mumkin.
-4. Kechikkan obuna to'lovida kassani to'xtatmaslik siyosatining huquqiy tasdig'i.
+4. Kechikkan obuna to'lovida kassani to'xtatmaslik siyosatining huquqiy tasdig'i (0-bosqich huquqiy maslahat qatoriga ko'chirildi). *(2026-10-14: tekshiruv)*
 
 ## Manbalar
 

@@ -1,0 +1,178 @@
+# Kamchiliklar tahlili — spetsifikatsiya qurishga tayyormi?
+
+*Tekshiruvchi: Arxitektura/mahsulot ko'rib chiqaruvchisi · 2026-10-14*
+
+## Asosiy xulosalar
+
+1. **`spec/02-arxitektura/` papkasi butunlay bo'sh** (faqat `.gitkeep`). Ma'lumotlar modeli, hisob rejasi, posting-qoidalari, API kontraktlari, offline-sync protokoli, xavfsizlik arxitekturasi — hech biri yozilmagan. Mahsulot (`01-mahsulot/`) hujjatlari yetarlicha batafsil, lekin ular **talab**, arxitektura esa **yechim** — yechim qismi nol. Dasturchilar hozir ishni boshlasa, ma'lumotlar modelini, hisob raqamlarini va API shaklini **o'zlari o'ylab topishga** majbur bo'ladi.
+2. ✅ *(2026-10-14 kechroq bajarildi — `spec/01-mahsulot/07-tuzatishlar-va-yechimlar.md`)* ~~**2026-10-14dagi fakt-tekshiruv natijasi (`research_notes/texnik/14-tekshiruv-xulosasi.md`) `spec/01-mahsulot/`dagi 4 faylga hali kiritilmagan.** Eng muhimi: "5 ish kuni" qoidasi **noto'g'ri** — to'g'risi **5 taqvim kuni**, huquqiy asosi topildi (O'RQ-1108, 2025-12-25; Soliq kodeksi 81-modda), va davlat **foyda solig'ini** emas (QQS, aylanma, mol-mulk, yer, JShDS, ijtimoiy soliqni) o'zi tuzadi. `01-rollar-va-ssenariylar.md`, `02-modullar-talablari.md` (M10), `03-biznes-jarayonlar.md` (BP-08), `04-ekranlar-va-ux.md` (BO-10) — to'rttasi ham hali "5 ish kuni" va eski (tasdiqlanmagan) huquqiy asosni ishlatadi. Bu kod yozilayotganda deadline-hisoblagich mantig'ini noto'g'ri kunlar bilan (ish kuni vs taqvim kuni — dam olish kunlarida 2 kun farq) qurib qo'yish xavfini keltiradi.~~
+3. ✅ *(2026-10-14 hal qilindi: ikkala usul ham, sozlama orqali — `02-modullar-talablari.md` US-M04-05)* ~~**Tovar-moddiy zaxira baholash usuli (FIFO/AVECO) hech qayerda tanlanmagan.** BHMS №4 standarti ikkala usulni (identifikatsiyalangan tannarx, AVECO, FIFO — LIFO yo'q) ruxsat beradi (`research_notes/texnik/08-mahsulot-modullari.md`, tuzatilgan qator; `14-tekshiruv-xulosasi.md`), lekin `spec/01-mahsulot/02-modullar-talablari.md` (M04, M11) birortasini tanlamaydi. Bu COGS (sotilgan tovar tannarxi) va shu orqali foyda-zarar hisobotining hisoblash formulasini belgilaydi — arxitektura jamoasi buni o'zi "default" qilib tanlasa, keyinchalik butun ombor-buxgalteriya integratsiyasini qayta yozish xavfi bor.~~
+4. **To'liq NSBU №21 hisob rejasi spec/research'da yo'q** — `02-modullar-talablari.md` (M11, ochiq savol 4) buni o'zi tan oladi. Dasturchilar "hisob toifasi" nomlari bilan (masalan "tovar-moddiy zaxira", "kreditorlik qarzi") ishlaydi, lekin aniq hisob raqamlari (balans/sub-hisob darajasida) yo'q — bu buxgalteriya moduli (M11) jadvallarini loyihalashni to'xtatib qo'yadi.
+5. **Har bir davlat integratsiyasi uchun sandbox/test muhiti, rasmiy API kontrakti va sertifikatlash yo'li aniq emas** — faqat E-IMZO uchun test server (testvpn.e-imzo.uz) tilga olingan; OFD, CRPT Turon, Didox/Faktura.uz, my.soliq.uz uchun sandbox mavjudligi/yo'qligi hech qayerda tekshirilmagan. Bu MVP'ning birinchi integratsiya sprinti uchun eng katta amaliy to'siq.
+6. **Nofunksional talablar (tezlik, sig'im, uptime) deyarli barcha hujjatlarda "taxmin" deb belgilangan**, lekin arxitektura/sprint rejalashtirish uchun kamida ichki maqsad (SLO) kerak — hozir hech qanday raqam yo'q, hatto ichki maqsad sifatida ham.
+7. **AI uchun eval-dataset, aniqlik chegarasi va xarajat limiti umuman yo'q.** `05-ai-funksiyalar.md` "pilot kerak" deb takrorlaydi, lekin pilot *qanday* o'tkazilishi (test savollar to'plami, minimal aniqlik foizi, kimga qarshi solishtiriladi) hech qayerda rejalashtirilmagan; tenant boshiga LLM xarajat limiti (rate limit/budget) hech qanday hujjatda yo'q.
+8. **Biznes/huquqiy qatlam deyarli bo'sh**: narx qarori *(2026-10-14 qabul qilindi: bozordan arzon; taklif 49k/129k/249k — unit-iqtisod bilan tasdiqlanadi, `06-mvp-chegarasi.md` 3.3)*, onboarding/migratsiya jarayoni (Excel/qog'oz hisobdan o'tish) yo'q, support SLA yo'q, yuridik shaxs/litsenziya/javobgarlik (masalan markirovka jarimasida AIOS'ning shartnoma javobgarligi) hech qayerda muhokama qilinmagan.
+9. Quyidagi jadvallar **61 ta aniq kamchilikni** (P0: qurishdan oldin hal qilinishi shart — 24 ta; P1: MVP davomida — 26 ta; P2: keyinroq — 11 ta) ro'yxatlaydi, har biriga sabab va yopish yo'li bilan.
+
+---
+
+## 1. Domen/ma'lumotlar modeli
+
+| # | Kamchilik | Nima uchun muhim | Kim/qanday yopiladi | Ustuvorlik |
+|---|---|---|---|---|
+| 1 | Hech qanday ER-diagramma yoki jadval ro'yxati yo'q (tovar, mijoz, hujjat, smena, ombor va h.k. uchun maydonlar, tiplar, bog'lanishlar) | Dasturchilar bir xil entitetni turlicha modellashi, keyin integratsiya qilishda qayta yozish kerak bo'ladi | Arxitektura: `spec/02-arxitektura/01-malumotlar-modeli.md` yozish (O'zbekiston-specific talablardan — QQS, MXIK, Asl belgisi — kelib chiqib, noldan loyihalangan) | P0 |
+| 2 | Hujjat ID/raqamlash sxemasi yo'q (chek, xaridnoma, ko'chirish, inventarizatsiya hujjati raqami qanday generatsiya qilinadi — tenant/filial/smena darajasida ketma-ketlikmi) | Fiskal chek raqami smena ichida qat'iy ketma-ket bo'lishi shart (`04-arxitektura-va-stack.md`, 2.2-bo'lim) — aniq algoritm bo'lmasa offline-sync paytida raqam to'qnashuvi yuzaga keladi | Arxitektura, offline-sync spetsifikatsiyasi bilan birga | P0 |
+| 3 | Hujjat holat-mashinasi (status lifecycle) yo'q — masalan xaridnoma: qoralama→yuborilgan→qisman qabul qilingan→yopilgan; ko'chirish: yaratilgan→yo'lda→qabul qilingan/qisman; nasiya: ochiq→qisman to'langan→yopilgan→shubhali qarz | Har bir modul (M02, M05, M06, M07, M08) holatlarni "ochiq savol" darajasida tasvirlaydi, lekin rasmiy state-diagram yo'q — noto'g'ri o'tishlar (masalan yopilgan hujjatni qayta tahrirlash) oldini olish logikasi yozilmay qoladi | Arxitektura, har modul uchun alohida state-diagram | P0 |
+| 4 | Ko'p ombor/filial modeli aniq emas: bitta filialda bir nechta ombor bo'lishi mumkinmi, yoki filial=ombor 1:1? | M04/M06/M14 orasidagi munosabat kodga to'g'ridan-to'g'ri ta'sir qiladi — noto'g'ri taxmin butun ombor modulini qayta qurishga olib keladi | Arxitektura qarori + Mahsulot bilan tasdiqlash | P0 |
+| 5 | O'lchov birligi (dona/quti/kg) konversiyasi modeli yo'q — M04 faqat "bir mahsulotning bir nechta o'lchov birligi balansi" deb eslatib o'tadi (chekka holat sifatida), hisoblash qoidasi yo'q | Noto'g'ri konversiya ombor qoldig'ini va QQS bazasini buzadi; og'irlik bilan sotiladigan tovar (tarozi) shu bilan bog'liq | Arxitektura: birlik-konversiya jadvali va dumaloqlash qoidasi | P0 |
+| 6 | MXIK (IKPU) kod katalogini qayerdan olish, qanday yangilanib turishi (davlat IKPU reyestri bilan sinxronlash mexanizmi) hujjatlashtirilmagan | Har bir tovar MXIK kodiga ega bo'lishi majburiy (chek rekviziti, QQS toifasi) — katalog manbasi aniq bo'lmasa, tovar kiritish jarayoni to'xtaydi | Arxitektura/Soliq integratsiyasi: IKPU reyestrini (soliq.uz yoki boshqa manba) aniqlash | P0 |
+| 7 | Narx ro'yxati (price list) modeli — chakana/optom, valyuta, mijoz toifasiga qarab narx, bir nechta narx ro'yxatining bir vaqtda qo'llanilishi (stacking) qoidasi yo'q | M09 faqat "optom va chakana narx bir vaqtda qo'llanilishi — siyosat kerak" deb ochiq qoldiradi; narxlash motori arxitekturasiz yoziluvchi eng xato-moyil qism | Mahsulot (biznes qoida) + Arxitektura (modellash) | P1 |
+| 8 | Qaytarish (M02) uchun qisman qaytarish va asl chekka bog'lanish modeli (line-item darajasida) yo'q — faqat "qisman qaytarish" chekka holat sifatida tilga olingan | To'liq model bo'lmasa, bitta tovar ikki marta qaytarilishi (double-refund) xavfi bor | Arxitektura: chek-qator darajasidagi bog'lanish modeli | P0 |
+| 9 | Nasiya (debt) modelida foiz/penya, to'lov jadvali (bir martalik vs bo'lib-bo'lib), "shubhali qarz"ga o'tkazish qoidasi yo'q | M08 limit/muddatni tasvirlaydi, lekin to'lov grafigi va kechiktirilgan foiz/penya biznes qoidasi butunlay yo'q | Mahsulot: biznes qoida sifatida MVP oldidan aniqlash | P1 |
+| 10 | Mijoz (customer) entity modeli — B2B (INN, yuridik manzil, bank rekviziti — e-faktura uchun shart) va B2C (jismoniy shaxs) maydonlari ajratilmagan | E-faktura B2B uchun shart (BP-03), kerakli rekvizitlar bo'lmasa faktura generatsiya qilinmaydi | Arxitektura: mijoz jadvali sxemasi | P0 |
+| 11 | Yetkazib beruvchi (supplier) entity modeli va ularning INN/litsenziya holati (QQS to'lovchimi yoki yo'qmi) saqlanishi aniq emas | AI-03 OCR qamrovi "QQS to'lovchi bo'lmagan yetkazib beruvchi"ga bog'liq (`05-ai-funksiyalar.md`) — bu holatni ajratish uchun supplier modelida maydon kerak | Arxitektura | P1 |
+| 12 | Audit-trail/o'zgarishlar tarixi modeli (kim, qachon, nimani o'zgartirdi) faqat umumiy "audit log" sifatida eslatiladi (`04-arxitektura-va-stack.md`, 7-bo'lim), lekin qaysi jadvallar uchun majburiy, qanday saqlanishi (event sourcing vs alohida audit jadvali) aniq emas | Buxgalteriya/soliq tekshiruvida dalil sifatida ishlatiladi — noto'g'ri modellangan audit tizim huquqiy himoyasiz qoldiradi | Arxitektura: xavfsizlik hujjati | P0 |
+
+---
+
+## 2. Buxgalteriya dvigateli (NSBU 21, posting, baholash, QQS)
+
+| # | Kamchilik | Nima uchun muhim | Kim/qanday yopiladi | Ustuvorlik |
+|---|---|---|---|---|
+| 13 | To'liq NSBU №21 hisob rejasi (barcha bo'lim/sub-hisob raqamlari) spec/research'da yo'q — faqat qisman topilgan (`01-erp-modullar-va-malumot-modeli.md`) | M11 buxgalteriya jurnalini (BO-08) loyihalash uchun aniq hisob raqamlari shart — hozir faqat "hisob toifasi nomi" bor | Buxgalter/tashqi maslahatchi: rasmiy 191-son buyruq ilovasidan (lex.uz/docs/7282759) to'liq COA chiqarib, Arxitektura hujjatiga kiritish | P0 |
+| 14 | Har bir hujjat turi (BP-01…BP-12) uchun **debet/kredit hisob juftligi** jadvali yo'q — faqat "qaysi toifaga ta'sir qiladi" so'z bilan tasvirlangan (`03-biznes-jarayonlar.md`, BP-06) | Avtomatik provodka generatsiyasi kodga aylantirilganda har bir hodisa uchun aniq Dt/Kt jadvali shart; buni dasturchi o'zi "taxmin" bilan yozsa, buxgalteriya noto'g'ri bo'ladi | Arxitektura + Buxgalter: `spec/02-arxitektura/02-provodka-qoidalari.md` | P0 |
+| 15 | ✅ *Hal qilindi (2026-10-14): FIFO + AVECO, US-M04-05.* ~~Tovar-moddiy zaxira baholash usuli (FIFO yoki AVECO) tanlanmagan~~ (Asosiy xulosa #3) | COGS va foyda-zarar hisobotining asosiy formulasi; tanlov bo'lmasa M04/M11 integratsiyasi arxitektura darajasida loyihalanmaydi | Arxitektura + Buxgalter qarori, BHMS №4 asosida (`08-mahsulot-modullari.md`) | P0 |
+| 16 | Davr yopish (oy/chorak yakunlash) jarayoni faqat bir qatorda tasvirlangan (US-M11-02) — yopilgan davrni qayta ochish siyosati, yopilgan davrdagi hujjatni tuzatish (retroactive correction) qoidasi yo'q | Yopilgan oyga tuzatish kiritish huquqiy/audit oqibatlariga ega (soliq solishtiruvi bilan ziddiyat) | Arxitektura + Buxgalter | P0 |
+| 17 | QQS imtiyozlari/0% ro'yxati (qaysi MXIK kodlar 0%, qaysilari 12%, "ixtiyoriy 6%" rejimi qachon qo'llaniladi) hujjatlashtirilmagan — faqat stavkalar nomi bor | Noto'g'ri QQS toifasi bilan tovar sotilsa, chek va QQS hisoboti noto'g'ri bo'ladi, jarima xavfi | Buxgalter: Soliq kodeksi 243-modda (imtiyozlar ro'yxati) asosida jadval tuzish | P0 |
+| 18 | QQS to'lovchi vs aylanma solig'i to'lovchi bo'lish chegarasi (aylanma chegarasi summasi) va tizim bu ikki rejimni qanday farqlashi (tenant sozlamasida bitta switch, yoki davr ichida o'zgarishi mumkinmi) aniq emas | M10 ikkala rejimni ham qo'llab-quvvatlashi kerak (US-M10-04) — rejim almashinuvi stsenariysi yo'q | Buxgalter + Arxitektura | P1 |
+| 19 | Qaytarish/chegirmaning QQS bazasiga orqaga qarab tuzatish (retroactive VAT adjustment) mexanizmi faqat "chekka holat" sifatida eslatilgan (M10, chekka holatlar) | Agar qaytarish keyingi davrda sodir bo'lsa (masalan o'tgan oy sotilgan tovar shu oy qaytarilsa), qaysi davrga QQS tuzatish yozilishi noaniq | Buxgalter: qoida yozish | P1 |
+| 20 | Inventarizatsiya kamomadi uchun "moddiy javobgar shaxs"ga yuklash jarayonining buxgalteriya va QQS oqibati (kamomad QQS bazasiga qaytariladimi) yo'q | BP-10 "zarar yoki moddiy javobgar shaxs qarzi" deydi, lekin ikkisidan qaysi birini qachon tanlash qoidasi yo'q | Buxgalter | P2 |
+| 21 | Asosiy vositalar (amortizatsiya) hisobi umuman yo'q — lekin M05/M06 inventarizatsiya/ko'chirish modullarida uskuna/jihoz aralashib ketish xavfi (tovar vs asosiy vosita farqi) tekshirilmagan | Agar foydalanuvchi noto'g'ri tovar sifatida asosiy vositani kiritsa, ombor/buxgalteriya aralashadi — validatsiya qoidasi kerak | Arxitektura: kiritish validatsiyasi | P2 |
+
+---
+
+## 3. Soliq integratsiyalari (OFD, e-faktura, e-TTN, Asl belgisi, e-ishonchnoma, my.soliq.uz)
+
+| # | Kamchilik | Nima uchun muhim | Kim/qanday yopiladi | Ustuvorlik |
+|---|---|---|---|---|
+| 22 | Hech bir davlat tizimi (OFD, CRPT Turon, Didox/Faktura.uz, my.soliq.uz, Vakolat.uz) uchun **sandbox/test muhiti** mavjudligi tekshirilmagan (faqat E-IMZO uchun testvpn.e-imzo.uz topilgan) | Sandbox'siz integratsiya development va test qilib bo'lmaydi — birinchi sprintning o'zidanoq bloklanish xavfi | Rasmiy murojaat (`research_notes/texnik/12-taxminlar-va-murojaatlar.md`dagi xat loyihalari) — har bir tizim uchun alohida so'rov | P0 |
+| 23 | Virtual kassa dasturini reyestrga kiritish **narxi** hali noma'lum (muddat endi topildi: VMQ-943 4-ilova — Soliq qo'mitasi 20 + Kiberxavfsizlik markazi 15 + FMO 10 + texnik tartibga solish 5 ish kuni, `14-tekshiruv-xulosasi.md`) | Narx loyiha byudjetiga, muddat esa MVP jadvaliga (≈50 ish kuni, taxminan 10 hafta) to'g'ridan-to'g'ri ta'sir qiladi — bu MVP boshlanishidan oldin reja chizig'iga kiritilishi kerak | Soliq qo'mitasi / "Yangi texnologiyalar" DUK bilan rasmiy murojaat | P0 |
+| 24 | CRPT Turon (Asl belgisi) integrator API hujjatlari hamon yopiq (403) — ro'yxatdan o'tish shartlari, SLA, texnik kontrakt yo'q | Markirovkalangan tovar (suv, ichimlik, tamaki) sotuvi — kundalik savdoning katta qismi — MVP'ning birinchi kunidanoq bloklanishi mumkin | CRPT Turon'ga rasmiy murojaat; muqobil: E-POS/MoySklad/Smartup orqali proksi integratsiya (`12-taxminlar-va-murojaatlar.md`, band 2) | P0 |
+| 25 | Offline holatda markirovka tekshiruvi/sotuvi siyosati (ruxsat/taqiq) — 4 ta spec faylida (M01, M02, M06, BO-10/POS ekranlari) takroran "ochiq savol" deb qoldirilgan, hali birorta joyda **qaror qilinmagan** | Bu MVP'ning eng ko'p marta takrorlangan hal qilinmagan savoli — kod yozilganda kassir UI'si, sync protokoli va huquqiy javobgarlik bir-biriga bog'liq uchta qism bir xil qarorga muhtoj | Yurist maslahati + Mahsulot/Arxitektura qarori (`12-taxminlar-va-murojaatlar.md`, band 6) | P0 |
+| 26 | E-faktura operatori tanlovi (Didox vs Faktura.uz, yoki ikkisi ham) qilinmagan — ikkisi turli autentifikatsiya/API shaklida (`03-efaktura-va-tolov.md`) | Backend integratsiya qatlami operator tanlanmaguncha loyihalanmaydi | Arxitektura qarori, narx/API qulayligi solishtirib | P0 |
+| 27 | e-TTN talab qilinishi ichki (bir yuridik shaxs ichidagi filiallararo) ko'chirishda ham kerakmi — aniqlanmagan (BP-09, ochiq savol 5) | Agar kerak bo'lsa, M06 modulining hujjat chiqishi (hujjat turi, maydonlari) butunlay o'zgaradi | Soliq.uz bilan aniqlashtirish | P1 |
+| 28 | E-ishonchnoma (Vakolat.uz) integratsiyasi — API yo'q, M07'ga qanday ulanishi (majburiymi, qachon) aniq emas | Yetkazib beruvchi vakili orqali tovar qabul qilishning huquqiy asosini tasdiqlamasdan qabul qilish risk | Vakolat.uz/Soliq qo'mitasi bilan rasmiy murojaat | P1 |
+| 29 | my.soliq.uz'dan davlat hisobotini olishning hech qanday dasturiy (yoki yarim-rasmiy, masalan E-IMZO orqali) yo'li tasdiqlanmagan — M10/BP-08 markaziy oqimi shunga bog'liq | Agar hatto yarim-avtomatik yo'l (E-IMZO autentifikatsiyali portal so'rovi) topilmasa, Buxgalter har oy qo'lda PDF yuklab, qo'lda tizimga kiritadi — bu operatsion xarajat va xato manbai | my.soliq.uz qo'llab-quvvatlash xizmatiga rasmiy murojaat | P0 |
+| 30 | Davlat hisoboti **hujjat darajasida** (har bir chek/e-faktura) keladimi yoki faqat **yig'ma summa** darajasida — hali tasdiqlanmagan (BO-10 ikkala variantni ham "zahira" sifatida ko'rsatadi) | Solishtirish motorining butun arxitekturasi (qator-ma-qator vs davr darajasida diff) shu javobga bog'liq — ikkalasini ham qo'llab-quvvatlashga urinish ortiqcha murakkablik keltiradi | my.soliq.uz bilan aniqlashtirish, keyin Arxitektura qarori | P0 |
+| 31 | "5 ish kuni" → aslida **5 taqvim kuni**, qonuniy asos O'RQ-1108/SK 81-modda (Asosiy xulosa #2) — e'tiroz/tuzatish yuborish **kanali va shakli** hamon spec'da yo'q | Noto'g'ri muddat hisoblagichi (dam olish kuni hisobga olinmasa) foydalanuvchini muddatdan "avtomatik qabul qilindi" holatiga tushirib qo'yadi — moliyaviy oqibati bor | Mahsulot: 4 faylni yangilash (quyida band 1) + e'tiroz kanalini my.soliq.uz'dan aniqlashtirish | P0 |
+| 32 | QR/Click/Payme to'lovida fiskal chekni kim chiqarishi (to'lov tizimi vs merchant) — ikki huquqiy talqin ziddiyatli, UI/arxitektura ikkisini ham hal qilmagan | Noto'g'ri tomon chek chiqarsa — ikki marta soliqqa tortish yoki chek chiqmay qolish xavfi | Yurist/soliq.uz bilan rasmiy aniqlashtirish | P0 |
+| 33 | Retry/idempotentlik siyosati faqat offline-sync (ichki event-log) darajasida tasvirlangan (`04-arxitektura-va-stack.md`, 2.2-bo'lim) — tashqi API'lar (OFD, Didox, CRPT, Payme/Click) uchun retry/backoff/circuit-breaker siyosati yo'q | Tashqi tizim bir necha soat ishlamay qolsa (masalan OFD operatori texnik uzilishi), tizimning xatti-harakati (navbatga qo'yish, foydalanuvchiga ko'rsatish, qachon eskalatsiya) hujjatlashtirilmagan | Arxitektura: integratsiya qatlami hujjati | P1 |
+| 34 | Har bir integratsiya uchun kutilayotgan xato kodlari katalogi (masalan FM xato kodi 704031 — bitta misol topilgan, `04-fayl`) to'liq emas — boshqa tizimlarning xato formatlari yig'ilmagan | Xato qayta ishlash logikasi (kassir/buxgalter nima ko'radi) to'liq xato katalogi bo'lmasa qisman yoziladi | Arxitektura: har integratsiya hujjatiga xato katalogi ilova qilish | P1 |
+| 35 | Sertifikatlash (ЗРУ-764) xususiy SaaS'ga tegishli-tegishli emasligi hamon ochiq — bu MVP byudjeti/jadvaliga eng katta ta'sirli noaniqlik (`00-xulosa-va-ochiq-savollar.md`, xavf #4) | Agar "ha" bo'lsa, ekspertiza (oylar, noma'lum narx) butun MVP sanasini suradi | csec.uz'ga rasmiy murojaat (`12-taxminlar-va-murojaatlar.md`, Xat 3) — **zudlik bilan** | P0 |
+
+---
+
+## 4. Offline-first POS
+
+| # | Kamchilik | Nima uchun muhim | Kim/qanday yopiladi | Ustuvorlik |
+|---|---|---|---|---|
+| 36 | 48 soatlik muddat **tugaganidan keyin** tizim nima qiladi — kassa butunlay bloklanadimi, faqat ogohlantirish beradimi? Hech qayerda qaror yo'q | Qonuniy muddat o'tgandan keyingi xatti-harakat yozilmasa, dasturchi o'zi taxmin qilib "block" yoki "warn" ni tanlaydi — huquqiy oqibati katta | Mahsulot + Yurist: siyosat qarori | P0 |
+| 37 | Offline paytda karta terminali (mustaqil aloqaga ega, masalan POS-terminal o'z simkartasi bilan) ishlashi aniq emas (`04-ekranlar-va-ux.md`, ochiq savol 11) | POS-03 UI holati shunga bog'liq — agar terminal mustaqil ishlay olsa, offline'da faqat naqd/nasiya cheklash noto'g'ri bo'lishi mumkin | Acquiring bank/terminal ta'minotchisi bilan aniqlashtirish | P1 |
+| 38 | Overselling (manfiy balansga tushish) siyosati — ikki offline kassa bir xil oxirgi tovarni sotganda nima bo'lishi faqat "konflikt yuzaga keladi" deb aytilgan, hal qilish qoidasi yo'q | Manfiy balans ombor hisobotini va QQS bazasini buzadi; hal qilish qoidasi (kim "g'olib" deb hisoblanadi, ikkinchi kassirga qanday bildirishnoma boradi) yo'q | Arxitektura: conflict-resolution qoidasi | P0 |
+| 39 | Nasiya limitining offline parallel oshib ketishi (bir necha kassa bir mijozga bir vaqtda nasiya bersa) — faqat "server qayta tekshiradi" deyilgan, keyin nima bo'lishi (ortiqcha summani kim yopadi, mijozga qanday bildiriladi) yo'q | Moliyaviy zarar va mijoz bilan nizo xavfi | Mahsulot: biznes qoida | P1 |
+| 40 | POS lokal saqlash (SQLite) hajm chegarasi va "disk to'lib ketsa" stsenariysi yo'q — necha kunlik offline log saqlanishi mumkinligi hisoblanmagan | Uzoq muddatli internet uzilishida (masalan mintaqaviy avariya, `04-arxitektura-va-stack.md` band 4 bunday holatlarni asos qilib keltiradi) qurilma xotirasi tugashi mumkin | Arxitektura: sig'im hisob-kitobi + eskirgan ma'lumotni arxivlash siyosati | P1 |
+| 41 | Sinxronlash tartibida bir nechta POS/filial bir vaqtda ulanganda server tomonidagi tartib/navbat (backpressure) siyosati yo'q | Katta hajmli bir martalik sinxronlash (masalan uzoq uzilishdan keyin) serverni ortiqcha yuklab qo'yishi mumkin | Arxitektura: sync protokoli hujjati | P2 |
+| 42 | Markirovka offline siyosati qaror qilinmagandan keyin ham, bu qarorning **audit-log**ka qanday yozilishi (kim, qachon "keyinroq tekshirish" tugmasini bosgani) spetsifikatsiyalanmagan | Jarima nizosida bu yagona huquqiy dalil bo'ladi | Arxitektura (band 25 bilan birga) | P0 |
+
+---
+
+## 5. Multi-tenancy, huquqlar, audit, lokalizatsiya, backup, xavfsizlik
+
+| # | Kamchilik | Nima uchun muhim | Kim/qanday yopiladi | Ustuvorlik |
+|---|---|---|---|---|
+| 43 | Huquqlar matritsasi (`01-rollar-va-ssenariylar.md`, 6-bo'lim) spec muallifi tomonidan ham "loyihalashtirilgan taxmin, tasdiqlanishi kerak" deb belgilangan — hali tasdiqlanmagan | Noto'g'ri huquq modeli bilan qurilgan M13 keyinchalik butun ruxsat tizimini qayta yozishni talab qilishi mumkin | Mahsulot egasi bilan MVP boshlanishidan oldin rasmiy tasdiqlash sessiyasi | P0 |
+| 44 | Tenant onboarding/provisioning jarayoni (yangi mijoz ro'yxatdan o'tganda nima avtomatik yaratiladi — standart hisob rejasi, standart rollar, standart MXIK katalogi) hujjatlashtirilmagan | Birinchi pilot mijozni "qo'lda" sozlash mumkin, lekin ko'payganda bu jarayon operatsion to'siqqa aylanadi | Arxitektura + Biznes: onboarding oqimi hujjati | P1 |
+| 45 | Audit-log'ning aniq sxemasi (qaysi voqealar, qaysi maydonlar, qancha saqlanadi) yo'q — faqat "3 yil, ichki siyosat sifatida" tavsiya qilingan (`04-arxitektura-va-stack.md`, 7-bo'lim), lekin qonuniy minimal muddat ham, tamper-evidence (o'zgartirib bo'lmaslik) talabi ham aniqlanmagan | Soliq tekshiruvi/nizo paytida audit-log yagona dalil; o'zgartirilishi mumkin bo'lgan log huquqiy qiymatga ega emas | Arxitektura: xavfsizlik hujjati + yurist maslahati (saqlash muddati) | P0 |
+| 46 | Ma'lumotlar lokalizatsiyasi bo'yicha qonuniy talab (faqat biometrik/genetik/telekom) tasdiqlangan, lekin **AI-03 (OCR) orqali chet el LLM API'ga yuboriladigan hujjat rasmlari** (faktura, chek) shaxsiy ma'lumot (ism, imzo) saqlashi mumkinligi muhokama qilinmagan | Agar faktura fotosida shaxsiy ma'lumot (jismoniy shaxs ismi, imzosi) bo'lsa, ZRU-547 doirasiga kirib qolish xavfi tekshirilmagan | Yurist: AI-03 ma'lumot oqimini ZRU-547 nuqtai nazaridan baholash | P1 |
+| 47 | Backup/DR uchun RPO/RTO maqsadlari yo'q — faqat "UzCloud Backup-as-a-Service mavjud" deyilgan, qancha ma'lumot yo'qotish mumkinligi (RPO) va qancha vaqtda tiklanishi (RTO) belgilanmagan | Fiskal/buxgalteriya ma'lumoti yo'qolishi to'g'ridan-to'g'ri qonun buzilishiga olib keladi — aniq maqsadsiz backup strategiyasi sinovdan o'tkazilmaydi | Arxitektura: DR hujjati, ichki SLO sifatida | P0 |
+| 48 | Backup/restore test siklining o'zi (qachon, qanday tekshiriladi) rejalashtirilmagan | "Backup bor" — "backup ishlaydi" degani emas; muntazam restore testi bo'lmasa, yo'qotish paytida backup buzuq chiqishi mumkin | Arxitektura: operatsion runbook | P1 |
+| 49 | Karta to'lovi (Humo/Uzcard/Visa, POS-03 ekranida) bilan bog'liq PCI-DSS yoki milliy karta xavfsizligi talablariga AIOS'ning tegishliligi tekshirilmagan (agar karta ma'lumoti tizim orqali o'tsa) | Agar karta raqami/CVV AIOS orqali o'tsa (hatto tranzit tarzida), PCI-DSS talab qilinishi mumkin — aniqlanmasa loyiha oxirida qimmat qayta ishlashga olib keladi | Acquiring bank/terminal integratsiyasi arxitekturasini aniqlashtirish (odatda terminal o'zi karta ma'lumotini ushlaydi, AIOS faqat natija oladi — lekin bu **tasdiqlanmagan taxmin**) | P0 |
+| 50 | Parol/PIN siyosati (murakkablik, muddat, bloklash chegarasi), sessiya muddati, bir nechta qurilmada parallel login siyosati umuman yo'q | Kassir PIN'i tez-tez ishlatiladi (chegirma/nasiya tasdig'i uchun) — zaif PIN siyosati ichki firibgarlik xavfini oshiradi | Arxitektura: xavfsizlik hujjati | P1 |
+| 51 | Shifrlash (at-rest, in-transit) standartlari, maxfiy kalitlarni boshqarish (E-IMZO sertifikati, API kalitlari) siyosati yo'q | E-IMZO shaxsiy kaliti va tashqi API tokenlari noto'g'ri saqlansa, butun tizim kompromisga uchrashi mumkin | Arxitektura: xavfsizlik hujjati | P0 |
+| 52 | Penetration test/xavfsizlik auditi rejasi (qachon, kim o'tkazadi) yo'q | Fiskal/moliyaviy ma'lumot bilan ishlovchi tizim uchun ishga tushirishdan oldin xavfsizlik tekshiruvi odatiy amaliyot, lekin reja yo'q | Biznes: MVP oldidan/keyin audit rejasi | P2 |
+| 53 | Xodim ishdan bo'shaganda huquqni **real-time** bekor qilish mexanizmi (M13 chekka holat sifatida eslatilgan) arxitekturada yechilmagan — offline POS'da eski token qancha vaqt amal qilib qolishi mumkin | Ishdan bo'shagan xodim POS'da offline rejimda eski huquq bilan ishlashni davom ettirishi mumkin | Arxitektura: token/sessiya muddat siyosati | P1 |
+
+---
+
+## 6. Nofunksional talablar, uskunalar
+
+| # | Kamchilik | Nima uchun muhim | Kim/qanday yopiladi | Ustuvorlik |
+|---|---|---|---|---|
+| 54 | Hech qanday tasdiqlangan ishlash (performance) maqsadi yo'q — chek yopish vaqti, API javob vaqti, bir vaqtda qancha POS/tenant qo'llab-quvvatlanishi — barchasi "taxmin" deb belgilangan, hatto ichki SLO sifatida ham yo'q | Arxitektura (DB indekslash, kesh strategiyasi, server sig'imi) aniq maqsadsiz loyihalanmaydi | Arxitektura: ichki SLO jadvalini e'lon qilish (manbasiz bo'lsa ham, "ichki maqsad" sifatida belgilash) | P0 |
+| 55 | Fiskal modul (FM) va chek printeri uchun **tasdiqlangan uskuna ro'yxati** yo'q — faqat bozor uskunalari (PAX A930, UZKASSA) "namuna" sifatida tilga olingan, AIOS qaysi uskuna bilan rasman integratsiya qilishini tanlamagan | Fiskal SDK integratsiyasi uskuna tanlovisiz boshlanmaydi — bu FM sertifikatlash yo'liga ham bog'liq (band 23) | Arxitektura + biznes: FM ta'minotchisi tanlovi | P0 |
+| 56 | Tarozi protokoli butunlay noma'lum ("aniq protokol nomi topilmadi" — `06-raqobatchilar-texnik-va-uskunalar.md`) — MVP'da faqat qo'lda kiritish zahirasi bor, lekin og'irlik bilan sotiladigan tovar (sabzavot, go'sht, don) ko'p do'konlar uchun kundalik amaliyot | Agar avtomatik tarozi integratsiyasi umuman bo'lmasa, bu segment uchun mahsulot amaliy jihatdan sekin bo'lib qoladi — raqobatchilarga nisbatan kamchilik | Uskuna tadqiqoti: mashhur tarozi modellari protokolini (odatda COM/serial, GOST yoki ishlab chiqaruvchiga xos) alohida tekshirish | P1 |
+| 57 | Chekni ikki tilda (o'zbek/rus) chiqarish talabi tasdiqlanmagan — ko'p shaharlarda ikkala tilda so'zlashuvchi mijoz bor | Agar qonuniy/amaliy talab bo'lsa, chek shabloni va fiskal rekvizit formatini qayta loyihalash kerak bo'ladi | Soliq.uz/amaliyot bilan aniqlashtirish | P2 |
+| 58 | Tizim sig'imi (nechta tenant, nechta bir vaqtdagi POS) bo'yicha hech qanday hajm-rejalashtirish (capacity planning) yo'q | UzCloud resurs tanlovi (VM o'lchami, DBaaS tarifi) hajm maqsadisiz tanlanadi, keyin qayta masshtablashtirish narxliroq bo'ladi | Arxitektura: boshlang'ich hajm-reja (masalan "birinchi 100 tenant, tenant boshiga N POS") | P1 |
+
+---
+
+## 7. AI
+
+| # | Kamchilik | Nima uchun muhim | Kim/qanday yopiladi | Ustuvorlik |
+|---|---|---|---|---|
+| 59 | O'zbek tili uchun eval-dataset (test savollar/hujjatlar to'plami) va minimal aniqlik chegarasi (masalan "AI-03 OCR kamida X% aniqlik bo'lmasa ishga tushmaydi") hech qayerda belgilanmagan — faqat "pilot kerak" deb takrorlanadi | Pilot *nima*ni o'lchashini, *qachon* "yetarli aniq" deb topilishini belgilaydigan mezon bo'lmasa, pilot cheksiz davom etishi yoki subyektiv qarorga asoslanishi mumkin | Mahsulot + AI jamoasi: MVP oldidan eval-dataset va chegara (threshold) hujjati | P0 |
+| 60 | Tenant boshiga LLM xarajat limiti/rate-limit siyosati umuman yo'q (narx jadvali bor, lekin tenant/foydalanuvchi darajasidagi budjet nazorati yo'q) | Bitta tenant'ning haddan tashqari AI ishlatishi (masalan chat'ni suiiste'mol qilish) butun mahsulot marjasini yeyishi mumkin — `00-xulosa-va-ochiq-savollar.md` bu xavfni "kichik model, kesh, foydalanuvchi boshiga limit" deb umumiy aytadi, lekin aniq limit/mexanizm yo'q | Arxitektura: AI qatlami hujjati, rate-limit/budjet siyosati | P0 |
+| 61 | AI xato/noaniq javob bergan holatlarning inson tomonidan ko'rib chiqilishi (review) jarayoni yo'q — faqat "aniq emas" degan UI xabari bor, lekin bu holatlar jamlanib sifatni kuzatish uchun qayerga yozilishi (log/feedback loop) aniq emas | Sifatsiz AI javoblari vaqt o'tishi bilan aniqlanmasa, ishonch pasayadi va tuzatish imkoni yo'qoladi | Arxitektura: AI monitoring/feedback hujjati | P1 |
+
+---
+
+## 8. Arxitektura hujjatlari (nima yozilishi kerak)
+
+`spec/02-arxitektura/` bo'sh. README.md'ga ko'ra bu jamoaning mas'uliyati: "Tizim arxitekturasi, ma'lumotlar modeli, buxgalteriya provodkalari, integratsiyalar, offline sync, AI qatlami, xavfsizlik, backlog". Quyidagi hujjatlar minimal to'plam sifatida tavsiya etiladi (yuqoridagi kamchiliklarning aksariyati shu hujjatlar orqali yopiladi):
+
+1. `01-malumotlar-modeli.md` — ER-diagramma, jadval/maydon ro'yxati, ID sxemasi, holat-mashinalari (band 1-12).
+2. `02-provodka-qoidalari.md` — to'liq NSBU №21 hisob rejasi, har hujjat uchun Dt/Kt jadvali, baholash usuli, davr yopish (band 13-21).
+3. `03-integratsiyalar.md` — har davlat tizimi uchun API kontrakt/sandbox holati, xato katalogi, retry/idempotentlik siyosati (band 22-35).
+4. `04-offline-sync.md` — event-log protokoli, konflikt hal qilish qoidalari, 48 soat/markirovka siyosati (band 36-42).
+5. `05-xavfsizlik-va-audit.md` — multi-tenant RLS detallari, audit-log sxemasi, shifrlash, parol siyosati, PCI-DSS baholash (band 43-53).
+6. `06-nofunksional-talablar.md` — ichki SLO (tezlik, sig'im), tasdiqlangan uskuna ro'yxati (band 54-58).
+7. `07-ai-qatlami.md` — eval-dataset, xarajat limiti, monitoring (band 59-61).
+8. `08-backlog.md` — README.md jadvalida va'da qilingan, hali yo'q.
+
+---
+
+## 9. Biznes
+
+| # | Kamchilik | Nima uchun muhim | Kim/qanday yopiladi | Ustuvorlik |
+|---|---|---|---|---|
+| — | Narx: qaror qabul qilindi (2026-10-14, bozordan arzon; taklif Start 49k / Biznes 129k / Pro 249k so'm/oy, `06-mvp-chegarasi.md` 3.3). **Qolgani: unit-iqtisod hisobi** — bir mijozga oylik xarajat (hosting, AI tokenlar, OFD/EDO haqlari, qo'llab-quvvatlash) | Xarajat Start narxidan oshsa, arzon tarif zarar keltiradi | Arxitektura + moliya: tenant boshiga xarajat modeli | P0 |
+| — | Onboarding jarayoni (qog'oz/Excel'dan AIOS'ga dastlabki ma'lumot — tovar katalogi, qoldiq, mijoz/nasiya balansi — qanday kiritiladi) butunlay yo'q | Birinchi kunlik foydalanish tajribasi shunga bog'liq; tizim noldan quriladi va tashqi tizimdan avtomatik import yo'q (`spec/README.md`), shuning uchun boshlang'ich ma'lumot **Excel/CSV shablon yuklash, qo'lda kiritish va AI-03 (foto orqali OCR)** kombinatsiyasi bilan kiritilishi kerak — lekin aniq shablon formati/vosita hali spetsifikatsiyalanmagan | Mahsulot: onboarding spetsifikatsiyasi (Excel/CSV shablon + qo'lda kiritish + AI-03 OCR asosida) | P1 |
+| — | Support modeli (kanal, SLA, ish vaqti) faqat "taxmin" deb belgilangan, aniq siyosat yo'q | Markirovka/fiskal jarima xavfi yuqori segmentda tezkor support kutilgan farqlovchi (`06-mvp-chegarasi.md`, 2-bo'lim) — lekin SLA yo'q, va'da bera olmaydi | Biznes: support SLA hujjati | P1 |
+| — | Yuridik shaxs/litsenziya va javobgarlik taqsimoti (masalan markirovka/fiskal xatosi AIOS dasturi aybidan bo'lsa, shartnomaviy javobgarlik qanday taqsimlanadi; sug'urta kerakmi) hech qayerda muhokama qilinmagan | Davlat jarimasi aylanmaning 2-20%igacha (`00-xulosa-va-ochiq-savollar.md`) — agar sabab dastur xatosi bo'lsa, AIOS'ning shartnoma javobgarligi aniq bo'lmasa, yuridik/moliyaviy xavf kompaniyaga qaytadi | Yurist: xizmat shartnomasi (ToS/SLA) loyihasi | P1 |
+| — | To'lov tizimlari (Payme/Click/Uzum) bilan rasmiy hamkorlik/shartnoma holati (merchant sifatida ro'yxatdan o'tish, komissiya stavkasi) aniqlanmagan | BP-05 texnik protokolni tasvirlaydi, lekin tijorat shartnomasi yo'q — integratsiya boshlanmasdan oldin kerak | Biznes: har to'lov provayderi bilan muzokara | P1 |
+
+---
+
+## Keyingi qadamlar
+
+1. ✅ *(bajarildi)* ~~**`spec/01-mahsulot/`dagi 4 faylni (01, 02-M10, 03-BP08, 04-BO10) 2026-10-14 fakt-tekshiruv natijasi bilan yangilash** — "5 ish kuni" → "5 taqvim kuni", huquqiy asos O'RQ-1108/SK 81-modda, "foyda solig'i" olib tashlash (band 2, 31).~~ Qolgani: e'tiroz/tuzatish yuborish kanali (band 31).
+2. **Rasmiy murojaatlarni zudlik bilan yuborish** — csec.uz (ЗРУ-764), CRPT Turon (markirovka API), Soliq qo'mitasi (virtual kassa narxi, my.soliq.uz API), Didox/Faktura.uz (operator tanlovi uchun) — loyiha allaqachon tayyorlangan (`12-taxminlar-va-murojaatlar.md`) (band 22-24, 29, 35).
+3. **Huquqiy maslahat olish**: offline markirovka siyosati, QR/Click/Payme chek javobgarligi, 48 soatdan keyingi kassa holati, shartnoma javobgarligi (band 25, 32, 36, "Biznes" bo'limi).
+4. **Buxgalter/tashqi maslahatchi bilan NSBU №21 to'liq hisob rejasini va baholash usulini (FIFO/AVECO) tanlash** — M04/M11 loyihalashning old sharti (band 13, 15).
+5. **Mahsulot egasi bilan huquqlar matritsasini va narx qarorini rasman tasdiqlash sessiyasi** (band 43, "Biznes" bo'limi birinchi qatori).
+6. **`spec/02-arxitektura/` hujjatlarini yozishni boshlash**, ustuvorlik: ma'lumotlar modeli → provodka qoidalari → offline-sync → integratsiyalar (8-bo'limdagi tartib).
+7. **Har bir davlat integratsiyasi uchun sandbox mavjudligini tekshirish** va topilmasa buni loyiha xavfi sifatida rasman qayd etish (band 22).
+8. **AI eval-dataset va xarajat-limit siyosatini loyihalash** — MVP AI funksiyalari (AI-01, 03, 05, 06) ishga tushishidan oldin (band 59-60).
+9. **Ichki nofunksional maqsadlar (SLO) jadvalini e'lon qilish** — manbasiz bo'lsa ham, "ichki maqsad, keyin tasdiqlanadi" deb belgilab (band 54).
+10. **Fiskal modul (FM)/chek printeri ta'minotchisini tanlash** — bu tanlov sertifikatlash yo'li va uskuna SDK integratsiyasini boshlash uchun shart (band 55).
+
+## Manbalar
+
+- `spec/README.md`
+- `spec/01-mahsulot/01-rollar-va-ssenariylar.md`, `02-modullar-talablari.md`, `03-biznes-jarayonlar.md`, `04-ekranlar-va-ux.md`, `05-ai-funksiyalar.md`, `06-mvp-chegarasi.md`
+- `research_notes/texnik/00-xulosa-va-ochiq-savollar.md`
+- `research_notes/texnik/04-arxitektura-va-stack.md`
+- `research_notes/texnik/08-mahsulot-modullari.md`
+- `research_notes/texnik/12-taxminlar-va-murojaatlar.md`
+- `research_notes/texnik/14-tekshiruv-xulosasi.md`
+- `research_notes/texnik/tekshiruv-2026-10-14/5-buxgalteriya-soliq.md`

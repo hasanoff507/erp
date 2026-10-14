@@ -7,12 +7,12 @@
 1. **Didox va Faktura.uz'ning rasmiy ochiq API hujjati yo'q darajada yopiq.** Faktura.uz'ning ochiq API hujjati bor (`api.faktura.uz/help/`), Didox'niki esa login talab qiladigan portalda (`api-docs.didox.uz`) — ikkisi uchun ham faqat **norasmiy, uchinchi tomon** SDK/MCP server topildi, rasmiy SDK yo'q.
 2. **To'g'ridan-to'g'ri davlat e-faktura API'si uchun ommaviy hujjat topilmadi.** Soliq qo'mitasining o'z ochiq API'si haqida ommaviy manbada hujjat topilmadi; integratsiya faqat akkreditatsiyalangan EDO operatorlari (Didox, Faktura.uz va boshqalar) orqali o'tadi.
 3. **E-IMZO'ning rasmiy dasturchi portali yo'q** — yagona batafsil texnik hujjat jamoatchilik tomonidan yozilgan GitHub repo (`qo0p/e-imzo-doc`). Bu davlat kripto-middleware'iga bog'liqlik nuqtai nazaridan tadqiqot uchun muhim xavf.
-4. **Fakturalarni AI bilan xavf bo'yicha baholash** 2025-12-22 pilot, 2026-01-01 dan to'liq ishga tushdi (PQ-830, 26.12.2025); yuqori xavfli fakturalar ulushi davr uchun ≤10% bilan cheklangan, QQS krediti to'lovdan keyin beriladi.
+4. **Fakturalarni AI bilan xavf bo'yicha baholash** 2025-12-22 pilot, 2026-01-01 dan to'liq ishga tushdi (VM qarori 830-son, 26.12.2025 *(2026-10-14 tuzatildi: avval PQ-830 edi)*); yuqori xavfli fakturalar ulushi davr uchun ≤10% bilan cheklangan, QQS krediti to'lovdan keyin beriladi.
 5. **Payme, Click, Uzum'ning uchtasi ham turlicha protokolda ishlaydi**: Payme — JSON obyekt sifatida yuboriladigan RPC-so'rov (`method`/`params`/`id` maydonlari bilan; rasmiy hujjatda aniq "JSON-RPC 2.0" deb atalmaydi, push model), Click — REST+MD5 imzo (Prepare/Complete), Uzum — aralash (OpenAPI + BaaS qismida JSON-RPC). Uchtasida ham Check/Create/Perform(Confirm)/Cancel uslubidagi metodlar bor.
 6. **Click'ning komissiya stavkasi business.click.uz'da (1–5%, toifa bo'yicha) rasman tasdiqlangan.** co.click.uz'dagi "0%" da'vosi keltirilgan havola (co.click.uz/ru/xizmat-haqide/tarify) tekshirishda 404 qaytardi — ishlaydigan manba bilan tasdiqlanmaguncha bu da'vo hujjatdan olib tashlandi.
 7. **Onlayn/QR to'lovda fiskal chekni kim chiqarishi aniq emas.** Soliq qo'mitasi amalda to'lov tizimi "komissioner" sifatida chekni o'zi chiqarishini talab qiladi, lekin huquqiy tahlil (PQ-943, PQ-5252, Soliq kodeksi 227-1-modda) buni majburiy deb emas, kelishiladigan deb talqin qiladi.
 8. **Humo/Uzcard'da ochiq merchant SDK yo'q.** "UzPay"/"OPAKET" degan yagona birlashgan tizim **mavjud emas** (faqat terminal/ATM o'zaro ishlashi 2024-yil aprelda tugallangan). To'g'ridan-to'g'ri karta qabul qilish faqat litsenziyalangan acquiring bank (Kapitalbank, Ipak Yuli) yoki gateway (PaySys, Multicard) orqali.
-9. **Ochiq banking (bank ko'chirmasi API'si) Oʻzbekistonda hali yoʻq** — rasmiy standart 2026-yil 1-sentyabrga rejalashtirilgan (PQ-359). Yagona haqiqiy ishlaydigan integratsiya: Kapitalbank DiBank → 1C/Didox'ga ko'chirma avtomatik tushishi.
+9. **Ochiq banking (bank ko'chirmasi API'si) Oʻzbekistonda hali yoʻq** — rasmiy standart 2026-yil 1-sentyabrga rejalashtirilgan (PQ-359). Yagona haqiqiy ishlaydigan integratsiya: Kapitalbank DiBank → buxgalteriya dasturi/Didox'ga ko'chirma avtomatik tushishi.
 10. AIOS uchun amaliy xulosa: barcha uch to'lov integratsiyasi (Payme/Click/Uzum) va ikki EDO operatori (Didox/Faktura.uz) bilan **alohida, moslashuvchan adapter qatlami** kerak — protokollar, imzolash va komissiya modeli har birida farq qiladi, yagona umumiy abstraktsiya yo'q.
 
 ---
@@ -28,17 +28,17 @@
 
 ### 1.2 AI xavf bo'yicha baholash (risk-scoring)
 
-- Huquqiy asos: Prezident Farmoni **PF-153 (2025-09-04)** — sarlavhasi asosan QQS'ni soddalashtirish haqida, lekin matbuot (gazeta.uz) uni EHF xavf baholash majburiyatining asosi deb ko'rsatadi, IMF Soliq qo'mitasi maslahatchisi Georgiy Kandelaki bilan ishlab chiqilgan ([lex.uz/uz/docs/-7716359](https://lex.uz/uz/docs/-7716359); [gazeta.uz, 2025-10-15](https://www.gazeta.uz/oz/2025/10/15/tax-vat/)).
+- Huquqiy asos: Prezident Farmoni **PF-153 (2025-09-04)** — to'liq sarlavhasi "qishloq xo'jaligida QQS hisoblashning soddalashtirilgan tartibini joriy etish chora-tadbirlari to'g'risida" (aniq qishloq xo'jaligi QQS'iga tegishli, umumiy QQS'ni soddalashtirish emas); farmonning **4-bandida to'g'ridan-to'g'ri** Soliq qo'mitasiga "elektron hisobvaraq-fakturalarni xavf darajasiga qarab real vaqt rejimida avtomatlashtirilgan tarzda tahlil qilish tizimini joriy qilish" buyurilgan — bu matbuot talqini emas, farmonning o'z matnidagi band (matbuot buni faqat tasdiqlaydi); IMF — Soliq qo'mitasi raisining soliq siyosati va soliq ma'muriyatchiligini takomillashtirish bo'yicha maslahatchisi Georgiy Kandelaki bilan ishlab chiqilgan ([lex.uz/uz/docs/-7716359](https://lex.uz/uz/docs/-7716359); [gazeta.uz, 2025-09-04](https://www.gazeta.uz/oz/2025/09/04/tax-administration/)). *(2026-10-14 tekshiruvida tuzatildi: avval sarlavha "asosan QQS'ni soddalashtirish haqida" deb umumlashtirilgan va EHF xavf-baholash bilan bog'lanishi "matbuot ko'rsatadi" deb ikkinchi darajali qilib ko'rsatilgan edi — aslida farmonning o'z 4-bandida bor; shuningdek Kandelaki/48-71 ma'lumoti noto'g'ri gazeta.uz 2025-10-15 maqolasiga bog'langan edi, to'g'ri manba gazeta.uz 2025-09-04.)*
 - Amalga oshirish qarori: Vazirlar Mahkamasi Qarori **№830 (2025-12-26)**, 6-modda (xavf mezonlari — soliq to'lovchi tarixi, moliyaviy holati, biznes toifasi, tranzaksiya naqshi asosida Soliq qo'mitasi belgilaydi) va 8-modda (EHF'ni past/yuqori xavf toifasiga ajratish) ([lex.uz/docs/-7962143](https://lex.uz/docs/-7962143)).
 - Pilot: **2025-12-22** dan test rejimi (shaxsiy kabinetda qizil/yashil belgi); to'liq majburiy: **2026-01-01** ([spot.uz, 2025-12-22](https://www.spot.uz/oz/2025/12/22/risk-analysis)).
 - Cheklov: yuqori xavfli fakturalar hisobot davri uchun soliq to'lovchining jami fakturalarining ≤10%ini tashkil qilishi mumkin; qizil fakturadagi QQS faqat sotuvchi/xaridor to'lagandan keyin kreditlanadi ([spot.uz, 2026-01-05](https://www.spot.uz/oz/2026/01/05/risk-assessment); [spot.uz, 2025-10-16](https://www.spot.uz/oz/2025/10/16/electronic-invoices)).
-- Metodologiya: matbuotda "48 mezon" va "71 davlat idorasi" ma'lumotlari takrorlanadi ([gazeta.uz, 2025-10-15](https://www.gazeta.uz/oz/2025/10/15/tax-vat/)). **Qaror №830'ning lex.uz'dagi asl matni qayta tekshirildi — bu ikki raqam (48, 71) o'sha matnda yo'q.** 6-modda xavf mezonlari omillarini (soliq to'lovchi tarixi, moliyaviy holat, biznes toifasi) sonsiz, umumiy shaklda sanab o'tadi. Shuning uchun "48 mezon / 71 idora" **faqat OAV (ommaviy axborot vositalari) manbasi** sifatida belgilanadi, qonun matnida tasdiqlanmagan.
+- Metodologiya: matbuotda "48 mezon" va "71 davlat idorasi" ma'lumotlari takrorlanadi ([gazeta.uz, 2025-09-04](https://www.gazeta.uz/oz/2025/09/04/tax-administration/) — "EHFning xavf darajasini baholash 48 ta mezon asosida...", "Tizim doirasida 71 ta vazirlik va davlat idoralari ma'lumotlari birlashtirilgan"). **Qaror №830'ning lex.uz'dagi asl matni qayta tekshirildi — bu ikki raqam (48, 71) o'sha matnda yo'q.** 6-modda xavf mezonlari omillarini (soliq to'lovchi tarixi, moliyaviy holat, biznes toifasi) sonsiz, umumiy shaklda sanab o'tadi. Shuning uchun "48 mezon / 71 idora" **faqat OAV (ommaviy axborot vositalari) manbasi** sifatida belgilanadi, qonun matnida tasdiqlanmagan. *(2026-10-14 tekshiruvida tuzatildi: avval manba gazeta.uz 2025-10-15 deb ko'rsatilgan edi — bu maqolada 48/71 raqamlari umuman yo'q; to'g'ri manba gazeta.uz 2025-09-04.)*
 - Pilot natijalari (2025-yil iyul–sentabr): 27 soliq to'lovchi nomuvofiq operatsiyalarda aniqlangan; 281 kompaniya 5,9 trln so'mlik shubhali faktura ro'yxatdan o'tkazgan; 706 mlrd so'mlik potensial soxta QQS da'vosi ([gazeta.uz, 2025-10-15](https://www.gazeta.uz/oz/2025/10/15/tax-vat/)).
 
 ### 1.3 Didox
 
 - Rasmiy sayt: didox.uz. API hujjat portali mavjud: **api-docs.didox.uz**, lekin login talab qiladi — to'liq endpoint ro'yxatini ochiq holda olib bo'lmadi ([api-docs.didox.uz/login](https://api-docs.didox.uz/login)).
-- "1C kabi buxgalteriya dasturlari bilan integratsiya uchun tayyor modul/API" borligi haqida ikkinchi darajali yozuvlar bor, rasmiy texnik tafsilotsiz ([internet-zapis.ru](https://internet-zapis.ru/info/didox-uz-v-uzbekistane-revolyutsiya-elektronnogo-dokumentooborota-i-rabota-s-esf); [spravke.livejournal.com](https://spravke.livejournal.com/691773.html)).
+- Buxgalteriya dasturlari bilan integratsiya uchun tayyor modul/API borligi haqida ikkinchi darajali yozuvlar bor, rasmiy texnik tafsilotsiz ([internet-zapis.ru](https://internet-zapis.ru/info/didox-uz-v-uzbekistane-revolyutsiya-elektronnogo-dokumentooborota-i-rabota-s-esf); [spravke.livejournal.com](https://spravke.livejournal.com/691773.html)).
 - TypeScript/Node.js SDK npm'da `didox` nomi bilan bor, lekin bu **norasmiy, jamoatchilik tomonidan yozilgan** SDK (muallif Ahrorbek Mirzaev, repo `mirzaevoff/didox`, sayt `didox.mirzaev.uz`) — Didox kompaniyasining rasmiy mahsuloti emas ([registry.npmjs.org/didox](https://registry.npmjs.org/didox); [socket.dev/npm/package/didox](https://socket.dev/npm/package/didox)).
 - Hujjat turlari (ochiq manbalarda tasdiqlangan): hisob-faktura, ishonchnoma (e-doverennost), bajarilgan ishlar dalolatnomasi, TTN (tovar-transport xati), shartnomalar, Rossiya kontragentlari bilan skan hujjat almashinuvi ([buxgalter.uz](https://buxgalter.uz/publish/doc/text159643_elektronnye_doverennosti_didox_pozvolyayut_identificirovat_podpisavshih); [internet-zapis.ru](https://internet-zapis.ru/info/didox-uz-v-uzbekistane-revolyutsiya-elektronnogo-dokumentooborota-i-rabota-s-esf)). Birlashtirilgan e-TTN (faktura+yo'l xati) Didox'da alohida qo'llab-quvvatlanishi **ochiq manbada topilmadi**.
 - Narx: 10 tagacha hujjat bepul; 11–100 va 101–1000 oralig'ida bosqichli narx (~800 so'm/hujjat atrofida, manbalar bir-biriga mos kelmaydi); ba'zi manbalar oyiga 1000 fakturagacha bepul, undan yuqorida ~300 so'm/hujjat (support bilan) deydi ([buxgalter.uz taqqoslash jadvali](https://buxgalter.uz/publish/doc/text171838_kak_opredelitsya_s_operatorom_esf_sravnitelnaya_tablica)). Ichki to'lov birligi "DICOIN" deb ataladi ([t.me/didox_info](https://t.me/s/didox_info?before=775)). Rasmiy integratsiya shartnomasi hujjati ochiq holda topilmadi.
@@ -58,6 +58,7 @@
 ### 1.5 E-IMZO / ERI (raqamli imzo)
 
 - Rasmiy sayt: [e-imzo.uz](https://e-imzo.uz/) (qidiruv natijasiga ko'ra Soliq qo'mitasining yangi texnologiyalar ilmiy-tadqiqot markazi tomonidan ishlab chiqilgan — asl manba mustaqil tasdiqlanmadi).
+- **Huquqiy asos (jamoa tomonidan tasdiqlangan, `00-xulosa-va-ochiq-savollar.md`):** O'RQ-793-son Qonun "Elektron raqamli imzo to'g'risida" (2022-10-12), 2023-01-14 dan kuchda ([lex.uz/docs/-6234904](https://lex.uz/docs/-6234904)).
 - Rasmiy dasturchi portali (OpenAPI/Swagger) **topilmadi** — yagona batafsil texnik hujjat jamoatchilik tomonidan yozilgan: [github.com/qo0p/e-imzo-doc](https://github.com/qo0p/e-imzo-doc/blob/master/README.md) (ko'zgu: [deepwiki.com/qo0p/e-imzo-doc](https://deepwiki.com/qo0p/e-imzo-doc)).
 - Arxitektura (shu hujjatdan):
   - **E-IMZO.exe** — lokal desktop dastur, xususiy kalitlarni saqlaydi, hech qachon tashqariga yubormaydi; brauzer bilan WebSocket orqali "CAPIWS" interfeysi orqali gaplashadi (eski NPAPI emas).
@@ -72,6 +73,8 @@
 ---
 
 ## 2. To'lov tizimlari (Payme, Click, Uzum)
+
+**Huquqiy kontekst (jamoa tomonidan tasdiqlangan, `00-xulosa-va-ochiq-savollar.md`):** yagona QR-kod orqali to'lovni qabul qilish 2026-01-01 dan boshlanib, **2026-07-01 dan to'liq majburiy** bo'ladi (Prezident Farmoni **PF-246, 2025-12-10**; [gazeta.uz, 2025-12-10](https://www.gazeta.uz/oz/2025/12/10/qr-code/)). O'zbekiston Markaziy banki Boshqaruvining **№5/11-sonli qarori (2026-03-25)**, Adliya vazirligida **№3817 bilan ro'yxatdan o'tgan (2026-04-15)**, faqat yagona QR-kod xizmatining texnik qoidalarini belgilaydi, majburiylikni o'zi joriy etmaydi ([lex.uz/docs/8139307](https://lex.uz/docs/8139307)). Demak quyidagi Payme/Click/Uzum QR integratsiyalari shunchaki qulaylik emas — 2026-07-01 dan kassa darajasida **majburiy qabul qilish nuqtai nazaridan** rejalashtirilishi kerak. *(2026-10-14 tekshiruvida tuzatildi: avval farmon raqami "manbada yo'q" deb yozilgan edi — aniqlandi: PF-246; CBU hujjati "Qarori №3817" deb atalgan edi, bu aslida Adliya vazirligining ro'yxatga olish raqami, CBU'ning o'z qarori raqami №5/11, 2026-03-25.)*
 
 ### 2.1 Payme
 
@@ -101,7 +104,7 @@
 
 - Dasturchi portali: [developer.uzumbank.uz/en/](https://developer.uzumbank.uz/en/) — onlayn to'lovlar, QR to'lovlar, ichki/xalqaro o'tkazmalar, "Nasiya" (bo'lib to'lash), fiskalizatsiya, "Checkout", "Merchant API", "FastPay", "Dynamic QR", "CrossBorder", "RemitCore", "BaaS (Payment Hub)" qamraydi.
 - Protokol: aralash — sahifada bir nechta integratsiya uchun "OpenAPI", BaaS Payment Hub mahsuloti uchun aniq "JSON-RPC" tilga olinadi. Asosiy Merchant API'ning aniq protokoli (JSON-RPC/REST) **to'liq tasdiqlanmagan**, faqat metod nomlari ma'lum.
-- Autentifikatsiya: HTTP Basic авторизация; summalar tiyinda ifodalanadi. Kredensiallar: `UZUM_USERNAME`, `UZUM_PASSWORD`, `UZUM_SERVICE_ID` (ikkinchi darajali manbadan, to'g'ridan-to'g'ri qayta tasdiqlanmagan).
+- Autentifikatsiya: HTTP Basic autentifikatsiya; summalar tiyinda ifodalanadi. Kredensiallar: `UZUM_USERNAME`, `UZUM_PASSWORD`, `UZUM_SERVICE_ID` (ikkinchi darajali manbadan, to'g'ridan-to'g'ri qayta tasdiqlanmagan).
 - Asosiy metodlar: check, create, confirm, reverse, status (Payme'ning Check/Create/Perform/Cancel naqshiga o'xshash) — [developer.uzumbank.uz/en/](https://developer.uzumbank.uz/en/), tasdiqlovchi jamoatchilik paketi: [packagist.org/packages/inwebuz/uzumbank-merchant](https://packagist.org/packages/inwebuz/uzumbank-merchant).
 - Webhook: mijoz Uzum Bank ilovasida to'lovni yakunlagach, Merchant API webhook orqali bildirishnoma yuboradi.
 - QR to'lov: ikki alohida mahsulot — **"FastPay"** (kassir mijozning QR kodini skanerlaydi) va **"Dynamic QR"** (mijoz chekdan generatsiya qilingan QR'ni skanerlaydi, narx oldindan kodlangan, qaytarish qo'llab-quvvatlanadi). Bu Uzum'ning kamida bitta oqimda **dinamik QR** ishlatishini tasdiqlaydi.
@@ -160,12 +163,12 @@
 - CBU (cbu.uz) Ochiq ma'lumotlar portali mavjud, lekin faqat makro/monetar statistika (XML/CSV/JSON/XLSX) — **hisob/ko'chirma API'si yo'q** ([cbu.uz/en/services/open_data/portal/](https://cbu.uz/en/services/open_data/portal/)).
 - **Rasmiy ochiq banking regulyatsiyasi hali mavjud emas — 2026-yil 1-sentyabrga rejalashtirilgan**, milliy fintech strategiyasi doirasida ([intellinews.com](https://www.intellinews.com/uzbekistan-advances-ambitious-plan-to-become-regional-fintech-hub-by-2030-452143/); Prezident Qarori **PQ-359, 2025-noyabr**, [uzdaily.uz](https://www.uzdaily.uz/en/uzbekistan-approves-fintech-development-strategy-through-2030/)).
 - Kapitalbank "Kapital API" mavjud ([kapitalbank.uz/en/corporate/services/kapital-api/](https://www.kapitalbank.uz/en/corporate/services/kapital-api/)), lekin hujjatlari cheklangan/faqat murojaat orqali.
-- **Kapitalbank DiBank** — bank ko'chirmalarini to'g'ridan-to'g'ri 1C:Buxgalteriya va Didox'ga yuboruvchi **tasdiqlangan ishlaydigan integratsiya**, bu tadqiqotda topilgan eng yaqin "bank-klient API" ([kapitalbank.uz matbuot xabari](https://www.kapitalbank.uz/en/press_center/news/news-for-accountants-bank-payments-directly-to-1c-and-didox/); [dibank.uz/Instruction/](https://dibank.uz/Instruction/)).
+- **Kapitalbank DiBank** — bank ko'chirmalarini to'g'ridan-to'g'ri buxgalteriya dasturlari va Didox'ga yuboruvchi **tasdiqlangan ishlaydigan integratsiya**, bu tadqiqotda topilgan eng yaqin "bank-klient API" ([kapitalbank.uz matbuot xabari](https://www.kapitalbank.uz/en/press_center/news/news-for-accountants-bank-payments-directly-to-1c-and-didox/); [dibank.uz/Instruction/](https://dibank.uz/Instruction/)).
 - TBC Bank O'zbekiston "CapitalBanker/CapitalConnect" API-asosidagi korporativ platformasi ~2025-yilda ishga tushdi, lekin texnik hujjatlari ochiq emas ([retailbankerinternational.com](https://www.retailbankerinternational.com/news/tbc-bank-goes-live-with-cbs-api-based-open-platform-in-uzbekistan/)).
 - Ipak Yuli Bank, Hamkorbank, Agrobank: ochiq dasturchi/korporativ API hujjati **topilmadi**.
 - Open Banking Tracker 61 ta O'zbek bankini sanaydi, lekin **0 tasida dasturchi portali, 0 tasida sandbox** borligini tasdiqlaydi ([openbankingtracker.com/providers/country/uz](https://www.openbankingtracker.com/providers/country/uz)).
 - Plaid, Tink, TrueLayer, Salt Edge: hech birida O'zbek banki qo'llab-quvvatlanishi **topilmadi** ([plaid.com/docs/institutions/](https://plaid.com/docs/institutions/) tekshirildi; saltedge.com/tink.com/truelayer.com'da sayt-cheklangan qidiruv natija bermadi).
-- **Xulosa**: rasmiy ochiq banking standarti 2026-yil sentyabrgacha yo'q; Kapitalbank DiBank — topilgan yagona haqiqiy ko'chirma→1C integratsiyasi.
+- **Xulosa**: rasmiy ochiq banking standarti 2026-yil sentyabrgacha yo'q; Kapitalbank DiBank — topilgan yagona haqiqiy ko'chirma→buxgalteriya integratsiyasi.
 
 ### 3.3 Dasturchi jamiyati kodi (GitHub, habr.com, infostart.ru)
 
@@ -174,13 +177,10 @@
 - [github.com/pashgo/multicard-ruby](https://github.com/pashgo/multicard-ruby) — Multicard.uz gateway (Humo, Uzcard, 9 hamyon).
 - [github.com/PayTechUz](https://github.com/PayTechUz) — Python/Go SDK'lar, Payme/Click/Uzum/Humo/Uzcard/Apelsin'ni birlashtiradi.
 - [github.com/azamatnarzuloyev/uzbekistan-web-developer-resources](https://github.com/azamatnarzuloyev/uzbekistan-web-developer-resources) — O'zbek to'lov API'lari ro'yxati.
-- [github.com/maximal/1c-client-bank-exchange-php](https://github.com/maximal/1c-client-bank-exchange-php) — umumiy (O'zbekistonga xos emas) 1C Client-Bank Exchange formatini tahlil qiluvchi parser; agar biror O'zbek banki shu formatda eksport qilsa, asos sifatida ishlatish mumkin.
-- [github.com/Artuganov/WWmcp](https://github.com/Artuganov/WWmcp) — 1C:Korxona + Payme (O'zbekiston)'ni birlashtiruvchi MCP server.
 
 **Topilmadi:**
 - To'g'ridan-to'g'ri "Humo API"/"Uzcard API" SDK'lari uchun GitHub repo yo'q.
 - habr.com'da O'zbek Humo/Uzcard/acquiring integratsiyasi haqida maqola topilmadi.
-- infostart.ru'da O'zbekiston banki/1C integratsiyasi haqida maxsus post topilmadi.
 
 **Umumiy xulosa**: Bugungi kunda to'g'ridan-to'g'ri ochiq Humo/Uzcard POS yoki ochiq-banking ko'chirma API'si yo'q. Har qanday haqiqiy integratsiya yo'li (a) litsenziyalangan acquiring bank/gateway (PaySys, Multicard, Kapitalbank DiBank) orqali, yoki (b) uchta aggregator (Payme/Click/Uzum) orqali o'tadi — ya'ni ERP+POS uchun oxir-oqibat ulardan biriga qarshi qurish, yoki CBU'ning ochiq banking freymvorki chiqishigacha (PQ-359 bo'yicha 2026-yil sentyabrga mo'ljallangan) bank bilan yopiq shartnoma tuzish kerak bo'ladi.
 
@@ -205,7 +205,8 @@
 - [lex.uz/acts/-4674902](https://lex.uz/acts/-4674902) — Soliq kodeksi
 - [lex.uz/uz/docs/-7716359](https://lex.uz/uz/docs/-7716359) — Prezident Farmoni PF-153
 - [lex.uz/docs/-7962143](https://lex.uz/docs/-7962143) — VM Qarori №830
-- [gazeta.uz/oz/2025/10/15/tax-vat/](https://www.gazeta.uz/oz/2025/10/15/tax-vat/)
+- [gazeta.uz/oz/2025/10/15/tax-vat/](https://www.gazeta.uz/oz/2025/10/15/tax-vat/) — pilot natijalari (27/281/5,9 trln/706 mlrd)
+- [gazeta.uz/oz/2025/09/04/tax-administration/](https://www.gazeta.uz/oz/2025/09/04/tax-administration/) — "48 mezon / 71 idora" va Kandelaki manbasi (to'g'rilangan)
 - [spot.uz/oz/2025/12/22/risk-analysis](https://www.spot.uz/oz/2025/12/22/risk-analysis), [spot.uz/oz/2026/01/05/risk-assessment](https://www.spot.uz/oz/2026/01/05/risk-assessment), [spot.uz/oz/2025/10/16/electronic-invoices](https://www.spot.uz/oz/2025/10/16/electronic-invoices)
 - [api-docs.didox.uz](https://api-docs.didox.uz/login), [registry.npmjs.org/didox](https://registry.npmjs.org/didox), [socket.dev/npm/package/didox](https://socket.dev/npm/package/didox)
 - [buxgalter.uz/.../text171838](https://buxgalter.uz/publish/doc/text171838_kak_opredelitsya_s_operatorom_esf_sravnitelnaya_tablica), [buxgalter.uz/.../text159643](https://buxgalter.uz/publish/doc/text159643_elektronnye_doverennosti_didox_pozvolyayut_identificirovat_podpisavshih)
@@ -227,4 +228,4 @@
 - [intellinews.com/...](https://www.intellinews.com/uzbekistan-advances-ambitious-plan-to-become-regional-fintech-hub-by-2030-452143/), [uzdaily.uz/...](https://www.uzdaily.uz/en/uzbekistan-approves-fintech-development-strategy-through-2030/)
 - [kapitalbank.uz matbuot xabari](https://www.kapitalbank.uz/en/press_center/news/news-for-accountants-bank-payments-directly-to-1c-and-didox/), [dibank.uz/Instruction/](https://dibank.uz/Instruction/)
 - [openbankingtracker.com/providers/country/uz](https://www.openbankingtracker.com/providers/country/uz)
-- [github.com/iamtime/uzpay](https://github.com/iamtime/uzpay), [github.com/PayTechUz](https://github.com/PayTechUz), [github.com/Artuganov/WWmcp](https://github.com/Artuganov/WWmcp)
+- [github.com/iamtime/uzpay](https://github.com/iamtime/uzpay), [github.com/PayTechUz](https://github.com/PayTechUz)

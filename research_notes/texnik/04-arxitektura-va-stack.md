@@ -4,8 +4,8 @@
 
 ## Asosiy xulosalar
 
-1. **Mahsulot 1C'dan ma'lumot olmaydi va 1C bilan integratsiya qilmaydi** (Claude Docs — asosiy hujjat, [artifact e57e7cd7](https://claude.ai/code/artifact/e57e7cd7-1117-40a7-8af5-8154a8d22540)) — noldan quriladi, 1C faqat ma'lumotlar modeli uchun namuna sifatida ishlatilgan (`01-1c-modullar-va-malumot-modeli.md`). Shuning uchun EnterpriseData/OData migratsiya yo'llari **rejadan olib tashlandi**.
-2. **2026-yildagi eng muhim arxitektura talabi — davlat hisoboti bilan solishtirish oqimi.** 2026-01-01 dan Soliq qo'mitasi QQS, mulk, yer, aylanma, JShDS va ijtimoiy soliq hisobotlarini cheklar/e-fakturalardan **o'zi tuzadi**; korxonaga **5 ish kuni** tekshirish/tuzatish beriladi, javob bo'lmasa hisobot avtomatik qabul qilingan hisoblanadi ([uz.kursiv.media, 2025-12-30](https://uz.kursiv.media/uz/2025-12-30/1-yanvardan-ayrim-soliq-hisobotlari-avtomatik-shakllantiriladi/)). Demak bizning vazifamiz deklaratsiya yozish emas — chek/faktura/ombor ma'lumotining to'g'ri ketishini ta'minlash va davlat hisobotini ichki hisob bilan solishtirib, farqni 5 kun ichida ko'rsatish. Bu **6-bo'limda** asosiy yangi arxitektura oqimi sifatida yoritilgan.
+1. **Mahsulot hech qanday tashqi buxgalteriya/savdo dasturidan ma'lumot olmaydi va ular bilan integratsiya qilmaydi** (Claude Docs — asosiy hujjat, [artifact e57e7cd7](https://claude.ai/code/artifact/e57e7cd7-1117-40a7-8af5-8154a8d22540)) — noldan quriladi; umumiy ERP ma'lumotlar modeli faqat ichki loyihalash namunasi sifatida ishlatilgan (`01-erp-modullar-va-malumot-modeli.md`). Shuning uchun uchinchi tomon dasturlardan ma'lumot ko'chirish/migratsiya yo'llari **rejadan olib tashlandi**.
+2. **2026-yildagi eng muhim arxitektura talabi — davlat hisoboti bilan solishtirish oqimi.** 2026-01-01 dan Soliq qo'mitasi mol-mulk, yer, JShDS, ijtimoiy soliq, QQS va aylanma solig'i hisobotlarini (foyda solig'i **bundan mustasno**) cheklar/e-fakturalardan **o'zi tuzadi**; korxonaga tafovutni tuzatish uchun **5 kalendar kun** beriladi (hisobot topshirish muddatidan kechiktirmay), javob bo'lmasa hisobot davlat tuzgan holida topshirilgan hisoblanadi (O'RQ-1108-son Qonun, 2025-12-25, Soliq kodeksi 81-moddasi, 2026-01-01 dan kuchda; [lex.uz/docs/-7944527](https://lex.uz/docs/-7944527); kontekst: [uz.kursiv.media, 2025-12-30](https://uz.kursiv.media/uz/2025-12-30/1-yanvardan-ayrim-soliq-hisobotlari-avtomatik-shakllantiriladi/)). Demak bizning vazifamiz deklaratsiya yozish emas — chek/faktura/ombor ma'lumotining to'g'ri ketishini ta'minlash va davlat hisobotini ichki hisob bilan solishtirib, farqni 5 kalendar kun ichida ko'rsatish. Bu **6-bo'limda** asosiy yangi arxitektura oqimi sifatida yoritilgan. *(2026-10-14 tekshiruvida tuzatildi: avval "5 ish kuni" deyilgan edi va qonun/qaror raqami "ochiq manbada topilmadi" deb qoldirilgan edi — to'g'risi 5 **kalendar** kun, qonun raqami O'RQ-1108 (SK 81-modda); foyda solig'i ro'yxatda yo'qligi aniq ko'rsatildi.)*
 3. **Multi-tenant model: shared DB + tenant_id (row-level isolation) — MVP uchun tavsiya**, chunki SME segment uchun operatsion xarajat past bo'lishi kerak (07-faylda UzCloud narxlari — vCPU 85 000 so'm/oy — kichik marjin bilan ishlaydi). Schema-per-tenant/baza-per-tenant — faqat yirik/nozik (masalan buxgalteriya auditi talab qiladigan) mijozlar uchun kelajakdagi variant.
 4. **Offline-first — majburiy, ixtiyoriy emas.** O'zbekistonda dalolatlangan internet/elektr uzilishlari (2022 Qoraqalpog'iston, yillik imtihon kuni to'xtatilishi, 2022 mintaqaviy elektr avariyasi, 2024–2025 Toshkent uzilishlari — `07-hosting-lokalizatsiya-xavfsizlik.md`) buni asoslaydi. Sinxronizatsiya **append-only event-log** asosida, CRDT asosida emas — sabab 2-bo'limda.
 5. **Qattiq fiskal muddat: offline holatda shakllangan birinchi chek 48 soat ichida OFD'ga yetib borishi shart** (943-son qaror, 1-ilova, 31-band — `02-kassa-ofd-markirovka.md`'da birlamchi manbadan tasdiqlangan). Bu sync arxitekturasining qattiq SLA chegarasi.
@@ -36,7 +36,7 @@
 - **PWA (orqa ofis)**: IndexedDB — brauzer ichida offline ombor/hisobot ko'rish uchun, lekin kassa tranzaksiyasi PWA'da birinchi ustuvorlik emas (asosiy savdo — Android ilova orqali).
 
 ### 2.2 Sinxronizatsiya: event-log, CRDT emas
-`01-fayl`da tasdiqlangan 1C naqshi (КассоваяСмена → ЧекККМ ketma-ketligi, smena ichida ketma-ket chek raqami) va `02-fayl`dagi fiskal talab (chek OFD'ga **ketma-ket, 48 soat ichida** yetishi) — bu ikki xususiyat CRDT'ning "istalgan tartibda birlashadigan" modeliga mos kelmaydi: fiskal chek raqami smena ichida qat'iy ketma-ket bo'lishi shart, shuning uchun **append-only event-log (outbox pattern)** tavsiya etiladi:
+`01-fayl`da tasdiqlangan kassa-smena naqshi (smena → chek ketma-ketligi, smena ichida ketma-ket chek raqami) va `02-fayl`dagi fiskal talab (chek OFD'ga **ketma-ket, 48 soat ichida** yetishi) — bu ikki xususiyat CRDT'ning "istalgan tartibda birlashadigan" modeliga mos kelmaydi: fiskal chek raqami smena ichida qat'iy ketma-ket bo'lishi shart, shuning uchun **append-only event-log (outbox pattern)** tavsiya etiladi:
 1. Kassa lokal SQLite'da har bir amalni (chek, qaytarish, smena ochish/yopish) **o'zgarmas voqea (event)** sifatida yozadi, lokal ketma-ket ID bilan.
 2. Internet qaytganda, voqealar serverga **xronologik tartibda** yuboriladi; server ularga global, smena-darajasidagi ketma-ket raqam beradi (fiskal chek raqami shu yerda rasmiylashadi).
 3. Server qabul qilgach, OFD'ga yuborish navbati boshlanadi — **48 soatlik hisob shu yerdan boshlanadi** (chek yaratilgan payt, OFD'ga yetib borish payti emas — bu `02-fayl`dagi 1-ilova 31-band talqiniga mos).
@@ -64,7 +64,7 @@
 
 ## 4. Backend va baza tanlovi
 
-- **Ma'lumotlar bazasi: PostgreSQL.** Sabab: (a) UzCloud'da to'liq managed DBaaS xizmati bor — HA klaster, avtomatik backup, PITR (`07-fayl`); (b) relyatsion model `01-fayl`dagi 1C obyekt-registr naqshiga (balans/aylanma registrlari) yaxshi mos keladi — PostgreSQL'ning jamlangan (aggregate) so'rovlari ombor qoldig'i/mijoz qarzi balansini real vaqtda hisoblash uchun yetarli; (c) JSONB maydon turi orqali tenant-specific moslashuvchan maydonlarni (masalan qo'shimcha hisobot ustunlari) qattiq schema o'zgarishisiz saqlash mumkin.
+- **Ma'lumotlar bazasi: PostgreSQL.** Sabab: (a) UzCloud'da to'liq managed DBaaS xizmati bor — HA klaster, avtomatik backup, PITR (`07-fayl`); (b) relyatsion model `01-fayl`dagi hujjat-registr naqshiga (qoldiq/aylanma registrlari) yaxshi mos keladi — PostgreSQL'ning jamlangan (aggregate) so'rovlari ombor qoldig'i/mijoz qarzi balansini real vaqtda hisoblash uchun yetarli; (c) JSONB maydon turi orqali tenant-specific moslashuvchan maydonlarni (masalan qo'shimcha hisobot ustunlari) qattiq schema o'zgarishisiz saqlash mumkin.
 - **Backend tili/freymvork** — bu bosqichda sohaga xos majburiy talab yo'q (hech bir qonun/standart buni belgilamaydi); tanlov jamoaning tajribasiga bog'liq, shuning uchun bu hujjat aniq til/freymvorkni "fakt" sifatida tavsiya qilmaydi — bu komandaning ichki muhandislik qarori.
 
 ---
@@ -84,10 +84,10 @@
 Bu — arxitektor tomonidan belgilangan eng muhim yangi yo'nalish, shuning uchun alohida bo'lim sifatida ajratildi.
 
 ### 6.1 Fon
-2026-01-01 dan Soliq qo'mitasi quyidagi hisobotlarni **o'zi, cheklar va e-fakturalardan avtomatik tuzadi**: QQS, mulk solig'i, yer solig'i, aylanmadan olinadigan soliq, jismoniy shaxslar daromad solig'i (JShDS), ijtimoiy soliq ([uz.kursiv.media, 2025-12-30](https://uz.kursiv.media/uz/2025-12-30/1-yanvardan-ayrim-soliq-hisobotlari-avtomatik-shakllantiriladi/)). Korxonaga **5 ish kuni** beriladi: shu muddatda tuzatish kiritish mumkin, aks holda hisobot **avtomatik qabul qilingan va topshirilgan** hisoblanadi (o'sha manba). Bu qoidaning aniq qonun/qaror raqami ochiq manbada **topilmadi** — faqat matbuot orqali tasdiqlangan (Claude Docs asosiy hujjatida ham shu holat qayd etilgan).
+2026-01-01 dan Soliq qo'mitasi quyidagi hisobotlarni **o'zi, cheklar va e-fakturalardan avtomatik tuzadi**: mol-mulk solig'i, yer solig'i, JShDS, ijtimoiy soliq, QQS, aylanmadan olinadigan soliq (**foyda solig'i bu ro'yxatga kirmaydi**) ([uz.kursiv.media, 2025-12-30](https://uz.kursiv.media/uz/2025-12-30/1-yanvardan-ayrim-soliq-hisobotlari-avtomatik-shakllantiriladi/)). Korxonaga tafovutni tuzatish uchun **5 kalendar kun** beriladi — "besh kun ichida", lekin hisobot topshirish muddatidan kechiktirmay; shu muddatda tuzatish kiritish mumkin, aks holda hisobot davlat tuzgan holida **topshirilgan** hisoblanadi. **Qonun/qaror asosi aniqlandi: O'RQ-1108-son Qonun (2025-12-25, 2026-01-01 dan kuchda), Soliq kodeksi 81-moddasiga kiritilgan o'zgartirish** ([lex.uz/docs/-7944527](https://lex.uz/docs/-7944527)). *(2026-10-14 tekshiruvida tuzatildi: avval "5 ish kuni" va "qonun/qaror raqami ochiq manbada topilmadi" deyilgan edi — to'g'risi 5 **kalendar** kun, qonun — O'RQ-1108 (SK 81-modda); foyda solig'i ro'yxatda yo'q.)*
 
 ### 6.2 Nega bu arxitektura uchun markaziy
-Agar davlat hisobotni o'zi tuzsa va javobsizlik avtomatik qabul deb hisoblansa, korxona uchun eng katta xavf — **davlat hisobga olgan raqam korxonaning o'z hisobidan farq qilishi, lekin 5 kun ichida bu farq payqalmasligi**. AIOS'ning qiymat taklifi shu yerda: deklaratsiya yozish emas, balki **(a) chek/faktura/ombor ma'lumotining to'g'ri va to'liq ketishini ta'minlash, (b) davlat tuzgan hisobotni ichki hisob bilan avtomatik solishtirish, (c) farqni 5 kunlik oyna yopilishidan oldin ko'rsatish.**
+Agar davlat hisobotni o'zi tuzsa va javobsizlik avtomatik qabul deb hisoblansa, korxona uchun eng katta xavf — **davlat hisobga olgan raqam korxonaning o'z hisobidan farq qilishi, lekin 5 kalendar kun ichida bu farq payqalmasligi**. AIOS'ning qiymat taklifi shu yerda: deklaratsiya yozish emas, balki **(a) chek/faktura/ombor ma'lumotining to'g'ri va to'liq ketishini ta'minlash, (b) davlat tuzgan hisobotni ichki hisob bilan avtomatik solishtirish, (c) farqni 5 kalendar kunlik oyna yopilishidan oldin ko'rsatish.**
 
 ### 6.3 Taklif qilinadigan oqim (arxitektura darajasida)
 ```mermaid
@@ -107,14 +107,14 @@ sequenceDiagram
     alt Farq topilmadi
         Diff->>Owner: "Mos keladi" bildirishnomasi
     else Farq topildi
-        Diff->>Owner: Ogohlantirish + aniq qator/sabab, 5 ish kuni hisoblagichi bilan
+        Diff->>Owner: Ogohlantirish + aniq qator/sabab, 5 kalendar kun hisoblagichi bilan
         Owner->>MySoliq: Tuzatish (qo'lda, E-IMZO bilan)
     end
 ```
 
 ### 6.4 Texnik talablar
 - **Ichki ledger** (soliq hisoblash motori) har bir savdo/xarid/qaytarish hujjatidan real vaqtda QQS/aylanma/boshqa soliq bazasini yig'ib boradi — bu `01-fayl`dagi MVP buxgalteriya moduli (NSBU №21 asosida) ustiga quriladi.
-- **5 kunlik hisoblagich** — har bir soliq turi uchun alohida kuzatiladigan deadline obyekti; UI'da egasi/buxgalterga aniq "N kun qoldi" ko'rsatiladi.
+- **5 kalendar kunlik hisoblagich** (O'RQ-1108, SK 81-modda) — har bir soliq turi uchun alohida kuzatiladigan deadline obyekti; UI'da egasi/buxgalterga aniq "N kun qoldi" ko'rsatiladi, lekin hisobot topshirish muddatidan kechiktirmasligi ham nazorat qilinadi.
 - **Solishtirish motori** — qator darajasida (masalan har bir e-faktura/chek bo'yicha), umumiy summa darajasida emas, chunki umumiy summa mos kelsa ham, bitta noto'g'ri yozilgan faktura boshqasini yashirib qo'yishi mumkin.
 
 ---
@@ -138,7 +138,7 @@ sequenceDiagram
 | Sinxronizatsiya | Append-only event-log (outbox) | Fiskal chek ketma-ketligi va 48-soat qoidasi bilan mos; CRDT mos kelmaydi | CRDT (faqat konflikt-ozod ma'lumotlar uchun, masalan mahsulot katalogi) |
 | Kassa platformasi | Android-native (Kotlin) | Bozordagi uskunalar (PAX A930, UZKASSA) Android asosida | Windows (faqat mavjud REGOS VCR integratsiyasi uchun) |
 | Orqa ofis platformasi | PWA | O'rnatishsiz, markazlashgan yangilanish | Native mobil ilova (keyingi bosqich) |
-| Baza | PostgreSQL (UzCloud DBaaS) | Managed, HA, PITR, relyatsion model 1C naqshiga mos | — |
+| Baza | PostgreSQL (UzCloud DBaaS) | Managed, HA, PITR, relyatsion model hujjat-registr naqshiga mos | — |
 | Hosting | UzCloud / Uztelecom | Mahalliy, ochiq narx, past kechikish, biznes tanlovi (qonuniy majburiyat emas) | Beeline fortifAI, East Telecom (narx yopiq) |
 | Obyekt xotira | UzCloud S3-mos | Chek/faktura PDF arxivi uchun | — |
 | Backup | UzCloud Backup-as-a-Service + PITR | Buxgalteriya hujjat saqlash muddatiga (3+ yil) mos | — |
@@ -185,7 +185,7 @@ flowchart TB
     API -->|markirovka tekshirish| CRPT
     Ledger --> Diff
     MySoliq -.->|API topilmadi, qo'lda| Diff
-    Diff -->|ogohlantirish, 5 kun| BackOffice
+    Diff -->|ogohlantirish, 5 kalendar kun| BackOffice
     BackOffice <--> API
     POS -.->|ixtiyoriy| Payme/Click/Uzum
 ```
@@ -206,14 +206,15 @@ flowchart TB
 ## Ochiq savollar
 
 1. Davlat hisobotini (my.soliq.uz) dasturiy ravishda olish/yuklab olish uchun biror yarim-rasmiy yo'l (masalan E-IMZO orqali autentifikatsiyalangan portal-skreyping) mavjudmi — to'g'ridan-to'g'ri my.soliq.uz bilan aniqlashtirish kerak.
-2. "5 ish kuni" qoidasining aniq qonun/qaror raqami — faqat kursiv.media orqali tasdiqlangan, lex.uz'da to'g'ridan-to'g'ri topilmadi.
+2. ~~"5 ish kuni" qoidasining aniq qonun/qaror raqami — faqat kursiv.media orqali tasdiqlangan, lex.uz'da to'g'ridan-to'g'ri topilmadi.~~ **Yopildi (2026-10-14 tekshiruvida tuzatildi)**: qonun — O'RQ-1108-son (2025-12-25, 2026-01-01 dan kuchda), Soliq kodeksi 81-moddasi ([lex.uz/docs/-7944527](https://lex.uz/docs/-7944527)); muddat — 5 **kalendar** kun ("ish kuni" emas), hisobot topshirish muddatidan kechiktirmay.
 3. Markirovkalangan tovarni offline sotish siyosati (ruxsat/taqiq) — huquqiy maslahat talab qiladi.
 4. Virtual kassa reyestriga mustaqil kiritish narxi/muddati (`02-fayl`dagi ochiq savol — hal qilinmagan, bu hujjat ham undan meros oladi).
 5. CRPT Turon bilan integrator sifatida ro'yxatdan o'tish shartlari — help.crpt-turon.uz asosiy bo'limlari 403 bilan yopiq.
 
 ## Manbalar
 
-- Ichki tadqiqot fayllari: `research_notes/texnik/01-1c-modullar-va-malumot-modeli.md`, `02-kassa-ofd-markirovka.md`, `03-efaktura-va-tolov.md`, `07-hosting-lokalizatsiya-xavfsizlik.md`, `09-soliq-integratsiyasi.md`
+- Ichki tadqiqot fayllari: `research_notes/texnik/01-erp-modullar-va-malumot-modeli.md`, `02-kassa-ofd-markirovka.md`, `03-efaktura-va-tolov.md`, `07-hosting-lokalizatsiya-xavfsizlik.md`, `09-soliq-integratsiyasi.md`
 - Claude Docs — loyihaning asosiy hujjati: [artifact e57e7cd7-1117-40a7-8af5-8154a8d22540](https://claude.ai/code/artifact/e57e7cd7-1117-40a7-8af5-8154a8d22540)
 - [uz.kursiv.media, 2025-12-30 — 2026-yildan avtomatik soliq hisobotlari](https://uz.kursiv.media/uz/2025-12-30/1-yanvardan-ayrim-soliq-hisobotlari-avtomatik-shakllantiriladi/)
 - [lex.uz/docs/4603329](https://lex.uz/docs/4603329) — VM 943-son qaror, 1-ilova 31-band (48 soat offline qoidasi)
+- [lex.uz/docs/-7944527](https://lex.uz/docs/-7944527) — O'RQ-1108-son Qonun (2025-12-25), Soliq kodeksi 81-moddasi (davlat hisobotlari, 5 kalendar kun)

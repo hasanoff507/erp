@@ -1,18 +1,22 @@
 # AI ERP+POS — spetsifikatsiya bosqichi
 
 O'zbekiston kichik va o'rta chakana/ulgurji biznesi uchun **AI ichiga qurilgan ERP+POS** —
-1C o'rnini bosuvchi, **noldan quriladigan** mahsulot. Asosiy qiymat taklifi: kassadan
+**noldan quriladigan** mahsulot. Asosiy qiymat taklifi: kassadan
 buxgalteriya va soliq hisobotigacha **bitta tizim** + o'zbek tilidagi AI yordamchi.
 
 ## Asosiy qarorlar (tadqiqotdan, o'zgarmaydi)
 
-- 1C dan ma'lumot olinmaydi, 1C bilan integratsiya yo'q. 1C faqat ma'lumotlar modeli uchun namuna.
-- MVP 14 modul: kassa, qaytarish, chegirma, ombor qoldig'i, inventarizatsiya, ko'chirish, xarid,
-  nasiya, narxlar, QQS, buxgalteriya, hisobotlar, huquqlar, filiallar
+- 1C bilan hech qanday bog'liqlik yo'q.
+- MVP 18 modul: kassa, qaytarish, chegirma, ombor qoldig'i, inventarizatsiya, ko'chirish, xarid,
+  nasiya/qarz daftari, narxlar, QQS, buxgalteriya, hisobotlar, huquqlar, filiallar, xarajatlar,
+  kassa pul harakati, obuna/ro'yxatdan o'tish, bildirishnomalar/Telegram bot (2026-10-14)
   (`research_notes/texnik/08-mahsulot-modullari.md`). Kadrlar/ish haqi, CRM, ishlab chiqarish — keyin.
-- Markaziy oqim: davlat (Soliq qo'mitasi) tuzgan hisobotni ichki hisob bilan solishtirish, 5 ish kuni ichida.
+- Markaziy oqim: davlat (Soliq qo'mitasi) tuzgan hisobotni ichki hisob bilan solishtirish, 5 kalendar kun ichida (O'RQ-1108, Soliq kodeksi 81-modda).
 - Multi-tenant SaaS (umumiy baza + tenant_id + RLS), PostgreSQL; offline-first kassa
-  (append-only event-log, 48 soat OFD chegarasi); Android POS + back-office PWA.
+  (append-only event-log, 48 soat OFD chegarasi).
+- Stack (2026-10-14, foydalanuvchi qarori): backend — **Python + FastAPI**; birinchi navbatda **veb**
+  (back-office + veb-kassa); Android POS (**Kotlin**) — keyingi bosqich, hujjatlari hozirdan tayyorlanadi.
+- AI: Claude API (Haiku 5.5 asosiy), `AiProvider` interfeysi; obuna/CLI faqat ishlab chiqishda.
 - Majburiy davlat tizimlari: virtual kassa/OFD, e-faktura, e-TTN, Asl belgisi, MXIK, e-ishonchnoma, E-IMZO, soliq hisobotlari.
 
 ## Manbalar (avval o'qing)

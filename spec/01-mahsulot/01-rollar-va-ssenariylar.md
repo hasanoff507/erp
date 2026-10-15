@@ -199,19 +199,19 @@ Belgilar: **K** = ko'rish, **Y** = yaratish, **T** = tasdiqlash. "–" = huquq y
 
 | Modul | Egasi | Menejer | Kassir | Omborchi | Buxgalter |
 |---|---|---|---|---|---|
-| M01 Kassa | K, T | K, Y | Y | – | K |
-| M02 Qaytarish | K, T | Y, T | Y | K | K |
-| M03 Chegirma | K, T | Y, T | Y | – | K |
-| M04 Ombor qoldig'i | K | K | K | Y | K |
-| M05 Inventarizatsiya | K, T | Y, T | – | Y | K |
-| M06 Ko'chirish | K, T | Y, T | – | Y | K |
-| M07 Xarid | K, T | Y, T | – | Y | K, Y |
-| M08 Nasiya | K, T | Y, T | Y | – | K |
-| M09 Narxlar | Y, T | Y | K | K | K |
-| M10 QQS | K, T | K | – | – | Y, T |
-| M11 Buxgalteriya | K | K | – | – | Y, T |
-| M12 Hisobotlar | K | K | K (faqat o'z smenasi) | K (faqat ombor) | Y, K |
-| M13 Huquqlar | Y, T | K | – | – | K |
+| M01 Kassa | K, Y, T | K, Y | Y | – | K |
+| M02 Qaytarish | K, Y, T | Y, T | Y | K | K |
+| M03 Chegirma | K, Y, T | Y, T | Y | – | K |
+| M04 Ombor qoldig'i | K, Y, T | K | K | Y | K |
+| M05 Inventarizatsiya | K, Y, T | Y, T | – | Y | K |
+| M06 Ko'chirish | K, Y, T | Y, T | – | Y | K |
+| M07 Xarid | K, Y, T | Y, T | – | Y | K, Y |
+| M08 Nasiya | K, Y, T | Y, T | Y | – | K |
+| M09 Narxlar | K, Y, T | Y | K | K | K |
+| M10 QQS | K, Y, T | K | – | – | Y, T |
+| M11 Buxgalteriya | K, Y, T | K | – | – | Y, T |
+| M12 Hisobotlar | K, Y, T | K | K (faqat o'z smenasi) | K (faqat ombor) | Y, K |
+| M13 Huquqlar | K, Y, T | K | – | – | K |
 | M14 Filiallar | K, Y, T | K | – | K | K |
 | M15 Xarajatlar | K, Y, T | K, Y | – | – | K, Y |
 | M16 Kassa pul harakati | K, Y, T | K, Y, T | Y (K faqat o'z smenasi) | – | K |
@@ -219,6 +219,8 @@ Belgilar: **K** = ko'rish, **Y** = yaratish, **T** = tasdiqlash. "–" = huquq y
 | M18 Bildirishnomalar / Telegram | K, Y, T | K (o'z Telegram'ini ulash, Egasi ruxsati bilan) | – | – | – |
 
 *Izoh: jadvaldagi aniq huquq taqsimoti (masalan, Kassir M08'ga Y huquqiga ega) bozor/texnik tadqiqotda tayyor matritsa sifatida topilmagan — bu hujjat ERP ma'lumotlar modeli namunasi (`01-erp-modullar-va-malumot-modeli.md`) va modul funksiyalari (`08-mahsulot-modullari.md`) asosida, odatiy chakana savdo amaliyotidan kelib chiqib **loyihalashtirilgan**; MVP oldidan Egasi/arxitektor bilan tasdiqlanishi tavsiya etiladi (pastda, ochiq savol 1).*
+
+*(2026-10-15: qabul-6/7 — tasdiq kutilmoqda)* **Egasi ustuni — barcha tenant ruxsatlarining supersetiga ega** (`platform.admin`dan tashqari — bu platforma admini uchun, tenant rollariga kirmaydi), limitlar cheksiz: avvalgi versiyada Egasida `sales.create`, `shift.open/close`, `returns.create`, `stock.count.create`, `transfer.*`, `purchases.*`, `cash.count.shift`, `accounting.*` kabi `Y`/yaratish huquqlari yo'q edi — 1–3 xodimli do'konda Egasi ko'pincha o'zi kassada/omborda ishlagani uchun bu amaliy emas edi (`spec/tekshiruv/qabul-7-ekran-api.md`, X-02; `spec/tekshiruv/00-qarorlar.md`, Founder ko'rib chiqishi #1). Yuqoridagi jadval shu standart bo'yicha yangilandi — yakuniy tasdiq Egasidan kutilmoqda.
 
 *Standart limitlar (2026-10-15: foydalanuvchi qarori)*: M03 (chegirma) — Kassir PIN'siz **5% gacha**; M02 (qaytarish) — chek bilan PIN'siz **100 000 so'mgacha** (chek yo'q bo'lsa har doim PIN); M16 (kassa pul harakati) — "Pul olish" PIN'siz **50 000 so'mgacha**; chekni bekor qilish (void) Kassirga limitsiz, audit bilan. Bu raqamlar **standart** qiymat — Egasi M13 (Huquqlar) orqali istalgan paytda o'zgartirishi mumkin (`02-modullar-talablari.md`, US-M02-02/US-M03-01/US-M16-01; `spec/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #1).
 

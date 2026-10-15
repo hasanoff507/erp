@@ -199,6 +199,8 @@ O'zbek tili uchun rasmiy LLM/OCR benchmark yo'qligi (`05-ai-funksiyalar.md`, Aso
 
 ## 10. OCR quvuri (AI-03) *(2026-10-15: foydalanuvchi qarori — AI-03 MVP'da, bu quvur MVP sprintlarida quriladi)*
 
+**Yagona yo'l (API unifikatsiyasi)** *(2026-10-15: qabul-6 — Q4/K2-01/A2-01)*: avvalgi tekshiruvda OCR ikki marta loyihalashtirilgan edi (13-2 `/purchase-ocr-drafts` natijasi va saqlash jadvali vs 13-3 `/ai/ocr/jobs`) — bu endi **bitta** jadval (`ai_ocr_jobs`) va **bitta** endpoint oilasi bilan birlashtirilgan: fayl avval `POST /api/v1/attachments` (`purpose=ocr_source`) orqali yuklanadi → `POST /api/v1/ai/ocr/jobs` (`attachment_id`, `doc_type_hint=purchase` — **faqat shu qiymat**, qaytarish uchun qog'oz chek faqat POS/sync orqali kiradi, `13-0` §9) → `GET /api/v1/ai/ocr/jobs/{job_id}` bilan poll (`status: processing→done→confirmed`/`failed`/`expired`) → `POST /api/v1/ai/ocr/jobs/{job_id}/confirm` — shu paytgina `goods_receipts` qoralamasi yaratiladi (ruxsat `ai.ocr.use` **va** `purchases.receive`). `purchase_ocr_drafts` nomi/jadvali endi **ishlatilmaydi**. Natija shakli pastdagi quvur bilan bir xil (sarlavha + `lines[]`, har maydon `value`/`confidence` 0..1, `low_confidence_fields` yo'l ro'yxati).
+
 ```mermaid
 flowchart TD
   U[Foydalanuvchi: qog'oz hujjat\nfotosini yuklaydi] --> S3[(S3-mos ombor:\nattachments)]

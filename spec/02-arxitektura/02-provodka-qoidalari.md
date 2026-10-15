@@ -172,6 +172,8 @@ Sabab `gift` (bepul berish): QQS oqibati — ogohlantirish 11-band. *(2026-10-14
 |---|---|---|---|
 | 1 | 5010/5110 (to'lov usuliga qarab) | 4010 | To'langan summa (eng eski qarzdan boshlab, `allocations`) |
 
+**Fiskal chek**: qarz to'lovi uchun alohida fiskal chek **MVP'da chiqarilmaydi** — standart sifatida shu holat bilan davom etiladi, buxgalter/OFD operatori javobigacha (reestr #9, R-01). `FiscalAdapter.issue_credit_payment()` porti stub sifatida qoldirilgan — keyin yoqish migratsiyasiz bo'ladi. `fiscal_receipts.kind` shuning uchun faqat `sale`/`return`/`z_report`ni qamraydi, `debt_payment` yo'q (DB-01) *(2026-10-15: qabul-6/7 — tasdiq kutilmoqda)*.
+
 ### 2.15 Qarzni kechish (debt_writeoff, shubhali qarz) *(2026-10-15: foydalanuvchi qarori — `tekshiruv/savollar-yakuniy-tavsiyalar.md` #9)*
 
 | # | Dt | Kt | Summa |
@@ -235,6 +237,52 @@ Buxgalteriya provodkasi **yaratilmaydi** — faqat boshlang'ich/sanalgan naqd `c
 ### 2.22 Chek asosida keyinroq chiquvchi e-faktura (`einvoice_from_receipt`) *(2026-10-15: qabul-5 — foydalanuvchi qarori, US-M01-06, BP-13)*
 
 Provodka **yo'q**: bu holatda `ledger_entries` va `vat_moves`ga **yangi qator yozilmaydi** — daromad va chiquvchi QQS allaqachon 2.1–2.4-bandlar bo'yicha **chek paytida** yozilgan; e-faktura keyinroq chiqarilishi QQS'ni ikkinchi marta hisoblamaydi. Bog'lanish faqat **hujjat darajasida**: `einvoices(direction=out, related_doc=receipt)`. `vat_moves` qatori **o'zgartirilmaydi** (append-only tamoyili saqlanadi, `01-malumotlar-modeli.md` §1/§7) — "chek ↔ e-faktura" ko'rinishi `einvoices.related_doc` orqali JOIN bilan quriladi, UPDATE orqali emas. **Cheklov**: bitta chekka bitta faol (`cancelled` bo'lmagan) chiquvchi e-faktura; e-faktura summasi chek summasidan (qaytarishlar ayirilgan holda) oshmaydi. BO-10 solishtirishida chekka bog'langan chiquvchi e-fakturalar alohida belgilanadi — davlat hisobotida ikki marta hisoblangan aylanma ko'rinsa, bu holat farq sababi sifatida ko'rsatiladi (huquqiy/texnik tasdiq — soliq tizimi bu bog'lanishni fiskal belgi rekviziti orqali qanday ko'rishi — `11-backlog.md` 0-bosqich (d) bilan bog'liq, ochiq).
+
+### 2.23 Qo'lda buxgalteriya tuzatishi (`ledger_adjustments`) *(2026-10-15: qabul-6 — DB-12/A3-04)*
+
+| # | Dt | Kt | Summa |
+|---|---|---|---|
+| 1 | `account_dt` (foydalanuvchi kiritadi) | `account_kt` (foydalanuvchi kiritadi) | `amount` |
+
+Bir bosqichli hujjat (`POST /ledger-adjustments` darhol `status=posted` qaytaradi, `draft` bosqichi yo'q — 13-0 §9); `comment` majburiy. `entry_date = doc_date`, faqat **joriy ochiq davrda** (§5.1, #15 qaror) — yopilgan davrga tegishli tuzatish `correction_of_period` (yopilgan davr 1-sanasi) bilan belgilanadi, lekin yozuv o'zi joriy ochiq davr sanasida qoladi. `account_dt ≠ account_kt` (DDL CHECK). `cancel` — storno qator (5.2-band qoidasi bilan bir xil).
+
+### 2.24 Chiquvchi e-faktura API yo'li — eslatma *(2026-10-15: qabul-6 — A1-24)*
+
+`POST /api/v1/einvoices` (`direction=out`) va `POST /einvoices/from-sale/{sale_id}` — **provodka yo'q**, 2.22-band bilan bir xil qoida (QQS chekda allaqachon hisoblangan). Farqi faqat manba: 2.22 — chekdan **keyin** qo'lda yaratilgan e-faktura (`einvoice_from_receipt`); bu band — B2B nasiya sotuvdan **server avtomatik** `draft` yaratadi. Ikkisi ham `einvoices.related_doc_type/related_doc_id` orqali bog'lanadi, `uq_einvoice_out_per_doc` bilan "bitta chekka bitta faol" cheklovi saqlanadi.
+
+---
+
+## 2.25 Posting qamrovi — hujjat (DDL) ↔ API post yo'li *(2026-10-15: qabul-6, vazifa 7)*
+
+| 02 band | Hujjat (DDL) | API post yo'li | Holat |
+|---|---|---|---|
+| 2.1–2.4 | `sales` | `sale.created` (sync) | ✓ (`receipt_seq` payload'da, A1-01) |
+| 2.5 | `returns` | `return.created` | ✓ (`shift_id`/`cash_register_id`/`refund_method` DB-03/A1-02 bilan) |
+| 2.6–2.8 | `goods_receipts` | `POST /goods-receipts/{id}/post` | ✓ (`paid_immediately`, `einvoice_id` — A2-04, DB-06) |
+| 2.9–2.10 | `transfers` | `/send`, `/receive` + `transfer.sent`/`transfer.received` | ✓ |
+| 2.11 | `stock_counts` | `POST /stock-counts/{id}/post` | ✓ |
+| 2.12 | `write_offs` | `POST /write-offs/{id}/post` | ✓ |
+| 2.13 | `debt_openings` | `POST /debt-openings/{id}/post` + import | ✓ |
+| 2.14 | `debt_payments` | `debt_payment.created` + `POST /debt-payments/{id}/post` | ✓ (`method` to'liq ro'yxat, DB-04) |
+| 2.15 | `debt_writeoffs` | `POST /debt-writeoffs/{id}/post` | ✓ |
+| 2.16 | `supplier_payments` | `POST /supplier-payments` (bir bosqichli) | ✓ |
+| 2.17 | `expenses` | `POST /expenses/{id}/post` + `expense.created` | ✓ |
+| 2.18 | `cash_movements` | `cash_movement.created` + `POST /cash-movements` | ✓ |
+| 2.19 | `shifts` (farq provodkasi) | `shift.closed` | ✓ — X-01 pastda |
+| 2.20 | `supplier_returns` | `POST /supplier-returns/{id}/post` | ✓ |
+| 2.21 | `stock_openings` | `POST /stock-openings/{id}/post` + import | ✓ |
+| 2.22/2.24 | `einvoices(out)` (provodkasiz) | `POST /einvoices`, `/from-sale/{id}` | ✓ — endi bor (A1-24) |
+| 2.23 | `ledger_adjustments` | `POST /ledger-adjustments` | ✓ — endi bor (DB-12/A3-04) |
+| — | `price_changes` (registr: `product_prices`) | `POST /price-changes/{id}/post` | ✓ |
+| — | `purchase_orders` | registrga ta'sir yo'q (`send`/`cancel`) | ✓ |
+
+### X-01 · Smena yopilganda farq provodkasi aniqlashtirish *(2026-10-15: qabul-6)*
+
+2.19-bandga aniqlik: "Smena yopilganda aniqlangan farq" — `doc_type='shifts'`, `doc_id=shifts.id`; farq qiymati `shifts.variance` (= `counted_cash − expected_cash`, DB-07 generated ustun) dan olinadi, qayta hisoblanmaydi. **Muhim**: `cash_moves`ga smena **ochilishida** `opening_cash` qatori **yozilmaydi** — aks holda `expected_cash = opening_cash + Σcash_moves` formulasi (13-1 §3.2) ikki marta hisoblab qo'yadi (`opening_cash` allaqachon `shifts.opening_cash`da, alohida `cash_moves` qatoriga ehtiyoj yo'q).
+
+### X-02 · Ochiq savol — inventarizatsiya davomidagi sotuv *(2026-10-15: qabul-6)*
+
+§2.11 ga qo'shiladigan ochiq savol: agar inventarizatsiya (`counting`) davom etayotganda shu omborda sotuv/kirim bo'lsa, `post` paytida `expected` qayta hisoblanishi kerakmi (A2-11). Hal qilinmagan — pilotda aniqlanadi.
 
 ---
 
@@ -348,7 +396,7 @@ Hujjat bekor qilinganda (`status=cancelled`, `cancelled_at`, `cancelled_by`, `ca
 
 - Har `ledger_entry`da `branch_id` majburiy analitika — konsolidatsiya `SUM(...) GROUP BY branch_id` yoki `branch_id` filtrsiz.
 - Filiallararo ko'chirish — 2910 (jo'natuvchi) → 2970 (oraliq) → 2910 (qabul qiluvchi), moddiy javobgarlik filial bo'yicha o'tadi (2.9–2.10-band).
-- Bitta tenant ichidagi barcha filiallar **bitta** yuridik shaxs hisob-kitobi (bitta 6410/4410/8710) ostida yuritiladi — alohida yuridik shaxs filiallari (masalan QQS to'lovchisi farqli) MVP modelida yo'q, **ochiq savol**.
+- Bitta tenant ichidagi barcha filiallar **bitta** yuridik shaxs hisob-kitobi (bitta 6410/4410/8710) ostida yuritiladi. **Bitta tenant = bitta yuridik shaxs** (STIR) — ko'p yuridik shaxsli egalar har bir shaxs uchun alohida tenant ochadi va `memberships` orqali ular o'rtasida almashadi; alohida yuridik shaxs filiallari (masalan QQS to'lovchisi farqli) bitta tenant ichida MVP modelida yo'q *(2026-10-15: qabul-6/7 — tasdiq kutilmoqda, founder "Founder ko'rib chiqishi kerak" #4)*.
 
 ---
 
@@ -360,7 +408,7 @@ Hujjat bekor qilinganda (`status=cancelled`, `cancelled_at`, `cancelled_by`, `ca
 4. Ortiqcha (inventarizatsiya, 2.11-band) uchun aniq daromad hisob kodi topilmadi.
 5. Boshlang'ich qarz balansini kiritishda qarshi hisob (8720) to'g'riligi tasdiqlanmagan.
 6. Ish haqi to'lovini 6710 orqali ikki bosqichli yozish yoki MVP'da to'g'ridan-to'g'ri xarajat (9420) sifatida qolishi — biznes/buxgalter qarori kerak.
-7. Ko'p yuridik shaxsli (filiallar turli STIR/QQS holatida) tenant — MVP modelida yo'q, kelajakda kerak bo'lishi mumkin.
+7. Ko'p yuridik shaxsli (filiallar turli STIR/QQS holatida) tenant — MVP modelida yo'q; tavsiya qilingan standart "bitta tenant = bitta yuridik shaxs" §5.4'da yozildi, lekin founder tasdig'i kutilmoqda *(2026-10-15: qabul-6/7 — tasdiq kutilmoqda)*.
 8. M16'dagi "Egasi oldi" operatsiyasi uchun aniq qarshi hisob (8720 taxmin qilindi, aslida "Egasi bilan hisob-kitoblar" alohida sub-hisob kerak bo'lishi mumkin).
 
 *(2026-10-14: tekshiruv — eski 3-band ("aylanma solig'i moddasi raqami noaniq") o'chirildi: Soliq kodeksi 467-moddasi aniqlandi, Asosiy xulosalar 5-band va 4.3-bo'lim.)*

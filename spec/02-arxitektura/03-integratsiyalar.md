@@ -160,6 +160,15 @@ class EInvoiceAdapter(Protocol):
 
 **Idempotentlik kaliti**: `operator_doc_id` (operatordan kelgan hujjat ID'si) + `tenant_id`; chiquvchi fakturada `client_event_id`.
 
+**Chiquvchi e-faktura oqimi (qaror #18 — chekdan keyin e-faktura, BP-13/BP-03)** *(2026-10-15: qabul-6 — K1-04/A1-24)*: avvalgi tekshiruvda chiquvchi e-faktura API'si umuman yo'q edi (KRITIK topilma) — endi yagona yo'l belgilandi:
+
+1. `POST /api/v1/einvoices` — `{direction:"out", source:"sale"|"manual", sale_id|null, counterparty_id, lines[]}`; B2B nasiya sotuvdan (`counterparty.kind=company`) server **avtomatik** `draft` yaratadi. Ruxsat — **`einvoice.create`** (05 §2.1, X-01).
+2. `POST /api/v1/einvoices/from-receipt` (yoki `from-sale/{sale_id}`) — `{sale_id, counterparty_id}`; chekdan keyin alohida chiquvchi faktura so'ralsa (BP-13), `related_doc` orqali asl chekka bog'lanadi, **QQS ikki marta hisoblanmaydi va provodka yozilmaydi** (`02-provodka-qoidalari.md` 2.22) — xatolar `EINVOICE_ALREADY_LINKED`, `EINVOICE_AMOUNT_EXCEEDS_RECEIPT`, `EINVOICE_COUNTERPARTY_INCOMPLETE`.
+3. Imzolash/yuborish — kiruvchi fakturadagi bilan **bir xil** `sign-challenge`/`submit-signed` oqimi (E-IMZO, yo'nalishdan qat'i nazar umumiy), ruxsat `einvoice.sign` (Buxgalter); yuborish `outbox_jobs(kind=einvoice_send)` orqali — faqat **Faktura.uz** (tavsiya #4, MVP'da yagona operator).
+4. DB cheklovi — bitta hujjatga (chek/kirim) bitta **faol** chiquvchi faktura (`uq_einvoice_out_per_doc`, 02 §2.22).
+
+Bu oqim bilan "sotuv/qarz katalogida" deb ko'rsatilgan, lekin kassa katalogida ta'riflanmagan ziddiyat (qabul-6 Asosiy xulosa #3) yopildi.
+
 **Qayta urinish/backoff**: `base=1 daqiqa, factor=2, cap=1 soat, max_attempts=24` (taxminan 1 kun davomida); e-faktura qonuniy muddati OFD'dan farqli, qattiq soat chegarasi topilmadi — shuning uchun `failed` bo'lganda Buxgalterga ko'rinadigan ogohlantirish, avtomatik to'xtatish yo'q.
 
 **Xato UX**: Buxgalter BO-15 (kiruvchi/chiquvchi e-faktura markazi) ekranida ko'radi, qo'lda qayta yuboradi/E-IMZO bilan qayta imzolaydi. Faktura kelmasa/yuborilmasa boshqa modul (sotuv, ombor) to'xtamaydi — faqat QQS krediti/kreditorlik holati "kutilmoqda" qoladi.
@@ -637,6 +646,8 @@ class AiProvider(Protocol):
     async def complete(self, prompt: str, feature: str, max_tokens: int, model: str | None = None) -> AiResult: ...
     async def complete_with_image(self, prompt: str, image: bytes, feature: str) -> AiResult: ...  # AI-03 OCR
 ```
+
+**OCR — yagona yo'l** *(2026-10-15: qabul-6 — Q4/K2-01/A2-01)*: AI-03 (qog'oz hujjat OCR) ikki marta loyihalashtirilgan edi (13-2 `/purchase-ocr-drafts` vs 13-3 `/ai/ocr/jobs`) — bu endi **`ai_ocr_jobs`** jadvali va **`POST /api/v1/ai/ocr/jobs`** (`doc_type_hint=purchase`) orqali birlashtirilgan, yagona manba sifatida ta'riflangan: fayl avval `POST /attachments` orqali yuklanadi, natija `poll GET /ai/ocr/jobs/{id}`, tasdiq `POST /ai/ocr/jobs/{id}/confirm` (`purchases.receive` + `ai.ocr.use`). To'liq oqim va ishonch chegaralari — `07-ai-qatlami.md` §10.
 
 **Ma'lumot moslashtirish**: `ai_requests(tenant_id, user_id, feature, model, input_tokens, output_tokens, cost_usd, latency_ms, status)`, `ai_feedback(ai_request_id, rating, correction, consent_for_training)` (`01-malumotlar-modeli.md`, 10-bo'lim).
 

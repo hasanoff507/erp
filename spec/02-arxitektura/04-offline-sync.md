@@ -57,10 +57,10 @@
 | `client_event_id` | UUIDv7 | Qurilmada yaratiladi (`01-malumotlar-modeli.md` §2 — vaqt bo'yicha tartiblangan); `sync_receipts.client_event_id` bilan idempotentlik ta'minlanadi |
 | `device_id` | UUIDv7 | `devices` jadvaliga mos, ro'yxatdan o'tgan qurilma |
 | `seq` | integer | Qurilma ichidagi lokal monoton ketma-ket raqam (restart/qayta ishga tushirishda ham davom etadi, lokal bazada saqlanadi) — server global tartib emas, faqat shu qurilma ichidagi nisbiy tartibni tasdiqlash uchun ishlatadi |
-| `type` | enum | `shift.opened`, `shift.closed`, `sale.created`, `sale.draft_voided` (to'lovdan oldin chek/qator bekor qilish — audit, registrga ta'sir yo'q), `receipt.reprinted` (chekni qayta chop etish — audit), `return.created`, `debt_payment.created`, `cash_movement.created`, `stock_count.line_recorded` (M05, mobil rejim) — to'liq ro'yxat `09-backend-arxitekturasi.md`da yakunlanadi (**ochiq savol**) *(2026-10-14: tekshiruv)* |
+| `type` | enum | **Yakuniy ro'yxat (ochiq savol yopildi)** *(2026-10-15: qabul-6/7)*: `shift.opened`, `shift.closed`, `sale.created`, `sale.draft_voided` (to'lovdan oldin chek/qator bekor qilish — audit, registrga ta'sir yo'q), `receipt.reprinted` (chekni qayta chop etish — audit), `return.created`, `debt_payment.created`, `cash_movement.created`, `counterparty.created` (tezkor mijoz, US-M08-05), `transfer.sent` (o'z filiallari orasida ko'chirish jo'natilishi — 13-2'dagi `transfer.created` nomidan o'zgartirildi, offline'da qoralama mazmunsiz, jo'natish bilan bir voqea), `transfer.received` (ko'chirishni qabul qilish), `stock_count.line_recorded` (M05, bitta qurilma), `expense.created` (faqat `source=cash`, POS-14 "Xarajat" sababi) — payload sxemalari `13-api-katalog-1` (§3–§13, §17a), `13-api-katalog-2` (§13, §14), `13-api-katalog-3` (#42)da aniqlangan |
 | `created_at` | ISO 8601, qurilma soati | Fiskal 48-soat hisobi va buxgalteriya sanasi shu maydondan olinadi (8-bo'lim, soat farqi) |
 | `actor_user_id` | UUID | Amalni bajargan kassir (offline PIN bilan kirgan); server uning `created_at` paytida faol membership'ini tekshiradi; push qilgan sessiya foydalanuvchisi farq qilsa, ikkalasi audit'ga yoziladi *(2026-10-14: tekshiruv)* |
-| `payload` | object | Hujjat turiga mos (masalan `sale.created` uchun `sales` + `sale_lines` + `sale_payments`, `01-malumotlar-modeli.md` §6 tuzilishiga mos); `sale.created`da `fiscal.receipt_seq` — qurilma beradi (3.3-bo'lim) *(2026-10-14: tekshiruv)* |
+| `payload` | object | Hujjat turiga mos (masalan `sale.created` uchun `sales` + `sale_lines` + `sale_payments`, `01-malumotlar-modeli.md` §6 tuzilishiga mos); `sale.created`/`return.created`da `receipt_seq` — payload **ildizida** (ichma-ich `fiscal` obyekti emas), int, qurilma beradi (Q11); `shift.opened`da xuddi shunday `shift_no` — qurilma beradi, kassa ichida ketma-ket (3.3-bo'lim) *(2026-10-15: qabul-6)* |
 
 Qarzga sotish alohida voqea turi emas — `sale.created` ichida `sale_payments.method = "debt"` sifatida yuboriladi (US-M08-01, US-M08-05); qarz daftaridagi tezkor yozuv (POS-13) ham shu yo'l bilan amalga oshadi.
 
@@ -85,11 +85,13 @@ Qarzga sotish alohida voqea turi emas — `sale.created` ichida `sale_payments.m
 // Javob
 {
   "results": [
-    { "client_event_id": "...", "status": "accepted", "server": { "id": "...", "number": "K-01-2026-000154" } },
-    { "client_event_id": "...", "status": "rejected", "error_code": "SALE_NOT_FOUND", "message": "Asl chek hali sinxronlanmagan", "retryable": true }
+    { "client_event_id": "...", "status": "accepted", "server": { "id": "...", "number": "K-01-2026-000154" }, "warnings": [] },
+    { "client_event_id": "...", "status": "rejected", "error_code": "SALE_NOT_FOUND", "message": "Asl chek hali sinxronlanmagan", "retryable": true, "warnings": [] }
   ]
 }
 ```
+
+`warnings` — har bir natija (entry) darajasida, string massivi (katalog kodlari, masalan `STOCK_NEGATIVE`, `DEBT_LIMIT_EXCEEDED`) — hujjat qabul qilingan, lekin diqqatga loyiq holat bor ekanini bildiradi (xato emas). *(2026-10-15: qabul-6)*
 
 - **Partiya hajmi**: taxmin — 50 voqea/so'rov (katta hujjat ro'yxatlari uchun kam, tarmoq kechikishi uchun ko'p emas); aniq raqam yuklama sinovida tasdiqlanadi.
 - **Backpressure** *(2026-10-15: spec yozish bilan yopildi, kamchiliklar-yakuniy #41)*: server — qurilma boshiga **5 so'rov/soniya**, tenant boshiga bir vaqtda **4 ta** parallel `/sync/push` (taxmin); bu chegaralardan oshsa `429 Too Many Requests` + `Retry-After` qaytariladi. Qurilma — eksponensial backoff + jitter bilan qayta uriniladi (ofline sinxronlashda to'lib-toshgan outbox'ni birdan yuborishning oldini olish uchun).
@@ -114,7 +116,7 @@ Qarzga sotish alohida voqea turi emas — `sale.created` ichida `sale_payments.m
 ### 3.3 Tartib kafolatlari
 
 - Bitta qurilma ichida voqealar **har doim `seq` tartibida** yuboriladi va shu tartibda serverga yetib boradi (bir partiya ichida massiv tartibi saqlanadi).
-- **Bog'liq voqealar** (masalan `return.created` o'zi tegishli `sale.created`ga bog'liq, agar asl chek hali sinxronlanmagan bo'lsa): server `SALE_NOT_FOUND` + `retryable: true` qaytaradi; qurilma bu voqeani keyingi push'da qayta yuboradi, lekin undan **keyingi, bog'liq bo'lmagan** voqealarni bloklamaydi.
+- **Bog'liq voqealar** (masalan `return.created` o'zi tegishli `sale.created`ga bog'liq, agar asl chek hali sinxronlanmagan bo'lsa): server `SALE_NOT_FOUND` + `retryable: true` qaytaradi; qurilma bu voqeani keyingi push'da qayta yuboradi, lekin undan **keyingi, bog'liq bo'lmagan** voqealarni bloklamaydi. Boshqa (`sale.created`dan farqli) bog'liqliklar — masalan `counterparty.created`dan oldin kelgan sotuv boshqa qurilmadan, yoki `transfer.received` tegishli `transfer.sent` sinxronidan oldin kelsa — umumiy `DEPENDENCY_NOT_SYNCED` kodi (`retryable: true`, `params.entity` — `counterparties`/`transfers`/`shifts`) bilan qaytariladi, xuddi shu "qayta urinish, boshqalarni bloklamaydi" qoidasi bilan. *(2026-10-15: qabul-6)*
 - Qoldiq/qarz kabi **delta-asosida** registrlar (`stock_moves`, `debt_moves`) uchun qat'iy global tartib shart emas — harakatlar qo'shiladi, tartib natijaga ta'sir qilmaydi (`04-arxitektura-va-stack.md`, §2.3).
 - Fiskal chek raqami (`fiscal_receipts.receipt_seq`) — **qurilma beradi** (offline ham), outbox `seq` bilan bir Web Lock ichida; kassa + smena ichida ketma-ket. **Bitta smena — bitta qurilma** (`shifts.device_id`): boshqa qurilmadan shu smenaga voqea `rejected SHIFT_DEVICE_MISMATCH`. *(2026-10-14: tekshiruv)*
 

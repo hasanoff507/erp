@@ -118,44 +118,62 @@ Har bir kod `role_permissions.permission_code` sifatida saqlanadi, zarur bo'lsa 
 | `ai.chat.use` | AI-01 | AI yordamchi chatdan foydalanish | — |
 | `ai.ocr.use` | AI-03 | Hujjat fotosidan AI orqali kiritish | — |
 | `platform.admin` | M17/ADM-01 | Platforma admin paneli, tenantlarga RLS'siz kirish | **faqat `platform_admins`**, har kirish audit'da |
+| `catalog.manage` | M09 | Mahsulot/kategoriya/shtrix-kod (ichki kod generatsiyasi) CRUD, mahsulot importi, ombor sozlamalari (`stock-settings`) *(2026-10-15: qabul-6/7)* | — |
+| `stock.opening.manage` | M04, M08 | Boshlang'ich tovar qoldig'i va boshlang'ich qarz (qo'lda va `import-jobs`) *(2026-10-15: qabul-6/7)* | — |
+| `valuation.settings.manage` | M04, M11 | FIFO/AVECO usulini almashtirish (faqat keyingi yildan) *(2026-10-15: qabul-6/7)* | — |
+| `integrations.retry` | M01, M07, M10 | OFD/e-faktura/markirovka integratsiya ishini qo'lda qayta navbatga qo'yish (BO-14) *(2026-10-15: qabul-6/7)* | — |
+| `einvoice.create` | M01, M08, M10 | Chiquvchi e-faktura qoralamasini yaratish va yuborish (B2B, chekdan keyin — BP-03/BP-13) *(2026-10-15: qabul-6/7)* | — |
+| `debts.remind` | M08, AI-06 | Mijozga qarz eslatmasini yuborish (Telegram/SMS) *(2026-10-15: qabul-6/7)* | — |
+| `settings.tenant` | M13, M14 | Do'kon sozlamalari, integratsiya kalitlari (Faktura.uz/CRPT), OFD qayta urinish, soliq rejimi o'zgarishi (BO-14) *(2026-10-15: qabul-6/7)* | **faqat Egasi** |
 
 ### 2.2 Standart matritsa (5 tizim roli)
 
 Quyidagi jadval `01-rollar-va-ssenariylar.md` (6-bo'lim) dagi K/Y/T matritsasi bilan **izchil**: K→faqat `*.view`/ko'rish huquqlari, Y→yaratish kodlari, T→tasdiqlash/`*.approve`/`*.post` kodlari. "✓(limit)" — `role_permissions.limit_value` bilan cheklangan huquq.
 
+**Egasi ustuni — "barcha ruxsat" (superset)** *(2026-10-15: qabul-7 R-02/X-02, tasdiq kutilmoqda)*: avvalgi matritsada Egasida `sales.create`, `shift.open/close`, `returns.create`, `stock.count.create`, `transfer.*`, `purchases.*` (yaratish/qabul), `cash.count.shift`, `accounting.*` kabi operatsion kodlar yo'q edi — 1–3 xodimli do'konda Egasi ko'pincha o'zi kassada/omborda turadi. **Qaror (standart, asoschi tasdig'i kutilmoqda): Egasi — `platform.admin`dan tashqari barcha tenant ruxsatlarining supersetiga ega**, limitlar cheksiz. Quyidagi jadvalning Egasi ustuni shunga mos yangilangan (reestr #1, qabul-7 X-02).
+
 | Ruxsat | Egasi | Menejer | Kassir | Omborchi | Buxgalter |
 |---|---|---|---|---|---|
-| `sales.create` | – | ✓ | ✓ | – | – |
-| `shift.open/close` | – | ✓ | ✓ | – | – |
-| `returns.create` | – | ✓ | ✓ | – | – |
+| `sales.create` | ✓ | ✓ | ✓ | – | – |
+| `shift.open/close` | ✓ | ✓ | ✓ | – | – |
+| `returns.create` | ✓ | ✓ | ✓ | – | – |
 | `returns.approve` | ✓ | ✓ | – | – | – |
 | `discount.give` | ✓ | ✓(limit) | ✓(limit, past) | – | – |
 | `discount.approve` | ✓ | ✓ | – | – | – |
-| `stock.count.create` | – | ✓ | – | ✓ | – |
+| `stock.count.create` | ✓ | ✓ | – | ✓ | – |
 | `stock.count.post` | ✓ | ✓ | – | – | – |
-| `transfer.create/receive` | – | ✓ | – | ✓ | – |
-| `purchases.create` | – | ✓ | – | ✓ | – |
-| `purchases.receive` | – | – | – | ✓ | – |
-| `purchases.post` | – | – | – | – | ✓ |
-| `purchases.pay` | – | – | – | – | ✓ |
-| `einvoice.sign` | – | – | – | – | ✓ |
+| `transfer.create/receive` | ✓ | ✓ | – | ✓ | – |
+| `purchases.create` | ✓ | ✓ | – | ✓ | – |
+| `purchases.receive` | ✓ | – | – | ✓ | – |
+| `purchases.post` | ✓ | – | – | – | ✓ |
+| `purchases.pay` | ✓ | – | – | – | ✓ |
+| `einvoice.sign` | ✓ | – | – | – | ✓ |
 | `debts.create` | ✓ | ✓ | ✓(limit) | – | – |
 | `debts.approve` | ✓ | ✓ | – | – | – |
 | `debts.forgive` | ✓ | – | – | – | – |
 | `debts.limit.manage` | ✓ | ✓ | – | – | – |
+| `debts.payment.accept` | ✓ | ✓ | ✓ | – | ✓ |
+| `debts.remind` | ✓ | ✓ | – | – | ✓ |
 | `prices.edit` | ✓ | ✓ | – | – | – |
 | `prices.approve` | ✓ | – | – | – | – |
 | `tax.vat.view` | ✓ | – | – | – | ✓ |
 | `tax.compare.review` / `tax.correction.submit` | ✓ (yakuniy) | – | – | – | ✓ |
-| `accounting.post` | – | – | – | – | ✓ |
+| `accounting.post` | ✓ | – | – | – | ✓ |
+| `accounting.period.close` | ✓ | – | – | – | ✓ |
 | `reports.finance.view` | ✓ | ✓ | – | – | ✓ |
 | `settings.users` | ✓ | – | – | – | – |
 | `settings.branches` | ✓ | – | – | – | – |
+| `settings.tenant` | ✓ | – | – | – | – |
+| `catalog.manage` | ✓ | ✓ | – | ✓ | – |
+| `stock.opening.manage` | ✓ | ✓ | – | – | ✓ |
+| `valuation.settings.manage` | ✓ | – | – | – | ✓ |
+| `integrations.retry` | ✓ | ✓ | – | – | ✓ |
+| `einvoice.create` | ✓ | ✓ | – | – | ✓ |
 | `expenses.create` | ✓ | ✓ | – | – | ✓ (kiritish) |
 | `expenses.approve` | ✓ | – | – | – | – |
 | `cash.withdraw` | ✓ | ✓(limit) | ✓(limit, past) | – | – |
 | `cash.deposit` | ✓ | ✓ | ✓ | – | – |
-| `cash.count.shift` | – | ✓ | ✓ | – | – |
+| `cash.count.shift` | ✓ | ✓ | ✓ | – | – |
 | `billing.manage` | ✓ | – | – | – | – |
 | `notifications.manage` | ✓ | – | – | – | – |
 | `telegram.link` | ✓ | ✓ | – | – | – |
@@ -164,15 +182,14 @@ Quyidagi jadval `01-rollar-va-ssenariylar.md` (6-bo'lim) dagi K/Y/T matritsasi b
 | `discount.rule.manage` | ✓ | ✓ | – | – | – |
 | `stock.view` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `stock.writeoff` | ✓ | ✓(limit) | – | ✓(limit) | – |
-| `purchases.return` | – | ✓ | – | ✓ | ✓ |
+| `purchases.return` | ✓ | ✓ | – | ✓ | ✓ |
 | `labels.print` | ✓ | ✓ | – | ✓ | – |
-| `accounting.period.close` | – | – | – | – | ✓ |
 | `reports.sales.view` | ✓ | ✓ | – | – | ✓ |
 | `reports.export` | ✓ | ✓ | – | – | ✓ |
 | `ai.chat.use` | ✓ | ✓ | – | – | ✓ |
 | `ai.ocr.use` | ✓ | ✓ | – | ✓ | ✓ |
 
-*(2026-10-14: tekshiruv — yuqoridagi 12 qator §2.1 katalogida mavjud bo'lib, matritsada yetishmayotgan kodlar uchun qo'shildi; `expenses.approve`, `cash.deposit`, `cash.count.shift`, `notifications.manage`, `telegram.link` allaqachon mavjud bo'lgani uchun takrorlanmadi.)*
+*(2026-10-14: tekshiruv — 12 qator §2.1 katalogida mavjud bo'lib, matritsada yetishmayotgan kodlar uchun qo'shildi; `expenses.approve`, `cash.deposit`, `cash.count.shift`, `notifications.manage`, `telegram.link` allaqachon mavjud bo'lgani uchun takrorlanmadi. `debts.payment.accept`, `debts.remind`, `catalog.manage`, `stock.opening.manage`, `valuation.settings.manage`, `integrations.retry`, `einvoice.create`, `settings.tenant` — qatorlari va Egasi ustunining to'liq yangilanishi `2026-10-15: qabul-6/7` — X-01/X-02, tasdiq kutilmoqda.)*
 
 *Izoh: kichik do'konda bir xodim bir nechta rolga ega bo'lishi mumkin (`memberships.role_ids[]`) — ruxsatlar jamlanadi, ziddiyatda yuqori huquq ustun bo'ladi (`02-modullar-talablari.md`, M13, chekka holat).*
 
@@ -196,6 +213,20 @@ Quyidagi jadval `01-rollar-va-ssenariylar.md` (6-bo'lim) dagi K/Y/T matritsasi b
 | `sales.void` (chekni bekor qilish) | **Limitsiz** | — (lekin har doim audit_log'ga yoziladi) |
 
 Bu raqamlar — **boshlang'ich standart** (hech bir raqobatchi — Loyverse, Square, BILLZ, REGOS — tayyor raqam bermaydi, hammasi "yoqish/o'chirish + PIN" modelida; bu kichik standart raqamlar kundalik mayda amallarni to'xtatmaydi, katta summani nazoratda saqlaydi). Egasi istalgan raqamni `role_permissions.limit_value` orqali tenant darajasida o'zgartira oladi (`01-rollar-va-ssenariylar.md`, Ochiq savol 2; `02-modullar-talablari.md`, Ochiq savol 1). **Keyin tekshiriladi**: pilotda PIN so'rovlari soni va Egalar bu raqamlarni qanchaga o'zgartirgani.
+
+**Tasdiqlash turi (`approval_requests.kind`) → tasdiqlovchi ruxsati** *(2026-10-15: qabul-6, yagona manba — 13-1 havola qiladi)*:
+
+| `kind` | Tasdiqlovchi ruxsati (`permission_code`) | Limit solishtiriladigan |
+|---|---|---|
+| `discount_over_limit` | `discount.approve` | foiz |
+| `return_over_limit`, `return_no_receipt` | `returns.approve` | summa (`return_no_receipt` — limitsiz, har doim tasdiq kerak) |
+| `debt_over_limit` | `debts.approve` | summa |
+| `cash_withdrawal_over_limit` | `cash.withdraw` (so'ralgan summadan yuqori `limit_value` yoki limitsiz) | summa |
+| `price_change` | `prices.approve` | foiz |
+| `expense_over_limit` | `expenses.approve` | summa |
+| `write_off_over_limit` | `stock.writeoff` (yuqori limit yoki limitsiz) | summa |
+
+Qo'shimcha qoida: tasdiqlovchi so'rovchining o'zi bo'la olmaydi (`approval_requests.resolved_by <> requested_by`); bitta `approval_request` bitta hujjatda bir marta ishlatiladi (`consumed`), qayta ishlatishga urinish — `APPROVAL_REQUEST_ALREADY_RESOLVED`.
 
 ### 2.4 Filialga bog'lash (branch scoping)
 

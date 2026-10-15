@@ -34,7 +34,7 @@
 
 ### 1.4 Til (o'zbek/rus)
 - Standart til — o'zbek (lotin). Til almashtirish — yuqori o'ng burchakda bir xil belgi (masalan "UZ/RU") barcha ekranlarda.
-- Mijozga ko'rinadigan matnlar (chek, QR orqali elektron chek) uchun ikki tilda chiqarish imkoniyati — **ochiq savol**, manbada tasdiqlanmagan.
+- *(2026-10-15: qabul-6/7 — tasdiq kutilmoqda)* **Chek tili — standart qaror**: fiskal chek (shu jumladan QR orqali elektron chek) **har doim o'zbek (lotin) tilida** chiqariladi — davlat tili talabiga zid bo'lib qolmasligi uchun, kassir UI tilini rus qilib tanlagan taqdirda ham chek rus tilida chiqmaydi. Rus tili — keyinroq, faqat **ikkinchi (qo'shimcha) qator** sifatida qo'shilishi mumkin, MVP'da yo'q. Bu standart — yakuniy tasdiq Egasidan kutilmoqda; interfeys (UI) tili almashtirish tugmasi (yuqorida, 1.4) bundan mustasno — u har doim almashtiriladi.
 
 ### 1.5 Katta shrift va kontrast
 - Narx va summa raqamlari — ekrandagi eng katta shrift (do'kon yorug'ligi/charchagan ko'z uchun, **taxmin**: boshqa matndan kamida 1.5x katta).
@@ -47,7 +47,7 @@
 - **iPhone/iPad (iOS)** *(2026-10-15: foydalanuvchi qarori — D3)*: AIOS kassa/back-office iOS'da **o'rnatilgan PWA** sifatida (Home Screen'ga qo'shilgan) ishlaydi. Chek chop etish faqat **bulut-print (cloud-print) printer** (masalan Star CloudPRNT, Epson Server Direct Print — **taxmin**, aniq model tasdiqlanmagan) orqali yoki **elektron chek** (QR-kod/Telegram orqali yuborish) bilan mumkin — iOS Safari/PWA USB/Bluetooth printer ulanishini qo'llab-quvvatlamaydi. **Chrome/Edge (Windows, Android)** — USB, Bluetooth, tarmoq (LAN/Wi-Fi) va bulut printerlarning barchasini qo'llab-quvvatlaydi. Bulut-print printerlarining O'zbekistonda mavjudligi/narxi va faqat-elektron-chek bilan cheklanishning fiskal/huquqiy ruxsati — **ochiq savol** (pastda).
 
 ### 1.7 Markirovka (Asl belgisi) maxsus holati
-- Manbada keltirilgan 80–90% xato ko'rsatkichi **yetkazib berish zanjiridagi yuklar darajasida** (`00-xulosa-va-ochiq-savollar.md`, 6-band), har bir alohida skanerlash urinishining xato ehtimoli sifatida emas (Asosiy xulosalar #5). Shunga qaramay, markirovka skanerlashning umuman nosog'lom ekanligini ko'rsatadi, shuning uchun har bir markirovka skaneri ekranida (POS-02, POS-08, POS-09, POS-10): (a) birinchi urinish muvaffaqiyatsiz bo'lsa avtomatik qayta urinish, (b) 2-3 muvaffaqiyatsiz urinishdan keyin "qo'lda MXIK kodini kiriting" maydoni ochiladi — **MXIK (IKPU)** 17 raqamli tovar klassifikator kodi (`research_notes/texnik/02-kassa-ofd-markirovka.md`, chek rekvizitlari bo'limi), **markirovka (DataMatrix) kodi emas** — qo'lda kiritilsa tovar tanib olinadi, lekin Asl belgisi "chiqarish" operatsiyasi bajarilmaydi, (c) **DataMatrix (markirovka) kodini qo'lda kiritish imkoniyati va huquqiy/texnik ruxsati manbada tasdiqlanmagan — ochiq savol** (kripto-qismli kod bo'lgani uchun qo'lda kiritish amalda ishlamasligi mumkin), (d) kod butunlay o'qilmasa, menejerga eskalatsiya tugmasi ko'rsatiladi.
+- Manbada keltirilgan 80–90% xato ko'rsatkichi **yetkazib berish zanjiridagi yuklar darajasida** (`00-xulosa-va-ochiq-savollar.md`, 6-band), har bir alohida skanerlash urinishining xato ehtimoli sifatida emas (Asosiy xulosalar #5). Shunga qaramay, markirovka skanerlashning umuman nosog'lom ekanligini ko'rsatadi, shuning uchun har bir markirovka skaneri ekranida (POS-02, POS-08, POS-09, POS-10): (a) birinchi urinish muvaffaqiyatsiz bo'lsa avtomatik qayta urinish, (b) 2-3 muvaffaqiyatsiz urinishdan keyin "qo'lda MXIK kodini kiriting" maydoni ochiladi — **MXIK (IKPU)** 17 raqamli tovar klassifikator kodi (`research_notes/texnik/02-kassa-ofd-markirovka.md`, chek rekvizitlari bo'limi), **markirovka (DataMatrix) kodi emas** — qo'lda kiritilsa tovar tanib olinadi, lekin Asl belgisi "chiqarish" operatsiyasi bajarilmaydi, (c) *(2026-10-15: qabul-6/7)* **DataMatrix (markirovka) kodini qo'lda kiritish — faqat online, va faqat `POST /marking/verify` muvaffaqiyatli tasdiqlasa**: shundan keyingina tovar markirovkasi haqiqiy deb qabul qilinadi va sotuvga qo'shiladi; **offline rejimda qo'lda kiritilgan kod bilan sotish taqiqlanadi** (aks holda bu 2026-07-01'dagi avtomatik tekshirish talabini chetlab o'tish yo'li bo'lib qolardi — `spec/tekshiruv/qabul-7-ekran-api.md`, R-02), (d) kod butunlay o'qilmasa, menejerga eskalatsiya tugmasi ko'rsatiladi.
 
 ---
 
@@ -79,7 +79,7 @@
 | POS-13 | Kassir, Egasi | M08 | Qarz daftari (tezkor) *(2026-10-14)* | Mijoz qidirish (ism/telefon), joriy qarz, oxirgi yozuvlar (sana, summa, tovarlar), "To'lov qabul qilish", "Qarz yozish"; bosh ekranda doimiy "📒 Qarz daftari" tugmasi | Bo'sh: qarzdor yo'q; Xato: telefon formati noto'g'ri; Offline: to'liq ishlaydi (lokal baza), sinxron belgisi ko'rsatiladi |
 | POS-14 | Kassir | M16 | Kassaga pul qo'yish / kassadan pul olish *(2026-10-14)* | Summa, sabab (Egasi oldi / Inkasso / Xarajat / Boshqa), izoh; katta summada Menejer/Egasi PIN | Xato: PIN noto'g'ri; Offline: to'liq ishlaydi |
 | POS-15 | Kassir | M16 | Smena yopishda naqdni sanash *(2026-10-14)* | Sanalgan naqd, kutilgan naqd, farq, izoh, *(2026-10-15: foydalanuvchi qarori)* **shu smenadagi "karta" (qo'lda belgilangan) jami** alohida ko'rsatuvi; keyin POS-07 (Z-hisobot) | Xato: farq bor — izoh majburiy; Offline: to'liq ishlaydi |
-| POS-08 | Omborchi | M07 | Yetkazib beruvchidan tovar qabul qilish (kirim) | Xaridnoma tanlash, shtrix-kod/markirovka skaneri, miqdor solishtirish (buyurtma vs kelgan), nomuvofiqlik belgilash | Bo'sh: xaridnoma tanlanmagan; Xato: markirovka o'qilmadi (1.7-bo'lim), miqdor mos kelmadi; Offline: qabul lokal yoziladi |
+| POS-08 | Omborchi | M07 | Yetkazib beruvchidan tovar qabul qilish (kirim) | Xaridnoma tanlash, shtrix-kod/markirovka skaneri, miqdor solishtirish (buyurtma vs kelgan), nomuvofiqlik belgilash | Bo'sh: xaridnoma tanlanmagan; Xato: markirovka o'qilmadi (1.7-bo'lim), miqdor mos kelmadi; Offline: *(2026-10-15: qabul-6/7)* skanerlash/sanash lokal davom etadi, lekin **"QABULNI YAKUNLASH" internet talab qiladi** — offline qabul (kirim) voqeasi yo'q |
 | POS-09 | Omborchi | M06 | Omborlar orasida tovar ko'chirish | Manba/manzil ombor tanlash, skanerlash, miqdor, "Yuborish" | Bo'sh: ombor tanlanmagan; Xato: qoldiq yetarli emas; Offline: harakat lokal yoziladi, qoldiq serverda qayta hisoblanadi; *(2026-10-15: foydalanuvchi qarori)* markirovkalangan tovar ham o'z filiallar/omborlari orasida offline ko'chirilishi **ruxsat etiladi** (jo'natish va qabul), Asl belgisiga keyin sinxronlanadi |
 | POS-10 | Omborchi | M05 | Inventarizatsiya — jismoniy sanash | Tovar ro'yxati (hali sanalmagan/sanalgan), skanerlash, qo'lda miqdor kiritish, farq ko'rsatuvi | Bo'sh: sanash boshlanmagan; Xato: tizimda yo'q shtrix-kod; Offline: sanash to'liq lokal, yakunida sinxron |
 | POS-11 | Kassir, Omborchi | M09 | Mahsulot va narxni tez qidirish | Qidiruv (nom/kod/shtrix-kod), narx, qoldiq ko'rsatuvi (faqat ko'rish) | Bo'sh: natija yo'q; Xato: —; Offline: oxirgi sinxronlangan narx/qoldiq ko'rsatiladi, "oxirgi yangilanish" vaqti bilan |
@@ -279,8 +279,11 @@ qayta tekshiradi" eslatmasi bilan
 │         [  QABULNI YAKUNLASH  ]        │
 └───────────────────────────────────────┘
 Holat: Bo'sh — xaridnoma tanlanmagan | Xato — "Markirovka kodi o'qilmadi,
-qo'lda kiriting" (1.7-bo'lim) | Offline — qabul lokal yoziladi,
-sinxronda serverga yuboriladi
+qo'lda kiriting" (1.7-bo'lim) | Offline — *(2026-10-15: qabul-6/7)*
+skanerlash/miqdor solishtirish lokal davom etishi mumkin, lekin
+"QABULNI YAKUNLASH" tugmasi internet talab qiladi — offline qabul
+(kirim) voqeasi sinxronizatsiya protokolida yo'q (`02-modullar-talablari.md`,
+M07 Offline xatti-harakati; `spec/tekshiruv/qabul-7-ekran-api.md`, K2-02)
 ```
 
 ### POS-10 — Inventarizatsiya skaneri
@@ -458,10 +461,10 @@ tasdiqlaydi
 
 ## Ochiq savollar
 
-1. Chekni ikki tilda (o'zbek/rus) chiqarish talabi — tadqiqotda tasdiqlanmagan, hozircha **taxmin** sifatida UI'da til almashtirish tugmasi bilan yechilgan.
+1. *(2026-10-15: qabul-6/7 — tasdiq kutilmoqda)* Chekni ikki tilda (o'zbek/rus) chiqarish — endi standart: chek **har doim o'zbek (lotin)**, rus faqat kelajakda ikkinchi qator sifatida (1.4-bo'lim); bu Egasining yakuniy tasdig'ini kutadi. Interfeys (UI) tili almashtirish tugmasi bu standartdan mustasno — u har doim UZ/RU o'rtasida almashadi, chekka ta'sir qilmaydi.
 2. Aniq teginish/vaqt maqsadlari (chek N soniyada yopilishi, tugma o'lchami dp'da, offline ogohlantirish qancha soat oldin boshlanishi) — hech bir tadqiqot faylida raqam yo'q, bu hujjatdagi barcha shunga o'xshash son ko'rsatkichlari **taxmin**.
 3. *(2026-10-15: hal qilindi — foydalanuvchi qarori)* Markirovkalangan tovarni offlayn holatda **sotish** siyosati endi aniq: narx qurilmada ma'lum bo'lsa ruxsat, bo'lmasa taqiq (`02-modullar-talablari.md`, US-M01-03/M01 Offline xatti-harakati) — POS-02'da shunga mos belgi ko'rsatiladi. Qaytarish/ko'chirish (POS-08/POS-09) uchun offlayn siyosati hali ochiq.
-4. DataMatrix (markirovka) kodini qo'lda kiritish texnik/huquqiy jihatdan ruxsat etilganmi — manbada yo'q (1.7-bo'lim).
+4. *(2026-10-15: qabul-6/7 — hal qilindi)* DataMatrix (markirovka) kodini qo'lda kiritish texnik/huquqiy jihatdan ruxsat etilganmi — endi aniq: **faqat online, faqat `POST /marking/verify` muvaffaqiyatli tasdiqlagandan keyin** sotuvga qo'shiladi; offlaynda qo'lda kiritilgan kod bilan sotish taqiqlanadi (1.7-bo'lim, R-02).
 5. Tarozi bilan integratsiya protokoli aniqlanmagani sababli BO/POS ekranlarida "qo'lda og'irlik kiritish" doimiy zahira sifatida qoldirilgan — avtomatik integratsiya aniqlangach, UX qayta ko'rib chiqilishi kerak.
 6. AI chatning offlayn qisman ishlashi (masalan, oxirgi javoblarni keshlab ko'rsatish) — bu hujjatda "to'liq o'chirilgan" deb soddalashtirilgan, kelajakda UX tadqiqoti kerak bo'lishi mumkin.
 7. Davlat hisobotini solishtirish ekranidagi (BO-10) "farqni ko'rib chiqish" oqimining to'liq bosqichlari (kim tasdiqlaydi, qanday eskalatsiya) — `spec/01-mahsulot/03-biznes-jarayonlar.md`, BP-08 bilan muvofiqlashtirilishi kerak.

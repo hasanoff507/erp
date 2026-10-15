@@ -271,7 +271,7 @@ Qabul qiluvchi tomonda internet yo'q bo'lsa, qabul mahalliy qayd etilib keyin si
 E-faktura (*(2026-10-15: foydalanuvchi qarori)* **Faktura.uz — MVP'da yagona operator**, ochiq API; Didox — MVP'dan keyin, login talab qiladigan API), e-TTN (agar tashish bo'lsa), MXIK kod tekshiruvi, E-IMZO (imzolash), AI xavf-baholash (VM Qarori №830, 2025-12-26, 2026-01-01 dan to'liq — `research_notes/texnik/03-efaktura-va-tolov.md`, 32-qator). Yetkazib beruvchi vakili ishonchnoma bilan tovar topshirsa, 2026-01-01'dan Vakolat.uz orqali e-ishonchnomani tekshirish zarurligi **ochiq savol** (`research_notes/texnik/09-soliq-integratsiyasi.md`, 14-qator).
 
 ### Offline xatti-harakati
-Majburiy emas — xarid odatda ofis/ombor sharoitida internet mavjud joyda amalga oshiriladi; agar offline bo'lsa, qabul hujjati mahalliy saqlanib keyin sinxronlanadi.
+*(2026-10-15: qabul-6/7)* **Qabul (tovar kirimi) faqat online** — offline kirim voqeasi yo'q (`spec/tekshiruv/qabul-7-ekran-api.md`, K2-02). Xaridnoma bo'yicha jismoniy sanash/skanerlash (miqdorni solishtirish) Omborchi tomonidan internetsiz ham lokal davom ettirilishi mumkin, lekin qabulni **yakunlash/o'tkazish** har doim internetga ulangan holda amalga oshadi — sabab M01'dagi markirovkalangan tovar bilan bir xil: markirovkalangan tovar qabulida tovar egaligi o'zgaradi, bu markaziy (CRPT/server) tasdiqni talab qiladi.
 
 ### Chekka holatlar
 - Qisman yetkazib berish (buyurtma qilingan miqdordan kam/ko'p kelishi).

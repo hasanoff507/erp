@@ -1,10 +1,11 @@
-# Android POS (keyingi bosqich)
+# 28. Android POS (keyingi bosqich)
 
-*2026-10-14 · Asos: foydalanuvchi qarori (Kotlin, keyingi bosqich — veb birinchi), `spec/kod-uchun/16-offline-sync.md` (bitta sinxronizatsiya protokoli), `24-frontend-arxitekturasi.md` (umumiy naqsh, API generatsiyasi), `research_notes/texnik/02-kassa-ofd-markirovka.md` (fiskal modul, PAX/UZKASSA), `06-raqobatchilar-texnik-va-uskunalar.md` (uskunalar, ESC/POS, Android POS terminallari), `spec/kod-uchun/06-ekranlar-umumiy.md` (POS-nn ekranlari).*
+**Maqsad:** Veb-kassadan keyingi bosqichda boshlanadigan native Kotlin Android POS uchun texnologiya, modul tuzilishi va uskuna integratsiyasi rejasini hozirdan belgilash — veb bilan bitta backend/sync protokolini baham ko'rish, keyinroq boshlash tezroq bo'lishi uchun.
+**Kim uchun:** Claude (Android POS bosqichi boshlanganda), asoschi.
+**Bog'liq fayllar:** `16-offline-sync.md` (sinxronizatsiya protokoli), `24-frontend-arxitekturasi.md` (veb tomonidagi naqsh, API generatsiyasi), `06-ekranlar-umumiy.md` (POS-nn ekranlari), `27-backlog.md` (MVP'dan keyin ro'yxati).
+**Holat:** joriy, 2026-10-15 — faqat hujjat, amalga oshirish veb-kassadan keyingi bosqichda boshlanadi.
 
-> Bu hujjat **hozirdan tayyorlanadi, lekin amalga oshirish veb-kassadan keyingi bosqichda boshlanadi** (`spec/README.md`). Maqsad — veb bilan bitta backend/protokolni baham ko'rish, keyinroq boshlash tezroq bo'lishi uchun.
-
-> **Eslatma** *(2026-10-15: foydalanuvchi qarori, D3)*: bu hujjat — **native Kotlin** Android POS (keyingi bosqich). U **Android Chrome'dagi veb-kassa PWA**dan (hozir ham mavjud, `24-frontend-arxitekturasi.md` §6) alohida: veb-kassa Android Chrome'da WebUSB/Web Serial/Web Bluetooth orqali uskunaga to'g'ridan-to'g'ri ulanadi, native Android POS esa shu hujjatdagi `hardware/*` adapterlari (4-bo'lim) orqali ishlaydi — ikkisi bir xil backend/sync protokolidan foydalanadi (3-bo'lim), lekin uskuna integratsiyasi usuli farq qiladi. D3 qarori (iOS/iPadOS qo'llab-quvvatlash, bulut printer) native Android POS'ga ta'sir qilmaydi — bu faqat veb-kassa (brauzer) tomoniga tegishli.
+> Bu hujjat — **native Kotlin** Android POS (keyingi bosqich). U **Android Chrome'dagi veb-kassa PWA**dan (hozir ham mavjud, `24-frontend-arxitekturasi.md` §6) alohida: veb-kassa Android Chrome'da WebUSB/Web Serial/Web Bluetooth orqali uskunaga to'g'ridan-to'g'ri ulanadi, native Android POS esa shu hujjatdagi `hardware/*` adapterlari (4-bo'lim) orqali ishlaydi — ikkisi bir xil backend/sync protokolidan foydalanadi (3-bo'lim), lekin uskuna integratsiyasi usuli farq qiladi. iOS/iPadOS qo'llab-quvvatlash va bulut printer qarori native Android POS'ga ta'sir qilmaydi — bu faqat veb-kassa (brauzer) tomoniga tegishli.
 
 ## Asosiy xulosalar
 
@@ -111,7 +112,7 @@ Farq faqat **klient tomonidagi saqlash mexanizmi** (Room o'rniga Dexie) va **UI 
 ### 4.5 NFC / karta terminali
 
 - Ushbu tadqiqotning hech bir faylida NFC/karta terminali integratsiyasi haqida ma'lumot **topilmadi** — bu talab vazifa tavsifida berilgan, lekin spetsifikatsiya manbalarida yo'q.
-- **Taklif** (tasdiqlanmagan): mustaqil aloqaga ega bank terminali (Humo/Uzcard/Visa/Mastercard EMV) bilan integratsiya — bank SDK'si orqali, xuddi to'lov adapterlari (Click/Payme) kabi alohida `hardware/card-terminal` moduli. Bu **ochiq savol** — tanlangan bank/to'lov hamkori bilan alohida aniqlashtirish kerak (`06-ekranlar-umumiy.md` Ochiq savol #11'dagi "mustaqil aloqaga ega karta terminali offlayn rejimda ishlashi" muammosiga ham bog'liq).
+- **Taklif** (tasdiqlanmagan): mustaqil aloqaga ega bank terminali (Humo/Uzcard/Visa/Mastercard EMV) bilan integratsiya — bank SDK'si orqali, xuddi to'lov adapterlari (Click/Payme) kabi alohida `hardware/card-terminal` moduli. Bu **ochiq savol** — tanlangan bank/to'lov hamkori bilan alohida aniqlashtirish kerak. Hozirgi standart: mustaqil terminal bilan karta to'lovi kassada qo'lda belgilanadi, online va offline (qaror #23, tavsiya #6; `21-integratsiyalar.md` §9.2).
 
 ---
 
@@ -157,7 +158,7 @@ Farq faqat **klient tomonidagi saqlash mexanizmi** (Room o'rniga Dexie) va **UI 
 
 | Faza | Mazmuni |
 |---|---|
-| **Faza 0 (hozir, 2026-10-14)** | Faqat hujjat (bu fayl) — amalga oshirish boshlanmagan, veb-kassa birinchi bosqichda |
+| **Faza 0 (hozir)** | Faqat hujjat (bu fayl) — amalga oshirish boshlanmagan, veb-kassa birinchi bosqichda |
 | **Faza 1** | Asosiy kassa oqimi (M01: smena, sotuv, to'lov, chek), offline-sync (`16-offline-sync.md` protokoli), bitta fiskal vendor bilan pilot (PAX **yoki** UZKASSA — ikkisini bir yo'la boshlamaslik) |
 | **Faza 2** | Qaytarish (M02), qarz daftari (M08, POS-13), kassa pul harakati (M16, POS-14/15), ombor skanerlash (M05/M06/M07, POS-08/09/10) |
 | **Faza 3** | Markirovka (Asl belgisi) integratsiyasi, ikkinchi fiskal vendor qo'llab-quvvatlash, tarozi/NFC (agar protokol/hamkor aniqlansa) |
@@ -168,14 +169,14 @@ Farq faqat **klient tomonidagi saqlash mexanizmi** (Room o'rniga Dexie) va **UI 
 ## Ochiq savollar
 
 1. PAX/UZKASSA fiskal SDK'larining rasmiy texnik hujjatlari ochiq manbada topilmadi (403/yopiq, CRPT Turon bilan bir xil holat) — integratsiyadan oldin vendor bilan rasmiy aloqa/shartnoma kerak.
-2. `minSdk` tanlovi — UZKASSA P100 (Android 5.1) qamrovdan tushib qolishi mumkin; pilot flotini tasdiqlash kerak (7-bo'lim).
+2. `minSdk` tanlovi — standart **24 (Android 7.0)** qabul qilingan (`26-ochiq-savollar-reestri.md` #64); UZKASSA P100 (Android 5.1) qamrovdan tushadi — pilot flotini tekshirgach qayta ko'rilishi mumkin (7-bo'lim).
 3. Tarozi ulanish protokoli aniqlanmagan (`06-fayl` §3) — qo'lda kiritish doimiy zahira bo'lib qoladi.
-4. NFC/karta terminali integratsiyasi — tadqiqot manbalarida umuman yo'q, bank/to'lov hamkori bilan alohida aniqlashtirilishi kerak.
-5. Play Store'da GMS mavjudligi maqsadli POS qurilmalarida tasdiqlanmagan — shu sabab MDM/APK asosiy kanal deb taklif qilindi, yakuniy qaror pilotdan keyin.
-6. OpenAPI'dan Kotlin klient generatsiya vositasi (openapi-generator vs qo'lda Retrofit+kotlinx.serialization) — hali tanlanmagan.
-7. DI vositasi (Hilt vs Koin) — tasdiqlanmagan, boshlang'ich taklif Hilt.
-8. SQLCipher vs Android Keystore maydon-darajasida shifrlash — ishlash tezligi/hajm bo'yicha sinov o'tkazilmagan.
-9. Bitta smenani ikki Android qurilma baham ko'rganda fiskal chek raqamlash tartibi — `16-offline-sync.md` §3.3'dagi bilan bir xil ochiq savol.
+4. NFC/karta terminali integratsiyasi — tadqiqot manbalarida umuman yo'q, bank/to'lov hamkori bilan alohida aniqlashtirilishi kerak (standart: MVP'da yo'q, mustaqil terminal bilan qo'lda "Karta" belgilash — reestr #65).
+5. Play Store'da GMS mavjudligi maqsadli POS qurilmalarida tasdiqlanmagan — shu sabab MDM/APK asosiy kanal deb taklif qilindi, yakuniy qaror pilotdan keyin (standart: MDM/APK — reestr #66).
+6. OpenAPI'dan Kotlin klient generatsiya vositasi (openapi-generator vs qo'lda Retrofit+kotlinx.serialization) — standart: openapi-generator (reestr #67).
+7. DI vositasi (Hilt vs Koin) — standart: Hilt (reestr #68).
+8. SQLCipher vs Android Keystore maydon-darajasida shifrlash — standart: SQLCipher (reestr #69); ishlash tezligi/hajm bo'yicha sinov o'tkazilmagan.
+9. Smena va qurilma — hal qilingan: **bitta smena — bitta qurilma** (`shifts.device_id`), fiskal chek raqamini qurilma beradi (`01-qarorlar.md` #12, `16-offline-sync.md` §3.3) — ikki qurilma bitta smenani baham ko'rmaydi.
 
 ## Manbalar
 

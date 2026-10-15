@@ -1,6 +1,9 @@
 # Umumiy arxitektura
 
-*2026-10-14 · Asos: `spec/kod-uchun/*`, `research_notes/texnik/04-arxitektura-va-stack.md`, foydalanuvchi qarorlari (stack, veb birinchi, Android keyin).*
+**Maqsad:** Tizimning yuqori darajadagi arxitekturasi — komponentlar, asosiy oqimlar, muhitlar va hujjatlar xaritasi.
+**Kim uchun:** Backend/frontend dasturchilar, arxitektura qarorlarini qabul qiluvchilar.
+**Bog'liq fayllar:** `11-malumotlar-modeli.md`, `14-autentifikatsiya-oauth2.md`, `16-offline-sync.md`, `21-integratsiyalar.md`, `22-ai-qatlami.md`, `23-backend-arxitekturasi.md`, `24-frontend-arxitekturasi.md`, `27-backlog.md`.
+**Holat:** joriy, 2026-10-15.
 
 ## Asosiy xulosalar
 
@@ -12,8 +15,8 @@
 6. **Offline-first kassa**: kassa avval o'z lokal bazasiga yozadi (veb: IndexedDB, Android: SQLite), keyin append-only outbox orqali serverga; server idempotent qabul qiladi (`16-offline-sync.md`).
 7. **Fon ishlari** (OFD'ga yuborish, e-faktura, hisobot solishtirish, eslatmalar, Telegram xabarlar, AI) — alohida worker jarayonlar, Redis navbati orqali; API so'rovi tashqi tizimni kutib turmaydi.
 8. **AI — chekka qatlam**: `AiProvider` porti (fake | cli | api), pul va soliqni hech qachon AI hisoblamaydi (`22-ai-qatlami.md`).
-9. **Autentifikatsiya — o'z OAuth 2.0 implementatsiyamiz**: API komponenti ham AS, ham RS; mock yo'q (`14-autentifikatsiya-oauth2.md`). Google — tashqi OIDC identity-provider sifatida **qo'shimcha** (majburiy emas) kirish yo'li, telefon+parolni almashtirmaydi (§2.2, asoschi qarori Q7). Obuna muddati 24 soatlik imtiyozdan o'tganda kassa va kirish **to'liq to'xtaydi** (barcha sessiya/token bekor, faqat to'lov havolasi ochiq). *(2026-10-15: foydalanuvchi qarori)*
-10. **Jamoa — asoschi + Claude (2 kishi)** *(2026-10-15: asoschi qarori, Q8)*: butun spec va backlog shu tarkibga mo'ljallangan — ketma-ket vertikal bo'laklar, qat'iy kalendar muddatlar yo'q, parallel ish oqimi yo'q (`27-backlog.md`); qo'llab-quvvatlash ham boshlang'ich bosqichda faqat asoschi (`25-nofunksional-talablar.md` §12).
+9. **Autentifikatsiya — o'z OAuth 2.0 implementatsiyamiz**: API komponenti ham AS, ham RS; mock yo'q (`14-autentifikatsiya-oauth2.md`, qaror #14). Google — tashqi OIDC identity-provider sifatida **qo'shimcha** (majburiy emas) kirish yo'li, telefon+parolni almashtirmaydi (§2.2, qaror #34). Obuna muddati 24 soatlik imtiyozdan o'tganda kassa va kirish **to'liq to'xtaydi** (barcha sessiya/token bekor, faqat to'lov havolasi ochiq) (qaror #15).
+10. **Jamoa — asoschi + Claude (2 kishi)** (qaror #35): butun spec va backlog shu tarkibga mo'ljallangan — ketma-ket vertikal bo'laklar, qat'iy kalendar muddatlar yo'q, parallel ish oqimi yo'q (`27-backlog.md`); qo'llab-quvvatlash ham boshlang'ich bosqichda faqat asoschi (`25-nofunksional-talablar.md` §12).
 
 ---
 
@@ -58,8 +61,8 @@ flowchart LR
 |---|---|---|
 | Veb ilova | React + Vite + TS, FSD, Effector, shadcn/ui, PWA | Back-office va veb-kassa (`24-frontend-arxitekturasi.md`) |
 | Android POS | Kotlin, SQLite (Room) | Keyingi bosqich (`28-android-pos.md`) |
-| API | Python 3.13, FastAPI, Pydantic v2, SQLAlchemy 2 + Alembic | Barcha biznes amallar, huquqlar; **shuningdek o'z OAuth 2.0 Authorization Server + Resource Server** (`14-autentifikatsiya-oauth2.md`, foydalanuvchi qarori 2026-10-15) — uchinchi tomon auth xizmati yo'q |
-| Worker'lar | Python, `SAQ` (Redis navbati; `23-backend-arxitekturasi.md`) *(2026-10-14: tekshiruv — arq o'rniga SAQ)* | Tashqi tizimlarga yuborish, qayta urinish, AI, xabarlar |
+| API | Python 3.13, FastAPI, Pydantic v2, SQLAlchemy 2 + Alembic | Barcha biznes amallar, huquqlar; **shuningdek o'z OAuth 2.0 Authorization Server + Resource Server** (`14-autentifikatsiya-oauth2.md`, qaror #14) — uchinchi tomon auth xizmati yo'q |
+| Worker'lar | Python, `SAQ` (Redis navbati; `23-backend-arxitekturasi.md`, qaror #2) | Tashqi tizimlarga yuborish, qayta urinish, AI, xabarlar |
 | Rejalashtiruvchi | worker ichida cron (masalan `SAQ` cron) | Kunlik hisobot, eslatmalar, obuna muddati, davlat hisobotini tekshirish |
 | Baza | PostgreSQL 16+ (UzCloud DBaaS) | Hamma ma'lumot, RLS bilan tenant ajratish |
 | Kesh/navbat | Redis | Navbat, rate-limit, sessiya keshi |
@@ -70,7 +73,7 @@ flowchart LR
 
 ## 2. Asosiy oqimlar
 
-**Kassa sotuvi (onlayn):** veb-kassa → lokal yozuv (Dexie outbox, `client_event_id`) → `POST /sync/push` (darhol, bitta voqea) → backend: hujjat + qoldiq registri + qarz/kassa harakati + buxgalteriya provodkasi **bitta tranzaksiyada** → navbatga "OFD'ga yuborish" ishi → worker → OFD → fiskal belgi keyingi pull'da veb-kassaga qaytadi. POS uchun alohida `POST /sales` yo'q — onlayn va offline yo'l bitta (`16-offline-sync.md` §4.1). *(2026-10-14: tekshiruv)*
+**Kassa sotuvi (onlayn):** veb-kassa → lokal yozuv (Dexie outbox, `client_event_id`) → `POST /sync/push` (darhol, bitta voqea) → backend: hujjat + qoldiq registri + qarz/kassa harakati + buxgalteriya provodkasi **bitta tranzaksiyada** → navbatga "OFD'ga yuborish" ishi → worker → OFD → fiskal belgi keyingi pull'da veb-kassaga qaytadi. POS uchun alohida `POST /sales` yo'q — onlayn va offline yo'l bitta (`16-offline-sync.md` §4.1).
 
 **Kassa sotuvi (offline):** lokal yozuv → outbox kutadi → internet qaytgach yuboriladi; 48 soat chegarasi kuzatiladi (`16-offline-sync.md`).
 
@@ -101,18 +104,17 @@ Deploy: Docker konteynerlar (api, worker, scheduler, web statik, bot) + boshqari
 | 24-frontend-arxitekturasi.md | Veb: FSD, Effector, shadcn/ui, kutubxonalar | ✅ |
 | 23-backend-arxitekturasi.md | FastAPI modulli monolit, qatlamlar, kutubxonalar | ✅ |
 | 28-android-pos.md | Kotlin POS (keyingi bosqich) | ✅ |
-| 27-backlog.md | Ketma-ket bosqichlar (2 kishilik jamoa — asoschi + Claude), tartib | ✅ *(2026-10-15: asoschi qarori, Q8)* |
-| 14-autentifikatsiya-oauth2.md | OAuth 2.0 AS+RS, token, admin panel, obuna lokauti, offline litsenziya | ✅ *(2026-10-15: foydalanuvchi qarori)* |
+| 27-backlog.md | Ketma-ket bosqichlar (2 kishilik jamoa — asoschi + Claude), tartib | ✅ (qaror #35) |
+| 14-autentifikatsiya-oauth2.md | OAuth 2.0 AS+RS, token, admin panel, obuna lokauti, offline litsenziya | ✅ (qaror #14) |
 
 ## Ochiq savollar
 
-1. ~~Navbat kutubxonasi~~ — hal qilindi: `SAQ` (`23-backend-arxitekturasi.md`, 4-bo'lim). *(2026-10-14: tekshiruv — arq o'rniga SAQ, python-arq/arq#510 texnik xizmat rejimi)*
-2. Fayl ombori: UzCloud'da S3-mos xizmat bormi va narxi — tekshirish kerak (`07-hosting-...md`).
-3. Ma'lumotlarni O'zbekistonda saqlash majburiy emas (faqat biometrik/genetik/telekom), lekin Claude API'ga yuboriladigan ma'lumot hajmini cheklash siyosati — `22-ai-qatlami.md`.
+- **2.** Fayl ombori: UzCloud'da S3-mos xizmat bormi va narxi — tekshirish kerak (`07-hosting-...md`).
+- **3.** Ma'lumotlarni O'zbekistonda saqlash majburiy emas (faqat biometrik/genetik/telekom), lekin Claude API'ga yuboriladigan ma'lumot hajmini cheklash siyosati — `22-ai-qatlami.md`.
 
 ## Manbalar
 
-- `spec/kod-uchun/14-autentifikatsiya-oauth2.md` — OAuth 2.0 AS/RS, obuna lokauti. *(2026-10-15: foydalanuvchi qarori)*
+- `spec/kod-uchun/14-autentifikatsiya-oauth2.md` — OAuth 2.0 AS/RS, obuna lokauti.
 - `research_notes/texnik/04-arxitektura-va-stack.md` (multi-tenant, offline-first, event-log, Android, PostgreSQL).
 - `research_notes/texnik/07-hosting-lokalizatsiya-xavfsizlik.md` (UzCloud, lokalizatsiya).
 - `spec/kod-uchun/03-modullar-talablari.md` (M01–M18), `09-ai-funksiyalar.md` (5-bo'lim).

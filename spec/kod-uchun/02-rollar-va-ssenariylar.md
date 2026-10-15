@@ -1,14 +1,16 @@
 # Rollar va kundalik ssenariylar
 
+**Maqsad:** 5 rol (Egasi, Menejer, Kassir, Omborchi, Buxgalter) uchun maqsad, og'riq, kundalik/haftalik/oylik ssenariy va huquqlar matritsasini belgilash. · **Kim uchun:** hammasi (backend — ruxsat modeli, frontend — ekran/rol UX). · **Bog'liq fayllar:** 03, 13, 14, 15, 17. · **Holat:** joriy, 2026-10-15.
+
 ## Asosiy xulosalar
 
 1. MVP uchun **5 rol** aniqlangan: **Egasi, Menejer, Kassir, Omborchi, Buxgalter**. Har biri uchun maqsad, og'riq, kundalik/haftalik/oylik ssenariy va huquqlar aniqlangan.
 2. Kichik do'konda (1-3 xodim) **bitta odam bir necha rolni bajaradi** — eng tipik kombinatsiya: Egasi = Menejer + Buxgalter (qisman), Kassir = Omborchi. Tizim rolni xodimga emas, **vazifaga** biriktiradi, shuning uchun bitta login bir nechta rol huquqiga ega bo'lishi mumkin (`03-modullar-talablari.md`, M13 — huquqlar).
 3. Kassir va Omborchi — **Android POS** qurilmasida ishlaydi (tez, offline-bardosh, bir qo'l bilan boshqariladigan interfeys talab qiladi); Menejer, Buxgalter, Egasi — asosan **back-office PWA** (brauzer, o'rnatishsiz) orqali, lekin Egasi mobilda ham tezkor ko'rish (dashboard) ehtiyojiga ega.
-4. Eng katta umumiy og'riq — **mavjud buxgalteriya/ERP tizimlarining narxi va murakkabligi** (litsenziya millionlab so'm, joriy etish narxi litsenziyadan oshishi mumkin, qo'shimcha foydalanuvchi uchun alohida to'lov) va **qog'oz/Excel/WhatsApp orqali qo'lda yuritiladigan hisob** (`research_notes/AI ERP startap Ozbekistonda/04_sohalar.md`) *(2026-10-14: neytral ifodalandi — koordinator direktivasi)*.
-5. Ikkinchi katta og'riq — **davlat tizimlaridagi texnik xatolar va jarima xavfi**: markirovkalangan yuklarning qabul qilinishida 80–90%i skanerlash xatosi bilan qaytadi — bu ko'rsatkich **bitta yirik ishlab chiqaruvchining tajribasi** (gazeta.uz, 2026-04-14), tizim bo'yicha umumiy statistika sifatida tasdiqlanmagan *(2026-10-14: tuzatildi)* (`research_notes/texnik/tekshiruv-2026-10-14/1-fiskal-kassa-markirovka.md`); jarima **birinchi buzilishda** choraklik aylanmaning 2%i, **takroriy buzilishda** 20%igacha *(2026-10-14: tuzatildi)*. Bu ayniqsa Omborchi (tovar qabulida) va Egasi (jarima javobgarligi) uchun kundalik xavf; kassada esa skanerlarning umuman ishlamay qolishi muammosi bor (11-fayl).
-6. 2026-yildan boshlangan yangi markaziy jarayon — davlat QQS, aylanma, mol-mulk, yer, JShDS va ijtimoiy soliq hisobotlarini **o'zi tuzadi** (Soliq kodeksi 81-moddasi, O'RQ-1108-son Qonun, 2025-12-25, 2026-01-01 dan kuchda — lex.uz/docs/-7944527), korxonaga **5 kalendar kun** (hisobot topshirish muddatidan kechiktirmay) ichida tuzatish kiritish imkoni beriladi; javobsiz qolsa, davlat shakllantirgan ko'rinishda topshirilgan hisoblanadi. **Foyda solig'i bu ro'yxatga kirmaydi** — u korxonaning o'z mas'uliyatida qoladi *(2026-10-14: tuzatildi — avval "5 ish kuni" va manba sifatida ikkinchi darajali OAV ko'rsatilgan edi; endi birlamchi qonun manbasi topildi)*. Bu **Buxgalter** rolining markaziy kundalik/haftalik vazifasiga aylanadi.
-7. Huquqlar matritsasi 18 modulning (M01–M18) barchasini qamrab oladi *(2026-10-14: M15–M18 qo'shildi, `kod-uchun/15-xavfsizlik-va-audit.md` §2 bilan izchil)*; har bir katakda rol shu modulda **ko'rish (K) / yaratish (Y) / tasdiqlash (T)** huquqlaridan qaysilariga ega ekani ko'rsatilgan.
+4. Eng katta umumiy og'riq — **mavjud buxgalteriya/ERP tizimlarining narxi va murakkabligi** (litsenziya millionlab so'm, joriy etish narxi litsenziyadan oshishi mumkin, qo'shimcha foydalanuvchi uchun alohida to'lov) va **qog'oz/Excel/WhatsApp orqali qo'lda yuritiladigan hisob** (`research_notes/AI ERP startap Ozbekistonda/04_sohalar.md`).
+5. Ikkinchi katta og'riq — **davlat tizimlaridagi texnik xatolar va jarima xavfi**: markirovkalangan yuklarning qabul qilinishida 80–90%i skanerlash xatosi bilan qaytadi — bu ko'rsatkich **bitta yirik ishlab chiqaruvchining tajribasi** (gazeta.uz, 2026-04-14), tizim bo'yicha umumiy statistika sifatida tasdiqlanmagan (`research_notes/texnik/tekshiruv-2026-10-14/1-fiskal-kassa-markirovka.md`); jarima **birinchi buzilishda** choraklik aylanmaning 2%i, **takroriy buzilishda** 20%igacha. Bu ayniqsa Omborchi (tovar qabulida) va Egasi (jarima javobgarligi) uchun kundalik xavf; kassada esa skanerlarning umuman ishlamay qolishi muammosi bor (11-fayl).
+6. 2026-yildan boshlangan yangi markaziy jarayon — davlat QQS, aylanma, mol-mulk, yer, JShDS va ijtimoiy soliq hisobotlarini **o'zi tuzadi** (Soliq kodeksi 81-moddasi, O'RQ-1108-son Qonun, 2025-12-25, 2026-01-01 dan kuchda — lex.uz/docs/-7944527), korxonaga **5 kalendar kun** (hisobot topshirish muddatidan kechiktirmay) ichida tuzatish kiritish imkoni beriladi; javobsiz qolsa, davlat shakllantirgan ko'rinishda topshirilgan hisoblanadi. **Foyda solig'i bu ro'yxatga kirmaydi** — u korxonaning o'z mas'uliyatida qoladi. Bu **Buxgalter** rolining markaziy kundalik/haftalik vazifasiga aylanadi.
+7. Huquqlar matritsasi 18 modulning (M01–M18) barchasini qamrab oladi (`15-xavfsizlik-va-audit.md` §2 bilan izchil); har bir katakda rol shu modulda **ko'rish (K) / yaratish (Y) / tasdiqlash (T)** huquqlaridan qaysilariga ega ekani ko'rsatilgan.
 8. Rollar va ssenariylar bo'yicha raqamli ma'lumot (masalan aniq limit summalari, eslatma vaqti) tadqiqot fayllarida yo'q — bular **taxmin** deb belgilangan va "Ochiq savollar"da qayd etilgan; keyingi bosqichda biznes-qoida sifatida sozlanishi tavsiya etiladi.
 
 ---
@@ -35,7 +37,7 @@ Bozor tadqiqoti shuni ko'rsatadi: 1-3 xodimli do'konlarda alohida "buxgalter" yo
 - Davlat jarima xavfidan (markirovka, soliq) himoyalanish.
 
 ### Og'riqlar (manba bilan)
-- Mavjud buxgalteriya/ERP tizimlarining litsenziyasi va joriy etish narxi yuqori, qo'shimcha foydalanuvchi uchun alohida to'lov *(2026-10-14: neytral ifodalandi — koordinator direktivasi)*.
+- Mavjud buxgalteriya/ERP tizimlarining litsenziyasi va joriy etish narxi yuqori, qo'shimcha foydalanuvchi uchun alohida to'lov.
 - Markirovka (Asl belgisi) jarimasi — bitta xodimning xatosi butun brendga 2-20% jarima va **"100% bankrotlik xavfi"** keltirishi mumkin (`research_notes/texnik/11-raqobatchilar-kamchiliklari.md`).
 - Fiskal kassa buzilishlari (chek bermaslik, naqdsiz to'lovni qabul qilmaslik) davlat tekshiruvida 400+ holatda aniqlangan — obro' va jarima xavfi (`research_notes/texnik/11-raqobatchilar-kamchiliklari.md`, kun.uz manbasi).
 - Hisob-kitob ko'p tizim (Excel + WhatsApp + qog'oz) orasida tarqoq, yagona manzara yo'q (`research_notes/AI ERP startap Ozbekistonda/04_sohalar.md`).
@@ -58,7 +60,7 @@ Back-office PWA (asosiy), mobil brauzerda tezkor dashboard ko'rish.
 
 **Oylik**
 1. Oy yakunida moliyaviy hisobot (foyda-zarar, balans) ni ko'radi (**M11**, **M12**).
-2. Davlat tuzgan QQS/boshqa hisobotlar bilan ichki hisob solishtirilgan natijani (5 kalendar kunlik jarayon *(2026-10-14: tuzatildi)*) Buxgalterdan ko'rib, yakuniy tasdiqlaydi (**M10**).
+2. Davlat tuzgan QQS/boshqa hisobotlar bilan ichki hisob solishtirilgan natijani (5 kalendar kunlik jarayon) Buxgalterdan ko'rib, yakuniy tasdiqlaydi (**M10**).
 3. Inventarizatsiya natijasidagi kamomad/ortiqchani tasdiqlaydi (**M05**).
 4. Yangi filial ochish yoki xodim/rol qo'shish kerak bo'lsa, amalga oshiradi (**M13**, **M14**).
 
@@ -115,7 +117,7 @@ Android POS (asosiy va yagona ish quroli) — bir qo'l bilan, tez, offline-bardo
 
 **Kundalik**
 1. Smena boshida boshlang'ich naqd summani kiritib, smenani ochadi (**M01**).
-2. Mijozga tovar sotadi: skanerlash → chek → to'lov (naqd/karta/yagona QR (UzQR, bank)/Payme/Click/Uzum) *(2026-10-14: tekshiruv)* (**M01**).
+2. Mijozga tovar sotadi: skanerlash → chek → to'lov (naqd/karta/yagona QR (UzQR, bank)/Payme/Click/Uzum) (**M01**).
 3. Markirovkalangan tovar sotganda kod avtomatik tekshiriladi (online bo'lsa); xato chiqsa, belgilangan siyosatga ko'ra harakat qiladi (**M01**).
 4. Mijoz tovarni qaytarganda, asl chek bo'yicha qaytarish amalga oshiradi; limitdan oshsa Menejerdan tasdiq so'raydi (**M02**).
 5. Kichik chegirma (limit ichida) berishi mumkin; kattaroq chegirma uchun Menejer PIN kodi kerak (**M03**).
@@ -164,13 +166,13 @@ Android POS (mobil skanerlash uchun; ombor sharoitida qo'l terminal sifatida) va
 
 ### Maqsadlar
 - Savdo/ombor operatsiyalaridan to'g'ri buxgalteriya yozuvlarini olish, QQS va boshqa soliqlarni to'g'ri hisoblash.
-- 2026-yildan davlat tuzgan hisobotni ichki hisob bilan **5 kalendar kun** ichida solishtirish va farqni hal qilish *(2026-10-14: tuzatildi)*.
+- 2026-yildan davlat tuzgan hisobotni ichki hisob bilan **5 kalendar kun** ichida solishtirish va farqni hal qilish.
 
 ### Og'riqlar (manba bilan)
 - Yangi NSBU №21 (2024/2025) hisob rejasiga o'tish — eski 2002-yilgi reja 2025-01-01'dan amal qilmaydi, ko'p kichik biznes buni hali to'liq bilmaydi (`research_notes/texnik/01-erp-modullar-va-malumot-modeli.md`, 3.4-bo'lim).
 - E-faktura AI xavf-baholash tizimi (2026-01-01 dan to'liq) tufayli "qizil" (yuqori xavfli) faktura bo'lsa, QQS krediti sotuvchi/xaridor to'lagandan keyin kreditlanadi — bu naqd pul oqimiga ta'sir qiladi va tezkor kuzatuvni talab qiladi (`research_notes/texnik/03-efaktura-va-tolov.md`, 1.2-bo'lim).
-- 2026-yildan davlat QQS va boshqa hisobotlarni **o'zi tuzadi**, korxonaga faqat **5 kalendar kun** tekshirish/tuzatish vaqti beriladi (Soliq kodeksi 81-moddasi, O'RQ-1108) *(2026-10-14: tuzatildi)* — bu avvalgi "deklaratsiya yozish" ishini "solishtirish va tezkor javob berish" ishiga aylantiradi, rasmiy API yo'qligi sababli bu jarayon hozircha qo'lda/yarim-avtomatik (`research_notes/texnik/00-xulosa-va-ochiq-savollar.md`, 5-band va 86-qator).
-- Mavjud tizimlarda buxgalteriya hisob rejasi savdo modulidan butunlay alohida bo'lishi odatiy muammo — ikki tizim orasida ma'lumot ko'chirish odatda qo'lda/Excel orqali bo'ladi (`research_notes/texnik/01-erp-modullar-va-malumot-modeli.md`, 4-band) *(2026-10-14: neytral ifodalandi — koordinator direktivasi)*.
+- 2026-yildan davlat QQS va boshqa hisobotlarni **o'zi tuzadi**, korxonaga faqat **5 kalendar kun** tekshirish/tuzatish vaqti beriladi (Soliq kodeksi 81-moddasi, O'RQ-1108) — bu avvalgi "deklaratsiya yozish" ishini "solishtirish va tezkor javob berish" ishiga aylantiradi, rasmiy API yo'qligi sababli bu jarayon hozircha qo'lda/yarim-avtomatik (`research_notes/texnik/00-xulosa-va-ochiq-savollar.md`, 5-band va 86-qator).
+- Mavjud tizimlarda buxgalteriya hisob rejasi savdo modulidan butunlay alohida bo'lishi odatiy muammo — ikki tizim orasida ma'lumot ko'chirish odatda qo'lda/Excel orqali bo'ladi (`research_notes/texnik/01-erp-modullar-va-malumot-modeli.md`, 4-band).
 
 ### Qurilma
 Back-office PWA (yagona ish muhiti).
@@ -188,7 +190,7 @@ Back-office PWA (yagona ish muhiti).
 
 **Oylik**
 1. Oy yakunida moliyaviy hisobotlarni (foyda-zarar, balans) shakllantiradi (**M11**, **M12**).
-2. Davlat qo'mitasi tuzgan QQS/aylanma/boshqa hisobotni my.soliq.uz'dan olib, ichki hisob bilan solishtiradi; farq topilsa **5 kalendar kun** ichida tekshirib, kerak bo'lsa tuzatish kiritadi, Egasiga yakuniy natijani tasdiqlash uchun yuboradi (**M10**). Agar 5 kalendar kun ichida javob berilmasa, hisobot davlat shakllantirgan ko'rinishda topshirilgan hisoblanadi (Soliq kodeksi 81-moddasi, O'RQ-1108 — [lex.uz/docs/-7944527](https://lex.uz/docs/-7944527)) *(2026-10-14: tuzatildi)* — shu sababli tizim muddat tugashidan oldin (1-/3-/4-kunlarda) Buxgalter va Egasiga ogohlantirish yuborishi kerak.
+2. Davlat qo'mitasi tuzgan QQS/aylanma/boshqa hisobotni my.soliq.uz'dan olib, ichki hisob bilan solishtiradi; farq topilsa **5 kalendar kun** ichida tekshirib, kerak bo'lsa tuzatish kiritadi, Egasiga yakuniy natijani tasdiqlash uchun yuboradi (**M10**). Agar 5 kalendar kun ichida javob berilmasa, hisobot davlat shakllantirgan ko'rinishda topshirilgan hisoblanadi (Soliq kodeksi 81-moddasi, O'RQ-1108 — [lex.uz/docs/-7944527](https://lex.uz/docs/-7944527)) — shu sababli tizim muddat tugashidan oldin (1-/3-/4-kunlarda) Buxgalter va Egasiga ogohlantirish yuborishi kerak.
 3. Inventarizatsiya natijasini (**M05**, ko'rish) buxgalteriya yozuviga aks ettiradi (**M11**, yaratish).
 
 ---
@@ -220,24 +222,22 @@ Belgilar: **K** = ko'rish, **Y** = yaratish, **T** = tasdiqlash. "–" = huquq y
 
 *Izoh: jadvaldagi aniq huquq taqsimoti (masalan, Kassir M08'ga Y huquqiga ega) bozor/texnik tadqiqotda tayyor matritsa sifatida topilmagan — bu hujjat ERP ma'lumotlar modeli namunasi (`01-erp-modullar-va-malumot-modeli.md`) va modul funksiyalari (`08-mahsulot-modullari.md`) asosida, odatiy chakana savdo amaliyotidan kelib chiqib **loyihalashtirilgan**; MVP oldidan Egasi/arxitektor bilan tasdiqlanishi tavsiya etiladi (pastda, ochiq savol 1).*
 
-*(2026-10-15: asoschi qarori)* **Egasi ustuni — barcha tenant ruxsatlarining supersetiga ega** (`platform.admin`dan tashqari — bu platforma admini uchun, tenant rollariga kirmaydi), limitlar cheksiz: avvalgi versiyada Egasida `sales.create`, `shift.open/close`, `returns.create`, `stock.count.create`, `transfer.*`, `purchases.*`, `cash.count.shift`, `accounting.*` kabi `Y`/yaratish huquqlari yo'q edi — 1–3 xodimli do'konda Egasi ko'pincha o'zi kassada/omborda ishlagani uchun bu amaliy emas edi (`spec/tarix/tekshiruv/qabul-7-ekran-api.md`, X-02; `spec/kod-uchun/01-qarorlar.md`, Founder ko'rib chiqishi #1). Yuqoridagi jadval shu standart bo'yicha yangilandi — tasdiqlandi ("Hamma narsani egasi boshqaradi", `spec/tarix/tekshiruv/asoschi-qarorlari-2026-10-15.md`, Q1).
+*(qaror #28)* **Egasi ustuni — barcha tenant ruxsatlarining supersetiga ega** (`platform.admin`dan tashqari — bu platforma admini uchun, tenant rollariga kirmaydi), limitlar cheksiz: sotuv, smena, qaytarish, buxgalteriya, sozlamalar ham kiradi.
 
-*Standart limitlar (2026-10-15: foydalanuvchi qarori)*: M03 (chegirma) — Kassir PIN'siz **5% gacha**; M02 (qaytarish) — chek bilan PIN'siz **100 000 so'mgacha** (chek yo'q bo'lsa har doim PIN); M16 (kassa pul harakati) — "Pul olish" PIN'siz **50 000 so'mgacha**; chekni bekor qilish (void) Kassirga limitsiz, audit bilan. Bu raqamlar **standart** qiymat — Egasi M13 (Huquqlar) orqali istalgan paytda o'zgartirishi mumkin (`03-modullar-talablari.md`, US-M02-02/US-M03-01/US-M16-01; `spec/tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #1).
+*Standart limitlar (qaror #23):* M03 (chegirma) — Kassir PIN'siz **5% gacha**; M02 (qaytarish) — chek bilan PIN'siz **100 000 so'mgacha** (chek yo'q bo'lsa har doim PIN); M16 (kassa pul harakati) — "Pul olish" PIN'siz **50 000 so'mgacha**; chekni bekor qilish (void) Kassirga limitsiz, audit bilan. Bu raqamlar **standart** qiymat — Egasi M13 (Huquqlar) orqali istalgan paytda o'zgartirishi mumkin (`03-modullar-talablari.md`, US-M02-02/US-M03-01/US-M16-01).
 
-*M15–M18 izohi (2026-10-14): Kassir xarajatni faqat M16 "Pul olish → Xarajat to'lovi" orqali yozadi (M15'ga avtomatik tushadi); M17 `billing.manage` faqat Egasi; platforma admini (ADM-01, `platform.admin`) tenant rollariga kirmaydi — `15-xavfsizlik-va-audit.md` §3.4.*
+*M15–M18 izohi:* Kassir xarajatni faqat M16 "Pul olish → Xarajat to'lovi" orqali yozadi (M15'ga avtomatik tushadi); M17 `billing.manage` faqat Egasi; platforma admini (ADM-01, `platform.admin`) tenant rollariga kirmaydi — `15-xavfsizlik-va-audit.md` §3.4.
 
-*M13 izohi (2026-10-15: foydalanuvchi qarori): M13 endi faqat rol/huquq emas — Egasi uchun to'liq foydalanuvchi boshqaruvi (xodim qo'shish, bloklash, parol/PIN tiklash, faol sessiya/qurilmalarni ko'rish va bekor qilish — US-M13-04…07) ham shu modulga kiradi; platforma admini (ADM-01) faqat tenant Egasi (owner) hisobi darajasida shu funksiyalarga ega (US-M13-08). Autentifikatsiya — o'z OAuth 2.0 implementatsiyasi, mock yo'q (`spec/kod-uchun/14-autentifikatsiya-oauth2.md`).*
+*M13 izohi (qaror #14):* M13 endi faqat rol/huquq emas — Egasi uchun to'liq foydalanuvchi boshqaruvi (xodim qo'shish, bloklash, parol/PIN tiklash, faol sessiya/qurilmalarni ko'rish va bekor qilish — US-M13-04…07) ham shu modulga kiradi; platforma admini (ADM-01) faqat tenant Egasi (owner) hisobi darajasida shu funksiyalarga ega (US-M13-08). Autentifikatsiya — o'z OAuth 2.0 implementatsiyasi, mock yo'q (`14-autentifikatsiya-oauth2.md`).
 
 ---
 
 ## Ochiq savollar
 
-1. Huquqlar matritsasidagi aniq taqsimot (6-bo'lim) tadqiqot fayllarida tayyor jadval sifatida topilmadi — bu hujjatda loyihalashtirilgan taxmin; MVP ishlab chiqishdan oldin foydalanuvchi bilan tasdiqlanishi kerak.
-2. *(2026-10-15: hal qilindi — foydalanuvchi qarori)* ~~Chegirma/qaytarish/nasiya uchun aniq summa limitlari~~ — endi standart qiymatlar bor (6-bo'lim yangi izoh: chegirma 5%, qaytarish 100 000, pul olish 50 000), Egasi tomonidan o'zgartiriladi.
-3. *(2026-10-15: hal qilindi — foydalanuvchi qarori)* Markirovkalangan tovar offline sotilganda kassir nima qilishi kerak — endi aniq: narx qurilmada ma'lum bo'lsa sotuvga ruxsat (CRPT tekshiruvi internet qaytganda), narx noma'lum bo'lsa taqiq (`03-modullar-talablari.md`, US-M01-03). Qaytarish/ko'chirish uchun siyosat hali ochiq.
-4. Kichik do'konda bir necha rol birlashuvi uchun aniq segment chegaralari (1-3 xodim, 4+ xodim) — bu hujjatdagi 0-bo'limdagi guruhlash taxminiy, tadqiqotda raqam bilan tasdiqlanmagan.
-5. Buxgalterning **5 kalendar kunlik** davlat hisobotini solishtirish jarayonida aniq ish oqimi (kim birinchi ko'radi, qanday eskalatsiya) — `02-arxitektura` jamoasi bilan birga ishlab chiqilishi kerak *(2026-10-14: "5 ish kuni" → "5 kalendar kun" tuzatildi, muddatning o'zi va huquqiy asosi endi aniq)*.
-6. Omborchi tovar qabul qilganda, yetkazib beruvchi vakilining ishonchnomasini 2026-01-01 dan majburiy Vakolat.uz orqali tekshirish kerakmi — `research_notes/texnik/09-soliq-integratsiyasi.md` (E-ishonchnoma bandi) bu talabni qayd etadi, lekin API hujjati topilmagan va bu jarayonning M07 moduliga aniq qanday integratsiya qilinishi ochiq.
+- **1.** Huquqlar matritsasidagi aniq taqsimot (6-bo'lim) tadqiqot fayllarida tayyor jadval sifatida topilmadi — bu hujjatda loyihalashtirilgan taxmin; MVP ishlab chiqishdan oldin foydalanuvchi bilan tasdiqlanishi kerak.
+- **4.** Kichik do'konda bir necha rol birlashuvi uchun aniq segment chegaralari (1-3 xodim, 4+ xodim) — bu hujjatdagi 0-bo'limdagi guruhlash taxminiy, tadqiqotda raqam bilan tasdiqlanmagan.
+- **5.** Buxgalterning **5 kalendar kunlik** davlat hisobotini solishtirish jarayonida aniq ish oqimi (kim birinchi ko'radi, qanday eskalatsiya) — arxitektura jamoasi bilan birga ishlab chiqilishi kerak.
+- **6.** Omborchi tovar qabul qilganda, yetkazib beruvchi vakilining ishonchnomasini 2026-01-01 dan majburiy Vakolat.uz orqali tekshirish kerakmi — `research_notes/texnik/09-soliq-integratsiyasi.md` (E-ishonchnoma bandi) bu talabni qayd etadi, lekin API hujjati topilmagan va bu jarayonning M07 moduliga aniq qanday integratsiya qilinishi ochiq.
 
 ## Manbalar
 
@@ -250,5 +250,5 @@ Belgilar: **K** = ko'rish, **Y** = yaratish, **T** = tasdiqlash. "–" = huquq y
 - `research_notes/texnik/11-raqobatchilar-kamchiliklari.md`
 - `research_notes/AI ERP startap Ozbekistonda/04_sohalar.md`
 - `research_notes/texnik/tekshiruv-2026-10-14/` — 2026-10-14 fakt-tekshiruv natijalari
-- `spec/kod-uchun/14-autentifikatsiya-oauth2.md` — autentifikatsiya arxitekturasi — Foydalanuvchi qarori, 2026-10-15
-- `spec/tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md` — 2026-10-15, tavsiya #1 (standart rol limitlari)
+- `spec/kod-uchun/14-autentifikatsiya-oauth2.md` — autentifikatsiya arxitekturasi (qaror #14)
+- `spec/tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md` — tavsiya #1 (standart rol limitlari, qaror #23)

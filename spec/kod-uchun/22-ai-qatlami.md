@@ -1,6 +1,9 @@
 # AI qatlami
 
-*2026-10-14 · Asos: `spec/kod-uchun/09-ai-funksiyalar.md` (AI-01…AI-11, provayder qarori), `05-mvp-chegarasi.md` (tariflar, AI MoSCoW), `kod-uchun/10-umumiy-arxitektura.md`, `11-malumotlar-modeli.md` (`ai_requests`, `ai_feedback`, `tenant_glossary`), `research_notes/texnik/05-ozbek-tilidagi-ai.md`, va `E:/Project/universal_ai_platform/src/backend/aios` (qayta ishlatiladigan Python kod, faqat o'qish uchun o'rganildi).*
+**Maqsad:** AI qatlamining port/adapter arxitekturasi, model routing, "kod hisoblaydi — AI tushuntiradi" majburlash mexanizmi, budjet/baholash siyosati.
+**Kim uchun:** Backend ishlab chiquvchi, AI/prompt muhandisi.
+**Bog'liq fayllar:** `09-ai-funksiyalar.md`, `05-mvp-chegarasi.md`, `10-umumiy-arxitektura.md`, `11-malumotlar-modeli.md`, `23-backend-arxitekturasi.md`.
+**Holat:** joriy, 2026-10-15.
 
 ## Asosiy xulosalar
 
@@ -8,7 +11,7 @@
 2. **Model routing**: oddiy tushuntirish/matn (AI-01 standart, AI-06) — **Claude Haiku 5.5** ($0,10–0,50 kirish / $0,50–2,50 chiqish, 1M tok); murakkab ko'p hujjatli tahlil (AI-05, AI-01'ning ko'p-modulli holati) — **Claude Sonnet 5.5** ($2/$10, Sonnet 5 bilan bir xil narx) — narxlar `research_notes/texnik/05-ozbek-tilidagi-ai.md` 2.2-bo'limidan, claude.com/pricing (2026-10-14 holati).
 3. **"Kod hisoblaydi, AI tushuntiradi" kod darajasida majburlanadi**, prompt qoidasi bilan emas: AI-01 faqat oldindan ro'yxatlangan (whitelisted) o'qish-uchun-tool'larni chaqiradi (hech qachon erkin SQL yozmaydi), tool natijasi kod tomonidan SQL orqali hisoblanadi; javob matni chiqqandan keyin **raqamli nazorat (numeric guard)** har bir raqamni tool natijasi bilan solishtiradi — `universal_ai_platform`dagi `narration_guard.py`ning moslashtirilgan versiyasi.
 4. **universal_ai_platform'dan ko'chiriladi**: port naqshi (`claude_port.py`/`text_completion_port.py` → `AiProvider`), CLI adapterining himoyalari (timeout, retry+backoff, circuit breaker — `cli_claude.py`), token/xarajat hisob-kitob modeli (`usage.py`), DI'dagi rejim almashtirish naqshi (`di_builders.py`), readiness tekshiruvi naqshi (`health_service.py`). Transport ERP'da **API kalit** orqali bo'ladi (CLI faqat dev/demo), lekin bu qatlamlarning tuzilishi saqlanadi.
-5. **Xarajat — tarif narxining kichik ulushi** *(2026-10-15: foydalanuvchi qarori — yagona 99 000 so'm/oy tarifga nisbatan qayta hisoblandi)*: taxminiy hisob-kitobga ko'ra (13-bo'lim) yengil tenant uchun ~700–800 so'm/oy (~0,7%), og'ir tenant uchun ~15–16 ming so'm/oy (~15,7%) — yagona tarif narxining (99 000 so'm) ~0,7–15,7%i oralig'ida, foydalanish darajasiga qarab; aniq raqam pilotda tasdiqlanishi shart (barcha hajm/token taxminlari **taxmin**, manbada yo'q).
+5. **Xarajat — tarif narxining kichik ulushi** (yagona 99 000 so'm/oy tarifga nisbatan): taxminiy hisob-kitobga ko'ra (13-bo'lim) yengil tenant uchun ~700–800 so'm/oy (~0,7%), og'ir tenant uchun ~15–16 ming so'm/oy (~15,7%) — yagona tarif narxining (99 000 so'm) ~0,7–15,7%i oralig'ida, foydalanish darajasiga qarab; aniq raqam pilotda tasdiqlanishi shart (barcha hajm/token taxminlari **taxmin**, manbada yo'q).
 6. **Maxfiylik**: biometrik/genetik/telekom ma'lumotdan tashqari hamma narsa (mijoz ismi, tranzaksiya matni) xavfsizlik talablariga rioya qilgan holda chet el API'ga (Claude) yuborilishi mumkin (`research_notes/texnik/05-ozbek-tilidagi-ai.md`, 1.3-bo'lim); shunga qaramay, minimal ma'lumot yuborish, PII mask qilish imkoniyati va **o'qitish uchun mijoz ma'lumotidan aniq rozilik (consent) siz foydalanilmasligi** majburiy qoida sifatida belgilanadi.
 7. **Baholash o'zbek tili uchun rasmiy benchmark yo'qligi sababli to'liq ichki**: har funksiya uchun 50–100 taxminiy holatli eval to'plam (lotin/kirill/rus aralash), CI'da regression gate, pilot davrida haqiqiy o'lchov — bu hujjatning markaziy yangiligi, chunki `09-ai-funksiyalar.md`da faqat "pilot kerak" deyilgan, usul ko'rsatilmagan.
 8. **Tenant oylik token budjeti tarifga bog'liq** (`plans.limits.ai_monthly_tokens`, `11-malumotlar-modeli.md` 2-bo'lim); limit tugaganda yoki Claude API ishlamaganda **faqat AI funksiyalari o'chadi, kassa/hisob to'liq ishlayveradi** — bu qoida `10-umumiy-arxitektura.md`dan meros.
@@ -17,14 +20,14 @@
 
 ## 1. `AiProvider` interfeysi
 
-Butun tizim AI bilan **bitta** portga murojaat qiladi — `AiProvider` (Python `Protocol`, `aios`dagi `ClaudePort`/`TextCompletionPort` naqshiga asoslangan, lekin ERP ehtiyojiga moslashtirilgan: raqamli tushuntirish, tuzilgan chiqish, vision). To'rt metod: *(2026-10-14: tekshiruv — `submit_batch` qo'shildi)*
+Butun tizim AI bilan **bitta** portga murojaat qiladi — `AiProvider` (Python `Protocol`, `aios`dagi `ClaudePort`/`TextCompletionPort` naqshiga asoslangan, lekin ERP ehtiyojiga moslashtirilgan: raqamli tushuntirish, tuzilgan chiqish, vision). To'rt metod:
 
 | Metod | Imzo (konseptual) | Vazifa | Kim chaqiradi |
 |---|---|---|---|
 | `complete` | `complete(system, user, *, model=None, stream=False) -> str \| AsyncIterator[str]` | Erkin matn generatsiyasi (tushuntirish, eslatma matni); `stream=True` — AI-01 chat UI uchun token-oqim | AI-01, AI-06 |
 | `complete_structured` | `complete_structured(system, user, schema: BaseModel, *, model=None) -> BaseModel` | Tuzilgan JSON chiqish (Anthropic "structured outputs"/tool-use orqali) — javobni frontend to'g'ridan-to'g'ri render qiladi, erkin matnni parse qilish kerak emas | AI-05 (tafovut tushuntirish + manba hujjat ro'yxati), AI-01 (tool-chaqiruv formati) |
 | `vision_extract` | `vision_extract(image: bytes, schema: BaseModel, instructions, *, model=None) -> BaseModel` | Rasmdan tuzilgan maydon chiqarish, har maydon uchun ishonch (confidence) darajasi bilan | AI-03 (OCR) |
-| `submit_batch` | `submit_batch(items: list[AiBatchItem]) -> batch_id`; natija `get_batch_results(batch_id)` | Shoshilinch bo'lmagan so'rovlarni Batch API orqali (−50% narx); `FakeProvider`/`CliProvider`da oddiy `complete`ga tushadi | AI-05, AI-06 (MVP'dan keyin, ixtiyoriy) *(2026-10-14: tekshiruv)* |
+| `submit_batch` | `submit_batch(items: list[AiBatchItem]) -> batch_id`; natija `get_batch_results(batch_id)` | Shoshilinch bo'lmagan so'rovlarni Batch API orqali (−50% narx); `FakeProvider`/`CliProvider`da oddiy `complete`ga tushadi | AI-05, AI-06 (MVP'dan keyin, ixtiyoriy) |
 
 Qo'shimcha: har metod `AiRequestContext` (tenant_id, user_id, feature kodi `AI-01`…, til) qabul qiladi — bu `ai_requests` yozuviga va budjet/rate-limit tekshiruviga ishlatiladi (8-bo'lim). Xato holatlari bitta umumiy `AiProviderUnavailable` (yoki `aios`dagi `SourceUnavailable` naqshiga o'xshash) istisno orqali ko'tariladi — chaqiruvchi tomon (worker) buni "AI vaqtincha ishlamaydi" holatiga aylantiradi, foydalanuvchiga xato chiqmaydi, faqat AI javobi kutilmoqda/mavjud emas ko'rinadi.
 
@@ -111,13 +114,13 @@ Bu mexanizm AI-05 va AI-06 uchun ham xuddi shunday ishlaydi: ularda "tool natija
 - Joylashuv (tavsiya): `backend/ai/prompts/<feature_id>/v<N>/system.md` (masalan `backend/ai/prompts/ai01_qna/v3/system.md`), har versiyada o'zgarmas matn + o'zgaruvchi joylar uchun aniq belgilangan placeholder'lar (tenant nomi, tenant_glossary atamalari, joriy sana).
 - Har prompt versiyasi **eval suite'dan o'tgandan keyin** (10-bo'lim) productionga chiqadi — versiya raqami oshirilganda eski versiya kodda saqlanadi (A/B yoki tezkor rollback uchun), hech qachon joyida tahrirlanmaydi.
 - `tenant_glossary` (`11-malumotlar-modeli.md`, 10-bo'lim: "kola" → mahsulot kabi tenant-xos atamalar) promptning alohida, tez-tez o'zgaruvchi bo'lagi — prompt caching chegarasida **boshqa** segmentga joylashtiriladi (asosiy tizim prompti — statik, uzoq TTL keshlanadi; glossary — tenant-xos, qisqaroq keshlanadi) — xarajatni pasaytirish uchun (9-bo'lim).
-- `ai_requests.prompt_version` (`11-malumotlar-modeli.md` 10-bo'lim) — har javob qaysi prompt versiyasidan kelganini qayd etadi (format: `ai01_qna/v3`). *(2026-10-14: tekshiruv)*
+- `ai_requests.prompt_version` (`11-malumotlar-modeli.md` 10-bo'lim) — har javob qaysi prompt versiyasidan kelganini qayd etadi (format: `ai01_qna/v3`).
 
 ---
 
 ## 5. Tenant oylik token budjeti, rate limit, graceful degradation
 
-- Har tenant uchun oylik token limiti — `plans.limits.ai_monthly_tokens` (`11-malumotlar-modeli.md`, 2-bo'lim, allaqachon mavjud JSONB maydon). *(2026-10-15: foydalanuvchi qarori — yagona tarif, eski uch-bosqichli jadval bekor qilindi)* Endi **bitta tarif, bitta limit** — barcha tenant hamma AI funksiyasiga (AI-01/03/05/06) kirishi mumkin bo'lgani uchun, avvalgi eng yuqori ("Pro") darajadagi tenantlar ehtiyojini qoplaydigan, "biroz kengroq" qiymat tanlandi (§5, #11 qarori bilan izchil):
+- Har tenant uchun oylik token limiti — `plans.limits.ai_monthly_tokens` (`11-malumotlar-modeli.md`, 2-bo'lim, allaqachon mavjud JSONB maydon). **Bitta tarif, bitta limit** — barcha tenant hamma AI funksiyasiga (AI-01/03/05/06) kirishi mumkin bo'lgani uchun, eng yuqori ehtiyojni qoplaydigan, "biroz kengroq" qiymat tanlandi (§5, tavsiya #11 — overage yo'q, qattiq to'xtatish, qaror #23 bilan izchil):
 
 | Tarif | Taklif (token/oy, taxmin) |
 |---|---|
@@ -126,7 +129,7 @@ Bu mexanizm AI-05 va AI-06 uchun ham xuddi shunday ishlaydi: ularda "tool natija
 Aniq raqam — **taxmin**, 10-bo'limdagi xarajat hisob-kitobiga asoslangan va unit-iqtisod hisobi bilan tasdiqlanishi shart (`25-nofunksional-talablar.md` §11 bilan bir xil ruhda); pilotda tenantlarning ≥10%i limitga urilsa, qiymat oshiriladi va/yoki prepaid AI paket (`addons`) qo'shiladi (§5).
 
 - Hisoblash: har `ai_requests` yozuvidagi `input_tokens + output_tokens` joriy oy bo'yicha tenant kesimida yig'iladi (Redis'da tez sanoq — kunlik/oylik kalit, davr oxirida 0'ga tushadi, PostgreSQL `ai_requests`'dan tasdiqlanadi).
-- **Limit tugaganda — qattiq to'xtatish, overage yo'q** *(2026-10-15: foydalanuvchi qarori — `tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md` #11)*: AI so'rovlari **hard-stop** qilinadi — foydalanuvchiga "bu oy uchun AI limiti tugadi, keyingi oyda tiklanadi" ko'rsatiladi, kassa/ombor/buxgalteriya **to'liq ishlayveradi** (`10-umumiy-arxitektura.md`, Asosiy xulosa #8). Qo'shimcha avtomatik to'lov (overage) **yo'q** — mayda summalarni Click/Payme orqali yechish komissiya, support savollari va murakkablik keltiradi, AI xarajati esa tarifning atigi ~1,5–6%i (13-bo'lim). Yagona tarif modelida "tarifni oshirish" taklifi yo'q (bir xil tarif hammaga). **Oldindan to'lanadigan AI paket** — faqat **pilotdan keyin**, agar tenantlarning **≥10%i** oylik limitga urilsa, qo'shimcha xizmat (`addons` katalogi, `11-malumotlar-modeli.md` §2) sifatida qo'shiladi. Limit qiymatlari (5-bo'lim) shu sababli biroz kengroq qo'yiladi, oshirib yuborish ehtimolini kamaytirish uchun.
+- **Limit tugaganda — qattiq to'xtatish, overage yo'q**: AI so'rovlari **hard-stop** qilinadi — foydalanuvchiga "bu oy uchun AI limiti tugadi, keyingi oyda tiklanadi" ko'rsatiladi, kassa/ombor/buxgalteriya **to'liq ishlayveradi** (`10-umumiy-arxitektura.md`, Asosiy xulosa #8). Qo'shimcha avtomatik to'lov (overage) **yo'q** — mayda summalarni Click/Payme orqali yechish komissiya, support savollari va murakkablik keltiradi, AI xarajati esa tarifning atigi ~1,5–6%i (13-bo'lim). Yagona tarif modelida "tarifni oshirish" taklifi yo'q (bir xil tarif hammaga). **Oldindan to'lanadigan AI paket** — faqat **pilotdan keyin**, agar tenantlarning **≥10%i** oylik limitga urilsa, qo'shimcha xizmat (`addons` katalogi, `11-malumotlar-modeli.md` §2) sifatida qo'shiladi. Limit qiymatlari (5-bo'lim) shu sababli biroz kengroq qo'yiladi, oshirib yuborish ehtimolini kamaytirish uchun.
 - **Rate limit**: Redis asosidagi tenant-kesimidagi daqiqalik chegara (`aios`dagi `RedisRateLimiter` naqshiga mos) — bitta tenant barcha boshqalarning navbatini band qilib qo'ymasligi uchun (worker navbat orqali ishlaganidan tashqari qo'shimcha himoya).
 - **Graceful degradation** (Claude API ishlamay qolganda — timeout, 5xx, circuit breaker ochiq): worker `outbox_jobs` (`kind='ai'`) qayta urinadi (backoff bilan, `cli_claude.py`dagi retry naqshiga mos); bir necha urinishdan keyin ham muvaffaqiyatsiz bo'lsa — AI-01 so'rovi uchun foydalanuvchiga "AI hozir javob bera olmayapti, keyinroq urinib ko'ring" xabari, AI-05/AI-06 uchun ko'rsatma/eslatma **AI matnisiz, faqat kod raqami** bilan ko'rsatiladi (masalan AI-06: eslatma shabloni + summa, tayyor matn o'rniga). Bu holatlar `ai_requests.status='failed'` bilan loglanadi.
 
@@ -134,11 +137,11 @@ Aniq raqam — **taxmin**, 10-bo'limdagi xarajat hisob-kitobiga asoslangan va un
 
 ## 6. Xarajat hisobi (`ai_requests`, USD→UZS)
 
-Har AI chaqiruvi (`usage.py`dagi `AiCallUsage` naqshiga mos) quyidagicha `ai_requests`ga yoziladi (maydonlar `11-malumotlar-modeli.md` 10-bo'limda: `tenant_id, user_id, feature, model, prompt_version, input_tokens, output_tokens, cache_read_tokens, cost_usd, fx_rate_used, cost_uzs, latency_ms, guard_result, status`): *(2026-10-14: tekshiruv)*
+Har AI chaqiruvi (`usage.py`dagi `AiCallUsage` naqshiga mos) quyidagicha `ai_requests`ga yoziladi (maydonlar `11-malumotlar-modeli.md` 10-bo'limda: `tenant_id, user_id, feature, model, prompt_version, input_tokens, output_tokens, cache_read_tokens, cost_usd, fx_rate_used, cost_uzs, latency_ms, guard_result, status`):
 
 1. Claude API javobi `usage.input_tokens`, `usage.output_tokens` (va kesh bo'lsa `cache_read_input_tokens`/`cache_creation_input_tokens`) qaytaradi.
 2. `cost_usd = (input_tokens × price_in + output_tokens × price_out) / 1_000_000` — narx jadvali model nomiga qarab (2-bo'lim narxlari), kesh o'qish ~0,1×, kesh yozish ~1,25× kirish narxida hisoblanadi (`usage.py`dagi `_CACHE_READ_MULT`/`_CACHE_WRITE_MULT` konstantalariga mos nisbat).
-3. So'mga ko'rsatish uchun: `cost_uzs = cost_usd × FX_USD_UZS` (`FX_USD_UZS = 12 500`, **taxmin**, sozlanadigan konfiguratsiya — real vaqtda kursi o'zgarishi mumkin). Yozuv vaqtidagi kurs `fx_rate_used`, natija `cost_uzs` ustunida saqlanadi (tarixiy aniqlik). *(2026-10-14: tekshiruv)*
+3. So'mga ko'rsatish uchun: `cost_uzs = cost_usd × FX_USD_UZS` (`FX_USD_UZS = 12 500`, **taxmin**, sozlanadigan konfiguratsiya — real vaqtda kursi o'zgarishi mumkin). Yozuv vaqtidagi kurs `fx_rate_used`, natija `cost_uzs` ustunida saqlanadi (tarixiy aniqlik).
 4. Bir foydalanuvchi so'rovida bir nechta AI chaqiruvi bo'lsa (masalan AI-01'ning tool-tanlash + yakuniy javob, ikki chaqiruv) — `usage.py`dagi `TurnUsage` naqshiga mos, bitta "turn" ichida yig'iladi, lekin **har chaqiruv** alohida `ai_requests` qatori sifatida ham saqlanishi mumkin (audit uchun to'liqlik) — aniq granularlik backend arxitekturasi bosqichida (`23-backend-arxitekturasi.md`) belgilanadi.
 5. Platform admin paneli va tenant hisobotida (M12 ichida yoki alohida AI-xarajat widget) oylik AI xarajati (USD va so'm) ko'rinadi — bu bir vaqtning o'zida budjet sarfini kuzatish vositasi (5-bo'lim).
 
@@ -170,7 +173,7 @@ O'zbek tili uchun rasmiy LLM/OCR benchmark yo'qligi (`09-ai-funksiyalar.md`, Aso
 | Funksiya | Asosiy metrika | Qo'shimcha |
 |---|---|---|
 | AI-01 | Raqamli nazorat o'tish darajasi (3-bo'lim) — **100% talab qilinadi** (nol tolerantlik) | Tool tanlash to'g'riligi (kutilgan tool chaqirilganmi); til aniqlanishi (savol tiliga javob berilganmi); uslub/tabiiylik (LLM-judge ball, 1–5, **taxmin metodologiya**) |
-| AI-03 | **Maydon bo'yicha ishga tushirish shartlari** *(2026-10-15: foydalanuvchi qarori — `tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md` #10)*: 100 ta O'zbekiston hujjatida (≈40% toza, 40% foto/skaner, 20% qo'lda yozilgan; lotin/kirill/rus) **summa ≥95%**, **sana ≥90%**, **miqdor va tovar nomi ≥80%** aniqlik; summa yoki sana 90%dan past bo'lsa — AI-03 pilotga chiqmaydi (yagona 90% chegara o'rniga maydon bo'yicha qattiqroq shart, chunki pul maydonidagi xato eng qimmat) | Past ishonchli maydon har doim sariq belgilanadi; ishonch kalibrlanishi — past-ishonch belgisi haqiqatan xato maydonlarga to'g'ri kelishi kerak |
+| AI-03 | **Maydon bo'yicha ishga tushirish shartlari**: 100 ta O'zbekiston hujjatida (≈40% toza, 40% foto/skaner, 20% qo'lda yozilgan; lotin/kirill/rus) **summa ≥95%**, **sana ≥90%**, **miqdor va tovar nomi ≥80%** aniqlik; summa yoki sana 90%dan past bo'lsa — AI-03 pilotga chiqmaydi (yagona 90% chegara o'rniga maydon bo'yicha qattiqroq shart, chunki pul maydonidagi xato eng qimmat) | Past ishonchli maydon har doim sariq belgilanadi; ishonch kalibrlanishi — past-ishonch belgisi haqiqatan xato maydonlarga to'g'ri kelishi kerak |
 | AI-05 | Raqamli nazorat o'tish darajasi — 100% | Tushuntirish aniqligi (manba hujjatga havola to'g'ri ko'rsatilganmi) |
 | AI-06 | Raqam generatsiya qilmaganligi (0 raqam AI tomonidan to'qilgan) | Ohang/tabiiylik (LLM-judge yoki qo'lda baholash) |
 
@@ -191,15 +194,15 @@ O'zbek tili uchun rasmiy LLM/OCR benchmark yo'qligi (`09-ai-funksiyalar.md`, Aso
 ## 9. Kelajakdagi fine-tuning uchun ma'lumot to'plash
 
 - **Opt-in, tenant darajasida** (`tenants.settings.ai_training_consent`, 7-bo'lim) — standart holatda **o'chiq**.
-- Rozilik berilgan tenantlar uchun: har `ai_feedback` yozuvi (ayniqsa foydalanuvchi tuzatgan javoblar — eng qiymatli signal) anonimlashtirish bosqichidan o'tadi (mijoz ismi/telefon/STIR kabi maydonlar olib tashlanadi yoki sintetik qiymat bilan almashtiriladi) va alohida saqlash joyiga (`ai_training_samples`, `11-malumotlar-modeli.md` 10-bo'lim) ko'chiriladi. *(2026-10-14: tekshiruv)*
+- Rozilik berilgan tenantlar uchun: har `ai_feedback` yozuvi (ayniqsa foydalanuvchi tuzatgan javoblar — eng qiymatli signal) anonimlashtirish bosqichidan o'tadi (mijoz ismi/telefon/STIR kabi maydonlar olib tashlanadi yoki sintetik qiymat bilan almashtiriladi) va alohida saqlash joyiga (`ai_training_samples`, `11-malumotlar-modeli.md` 10-bo'lim) ko'chiriladi.
 - Yig'ilgan namunalar davriy ravishda (masalan choraklik) ko'rib chiqiladi/tasdiqlanadi (inson nazorati) va faqat shundan keyin markaziy GPU serverdagi fine-tuning jarayoniga kiritiladi — bu bosqich `09-ai-funksiyalar.md` 5-bo'limidagi "Lokal modelni o'zimiz o'qitish — hozir yo'q, keyin ko'rib chiqiladi" qarori bilan mos.
 - Maqsad — tor vazifalar (masalan tovar nomini toifaga ajratish, eslatma matnining tenant ohangiga moslashuvi), umumiy suhbat qobiliyatini almashtirish emas.
 
 ---
 
-## 10. OCR quvuri (AI-03) *(2026-10-15: foydalanuvchi qarori — AI-03 MVP'da, bu quvur MVP sprintlarida quriladi)*
+## 10. OCR quvuri (AI-03) — MVP'da, bu quvur MVP bosqichlarida quriladi
 
-**Yagona yo'l (API unifikatsiyasi)** *(2026-10-15: qabul-6 — Q4/K2-01/A2-01)*: avvalgi tekshiruvda OCR ikki marta loyihalashtirilgan edi (13-2 `/purchase-ocr-drafts` natijasi va saqlash jadvali vs 13-3 `/ai/ocr/jobs`) — bu endi **bitta** jadval (`ai_ocr_jobs`) va **bitta** endpoint oilasi bilan birlashtirilgan: fayl avval `POST /api/v1/attachments` (`purpose=ocr_source`) orqali yuklanadi → `POST /api/v1/ai/ocr/jobs` (`attachment_id`, `doc_type_hint=purchase` — **faqat shu qiymat**, qaytarish uchun qog'oz chek faqat POS/sync orqali kiradi, `13-0` §9) → `GET /api/v1/ai/ocr/jobs/{job_id}` bilan poll (`status: processing→done→confirmed`/`failed`/`expired`) → `POST /api/v1/ai/ocr/jobs/{job_id}/confirm` — shu paytgina `goods_receipts` qoralamasi yaratiladi (ruxsat `ai.ocr.use` **va** `purchases.receive`). `purchase_ocr_drafts` nomi/jadvali endi **ishlatilmaydi**. Natija shakli pastdagi quvur bilan bir xil (sarlavha + `lines[]`, har maydon `value`/`confidence` 0..1, `low_confidence_fields` yo'l ro'yxati).
+**Yagona yo'l (API unifikatsiyasi)**: OCR **bitta** jadval (`ai_ocr_jobs`) va **bitta** endpoint oilasi bilan amalga oshiriladi: fayl avval `POST /api/v1/attachments` (`purpose=ocr_source`) orqali yuklanadi → `POST /api/v1/ai/ocr/jobs` (`attachment_id`, `doc_type_hint=purchase` — **faqat shu qiymat**, qaytarish uchun qog'oz chek faqat POS/sync orqali kiradi, `17-api-umumiy.md` §9) → `GET /api/v1/ai/ocr/jobs/{job_id}` bilan poll (`status: processing→done→confirmed`/`failed`/`expired`) → `POST /api/v1/ai/ocr/jobs/{job_id}/confirm` — shu paytgina `goods_receipts` qoralamasi yaratiladi (ruxsat `ai.ocr.use` **va** `purchases.receive`). Natija shakli pastdagi quvur bilan bir xil (sarlavha + `lines[]`, har maydon `value`/`confidence` 0..1, `low_confidence_fields` yo'l ro'yxati).
 
 ```mermaid
 flowchart TD
@@ -216,10 +219,10 @@ flowchart TD
 ```
 
 - **Qamrov eslatmasi** (`09-ai-funksiyalar.md`, AI-03): faqat (a) QQS to'lovchi bo'lmagan/norasmiy yetkazib beruvchining qog'oz yuk xati, (b) texnik uzilish davridagi qog'oz faktura, (c) qaytarish uchun qog'oz chek — standart QQS to'lovchilar o'rtasidagi e-faktura/e-TTN bu quvur orqali **emas**, EDO operatori import orqali kiradi.
-- **Ishonch chegarasi, maydon bo'yicha** *(2026-10-15: foydalanuvchi qarori — `tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md` #10)*: summa **≥95%**, sana **≥90%**, miqdor/tovar nomi **≥80%** — 100 ta O'zbekiston hujjatida (≈40% toza, 40% foto/skaner, 20% qo'lda yozilgan; lotin/kirill/rus aralash) o'lchanadi; summa yoki sana shu chegaradan past chiqsa, AI-03 pilotga **chiqmaydi**. Yagona 90% chegara o'rniga maydon bo'yicha differensial yondashuv — xalqaro amaliyotda ham maydon ishonchi avtomatik qabul/odam tekshiruviga yo'naltirish uchun ishlatiladi (F16, `tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md`), aniq raqamlar esa o'zbek hujjatlari uchun yangi benchmark — ishonch darajasi o'rta.
+- **Ishonch chegarasi, maydon bo'yicha**: summa **≥95%**, sana **≥90%**, miqdor/tovar nomi **≥80%** — 100 ta O'zbekiston hujjatida (≈40% toza, 40% foto/skaner, 20% qo'lda yozilgan; lotin/kirill/rus aralash) o'lchanadi; summa yoki sana shu chegaradan past chiqsa, AI-03 pilotga **chiqmaydi**. Yagona 90% chegara o'rniga maydon bo'yicha differensial yondashuv — xalqaro amaliyotda ham maydon ishonchi avtomatik qabul/odam tekshiruviga yo'naltirish uchun ishlatiladi (F16, `tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md`), aniq raqamlar esa o'zbek hujjatlari uchun yangi benchmark — ishonch darajasi o'rta.
 - AI hech qachon hujjatni avtomatik tasdiqlamaydi yoki davlat tizimiga (Didox/Faktura.uz, e-TTN) yubormaydi — faqat loyiha tayyorlaydi; yakuniy tasdiq va yuborish har doim odam (Buxgalter/Omborchi) tomonidan.
 - Vision chaqiruvi narxi — **taxmin** (2-bo'lim, Ochiq savol 1 bilan bir xil): rasmiy vision-narx sahifada yo'q, matn narxiga yaqin deb baholangan.
-- *(2026-10-15: foydalanuvchi qarori)* AI-03 — 2026-10-14'dagi tekshiruv bosqichida vaqtincha "MVP'dan keyin"ga surilgan edi; bu qaror foydalanuvchi tomonidan bekor qilindi, AI-03 MVP'da qoladi, shuning uchun bu quvur birinchi relizdan boshlab quriladi (13-bo'lim xarajat jadvalida ham hisobga olingan).
+- AI-03 MVP'da qoladi, bu quvur birinchi relizdan boshlab quriladi (13-bo'lim xarajat jadvalida ham hisobga olingan).
 
 ---
 
@@ -256,7 +259,7 @@ Qabul qilingan token/chaqiruv taxminlari va narxlar (2-bo'lim):
 | AI-05 | Sonnet 5.5 | 2 / 10 | 5000 + 600 |
 | AI-03 (OCR, vision — narx taxmin) | Sonnet 5.5 | 2 / 10 | 1800 + 400 |
 
-Oylik so'rovlar soni (taxmin) — *(2026-10-15: foydalanuvchi qarori — yagona tarifda barcha tenant barcha AI funksiyasiga (AI-01/03/05/06) kirishi mumkin, shuning uchun daraja endi tarifga emas, tenantning haqiqiy faolligiga bog'liq)*:
+Oylik so'rovlar soni (taxmin) — yagona tarifda barcha tenant barcha AI funksiyasiga (AI-01/03/05/06) kirishi mumkin, shuning uchun daraja tarifga emas, tenantning haqiqiy faolligiga bog'liq:
 
 | Daraja (foydalanish darajasi, tarif emas) | AI-01/oy | AI-06/oy | AI-05/oy | AI-03/oy |
 |---|---|---|---|---|
@@ -272,7 +275,7 @@ Oylik so'rovlar soni (taxmin) — *(2026-10-15: foydalanuvchi qarori — yagona 
 | O'rta | $0,220 | $0,012 | $0,064 | $0,114 | **$0,410** | **~5 130 so'm** |
 | Og'ir | $0,660 | $0,047 | $0,160 | $0,380 | **$1,247** | **~15 580 so'm** |
 
-- Taqqoslash *(2026-10-15: foydalanuvchi qarori — yagona 99 000 so'm/oy tarifga nisbatan qayta hisoblandi)*: yengil/o'rta/og'ir foydalanish yagona tarif narxining mos ravishda **~0,7% / ~5,2% / ~15,7%**ini tashkil qiladi — `25-nofunksional-talablar.md` §11dagi jami xarajat jadvalida AI komponenti ~2 000–5 000 so'm sifatida kiritilgan (o'rta foydalanish darajasiga yaqin).
+- Taqqoslash (yagona 99 000 so'm/oy tarifga nisbatan): yengil/o'rta/og'ir foydalanish yagona tarif narxining mos ravishda **~0,7% / ~5,2% / ~15,7%**ini tashkil qiladi — `25-nofunksional-talablar.md` §11dagi jami xarajat jadvalida AI komponenti ~2 000–5 000 so'm sifatida kiritilgan (o'rta foydalanish darajasiga yaqin).
 - **Qo'shimcha tejash (jadvalga kiritilmagan)**: AI-05 va AI-06 real-vaqt talab qilmaydi (hisobot tayyor bo'lgandan keyin yoki rejalashtirilgan eslatma sifatida generatsiya qilinadi) — Batch API orqali −50% qo'llanilsa, bu ikki funksiya xarajati yarmiga tushadi; prompt caching (tizim prompti + tenant glossary takroriy qismi) AI-01'ning kirish narxini yanada kamaytiradi (kesh o'qish ~0,1× narxda, `usage.py` naqshi).
 - **Taxmin ekanligi ta'kidi**: yuqoridagi barcha so'rovlar soni va token/chaqiruv raqamlari hech qanday manbada tasdiqlanmagan — bular MVP pilotida haqiqiy `ai_requests` ma'lumoti bilan almashtirilishi SHART (shu jadvalning o'zi — unit-iqtisod hisobini tasdiqlash vazifasining bir qismi, `05-mvp-chegarasi.md`, 3.3-bo'lim shartiga mos).
 
@@ -284,7 +287,7 @@ Oylik so'rovlar soni (taxmin) — *(2026-10-15: foydalanuvchi qarori — yagona 
 2. Oylik AI token budjeti qiymatlari (5-bo'lim jadvali) — taxmin, unit-iqtisod hisobi va pilot ma'lumoti bilan tasdiqlanishi shart.
 3. Limit tugagandan keyin "overage" (qo'shimcha to'lov bilan limitni oshirish) imkoniyati kerakmi — hal qilinmagan (5-bo'lim).
 4. LLM-judge uslub/tabiiylik bahosi uchun metodologiya (qaysi model, qaysi mezon) — aniqlashtirilmagan, pilotgacha ochiq (8.2-bo'lim).
-5. `ai_training_samples` uchun saqlash muddati va anonimlashtirish darajasi (sxema 01'da bor) — aniqlanmagan (9-bo'lim). *(2026-10-14: tekshiruv)*
+5. `ai_training_samples` uchun saqlash muddati va anonimlashtirish darajasi (sxema 01'da bor) — aniqlanmagan (9-bo'lim).
 6. Raqamli nazorat (numeric guard) ikki marta muvaffaqiyatsiz bo'lgan holatlarning tenant-ko'rinadigan chastotasi qanday bo'lishi — agar tez-tez bo'lsa, bu prompt/tool dizayni muammosini bildiradi; pilotda kuzatilishi kerak (3.2-bo'lim).
 
 ## Manbalar
@@ -300,4 +303,3 @@ Oylik so'rovlar soni (taxmin) — *(2026-10-15: foydalanuvchi qarori — yagona 
 - `E:/Project/universal_ai_platform/src/backend/aios/application/companion/narration_guard.py` — deterministik raqamli nazorat naqshi.
 - `E:/Project/universal_ai_platform/src/backend/aios/interface/di_builders.py` — rejim almashtirish naqshi (DI).
 - `E:/Project/universal_ai_platform/src/backend/aios/infrastructure/observability/health_service.py` — gating vs reported readiness naqshi.
-- Foydalanuvchi qarori, 2026-10-15 — AI-03 (OCR) MVP'ga qaytarildi.

@@ -1,37 +1,40 @@
 # Xavfsizlik va audit
 
-*2026-10-14 · Asos: `spec/kod-uchun/10-umumiy-arxitektura.md`, `11-malumotlar-modeli.md` (tenants, memberships, roles, role_permissions, audit_log, devices, platform_admins), `24-frontend-arxitekturasi.md` (HttpOnly cookie, CSRF, Idempotency-Key), `spec/kod-uchun/02-rollar-va-ssenariylar.md` (huquqlar matritsasi), `03-modullar-talablari.md` (M13, M17, M18), `06-ekranlar-umumiy.md`, `research_notes/texnik/07-hosting-lokalizatsiya-xavfsizlik.md`, `research_notes/texnik/04-arxitektura-va-stack.md`, `research_notes/texnik/tekshiruv-2026-10-14/2-efaktura-tolov-hosting.md`.*
+**Maqsad:** Huquqlar katalogi, PostgreSQL Row-Level Security (RLS) mexanizmi, sirlar/kalitlar boshqaruvi, PII/AI ma'lumot minimizatsiyasi, audit jurnali, backup, xavfsizlik bazaviy darajasi va muvofiqlik (compliance) talablarini belgilash.
+**Kim uchun:** Backend ishlab chiquvchilar, DevOps, huquqiy maslahatchi (ochiq savollar bo'yicha).
+**Bog'liq fayllar:** `10-umumiy-arxitektura.md`, `11-malumotlar-modeli.md` (tenants, memberships, roles, role_permissions, audit_log, devices, platform_admins), `14-autentifikatsiya-oauth2.md`, `24-frontend-arxitekturasi.md` (HttpOnly cookie, CSRF, Idempotency-Key), `02-rollar-va-ssenariylar.md` (huquqlar matritsasi), `03-modullar-talablari.md` (M13, M17, M18), `06-ekranlar-umumiy.md`, `research_notes/texnik/07-hosting-lokalizatsiya-xavfsizlik.md`, `research_notes/texnik/04-arxitektura-va-stack.md`, `research_notes/texnik/tekshiruv-2026-10-14/2-efaktura-tolov-hosting.md`.
+**Holat:** joriy, 2026-10-15.
 
 ## Asosiy xulosalar
 
-1. **Autentifikatsiya — o'z OAuth 2.0 implementatsiyamiz** (foydalanuvchi qarori, 2026-10-15): backend ham Authorization Server, ham Resource Server; to'liq protokol, saqlash, rotatsiya, bekor qilish tafsiloti **`14-autentifikatsiya-oauth2.md`da** — bu bo'lim endi faqat xulosa va havola. Veb (back-office+veb-kassa) — BFF naqshi, token brauzerga chiqmaydi, **HttpOnly cookie + CSRF token** (3-bo'lim, o'zgarmaydi) OAuth sessiyasini bildiradi; Android — public OAuth mijoz, to'g'ridan-to'g'ri Bearer access token; kassir **PIN — OAuth grant emas**, mahalliy tezkor almashish/tasdiqlash vositasi (`14-autentifikatsiya-oauth2.md` §4.3). *(2026-10-15: foydalanuvchi qarori)*
+1. **Autentifikatsiya — o'z OAuth 2.0 implementatsiyamiz**: backend ham Authorization Server, ham Resource Server; to'liq protokol, saqlash, rotatsiya, bekor qilish tafsiloti **`14-autentifikatsiya-oauth2.md`da** — bu bo'lim faqat xulosa va havola. Veb (back-office+veb-kassa) — BFF naqshi, token brauzerga chiqmaydi, **HttpOnly cookie + CSRF token** (3-bo'lim) OAuth sessiyasini bildiradi; Android — public OAuth mijoz, to'g'ridan-to'g'ri Bearer access token; kassir **PIN — OAuth grant emas**, mahalliy tezkor almashish/tasdiqlash vositasi (`14-autentifikatsiya-oauth2.md` §4.3).
 2. **Huquqlar — kod darajasidagi ruxsat (`permission_code`) + ixtiyoriy limit** (`role_permissions.limit_value`, `11-malumotlar-modeli.md`), 5 standart rol (Egasi, Menejer, Kassir, Omborchi, Buxgalter) uchun standart matritsa `02-rollar-va-ssenariylar.md` (6-bo'lim, K/Y/T) bilan izchil loyihalashtirilgan; aniq limit summalari **tadqiqotda yo'q — taxmin**, MVP oldidan biznes-qoida sifatida sozlanadi.
-3. **PostgreSQL Row-Level Security (RLS) — tenant izolyatsiyasining asosiy (DB darajasidagi) mexanizmi**; ilova filtri (SQLAlchemy `with_loader_criteria`) — ikkinchi qatlam (`23-backend-arxitekturasi.md`, 4-xulosa). Har tranzaksiya `tenant_transaction(session, tenant_id)` helper orqali ochiladi, ichida `SELECT set_config('app.tenant_id', :tid, true)` bajariladi, har jadvalda siyosat; CI'da **har jadvalda RLS yoqilganini tekshiruvchi test** majburiy (`04-arxitektura-va-stack.md`, 1-bo'lim). *(2026-10-14: tekshiruv)*
+3. **PostgreSQL Row-Level Security (RLS) — tenant izolyatsiyasining asosiy (DB darajasidagi) mexanizmi**; ilova filtri (SQLAlchemy `with_loader_criteria`) — ikkinchi qatlam (`23-backend-arxitekturasi.md`, 4-xulosa). Har tranzaksiya `tenant_transaction(session, tenant_id)` helper orqali ochiladi, ichida `SELECT set_config('app.tenant_id', :tid, true)` bajariladi, har jadvalda siyosat; CI'da **har jadvalda RLS yoqilganini tekshiruvchi test** majburiy (`04-arxitektura-va-stack.md`, 1-bo'lim).
 4. **Platform admin** (`platform_admins`) tenant RLS'ini **chetlab o'tadi**, lekin har bir kirish `audit_log`ga majburiy yoziladi (`11-malumotlar-modeli.md`, 2-bo'lim) — bu yagona qonuniy "bypass" yo'li.
-5. **AI'ga (Claude API) yuboriladigan ma'lumot cheklanadi**: biometrik/genetik/telekom ma'lumot umuman yo'q va yuborilmaydi; mijoz ismi/telefon/tranzaksiya kabi oddiy shaxsiy ma'lumotni chet el API'ga yuborish **qonunan mumkin** (ZRU-547, 27-1-modda — faqat 3 toifa lokalizatsiya qilinadi), lekin minimallashtirish siyosati bilan (`research_notes/texnik/05-ozbek-tilidagi-ai.md`, 1.3-bo'lim; `spec/kod-uchun/09-ai-funksiyalar.md`, Asosiy xulosa #8).
-6. **Audit jurnali — o'zgarmas (append-only)**, hech qachon UPDATE/DELETE qilinmaydi; saqlash muddati uchun qonuniy minimum **topilmadi** — ichki siyosat sifatida buxgalteriya hujjatlari muddati (kamida 5 yil, hisobot yilidan keyin, "Buxgalteriya hisobi to'g'risida"gi qonun O'RQ-404, 29-modda) bilan tenglashtiriladi (`07-hosting-lokalizatsiya-xavfsizlik.md`, 3.3-bo'lim; `04-arxitektura-va-stack.md`, 7-bo'lim). *(2026-10-14: tekshiruv)*
+5. **AI'ga (Claude API) yuboriladigan ma'lumot cheklanadi**: biometrik/genetik/telekom ma'lumot umuman yo'q va yuborilmaydi; mijoz ismi/telefon/tranzaksiya kabi oddiy shaxsiy ma'lumotni chet el API'ga yuborish **qonunan mumkin** (ZRU-547, 27-1-modda — faqat 3 toifa lokalizatsiya qilinadi), lekin minimallashtirish siyosati bilan (`research_notes/texnik/05-ozbek-tilidagi-ai.md`, 1.3-bo'lim; `09-ai-funksiyalar.md`, Asosiy xulosa #8).
+6. **Audit jurnali — o'zgarmas (append-only)**, hech qachon UPDATE/DELETE qilinmaydi; saqlash muddati uchun qonuniy minimum **topilmadi** — ichki siyosat sifatida buxgalteriya hujjatlari muddati (kamida 5 yil, hisobot yilidan keyin, "Buxgalteriya hisobi to'g'risida"gi qonun O'RQ-404, 29-modda) bilan tenglashtiriladi (`07-hosting-lokalizatsiya-xavfsizlik.md`, 3.3-bo'lim; `04-arxitektura-va-stack.md`, 7-bo'lim).
 7. **Backup — UzCloud Backup-as-a-Service + DBaaS PITR**; aniq chastota/RPO/RTO raqami manbada yo'q — **taxmin** sifatida tavsiya beriladi, buxgalteriya hujjat muddatidan (3+ yil) kam bo'lmasligi shart (`07-fayl`, 2.1-bo'lim; `04-fayl`, 7-bo'lim).
-8. **Fiskal modul uchun kripto milliy standart aniq, umumiy dastur uchun majburiy kripto-algoritm standarti qonun darajasida topilmadi** — standart sanoat amaliyoti (TLS 1.2+, bcrypt/argon2) yetarli deb baholanadi (`07-fayl`, 3.2-bo'lim).
+8. **Fiskal modul uchun kripto milliy standart aniq, umumiy dastur uchun majburiy kripto-algoritm standarti qonun darajasida topilmadi** — standart sanoat amaliyoti (TLS 1.2+, argon2) yetarli deb baholanadi (`07-fayl`, 3.2-bo'lim).
 9. **Kompleks muvofiqlik ikki ochiq savol bilan boshlanadi**: (a) ЗРУ-764 (Kiberxavfsizlik to'g'risida) sertifikatlash/ekspertiza talabining oddiy xususiy SaaS'ga tegishliligi aniqlanmagan — csec.uz'ga yozma so'rov tavsiya etiladi; (b) shaxsiy ma'lumotlar qonuni (ZRU-547/ЗРУ-666/ЗРУ-1125) bo'yicha lokalizatsiya faqat biometrik/genetik/telekom ma'lumotga tegishli, AIOS'ning odatiy ma'lumoti bu toifaga **kirmaydi** (`07-fayl`, 1.1 va 3.1-bo'lim).
 10. **PCI DSS qamrovi minimal**: karta ma'lumoti hech qachon bizning tizimimizda saqlanmaydi/qayta ishlanmaydi — to'lovlar Click/Payme/bank terminali orqali, ular o'z PCI-sertifikatlangan muhitida ishlaydi (`research_notes/texnik/03-efaktura-va-tolov.md`, 2.1–2.3-bo'lim izidan, mantiqiy xulosa — manbada PCI so'zi yo'q, **taxmin**).
-11. **Obuna muddati — qattiq to'xtatish**: 24 soatlik imtiyoz tugagach tenantning barcha sessiya/tokenlari bekor qilinadi, login rad etiladi (to'lov havolasi bundan mustasno); offline qurilma imzolangan litsenziya tokeni (`valid_until = subscription_end + 24 soat`) bilan serversiz ham mahalliy bloklanadi — to'liq mexanizm va fiskal oqibat izohi `14-autentifikatsiya-oauth2.md` §16–17'da. *(2026-10-15: foydalanuvchi qarori — avvalgi "kassa ishlashda davom etadi" taklifi bekor qilindi)*
+11. **Obuna muddati — qattiq to'xtatish**: 24 soatlik imtiyoz tugagach tenantning barcha sessiya/tokenlari bekor qilinadi, login rad etiladi (to'lov havolasi bundan mustasno); offline qurilma imzolangan litsenziya tokeni (`valid_until = min(grace_ends_at, issued_at + 7 kun)`) bilan serversiz ham mahalliy bloklanadi — to'liq mexanizm va fiskal oqibat izohi `14-autentifikatsiya-oauth2.md` §16–17'da.
 
 ---
 
 ## 1. Autentifikatsiya va seanslar
 
-*(2026-10-15: foydalanuvchi qarori)* **To'liq protokol tafsiloti `14-autentifikatsiya-oauth2.md`ga ko'chirildi** — OAuth 2.0 AS/RS, mijozlar (BFF/Android/bot/admin), grant turlari, access/refresh token formati, imzolash kalitlari, bekor qilish/introspeksiya, tenant almashtirish, scope↔permission_code, obuna lokauti, offline litsenziya tokeni, admin panel API'lari. Bu bo'lim quyida faqat **xulosa va bu hujjat bilan izchil qoladigan** qism (CSRF, huquqlar/limit mexanizmi) ni saqlaydi.
+**To'liq protokol tafsiloti `14-autentifikatsiya-oauth2.md`da** — OAuth 2.0 AS/RS, mijozlar (BFF/Android/bot/admin), grant turlari, access/refresh token formati, imzolash kalitlari, bekor qilish/introspeksiya, tenant almashtirish, scope↔permission_code, obuna lokauti, offline litsenziya tokeni, admin panel API'lari. Bu bo'lim quyida faqat **xulosa va bu hujjat bilan izchil qoladigan** qism (CSRF, huquqlar/limit mexanizmi) ni saqlaydi.
 
 ### 1.1 Ro'yxatdan o'tish va kirish (veb, back-office) — xulosa
 
-- Ro'yxatdan o'tish: telefon raqami → SMS OTP tasdiqlash → do'kon nomi/faoliyat turi (US-M17-01, BO-21, `03-modullar-talablari.md` M17). STIR, OFD, e-faktura ulash keyinroq, bosqichma-bosqich.
+- Ro'yxatdan o'tish: telefon raqami → OTP tasdiqlash (Telegram bot birinchi, SMS zaxira, `14-autentifikatsiya-oauth2.md` §4.2) → do'kon nomi/faoliyat turi (US-M17-01, BO-21, `03-modullar-talablari.md` M17). STIR, OFD, e-faktura ulash keyinroq, bosqichma-bosqich.
 - Kirish: telefon + parol (Egasi, Menejer, Buxgalter) — OAuth Authorization Code+PKCE orqali, BFF naqshida (`14-autentifikatsiya-oauth2.md` §2, §4.1); kassir/omborchi — mahalliy PIN (1.2-bo'lim, OAuth grant emas).
-- Parol saqlash: **argon2id** (`user_credentials.password_hash`) — avvalgi "bcrypt yoki argon2" ochiq tanlovi endi aniq belgilandi (`14-autentifikatsiya-oauth2.md` §4.1, §13). *(2026-10-15: foydalanuvchi qarori — aniqlashtirildi)* PIN — `user_credentials.pin_hash`, alohida, qisqa (4-6 raqam, **taxmin**) kod, faqat shu tenant/qurilma kontekstida tekshiriladi.
+- Parol saqlash: **argon2id** (`user_credentials.password_hash`, `14-autentifikatsiya-oauth2.md` §4.1, §13). PIN — `user_credentials.pin_hash`, alohida, qisqa (4-6 raqam, **taxmin**) kod, faqat shu tenant/qurilma kontekstida tekshiriladi.
 - Qulflash siyosati — brute-force himoyasi va rate limitlar bilan birga `14-autentifikatsiya-oauth2.md` §12'da to'liq (progressiv bloklash, OWASP ASVS L2 asosida, **taxmin**).
 
 ### 1.2 Kassir/Omborchi tezkor PIN (umumiy qurilma)
 
-- Bir nechta xodim bitta qurilmadan (veb-kassa ham, Android POS ham) smena bo'yicha almashib foydalanishi mumkin (`02-rollar-va-ssenariylar.md`, 0-bo'lim). PIN — **OAuth grant emas**, mahalliy (offline ham) tekshiriladigan tezkor almashish/tasdiqlash vositasi; aniq ta'rifi va OAuth bilan munosabati `14-autentifikatsiya-oauth2.md` §4.3'da. *(2026-10-15: foydalanuvchi qarori — aniq ta'riflandi)*
+- Bir nechta xodim bitta qurilmadan (veb-kassa ham, Android POS ham) smena bo'yicha almashib foydalanishi mumkin (`02-rollar-va-ssenariylar.md`, 0-bo'lim). PIN — **OAuth grant emas**, mahalliy (offline ham) tekshiriladigan tezkor almashish/tasdiqlash vositasi; aniq ta'rifi va OAuth bilan munosabati `14-autentifikatsiya-oauth2.md` §4.3'da.
 - PIN — shu bilan birga **tasdiqlash vositasi** (limitdan yuqori chegirma/qaytarish/nasiyada Menejer/Egasi PIN'i, 2.3-bo'lim).
 - Qurilma bekor qilinganda unda kirgan xodimlarning PIN'i majburiy almashtiriladi (`16-offline-sync.md` §9).
 
@@ -47,7 +50,7 @@ Mijoz turlari, token formatlari, muddatlari, qurilmaga bog'lash — **to'liq `14
 
 Barcha so'rovlarda yozuvchi amallar uchun **`Idempotency-Key`** majburiy (`24-frontend-arxitekturasi.md`, 3-bo'lim) — offline qayta yuborishda takror yozuvdan himoya, xavfsizlik nuqtai nazaridan ham takror-so'rov (replay) hujumini kamaytiradi. `/sync/push` bundan mustasno: dedupe har voqea bo'yicha `sync_receipts.client_event_id` orqali (`16-offline-sync.md` §3.1); `Idempotency-Key` faqat back-office REST yozuvchi so'rovlariga tegishli.
 
-**CSRF mexanizmi (sinxronizator-token) — o'zgarmaydi, hamon kerak**: BFF cookie OAuth sessiyasiga ishora qilsa ham, brauzer hamon cookie-asosli so'rov yuboradi, shuning uchun CSRF himoyasi to'liq saqlanadi: `GET /api/v1/auth/csrf` → klient tokenni xotirada saqlaydi → yozuvchi metodlarda (`POST`/`PUT`/`PATCH`/`DELETE`, shu jumladan **`/sync/push` va `/sync/pull` — cookie-autentifikatsiyali barcha so'rovlar**) `X-CSRF-Token` header'ida yuboradi. CSRF cookie yo'q (double-submit emas) — token sessiya ID'ga bog'langan, `itsdangerous` bilan imzolangan. Noto'g'ri/eskirgan token → `403 {code: CSRF_INVALID}` → klient tokenni bir marta qayta oladi va so'rovni takrorlaydi. **Bearer access token (Android, to'g'ridan-to'g'ri API chaqiruvi) CSRF tekshiruvidan ozod** — brauzer buni avtomatik biriktirmaydi. *(2026-10-15: foydalanuvchi qarori — CSRF mexanizmi o'zi o'zgarmadi, faqat OAuth asosiga bog'landi)*
+**CSRF mexanizmi (sinxronizator-token)**: BFF cookie OAuth sessiyasiga ishora qilsa ham, brauzer hamon cookie-asosli so'rov yuboradi, shuning uchun CSRF himoyasi to'liq saqlanadi: `GET /api/v1/auth/csrf` → klient tokenni xotirada saqlaydi → yozuvchi metodlarda (`POST`/`PUT`/`PATCH`/`DELETE`, shu jumladan **`/sync/push` va `/sync/pull` — cookie-autentifikatsiyali barcha so'rovlar**) `X-CSRF-Token` header'ida yuboradi. CSRF cookie yo'q (double-submit emas) — token sessiya ID'ga bog'langan, `itsdangerous` bilan imzolangan. Noto'g'ri/eskirgan token → `403 {code: CSRF_INVALID}` → klient tokenni bir marta qayta oladi va so'rovni takrorlaydi. **Bearer access token (Android, to'g'ridan-to'g'ri API chaqiruvi) CSRF tekshiruvidan ozod** — brauzer buni avtomatik biriktirmaydi.
 
 ### 1.4 Telegram ulash
 
@@ -57,7 +60,7 @@ Barcha so'rovlarda yozuvchi amallar uchun **`Idempotency-Key`** majburiy (`24-fr
 
 ### 1.5 Ro'yxatdan o'tishda avtomatik yaratiladigan obyektlar (tenant provisioning)
 
-*(2026-10-15: kamchiliklar-yakuniy #44)* Ro'yxatdan o'tish (US-M17-01) **bitta tranzaksiyada** quyidagilarni yaratadi: `tenants`, `subscriptions` (`status=trial`, 30 kun), Egasi uchun `memberships` (barcha filialga — bo'sh `branch_ids`), 5 standart tizim roli + ularning `role_permissions` (`§2.2` standart matritsa), standart filial + standart ombor + standart kassa (`cash_registers`), `doc_sequences` boshlang'ich qatorlari, standart xarajat toifalari (`expense_categories`, `27-backlog.md` seed ro'yxati bilan bir xil), `tenants.settings.valuation_method='AVECO'` (standart). Hisob rejasi, `units`, `plans` — **global**, tenant uchun nusxalanmaydi; MXIK katalogi — tasnif.soliq.uz orqali tashqi manba, tenant ichida saqlanmaydi.
+Ro'yxatdan o'tish (US-M17-01) **bitta tranzaksiyada** quyidagilarni yaratadi: `tenants`, `subscriptions` (`status=trial`, 30 kun), Egasi uchun `memberships` (barcha filialga — bo'sh `branch_ids`), 5 standart tizim roli + ularning `role_permissions` (§2.2 standart matritsa), standart filial + standart ombor + standart kassa (`cash_registers`), `doc_sequences` boshlang'ich qatorlari, standart xarajat toifalari (`expense_categories`, `27-backlog.md` seed ro'yxati bilan bir xil), `tenants.settings.valuation_method='AVECO'` (standart). Hisob rejasi, `units`, `plans` — **global**, tenant uchun nusxalanmaydi; MXIK katalogi — tasnif.soliq.uz orqali tashqi manba, tenant ichida saqlanmaydi.
 
 ---
 
@@ -65,7 +68,7 @@ Barcha so'rovlarda yozuvchi amallar uchun **`Idempotency-Key`** majburiy (`24-fr
 
 ### 2.1 Ruxsat kodlari (`permission_code`)
 
-Har bir kod `role_permissions.permission_code` sifatida saqlanadi, zarur bo'lsa `limit_value` bilan (masalan foiz, summa). Quyidagi katalog `02-rollar-va-ssenariylar.md` (6-bo'lim, modul × K/Y/T) va `03-modullar-talablari.md` (M01–M18) asosida, granular (amal darajasida) qayta loyihalangan — **bu jadval ham o'z navbatida MVP oldidan Egasi/arxitektor bilan tasdiqlanishi tavsiya etilgan loyihaviy taxmin** (manba hujjatning o'zi shunday belgilaydi, 02-rollar-va-ssenariylar.md, 6-bo'lim izohi).
+Har bir kod `role_permissions.permission_code` sifatida saqlanadi, zarur bo'lsa `limit_value` bilan (masalan foiz, summa). Quyidagi katalog `02-rollar-va-ssenariylar.md` (6-bo'lim, modul × K/Y/T) va `03-modullar-talablari.md` (M01–M18) asosida, granular (amal darajasida) qayta loyihalangan — **bu jadval ham o'z navbatida MVP oldidan Egasi/arxitektor bilan tasdiqlanishi tavsiya etilgan loyihaviy taxmin** (manba hujjatning o'zi shunday belgilaydi, `02-rollar-va-ssenariylar.md`, 6-bo'lim izohi).
 
 | Kod | Modul | Ma'nosi | Limit |
 |---|---|---|---|
@@ -79,7 +82,7 @@ Har bir kod `role_permissions.permission_code` sifatida saqlanadi, zarur bo'lsa 
 | `discount.approve` | M03 | Limitdan yuqori chegirmani PIN bilan tasdiqlash | foiz/summa (taxmin) |
 | `discount.rule.manage` | M03 | Avtomatik chegirma/aksiya qoidasi | — |
 | `stock.view` | M04 | Qoldiqni ko'rish | — |
-| `stock.writeoff` | M04 | Hisobdan chiqarish | summa (taxmin) *(2026-10-14: tekshiruv)* |
+| `stock.writeoff` | M04 | Hisobdan chiqarish | summa (taxmin) |
 | `stock.count.create` | M05 | Inventarizatsiya boshlash, sanash | — |
 | `stock.count.post` | M05 | Sanash natijasini tasdiqlab balansga o'tkazish | — |
 | `transfer.create` | M06 | Ko'chirish hujjati yaratish (yuborish) | — |
@@ -88,26 +91,33 @@ Har bir kod `role_permissions.permission_code` sifatida saqlanadi, zarur bo'lsa 
 | `purchases.receive` | M07 | Tovarni jismoniy qabul qilish | — |
 | `purchases.post` | M07 | Kirim hujjatini/ e-fakturani yakuniy o'tkazish (buxgalteriya) | — |
 | `purchases.pay` | M07 | Yetkazib beruvchiga to'lov qayd etish | — |
-| `purchases.return` | M07 | Yetkazib beruvchiga qaytarish | — *(2026-10-14: tekshiruv)* |
+| `purchases.return` | M07 | Yetkazib beruvchiga qaytarish | — |
 | `einvoice.sign` | M07, M10 | E-IMZO bilan kiruvchi/chiquvchi e-fakturani imzolash | — |
 | `debts.create` | M08 | Mijozga nasiya/qarz yozish | — |
 | `debts.approve` | M08 | Kredit limitidan yuqori nasiyani tasdiqlash | summa (taxmin) |
-| `debts.payment.accept` | M08 | Qarz to'lovini qabul qilish | — |
 | `debts.forgive` | M08 | Qarzni kechish/"undirib bo'lmaydigan" deb yopish | **faqat Egasi** (`03-modullar-talablari.md`, M08 qoidalari) |
 | `debts.limit.manage` | M08 | Mijoz kredit limitini belgilash/o'zgartirish | — |
+| `debts.payment.accept` | M08 | Qarz to'lovini qabul qilish | — |
+| `debts.remind` | M08, AI-06 | Mijozga qarz eslatmasini yuborish (Telegram/SMS) | — |
 | `prices.edit` | M09 | Narx/chegirma qoidasini o'zgartirish | — |
-| `prices.approve` | M09 | Katta narx o'zgarishini tasdiqlash | foiz (taxmin) |
+| `prices.approve` | M09 | Katta narx o'zgarishini tasdiqlash | foiz — ±10% (reestr #5, `limit_value` `10.00`) |
 | `labels.print` | M09 | Yorliq/shtrix-kod chop etish | — |
+| `catalog.manage` | M09 | Mahsulot/kategoriya/shtrix-kod (ichki kod generatsiyasi) CRUD, mahsulot importi, ombor sozlamalari (`stock-settings`) | — |
 | `tax.vat.view` | M10 | Ichki QQS hisobini ko'rish | — |
 | `tax.compare.review` | M10 | Davlat hisoboti bilan farqni ko'rib chiqish | — |
 | `tax.correction.submit` | M10 | Tuzatish/e'tiroz yuborish (E-IMZO) | — |
 | `accounting.post` | M11 | Buxgalteriya yozuvini ko'rish/qo'lda tuzatish | — |
 | `accounting.period.close` | M11 | Hisob davrini yopish | — |
+| `stock.opening.manage` | M04, M08 | Boshlang'ich tovar qoldig'i va boshlang'ich qarz (qo'lda va `import-jobs`) | — |
+| `valuation.settings.manage` | M04, M11 | FIFO/AVECO usulini almashtirish (faqat keyingi yildan) | — |
 | `reports.sales.view` | M12 | Savdo/ombor hisobotlarini ko'rish | — |
 | `reports.finance.view` | M12 | Moliyaviy (foyda-zarar, balans) hisobotlarni ko'rish | — |
 | `reports.export` | M12 | Hisobotni Excel/PDF eksport qilish | — |
 | `settings.users` | M13 | Xodim qo'shish, rol/limit tayinlash | — |
 | `settings.branches` | M14 | Filial qo'shish/boshqarish | — |
+| `settings.tenant` | M13, M14 | Do'kon sozlamalari, integratsiya kalitlari (Faktura.uz/CRPT), OFD qayta urinish, soliq rejimi o'zgarishi (BO-14) | **faqat Egasi** |
+| `integrations.retry` | M01, M07, M10 | OFD/e-faktura/markirovka integratsiya ishini qo'lda qayta navbatga qo'yish (BO-14) | — |
+| `einvoice.create` | M01, M08, M10 | Chiquvchi e-faktura qoralamasini yaratish va yuborish (B2B, chekdan keyin — BP-03/BP-13) | — |
 | `expenses.create` | M15 | Xarajat yozish | — |
 | `expenses.approve` | M15 | Katta/takrorlanuvchi xarajatni tasdiqlash | summa (taxmin) |
 | `cash.deposit` / `cash.withdraw` | M16 | Kassaga pul qo'yish / kassadan olish | summa (taxmin, `cash.withdraw`) |
@@ -118,19 +128,12 @@ Har bir kod `role_permissions.permission_code` sifatida saqlanadi, zarur bo'lsa 
 | `ai.chat.use` | AI-01 | AI yordamchi chatdan foydalanish | — |
 | `ai.ocr.use` | AI-03 | Hujjat fotosidan AI orqali kiritish | — |
 | `platform.admin` | M17/ADM-01 | Platforma admin paneli, tenantlarga RLS'siz kirish | **faqat `platform_admins`**, har kirish audit'da |
-| `catalog.manage` | M09 | Mahsulot/kategoriya/shtrix-kod (ichki kod generatsiyasi) CRUD, mahsulot importi, ombor sozlamalari (`stock-settings`) *(2026-10-15: qabul-6/7)* | — |
-| `stock.opening.manage` | M04, M08 | Boshlang'ich tovar qoldig'i va boshlang'ich qarz (qo'lda va `import-jobs`) *(2026-10-15: qabul-6/7)* | — |
-| `valuation.settings.manage` | M04, M11 | FIFO/AVECO usulini almashtirish (faqat keyingi yildan) *(2026-10-15: qabul-6/7)* | — |
-| `integrations.retry` | M01, M07, M10 | OFD/e-faktura/markirovka integratsiya ishini qo'lda qayta navbatga qo'yish (BO-14) *(2026-10-15: qabul-6/7)* | — |
-| `einvoice.create` | M01, M08, M10 | Chiquvchi e-faktura qoralamasini yaratish va yuborish (B2B, chekdan keyin — BP-03/BP-13) *(2026-10-15: qabul-6/7)* | — |
-| `debts.remind` | M08, AI-06 | Mijozga qarz eslatmasini yuborish (Telegram/SMS) *(2026-10-15: qabul-6/7)* | — |
-| `settings.tenant` | M13, M14 | Do'kon sozlamalari, integratsiya kalitlari (Faktura.uz/CRPT), OFD qayta urinish, soliq rejimi o'zgarishi (BO-14) *(2026-10-15: qabul-6/7)* | **faqat Egasi** |
 
 ### 2.2 Standart matritsa (5 tizim roli)
 
 Quyidagi jadval `02-rollar-va-ssenariylar.md` (6-bo'lim) dagi K/Y/T matritsasi bilan **izchil**: K→faqat `*.view`/ko'rish huquqlari, Y→yaratish kodlari, T→tasdiqlash/`*.approve`/`*.post` kodlari. "✓(limit)" — `role_permissions.limit_value` bilan cheklangan huquq.
 
-**Egasi ustuni — "barcha ruxsat" (superset)** *(2026-10-15: asoschi qarori, Q1)*: avvalgi matritsada Egasida `sales.create`, `shift.open/close`, `returns.create`, `stock.count.create`, `transfer.*`, `purchases.*` (yaratish/qabul), `cash.count.shift`, `accounting.*` kabi operatsion kodlar yo'q edi — 1–3 xodimli do'konda Egasi ko'pincha o'zi kassada/omborda turadi. **Qaror (asoschi tasdiqladi, 2026-10-15): Egasi — `platform.admin`dan tashqari barcha tenant ruxsatlarining supersetiga ega**, limitlar cheksiz. Quyidagi jadvalning Egasi ustuni shunga mos yangilangan (reestr #1, qabul-7 X-02, asoschi qarori Q1 bilan yakunlangan).
+**Egasi ustuni — "barcha ruxsat" (superset)** (qaror #28): **Egasi — `platform.admin`dan tashqari barcha tenant ruxsatlarining supersetiga ega**, limitlar cheksiz (1–3 xodimli do'konda Egasi ko'pincha o'zi kassada/omborda turadi). Quyidagi jadvalning Egasi ustuni shunga mos.
 
 | Ruxsat | Egasi | Menejer | Kassir | Omborchi | Buxgalter |
 |---|---|---|---|---|---|
@@ -189,8 +192,6 @@ Quyidagi jadval `02-rollar-va-ssenariylar.md` (6-bo'lim) dagi K/Y/T matritsasi b
 | `ai.chat.use` | ✓ | ✓ | – | – | ✓ |
 | `ai.ocr.use` | ✓ | ✓ | – | ✓ | ✓ |
 
-*(2026-10-14: tekshiruv — 12 qator §2.1 katalogida mavjud bo'lib, matritsada yetishmayotgan kodlar uchun qo'shildi; `expenses.approve`, `cash.deposit`, `cash.count.shift`, `notifications.manage`, `telegram.link` allaqachon mavjud bo'lgani uchun takrorlanmadi. `debts.payment.accept`, `debts.remind`, `catalog.manage`, `stock.opening.manage`, `valuation.settings.manage`, `integrations.retry`, `einvoice.create`, `settings.tenant` — qatorlari va Egasi ustunining to'liq yangilanishi `2026-10-15: qabul-6/7` — X-01/X-02, **2026-10-15: asoschi qarori (Q1) bilan yakuniy tasdiqlandi**.)*
-
 *Izoh: kichik do'konda bir xodim bir nechta rolga ega bo'lishi mumkin (`memberships.role_ids[]`) — ruxsatlar jamlanadi, ziddiyatda yuqori huquq ustun bo'ladi (`03-modullar-talablari.md`, M13, chekka holat).*
 
 ### 2.3 Limitlar va PIN bilan tasdiqlash oqimi
@@ -200,10 +201,10 @@ Quyidagi jadval `02-rollar-va-ssenariylar.md` (6-bo'lim) dagi K/Y/T matritsasi b
 3. Limitdan oshsa — amal **"kutilmoqda"** holatiga o'tadi:
    - Agar Menejer/Egasi fizik yaqinda (kassada) bo'lsa — PIN kiritib **inline** tasdiqlaydi (POS-06, POS ekranida bottom-sheet, `06-ekranlar-umumiy.md`);
    - Aks holda — **BO-16 Tasdiqlash navbati** ekraniga tushadi, Menejer/Egasi PWA'dan ko'rib tasdiqlaydi/rad etadi.
-4. Offline holatda: limit tekshiruvi oxirgi sinxronlangan ma'lumot asosida, Menejer PIN'i **lokal** tasdiqlaydi, server qayta tekshiradi (konflikt — **ochiq savol**, 06-ekranlar-umumiy.md, Ochiq savol 3 bilan bog'liq emas, lekin shunga yaqin xavf sinfi).
+4. Offline holatda: limit tekshiruvi oxirgi sinxronlangan ma'lumot asosida, Menejer PIN'i **lokal** tasdiqlaydi, server qayta tekshiradi; limitdan oshgan bo'lsa ham PIN bilan tasdiqlangan amal qabul qilinadi, `limit_exceeded=true` bayrog'i + M18 xabar (`16-offline-sync.md` §5).
 5. Har bir tasdiqlash/rad etish `audit_log`ga yoziladi (kim, qachon, limit, natija).
 
-**Standart limitlar (Kassir uchun)** *(2026-10-15: foydalanuvchi qarori — `tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md` #1)*:
+**Standart limitlar (Kassir uchun)** (qaror #23 — tavsiya #1):
 
 | Ruxsat | Standart limit (PIN'siz) | Limitdan oshganda |
 |---|---|---|
@@ -212,9 +213,9 @@ Quyidagi jadval `02-rollar-va-ssenariylar.md` (6-bo'lim) dagi K/Y/T matritsasi b
 | `cash.withdraw` (kassadan pul olish) | **50 000 so'm**gacha | Menejer/Egasi PIN |
 | `sales.void` (chekni bekor qilish) | **Limitsiz** | — (lekin har doim audit_log'ga yoziladi) |
 
-Bu raqamlar — **boshlang'ich standart** (hech bir raqobatchi — Loyverse, Square, BILLZ, REGOS — tayyor raqam bermaydi, hammasi "yoqish/o'chirish + PIN" modelida; bu kichik standart raqamlar kundalik mayda amallarni to'xtatmaydi, katta summani nazoratda saqlaydi). Egasi istalgan raqamni `role_permissions.limit_value` orqali tenant darajasida o'zgartira oladi (`02-rollar-va-ssenariylar.md`, Ochiq savol 2; `03-modullar-talablari.md`, Ochiq savol 1). **Keyin tekshiriladi**: pilotda PIN so'rovlari soni va Egalar bu raqamlarni qanchaga o'zgartirgani.
+Bu raqamlar — **boshlang'ich standart** (hech bir raqobatchi — Loyverse, Square, BILLZ, REGOS — tayyor raqam bermaydi, hammasi "yoqish/o'chirish + PIN" modelida; bu kichik standart raqamlar kundalik mayda amallarni to'xtatmaydi, katta summani nazoratda saqlaydi). Egasi istalgan raqamni `role_permissions.limit_value` orqali tenant darajasida o'zgartira oladi (qaror #23 — tavsiya #1). **Keyin tekshiriladi**: pilotda PIN so'rovlari soni va Egalar bu raqamlarni qanchaga o'zgartirgani.
 
-**Tasdiqlash turi (`approval_requests.kind`) → tasdiqlovchi ruxsati** *(2026-10-15: qabul-6, yagona manba — 13-1 havola qiladi)*:
+**Tasdiqlash turi (`approval_requests.kind`) → tasdiqlovchi ruxsati** (yagona manba, `18-api-kassa.md` havola qiladi):
 
 | `kind` | Tasdiqlovchi ruxsati (`permission_code`) | Limit solishtiriladigan |
 |---|---|---|
@@ -232,7 +233,7 @@ Qo'shimcha qoida: tasdiqlovchi so'rovchining o'zi bo'la olmaydi (`approval_reque
 
 - `memberships.branch_ids[]` — bo'sh massiv = barcha filiallarga kirish (odatda Egasi/Buxgalter), to'ldirilgan massiv = faqat ko'rsatilgan filial(lar) (odatda Kassir/Omborchi/Menejer bitta filialga).
 - Har bir API so'rovida `X-Branch-Id` header (`24-frontend-arxitekturasi.md`, 3-bo'lim) — backend bu qiymatni `memberships.branch_ids`ga qarshi tekshiradi, mos kelmasa 403.
-- **Qaror: filial cheklovi — yagona qatlam, ilova darajasida** (RLS'da emas): `current_branch_scope` dependency → `BranchScopedRepository` bazaviy klassi har so'rovga `branch_id = ANY(:scope)` qo'shadi (ko'chirishda `from_branch_id`/`to_branch_id`). Har bir filialli endpoint uchun majburiy integratsion test: boshqa filial ma'lumoti → 403/bo'sh natija. Tenant izolyatsiyasi esa ikki qatlamda qoladi (3.1-bo'lim). *(2026-10-14: tekshiruv)*
+- **Qaror: filial cheklovi — yagona qatlam, ilova darajasida** (RLS'da emas): `current_branch_scope` dependency → `BranchScopedRepository` bazaviy klassi har so'rovga `branch_id = ANY(:scope)` qo'shadi (ko'chirishda `from_branch_id`/`to_branch_id`). Har bir filialli endpoint uchun majburiy integratsion test: boshqa filial ma'lumoti → 403/bo'sh natija. Tenant izolyatsiyasi esa ikki qatlamda qoladi (3.1-bo'lim).
 
 ---
 
@@ -242,24 +243,24 @@ Qo'shimcha qoida: tasdiqlovchi so'rovchining o'zi bo'la olmaydi (`approval_reque
 
 - Har bir jadvalda `tenant_id` ustuni majburiy (`11-malumotlar-modeli.md`, 1-bo'lim).
 - Har bir DB tranzaksiya `tenant_transaction(session, tenant_id)` helper orqali ochiladi (`async_session_factory(..., autobegin=False)`); ichida `SELECT set_config('app.tenant_id', :tid, true)` bajariladi — bu **tranzaksiya-lokal** (`SET LOCAL`ga ekvivalent). `SET LOCAL ... = :param` ishlatilmaydi, chunki PostgreSQL `SET` buyrug'i parametr qabul qilmaydi (sintaksis xatosi bo'lar edi). `autobegin=False` tufayli tranzaksiyadan tashqarida `execute` xato beradi, shuning uchun tenant kontekstisiz so'rov jismonan mumkin emas; connection pool qayta ishlatilganda eski qiymat qolib ketmaydi, chunki qiymat tranzaksiya tugaganda avtomatik tozalanadi. Posting xizmati, `/sync/push` (har voqea uchun alohida `tenant_transaction`) va worker job'lari ham aynan shu helper'dan foydalanadi.
-- RLS siyosati: `tenant_id = current_setting('app.tenant_id', true)::uuid` — bu qoida `10-umumiy-arxitektura.md` (2-band) va `11-malumotlar-modeli.md` (1-bo'lim) da allaqachon qaror sifatida qayd etilgan, bu hujjat uni texnik detallashtiradi. *(2026-10-14: tekshiruv)*
+- RLS siyosati: `tenant_id = current_setting('app.tenant_id', true)::uuid` — bu qoida `10-umumiy-arxitektura.md` (2-band) va `11-malumotlar-modeli.md` (1-bo'lim) da allaqachon qaror sifatida qayd etilgan, bu hujjat uni texnik detallashtiradi.
 
 ### 3.2 Siyosat namunasi (konseptual, SQL emas kod yozish qoidasiga ko'ra bu spec hujjatida faqat tavsif)
 
 Har jadval uchun:
 - `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY` (jadval egasi — superuser/owner rolidan so'rov kelsa ham siyosat qo'llanishi uchun);
 - `SELECT/INSERT/UPDATE/DELETE` siyosati: `USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)`, INSERT uchun qo'shimcha `WITH CHECK` xuddi shu shartda. `current_setting(..., true)` parametr o'rnatilmagan bo'lsa xato tashlamay `NULL`/bo'sh satr qaytaradi; `NULLIF(..., '')` bo'sh satrni ham `NULL`ga aylantiradi — natijada `tenant_id = NULL` taqqoslash hech qanday qatorni qaytarmaydi (**fail-closed**: tenant konteksti yo'q bo'lsa — nol natija, xato emas).
-- Ilova DB foydalanuvchisi **superuser emas** (superuser RLS'ni avtomatik chetlab o'tadi) — oddiy rol, `FORCE ROW LEVEL SECURITY` bilan birga. *(2026-10-14: tekshiruv)*
+- Ilova DB foydalanuvchisi **superuser emas** (superuser RLS'ni avtomatik chetlab o'tadi) — oddiy rol, `FORCE ROW LEVEL SECURITY` bilan birga.
 
 ### 3.3 Har jadvalda RLS borligini tekshiruvchi test
 
 - CI'da avtomatik test: `information_schema`/`pg_class.relrowsecurity` orqali barcha biznes jadvallarini (istisno faqat `tenant_id`'siz global jadvallar — `plans`, `units`, `platform_admins`, `oauth_clients`, `signing_keys`; `tenants` — `id = app.tenant_id` siyosati, `users` — membership siyosati, `11-malumotlar-modeli.md` 1-bo'lim) ro'yxatlab, har birida `relrowsecurity = true` va kamida bitta siyosat borligini tasdiqlaydi.
-- **Auth-sxema istisnosi** *(2026-10-15: qabul-5 — O7 tuzatish)*: `user_credentials`, `otp_challenges`, `login_attempts`, `authorization_codes`, `refresh_tokens`, `sessions` — standart `tenant_id` RLS siyosati **texnik jihatdan ishlamaydi** (login/ro'yxatdan o'tishda tenant konteksti hali yo'q, kod/token qidiruvi tenant kontekstidan oldin bo'ladi). Bu jadvallar alohida PostgreSQL `auth` sxemasida, ilova roliga to'g'ridan-to'g'ri ruxsat yo'q, kirish faqat `SECURITY DEFINER` funksiyalar orqali (`14-autentifikatsiya-oauth2.md` §19). CI testi bu ro'yxatni **alohida tekshiradi**: RLS siyosati o'rniga — (a) ilova (`app`) rolida bu jadvallarga `GRANT` yo'qligi, (b) kerakli `SECURITY DEFINER` funksiyalar mavjudligi va ichida tegishli tekshiruv borligi. `license_tokens` bu istisnoga **kirmaydi** — tenant/qurilma konteksti login'dan keyin mavjud, shuning uchun u standart `tenant_id` RLS ro'yxatida qoladi.
-- Yangi migratsiya `tenant_id`li jadval qo'shsa, lekin RLS siyosatini unutsa — CI **qizil** bo'ladi (bu `04-arxitektura-va-stack.md`, 1-bo'limdagi "alohida qat'iy RLS tekshiruvi shart" tavsiyasining konkret amalga oshirilishi).
+- **Auth-sxema istisnosi**: `user_credentials`, `otp_challenges`, `login_attempts`, `authorization_codes`, `refresh_tokens`, `sessions` — standart `tenant_id` RLS siyosati **texnik jihatdan ishlamaydi** (login/ro'yxatdan o'tishda tenant konteksti hali yo'q, kod/token qidiruvi tenant kontekstidan oldin bo'ladi). Bu jadvallar alohida PostgreSQL `auth` sxemasida, ilova roliga to'g'ridan-to'g'ri ruxsat yo'q, kirish faqat `SECURITY DEFINER` funksiyalar orqali (`14-autentifikatsiya-oauth2.md` §19). CI testi bu ro'yxatni **alohida tekshiradi**: RLS siyosati o'rniga — (a) ilova (`app`) rolida bu jadvallarga `GRANT` yo'qligi, (b) kerakli `SECURITY DEFINER` funksiyalar mavjudligi va ichida tegishli tekshiruv borligi. `license_tokens` bu istisnoga **kirmaydi** — tenant/qurilma konteksti login'dan keyin mavjud, shuning uchun u standart `tenant_id` RLS ro'yxatida qoladi.
+- Yangi migratsiya `tenant_id`li jadval qo'shsa, lekin RLS siyosatini unutsa — CI **qizil** bo'ladi (`04-arxitektura-va-stack.md`, 1-bo'limdagi "alohida qat'iy RLS tekshiruvi shart" tavsiyasining konkret amalga oshirilishi).
 - Qo'shimcha integratsion test: ikki xil `tenant_id` bilan ma'lumot kiritilib, biri ikkinchisining yozuvini ko'ra olmasligi tekshiriladi (cross-tenant leak testi).
 - **Global jadvallar siyosati**: `users` jadvalida RLS yoqilgan, lekin `tenant_id` siyosati o'rniga membership siyosati qo'llanadi: `id = app.user_id` YOKI `EXISTS (memberships WHERE user_id = users.id AND tenant_id = app.tenant_id)`. Login va tenant tanlash tenant kontekstisiz ishlaydi — buning uchun ikkita `SECURITY DEFINER` funksiya: `auth_find_user(phone)` (faqat id va hash qaytaradi) va `auth_list_memberships(user_id)`. Scheduler ham shunga o'xshash `list_active_tenant_ids()` (`SECURITY DEFINER`) funksiyasidan foydalanadi, har tenant uchun alohida job navbatga qo'yadi (`23-backend-arxitekturasi.md`, 4-bo'lim).
 - **Worker/scheduler testlari**: (1) tenant A job'i B ma'lumotini ko'rmaydi; (2) `tenant_id`'siz job xato bilan tugaydi, so'rov bajarilmaydi; (3) bitta ulanishda ketma-ket ikki tenant job'i — ikkinchisida birinchi tenant konteksti qolmaganligi (`set_config(..., true)` tranzaksiya-lokal).
-- `users`: tenant A kontekstida faqat A'ga membership'i bor foydalanuvchilar ko'rinadi; `auth_find_user` faqat id/hash qaytaradi. *(2026-10-14: tekshiruv)*
+- `users`: tenant A kontekstida faqat A'ga membership'i bor foydalanuvchilar ko'rinadi; `auth_find_user` faqat id/hash qaytaradi.
 
 ### 3.4 Platform admin kirish yo'li va audit
 
@@ -287,7 +288,7 @@ Har jadval uchun:
 
 Tenant-specific integratsiya sirlari (ayniqsa Click/Payme, EDO) **shifrlangan holda** saqlanishi kerak — oddiy matn sifatida emas. Variantlar (manbada aniq UzCloud KMS xizmati tasdiqlanmagan — **ochiq savol/taxmin**, quyida):
 
-1. **Ilova darajasidagi envelope encryption** (tavsiya, UzCloud'da alohida KMS xizmati topilmagani sababli): har bir sir **Data Encryption Key (DEK)** bilan AES-256-GCM orqali shifrlanadi; DEK'lar o'zi platforma darajasidagi **Key Encryption Key (KEK)** bilan shifrlanib bazada saqlanadi; KEK — muhit o'zgaruvchisi/sir boshqaruv xizmatida (masalan HashiCorp Vault yoki shunga o'xshash — **taxmin**, UzCloud'da tayyor KMS borligi tasdiqlanmagan, `07-fayl`'da bu xizmat tilga olinmagan). **MVP joylashuvi** *(2026-10-15: kamchiliklar-yakuniy #51)*: KEK — deploy-vaqtidagi sir (muhit o'zgaruvchisi), **faqat** `api`/`worker` konteyneriga uzatiladi (boshqa konteyner — `bot`, `scheduler` — kerak bo'lmasa olmaydi); rotatsiya — **yillik** (taxmin, `key_version` ustuni orqali eski DEK'lar qayta shifrlanadi). UzCloud rasmiy KMS-as-a-Service xizmatini tasdiqlasa, KEK saqlash joyi shunga ko'chiriladi — bu migratsiya DEK qiymatlarini o'zgartirmaydi, faqat KEK saqlanadigan joy almashadi.
+1. **Ilova darajasidagi envelope encryption** (tavsiya, UzCloud'da alohida KMS xizmati topilmagani sababli): har bir sir **Data Encryption Key (DEK)** bilan AES-256-GCM orqali shifrlanadi; DEK'lar o'zi platforma darajasidagi **Key Encryption Key (KEK)** bilan shifrlanib bazada saqlanadi; KEK — muhit o'zgaruvchisi/sir boshqaruv xizmatida (masalan HashiCorp Vault yoki shunga o'xshash — **taxmin**, UzCloud'da tayyor KMS borligi tasdiqlanmagan, `07-fayl`'da bu xizmat tilga olinmagan). **MVP joylashuvi**: KEK — deploy-vaqtidagi sir (muhit o'zgaruvchisi), **faqat** `api`/`worker` konteyneriga uzatiladi (boshqa konteyner — `bot`, `scheduler` — kerak bo'lmasa olmaydi); rotatsiya — **yillik** (taxmin, `key_version` ustuni orqali eski DEK'lar qayta shifrlanadi). UzCloud rasmiy KMS-as-a-Service xizmatini tasdiqlasa, KEK saqlash joyi shunga ko'chiriladi — bu migratsiya DEK qiymatlarini o'zgartirmaydi, faqat KEK saqlanadigan joy almashadi.
 2. **PostgreSQL `pgcrypto`** — muqobil, lekin kalitni DB ichida saqlash xavfi (DB buzilsa kalit ham ochiladi) — faqat ikkinchi darajali himoya qatlami sifatida ko'rib chiqilishi mumkin, asosiy emas.
 3. **UzCloud'da KMS-as-a-Service** — rasmiy narx/sahifa tadqiqotda topilmadi (`07-fayl`, 2.1-bo'lim faqat VM/K8s/DBaaS/S3'ni sanab o'tadi, KMS yo'q) — agar kelajakda UzCloud bu xizmatni taqdim etsa, (1)dagi KEK saqlash joyi shunga ko'chiriladi.
 
@@ -333,10 +334,10 @@ Har bir sir yozuvida: `tenant_id`, `kind` (masalan `click_secret`, `didox_token`
 - Kirish/chiqish (login success/fail), parol/PIN o'zgarishi, qurilma ro'yxatdan o'tishi.
 - Sir/kalit rotatsiyasi (4.2-bo'lim).
 - Ma'lumot eksporti (`reports.export`, tenant bo'yicha to'liq eksport, 7.3-bo'lim).
-- To'lovdan oldin chek qatori/chekni bekor qilish (`sale.draft_voided`), chekni qayta chop etish (`receipt.reprinted`), qurilmani bekor qilish va PIN majburiy almashtirish. *(2026-10-14: tekshiruv)*
-- **OAuth/autentifikatsiya voqealari (to'liq ro'yxat `14-autentifikatsiya-oauth2.md` §14'da)**: `login_success`/`login_failed`/`account_locked`, `otp_requested`/`otp_verified`/`otp_failed`, `password_changed`/`password_reset`, `pin_changed`/`pin_reset_forced`, `refresh_token_reuse_detected`, `session_revoked`/`all_sessions_revoked`, `tenant_switched`, `subscription_lockout_triggered`/`subscription_restored`, `signing_key_rotated`. *(2026-10-15: foydalanuvchi qarori)*
-- **Qo'shimcha voqealar** *(2026-10-15: qabul-5)*: `sync_drain_started`/`sync_drain_completed` (lokautdan oldingi offline cheklarni drenaj qilish, `14-autentifikatsiya-oauth2.md` §16.4), `data_export_during_restriction` (lokaut paytida to'lov-sahifa orqali eksport, §16.5), `platform_admin_mfa_failed` (§18.1).
-- **Markirovkalangan tovar offline audit voqealari** *(2026-10-15: kamchiliklar-yakuniy #1/#42)*: `marking.offline_sold` (actor_user_id, device_id, code, sale_id, price_source=`cache`, created_at), `marking.offline_refused_no_price`, `marking.verify_failed` (sinxronlanishdan keyin: noto'g'ri/takroriy kod yoki CRPT xatosi — Egasi/Buxgalterga M18 ogohlantirishi bilan birga) — to'liq siyosat `16-offline-sync.md` §7'da.
+- To'lovdan oldin chek qatori/chekni bekor qilish (`sale.draft_voided`), chekni qayta chop etish (`receipt.reprinted`), qurilmani bekor qilish va PIN majburiy almashtirish.
+- **OAuth/autentifikatsiya voqealari** (to'liq ro'yxat `14-autentifikatsiya-oauth2.md` §14'da): `login_success`/`login_failed`/`account_locked`, `otp_requested`/`otp_verified`/`otp_failed`, `password_changed`/`password_reset`, `pin_changed`/`pin_reset_forced`, `refresh_token_reuse_detected`, `session_revoked`/`all_sessions_revoked`, `tenant_switched`, `subscription_lockout_triggered`/`subscription_restored`, `signing_key_rotated`.
+- **Qo'shimcha voqealar**: `sync_drain_started`/`sync_drain_completed` (lokautdan oldingi offline cheklarni drenaj qilish, `14-autentifikatsiya-oauth2.md` §16.4), `data_export_during_restriction` (lokaut paytida to'lov-sahifa orqali eksport, §16.5), `platform_admin_mfa_failed` (§18.1).
+- **Markirovkalangan tovar offline audit voqealari**: `marking.offline_sold` (actor_user_id, device_id, code, sale_id, price_source=`cache`, created_at), `marking.offline_refused_no_price`, `marking.verify_failed` (sinxronlanishdan keyin: noto'g'ri/takroriy kod yoki CRPT xatosi — Egasi/Buxgalterga M18 ogohlantirishi bilan birga) — to'liq siyosat `16-offline-sync.md` §7'da.
 
 ### 6.2 O'zgarmaslik (immutability)
 
@@ -346,7 +347,7 @@ Har bir sir yozuvida: `tenant_id`, `kind` (masalan `click_secret`, `didox_token`
 ### 6.3 Saqlash muddati
 
 - Umumiy qonuniy minimum **topilmadi** (`07-fayl`, 3.3-bo'lim: "Audit log saqlash muddati umumiy qoida sifatida — topilmadi"; faqat KAI obyektlari uchun past ishonchli "3 oy" raqami bor, bizga tegishli emas).
-- **Ichki siyosat (tavsiya)**: `audit_log` kamida **buxgalteriya hujjatlari bilan bir xil muddat — 5 yil** ("Buxgalteriya hisobi to'g'risida"gi qonun, O'RQ-404, 29-modda) saqlanadi, chunki audit yozuvlari ko'pincha moliyaviy hujjat (narx, qarz, provodka) o'zgarishini izohlaydi va soliq tekshiruvida dalil bo'lishi mumkin (`04-arxitektura-va-stack.md`, 7-bo'lim tavsiyasi asosida kengaytirildi). Bu — **qonuniy majburiyat emas, ichki qaror**. *(2026-10-14: tekshiruv)*
+- **Ichki siyosat (tavsiya)**: `audit_log` kamida **buxgalteriya hujjatlari bilan bir xil muddat — 5 yil** ("Buxgalteriya hisobi to'g'risida"gi qonun, O'RQ-404, 29-modda) saqlanadi, chunki audit yozuvlari ko'pincha moliyaviy hujjat (narx, qarz, provodka) o'zgarishini izohlaydi va soliq tekshiruvida dalil bo'lishi mumkin (`04-arxitektura-va-stack.md`, 7-bo'lim tavsiyasi asosida kengaytirildi). Bu — **qonuniy majburiyat emas, ichki qaror**.
 
 ---
 
@@ -356,36 +357,36 @@ Har bir sir yozuvida: `tenant_id`, `kind` (masalan `click_secret`, `didox_token`
 
 - UzCloud DBaaS — HA klaster + **avtomatik backup** + **PITR (Point-in-Time Recovery)** imkoniyati (`07-fayl`, 2.1-bo'lim; `04-arxitektura-va-stack.md`, 8-bo'lim jadvali).
 - Aniq backup chastotasi (kunlikmi, soatlikmi) va RPO/RTO raqami **rasmiy sahifada topilmadi** — **taxmin tavsiya**: operatsion backup kuniga 1 marta to'liq + doimiy WAL-asosidagi PITR (RPO — bir necha daqiqa, **taxmin**).
-- **Ichki maqsad (SLO)** *(2026-10-15: kamchiliklar-yakuniy #47/#48)*: **RPO ≤ 5 daqiqa** (PITR, WAL yuborish chastotasi asosida), **RTO ≤ 4 soat** (taxmin — to'liq restore + tekshirish uchun). Bu raqamlar qonuniy majburiyat emas, ichki maqsad; pilot bosqichida real o'lchov bilan tasdiqlanadi.
-- Saqlash muddati: operatsion backup **30 kun** (**taxmin**), arxiv backup **kamida 5 yil** (buxgalteriya hujjat muddatiga mos — O'RQ-404, 29-modda; soliq hujjatlari alohida 3 yil, Soliq kodeksi 84-modda) — `04-arxitektura-va-stack.md`, 7-bo'lim tavsiyasi. *(2026-10-14: tekshiruv)*
+- **Ichki maqsad (SLO)**: **RPO ≤ 5 daqiqa** (PITR, WAL yuborish chastotasi asosida), **RTO ≤ 4 soat** (taxmin — to'liq restore + tekshirish uchun). Bu raqamlar qonuniy majburiyat emas, ichki maqsad; pilot bosqichida real o'lchov bilan tasdiqlanadi.
+- Saqlash muddati: operatsion backup **30 kun** (**taxmin**), arxiv backup **kamida 5 yil** (buxgalteriya hujjat muddatiga mos — O'RQ-404, 29-modda; soliq hujjatlari alohida 3 yil, Soliq kodeksi 84-modda) — `04-arxitektura-va-stack.md`, 7-bo'lim tavsiyasi.
 
 ### 7.2 Tiklash sinovlari
 
 - Backup'dan tiklash muntazam **sinovdan o'tkazilishi** kerak (masalan choraklik, staging muhitida to'liq restore) — bu amaliyot manbada yo'q, OWASP/sanoat amaliyoti sifatida **taxmin** qo'shiladi (8-bo'limga qarang).
 - Sinov natijasi (muvaffaqiyatli/vaqt) ichki ravishda qayd etiladi (operatsion jurnal, `audit_log`ning o'zi emas — bu infratuzilma darajasidagi jurnal).
-- **Mas'ul va eskalatsiya** *(2026-10-15: kamchiliklar-yakuniy #48)*: sinov siklini DevOps (yoki shu vazifani bajaradigan rol) o'tkazadi, natija (sana, muvaffaqiyatli/yo'q, o'lchangan vaqt) operatsion jurnalga yoziladi; o'lchangan tiklash vaqti 7.1-bo'limdagi RTO maqsadidan (≤4 soat) oshsa — bu **insident** sifatida ko'rib chiqiladi (10-bo'lim oqimi bo'yicha).
+- **Mas'ul va eskalatsiya**: sinov siklini DevOps (yoki shu vazifani bajaradigan rol) o'tkazadi, natija (sana, muvaffaqiyatli/yo'q, o'lchangan vaqt) operatsion jurnalga yoziladi; o'lchangan tiklash vaqti 7.1-bo'limdagi RTO maqsadidan (≤4 soat) oshsa — bu **insident** sifatida ko'rib chiqiladi (10-bo'lim oqimi bo'yicha).
 
 ### 7.3 Tenant bo'yicha eksport
 
-- Har bir tenant o'z ma'lumotini **istalgan vaqtda** eksport qila oladi: Excel/PDF hisobotlar (`reports.export`, BO-09, US-M12-03) — bu `active`/`grace` holatda ishlaydi. ~~Obuna to'xtagan taqdirda ham eksport saqlanadi (US-M17-03)~~ — **2026-10-15 qarori bilan bekor qilindi**: `restricted`/`closed` holatda oddiy `reports.export` **yopiq** (US-M17-03/US-M17-05, `14-autentifikatsiya-oauth2.md` §16.1.1 — O1 tuzatish). Buning o'rniga foydalanuvchi qarori (D2, 2026-10-15): lokaut paytida ma'lumot eksporti **faqat** login/to'lov sahifasidagi alohida "Ma'lumotlarimni yuklab olish" yo'li orqali — parol tasdiqlash + SMS OTP (`purpose=data_export`) + tenant bo'yicha 1 marta/24 soat rate-limit + `data_export_during_restriction` audit yozuvi bilan (to'liq mexanizm `14-autentifikatsiya-oauth2.md` §16.5). *(2026-10-15: qabul-5/kamchiliklar-yakuniy ziddiyat 3 — tuzatildi)*
-- To'liq tenant ma'lumotlar bazasi eksporti (masalan tenant tizimdan chiqib ketganda) — alohida, kattaroq operatsiya (platform admin orqali, audit bilan) — **ochiq savol**: aniq format/SLA belgilanmagan — mahsulot talabi: US-M17-05 (MVP'dan keyin). *(2026-10-14: tekshiruv)*
+- Har bir tenant o'z ma'lumotini **istalgan vaqtda** eksport qila oladi: Excel/PDF hisobotlar (`reports.export`, BO-09, US-M12-03) — bu `active`/`grace` holatda ishlaydi. `restricted`/`closed` holatda oddiy `reports.export` **yopiq** (US-M17-03/US-M17-05, `14-autentifikatsiya-oauth2.md` §16.1.1). Buning o'rniga lokaut paytida ma'lumot eksporti (qaror #20) **faqat** login/to'lov sahifasidagi alohida "Ma'lumotlarimni yuklab olish" yo'li orqali — parol tasdiqlash + SMS OTP (`purpose=data_export`) + tenant bo'yicha 1 marta/24 soat rate-limit + `data_export_during_restriction` audit yozuvi bilan (to'liq mexanizm `14-autentifikatsiya-oauth2.md` §16.5).
+- To'liq tenant ma'lumotlar bazasi eksporti (masalan tenant tizimdan chiqib ketganda) — alohida, kattaroq operatsiya (platform admin orqali, audit bilan) — **ochiq savol**: aniq format/SLA belgilanmagan — mahsulot talabi: US-M17-05 (MVP'dan keyin).
 
 ---
 
 ## 8. Xavfsizlik bazaviy darajasi (baseline)
 
-Manbada aniq "OWASP ASVS L2" talabi tilga olinmagan — quyidagilar sanoat standart amaliyoti sifatida **tavsiya** qilinadi (**taxmin**, lekin loyihaning boshqa qarorlari — TLS, bcrypt/argon2, CSRF, rate-limit — bilan izchil):
+Manbada aniq "OWASP ASVS L2" talabi tilga olinmagan — quyidagilar sanoat standart amaliyoti sifatida **tavsiya** qilinadi (**taxmin**, lekin loyihaning boshqa qarorlari — TLS, argon2, CSRF, rate-limit — bilan izchil):
 
 | Band | Talab | Manba/izoh |
 |---|---|---|
 | Transport | TLS 1.2+ barcha ulanishlarda | `04-arxitektura-va-stack.md`, 7-bo'lim |
-| Parol/PIN | **argon2id** heshlash (`14-autentifikatsiya-oauth2.md` §4.1 — avvalgi "bcrypt/argon2" ochiq tanlovi aniqlashtirildi) | `04-arxitektura-va-stack.md`, 7-bo'lim *(2026-10-15: kamchiliklar-yakuniy ziddiyat 5 — tuzatildi)* |
-| Sessiya | HttpOnly, Secure, SameSite cookie + CSRF token | `24-frontend-arxitekturasi.md`, 3-bo'lim (qaror allaqachon qabul qilingan) |
+| Parol/PIN | **argon2id** heshlash (`14-autentifikatsiya-oauth2.md` §4.1) | `04-arxitektura-va-stack.md`, 7-bo'lim |
+| Sessiya | HttpOnly, Secure, SameSite cookie + CSRF token | `24-frontend-arxitekturasi.md`, 3-bo'lim |
 | Kirish cheklovi (rate limiting) | Redis orqali, login/API darajasida | `10-umumiy-arxitektura.md` — Redis "rate-limit" vazifasi uchun allaqachon rejalashtirilgan |
 | CSP (Content Security Policy) | Veb frontendda standart sarlavhalar | **Taxmin** — frontend hujjatida alohida tilga olinmagan, bazaviy amaliyot sifatida qo'shiladi |
 | Kirish nazorati (input validation) | Pydantic v2 (backend), zod (frontend) | `10-umumiy-arxitektura.md`, `24-frontend-arxitekturasi.md` — ikkalasi ham allaqachon tanlangan |
 | Dependency scanning | CI'da avtomatik (masalan `pip-audit`/`npm audit` darajasidagi tekshiruv) | **Taxmin** — manbada yo'q, CI jarayoniga qo'shiladigan tavsiya |
-| Penetratsion test | **Ikki bosqich** *(2026-10-15: foydalanuvchi qarori — `tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md` #14)*: (1) **pilotdan oldin** — bepul avtomatik DAST skaner (masalan OWASP ZAP) + ichki OAuth/to'lov/fiskal tekshiruv ro'yxati; (2) **ommaviy sotuvdan oldin** — Celion yoki ONESEC'dan (ikkalasidan narx so'rab) OWASP ASVS L2 bo'yicha to'liq pentest (veb, API, OAuth, Android). Byudjet rezervi: **~60 mln so'm (~$5 000)** | Standart/qamrov — yuqori ishonch; narx — xalqaro ma'lumotdan taxmin ($1 500–7 000), mahalliy firmalar (Celion, ONESEC, Toshkent) narxni ochiq bermaydi — rasmiy taklif so'ralishi kerak |
+| Penetratsion test | **Ikki bosqich** (qaror #23 — tavsiya #14): (1) **pilotdan oldin** — bepul avtomatik DAST skaner (masalan OWASP ZAP) + ichki OAuth/to'lov/fiskal tekshiruv ro'yxati; (2) **ommaviy sotuvdan oldin** — Celion yoki ONESEC'dan (ikkalasidan narx so'rab) OWASP ASVS L2 bo'yicha to'liq pentest (veb, API, OAuth, Android). Byudjet rezervi: **~60 mln so'm (~$5 000)** | Standart/qamrov — yuqori ishonch; narx — xalqaro ma'lumotdan taxmin ($1 500–7 000), mahalliy firmalar (Celion, ONESEC, Toshkent) narxni ochiq bermaydi — rasmiy taklif so'ralishi kerak |
 | Shifrlash (tinch holatda) | DBaaS/S3 darajasidagi shifrlash (UzCloud taqdim etadigan darajada) | **Taxmin** — UzCloud'ning aniq "encryption at rest" xususiyati rasmiy sahifada alohida tasdiqlanmagan |
 
 ---
@@ -425,19 +426,17 @@ Manbada O'zbekiston qonunchiligida ma'lumot buzilishi (data breach) haqida davla
 ## Ochiq savollar
 
 1. ЗРУ-764 (Kiberxavfsizlik to'g'risida) ning oddiy xususiy SaaS ERP'ga (davlat API'lariga mijoz sifatida ulangan) tegishliligi — csec.uz bilan yozma aniqlashtirish kerak (`07-fayl`, Ochiq savol 1).
-2. Chegirma/qaytarish/nasiya/pul olish uchun aniq limit summalari — manbada yo'q, MVP oldidan biznes-qoida sifatida sozlanishi kerak (`02-rollar-va-ssenariylar.md`, Ochiq savol 2).
-3. ~~Branch scoping'ning RLS siyosati ichida yoki ilova qatlamida amalga oshirilishi.~~ **Yopildi**: yagona qatlam, ilova darajasida (`BranchScopedRepository`, 2.4-bo'lim). *(2026-10-14: tekshiruv)*
-4. UzCloud'da tayyor KMS-as-a-Service xizmati bor-yo'qligi tasdiqlanmagan — agar yo'q bo'lsa, qaysi sir boshqaruv vositasi (Vault yoki boshqa) ishlatilishi arxitektura qarori sifatida qoldirilgan.
-5. Click/Payme merchant hisobi — tenant darajasida alohida yoki platforma darajasida umumiy bo'lishi (bu sirlarni kim nazorat qilishiga ta'sir qiladi) — biznes qarori kerak.
-6. Chet elga (Claude API) shaxsiy ma'lumot uzatish uchun ZRU-547 15/27-1-moddadagi uch shartdan qaysi birini tanlash — huquqiy maslahat kerak.
-7. Audit log va backup uchun aniq RPO/RTO va tiklash sinovi chastotasi — manbada yo'q, bu hujjatdagi raqamlar taxmin, pilot/ishga tushirish oldidan amaliy sinovlar bilan tasdiqlanishi kerak.
-8. Qurilma tokeni (Android POS) refresh/rotatsiya aniq muddati — `28-android-pos.md`da arxitektura qarori sifatida belgilanadi.
-9. Ma'lumot buzilishi (data breach) holatida O'zbekiston qonunchiligi bo'yicha xabar berish muddati/formati — ochiq manbada topilmadi, huquqiy maslahat tavsiya etiladi.
-10. Tenant darajasidagi to'liq ma'lumotlar bazasi eksporti (tenant chiqib ketganda) uchun aniq format/SLA — mahsulot jamoasi bilan belgilanishi kerak.
+2. UzCloud'da tayyor KMS-as-a-Service xizmati bor-yo'qligi tasdiqlanmagan — agar yo'q bo'lsa, qaysi sir boshqaruv vositasi (Vault yoki boshqa) ishlatilishi arxitektura qarori sifatida qoldirilgan.
+3. Click/Payme merchant hisobi — tenant darajasida alohida yoki platforma darajasida umumiy bo'lishi (bu sirlarni kim nazorat qilishiga ta'sir qiladi) — biznes qarori kerak.
+4. Chet elga (Claude API) shaxsiy ma'lumot uzatish uchun ZRU-547 15/27-1-moddadagi uch shartdan qaysi birini tanlash — huquqiy maslahat kerak.
+5. Audit log va backup uchun aniq RPO/RTO va tiklash sinovi chastotasi — manbada yo'q, bu hujjatdagi raqamlar taxmin, pilot/ishga tushirish oldidan amaliy sinovlar bilan tasdiqlanishi kerak.
+6. Qurilma tokeni (Android POS) refresh/rotatsiya aniq muddati — `28-android-pos.md`da arxitektura qarori sifatida belgilanadi.
+7. Ma'lumot buzilishi (data breach) holatida O'zbekiston qonunchiligi bo'yicha xabar berish muddati/formati — ochiq manbada topilmadi, huquqiy maslahat tavsiya etiladi.
+8. Tenant darajasidagi to'liq ma'lumotlar bazasi eksporti (tenant chiqib ketganda) uchun aniq format/SLA — mahsulot jamoasi bilan belgilanishi kerak.
 
 ## Manbalar
 
-- `spec/kod-uchun/14-autentifikatsiya-oauth2.md` — OAuth 2.0 AS/RS, token, obuna lokauti, offline litsenziya, admin panel (to'liq protokol tafsiloti). *(2026-10-15: foydalanuvchi qarori)*
+- `spec/kod-uchun/14-autentifikatsiya-oauth2.md` — OAuth 2.0 AS/RS, token, obuna lokauti, offline litsenziya, admin panel (to'liq protokol tafsiloti).
 - `spec/kod-uchun/10-umumiy-arxitektura.md`, `11-malumotlar-modeli.md`, `24-frontend-arxitekturasi.md`
 - `spec/kod-uchun/02-rollar-va-ssenariylar.md` (huquqlar matritsasi), `03-modullar-talablari.md` (M01–M18, limit/PIN/audit talablari), `06-ekranlar-umumiy.md` (POS-01/06, BO-16 tasdiqlash oqimi), `09-ai-funksiyalar.md` (AI va ma'lumot minimizatsiyasi)
 - `research_notes/texnik/04-arxitektura-va-stack.md` (RLS, sertifikatlash, backup, kripto)

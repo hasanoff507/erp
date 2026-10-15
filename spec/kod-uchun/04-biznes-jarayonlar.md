@@ -1,19 +1,22 @@
 # Uchdan-uchgacha biznes jarayonlar
 
-*Muallif: Jarayonchi (Mahsulot team) · 2026-10-12*
+**Maqsad:** 13 ta markaziy biznes jarayonni (xarid, sotuv, qaytarish, to'lov, buxgalteriya, QQS, davlat hisobotini solishtirish, filiallararo ko'chirish, inventarizatsiya, qarz undirish, yetkazib beruvchiga to'lov, chekdan keyingi e-faktura) qadam-baqadam, rol/modul/hujjat/davlat tizimi/buxgalteriya effekti bilan tasvirlash.
+**Kim uchun:** backend/frontend ishlab chiquvchilar va ekran/API loyihalovchilar.
+**Bog'liq fayllar:** `01-qarorlar.md`, `03-modullar-talablari.md`, `06-ekranlar-umumiy.md`, `07-ekran-tafsilotlari.md`, `13-provodka-qoidalari.md`.
+**Holat:** joriy, 2026-10-15.
 
 ## Asosiy xulosalar
 
-1. Mahsulotning markaziy oqimi endi deklaratsiya yozish emas — **davlat (Soliq qo'mitasi/soliq organlari) 2026-01-01 dan QQS, aylanma, mol-mulk, yer, JShDS va ijtimoiy soliq hisobotlarini o'zi tuzadi** (Soliq kodeksi 81-moddasi, O'RQ-1108-son Qonun, 2025-12-25, lex.uz/docs/-7944527 — **foyda solig'i bu ro'yxatga kirmaydi**), korxonaga shuni ichki hisob bilan solishtirish va **5 kalendar kun ichida (hisobot topshirish muddatidan kechiktirmay) tuzatish kiritish** imkoni beriladi *(2026-10-14: tuzatildi — avval "5 ish kuni" va ikkinchi darajali OAV manbasi ko'rsatilgan edi; endi birlamchi qonun manbasi topildi)*. AIOS'ning 18 MVP moduli faqat **QQS va aylanma solig'ini** to'liq ichki ma'lumot bilan solishtira oladi *(2026-10-14: tuzatildi — "aylanma/foyda solig'i" noto'g'ri edi, foyda solig'ini davlat o'zi tuzmaydi)* — mol-mulk, yer, JShDS va ijtimoiy soliq uchun kerakli ichki ma'lumot (asosiy vositalar, kadrlar/ish haqi) MVP modullari qatorida yo'q, shuning uchun ular faqat "davlat ko'rsatgan raqam sifatida ko'rsatiladi, ichki solishtirish keyingi bosqich" deb belgilanadi (README.md MVP ro'yxati). Shu sabab BP-08 (davlat hisobotini solishtirish) — eng muhim jarayon.
-2. **13 ta biznes jarayon** (BP-01…BP-13) aniqlandi: xarid, kassa sotuv, nasiya sotuv, qaytarish, to'lov qabul qilish, buxgalteriya provodkalari, QQS ichki hisob-kitob, davlat hisobotini solishtirish, filiallararo ko'chirish, inventarizatsiya, nasiya qarzini undirish, yetkazib beruvchiga to'lov, **va chek asosida keyinchalik e-faktura chiqarish** (BP-13, *2026-10-15: foydalanuvchi qarori bilan qo'shildi*, US-M01-06).
+1. Mahsulotning markaziy oqimi endi deklaratsiya yozish emas — **davlat (Soliq qo'mitasi/soliq organlari) 2026-01-01 dan QQS, aylanma, mol-mulk, yer, JShDS va ijtimoiy soliq hisobotlarini o'zi tuzadi** (Soliq kodeksi 81-moddasi, O'RQ-1108-son Qonun, 2025-12-25, lex.uz/docs/-7944527 — **foyda solig'i bu ro'yxatga kirmaydi**), korxonaga shuni ichki hisob bilan solishtirish va **5 kalendar kun ichida (hisobot topshirish muddatidan kechiktirmay) tuzatish kiritish** imkoni beriladi. AIOS'ning 18 MVP moduli faqat **QQS va aylanma solig'ini** to'liq ichki ma'lumot bilan solishtira oladi — mol-mulk, yer, JShDS va ijtimoiy soliq uchun kerakli ichki ma'lumot (asosiy vositalar, kadrlar/ish haqi) MVP modullari qatorida yo'q, shuning uchun ular faqat "davlat ko'rsatgan raqam sifatida ko'rsatiladi, ichki solishtirish keyingi bosqich" deb belgilanadi (README.md MVP ro'yxati). Shu sabab BP-08 (davlat hisobotini solishtirish) — eng muhim jarayon.
+2. **13 ta biznes jarayon** (BP-01…BP-13) aniqlandi: xarid, kassa sotuv, nasiya sotuv, qaytarish, to'lov qabul qilish, buxgalteriya provodkalari, QQS ichki hisob-kitob, davlat hisobotini solishtirish, filiallararo ko'chirish, inventarizatsiya, nasiya qarzini undirish, yetkazib beruvchiga to'lov, **va chek asosida keyinchalik e-faktura chiqarish** (BP-13, qaror #18, US-M01-06).
 3. Oltita majburiy davlat tizimi (virtual kassa/OFD, e-faktura, e-TTN, Asl belgisi, MXIK, E-IMZO) jarayonlarda qayerda ishtirok etishi pastdagi matritsada ko'rsatilgan — soliq hisobotlari (my.soliq.uz) BP-08 uchun va e-ishonchnoma (Vakolat.uz) BP-01 uchun qo'shimcha ustun sifatida kiritildi, chunki ular matritsaning talab qilingan 6 tizimidan tashqari, lekin markaziy oqim/vakillik holatlari uchun zarur (e-ishonchnoma — 8 majburiy tizim ro'yxatidan, `09-soliq-integratsiyasi.md`, 14-qator).
-4. Offline rejim majburiy: kassa internetsiz chek shakllantiradi, **48 soat ichida** OFD'ga yuborishi shart (943-son qaror, 1-ilova, 31-band — `02-kassa-ofd-markirovka.md`). Markirovkalangan tovar (Asl belgisi) kodi esa markaziy tizimga bog'liq bo'lgani uchun offlayn rejimda tekshirilishi **mumkin emas** — offline **sotish** siyosati 2026-10-15 qarori bilan hal qilindi (narx qurilmada ma'lum bo'lsa ruxsat, bo'lmasa taqiq, US-M01-03); offline **qaytarish/ko'chirish** siyosati hali ochiq savol (quyida) *(2026-10-15: foydalanuvchi qarori)*.
+4. Offline rejim majburiy: kassa internetsiz chek shakllantiradi, **48 soat ichida** OFD'ga yuborishi shart (943-son qaror, 1-ilova, 31-band — `02-kassa-ofd-markirovka.md`). Markirovkalangan tovar (Asl belgisi) kodi esa markaziy tizimga bog'liq bo'lgani uchun offlayn rejimda tekshirilishi **mumkin emas** — offline **sotish** siyosati aniq (qaror #17: narx qurilmada ma'lum bo'lsa ruxsat, bo'lmasa taqiq, US-M01-03); offline **qaytarish** — faqat online (BP-04); offline **ko'chirish** — o'z filiallari ichida ruxsat (BP-09).
 5. Markirovkalangan tovar (Asl belgisi) sotuv, qaytarish va filiallararo ko'chirishning har uchida alohida qadam talab qiladi; ko'chirishda **72 soat** chegarasi bor (23-son qaror, 2026-01-23 — `02-kassa-ofd-markirovka.md`).
 6. Onlayn/QR to'lovda fiskal chekni kim chiqarishi (to'lov tizimi "komissioner" sifatida, yoki merchant o'zi) **huquqiy jihatdan ziddiyatli** — amaliyotda ustun model to'lov tizimi tomonidan chiqarilishi, lekin buxgalter.uz tahlili buni majburiy emas deb hisoblaydi (`03-efaktura-va-tolov.md`, 2.5-band). BP-05'da ikki variant ham ko'rsatildi.
 7. Buxgalteriya provodkalari faqat **mahsulot darajasida** (qaysi hodisa qaysi hisob guruhiga ta'sir qiladi — so'z bilan, hisob raqamlarisiz) tasvirlandi; to'liq hisob rejasi (NSBU №21 asosida) Arxitektura teamining ishi.
-8. *(2026-10-14: tuzatildi — tezis haddan oshirilgan edi)* Bozorda ayrim mahsulotlar (eng muhimi — **MoySklad**, o'z saytida "Регистрация продаж в налоговой Узбекистана через один клик" va Asl belgisi/AslBelgisi integratsiyasini ochiq da'vo qiladi) virtual kassa + e-faktura + Asl belgisi integratsiyasining ko'pini uchinchi tomon ulanishlari orqali ta'minlaydi — shuning uchun "hech kim integratsiya qilmagan" degan tezis noto'g'ri. AIOS'ning haqiqiy farqlanish nuqtasi: (a) bu integratsiyalar **bitta tizimda ichki**, tashqi kassa/EDO dasturiga bog'lanish shart emas; (b) **davlat tuzgan soliq hisobotini ichki hisob bilan avtomatik solishtirish** (BP-08) — bu 2026-01-01'dan boshlangan yangi talab bo'lib, tekshirilgan 9 ta raqobatchining birortasida ham rasmiy sahifada bunday funksiya haqida da'vo topilmadi; (c) offline-first + markirovka maxsus holatlari; (d) o'zbek tilidagi AI. Jarayonlar shu to'rtta nuqta asosida loyihalashtirildi (`research_notes/texnik/tekshiruv-2026-10-14/4-raqobat-bozor.md`).
+8. Bozorda ayrim mahsulotlar (eng muhimi — **MoySklad**, o'z saytida "Регистрация продаж в налоговой Узбекистана через один клик" va Asl belgisi/AslBelgisi integratsiyasini ochiq da'vo qiladi) virtual kassa + e-faktura + Asl belgisi integratsiyasining ko'pini uchinchi tomon ulanishlari orqali ta'minlaydi — shuning uchun "hech kim integratsiya qilmagan" degan tezis noto'g'ri. AIOS'ning haqiqiy farqlanish nuqtasi: (a) bu integratsiyalar **bitta tizimda ichki**, tashqi kassa/EDO dasturiga bog'lanish shart emas; (b) **davlat tuzgan soliq hisobotini ichki hisob bilan avtomatik solishtirish** (BP-08) — bu 2026-01-01'dan boshlangan yangi talab bo'lib, tekshirilgan 9 ta raqobatchining birortasida ham rasmiy sahifada bunday funksiya haqida da'vo topilmadi; (c) offline-first + markirovka maxsus holatlari; (d) o'zbek tilidagi AI. Jarayonlar shu to'rtta nuqta asosida loyihalashtirildi (`research_notes/texnik/tekshiruv-2026-10-14/4-raqobat-bozor.md`).
 9. QQS krediti endi shartli: agar e-faktura davlat xavf-baholashda "yuqori xavfli" (qizil) toifaga tushsa, QQS krediti faqat to'lovdan keyin beriladi va bunday fakturalar ulushi davr uchun ≤10% bilan cheklanadi (VM Qarori №830-son, 2025-12-26 — `03-efaktura-va-tolov.md`). Bu BP-01, BP-07 va BP-12'ga (yetkazib beruvchiga to'lov) ta'sir qiladi.
-10. **"5 kalendar kun"** hisoblagichi davlat hisoboti **tuzilgan/e'lon qilingan paytdan** boshlanadi (farq topilgan paytdan emas), lekin hisobot topshirish muddatidan kechiktirmasligi kerak, va muddat ichida tuzatish kiritilmasa hisobot **davlat shakllantirgan ko'rinishda topshirilgan** hisoblanadi *(2026-10-14: tuzatildi — "5 ish kuni" va manba endi birlamchi: Soliq kodeksi 81-moddasi, O'RQ-1108-son Qonun, 2025-12-25, [lex.uz/docs/-7944527](https://lex.uz/docs/-7944527); ikkinchi darajali kursiv.media manbasi ham mazmunan mos ekanligi tasdiqlandi).*
+10. **"5 kalendar kun"** hisoblagichi davlat hisoboti **tuzilgan/e'lon qilingan paytdan** boshlanadi (farq topilgan paytdan emas), lekin hisobot topshirish muddatidan kechiktirmasligi kerak, va muddat ichida tuzatish kiritilmasa hisobot **davlat shakllantirgan ko'rinishda topshirilgan** hisoblanadi (Soliq kodeksi 81-moddasi, O'RQ-1108-son Qonun, 2025-12-25, [lex.uz/docs/-7944527](https://lex.uz/docs/-7944527)).
 11. To'lov oqimi sotuv paytidagi kiruvchi to'lov (BP-05) bilan tugamaydi — nasiya qarzini keyinroq undirish (BP-11) va yetkazib beruvchiga to'lov/kreditorlikni yopish (BP-12) alohida jarayon sifatida qo'shildi, chunki BP-07'dagi "qizil faktura — QQS krediti to'lovdan keyin" qoidasi aynan BP-12'ga bog'liq.
 
 ---
@@ -84,9 +87,7 @@ Manba: `02-kassa-ofd-markirovka.md` (fiskal chek, 48 soat qoidasi, Asl belgisi P
 
 ---
 
-## BP-03: Sotuv — nasiya (qarzga sotish)
-
-*(2026-10-15: asoschi qarori, Q3 — avvalgi diagramma/jadval "nasiya sotuvda fiskal chek darhol chiqadi" deb ko'rsatgan edi, bu almashtirildi)*
+## BP-03: Sotuv — nasiya (qarzga sotish) (qaror #30)
 
 ```mermaid
 flowchart TD
@@ -111,7 +112,7 @@ flowchart TD
 | 8 | Tizim (AI) / Menejer | M08 | Eslatma matni (loyiha) | — | Effekt yo'q — AI faqat matn loyihasini tayyorlaydi, odam tasdiqlagandan keyin yuboriladi (AI-06, `09-ai-funksiyalar.md`) |
 | 9 | — | M08 | **Fiskal chek shu yerda chiqadi** | — | Davomi BP-11'da (nasiya qarzini undirish) |
 
-Manba: `03-efaktura-va-tolov.md` (B2B e-faktura), `02-kassa-ofd-markirovka.md`; `spec/tarix/tekshiruv/asoschi-qarorlari-2026-10-15.md`, Q3. *Eslatma: B2C nasiya savdosida ham e-faktura kerakligi/kerak emasligi ochiq manbada aniq ko'rsatilmagan — "taxmin" sifatida belgilangan (faqat yuridik shaxslar uchun E-faktura shart, `03-fayl` 1.1-band).*
+Manba: `03-efaktura-va-tolov.md` (B2B e-faktura), `02-kassa-ofd-markirovka.md`; `spec/tarix/tekshiruv/asoschi-qarorlari-2026-10-15.md` (qaror #30). *Eslatma: B2C nasiya savdosida ham e-faktura kerakligi/kerak emasligi ochiq manbada aniq ko'rsatilmagan — "taxmin" sifatida belgilangan (faqat yuridik shaxslar uchun E-faktura shart, `03-fayl` 1.1-band).*
 
 ---
 
@@ -138,7 +139,7 @@ flowchart TD
 | 5 | Omborchi | M04 | Ichki kirim hujjati | — | Ombor qoldig'i ortadi |
 | 6 | Buxgalter | M10, M11 | Avtomatik provodka | — | QQS majburiyati mos ravishda qayta hisoblanadi |
 
-Manba: `02-kassa-ofd-markirovka.md` (korrektsiya cheki tushunchasi fiskal chek talablaridan kelib chiqadi). *Eslatma: markirovkalangan tovarni Asl belgisi tizimida qanday "qaytarish" qilish kerakligi texnik API hujjatlari yopiq bo'lgani sababli ochiq manbada tasdiqlanmagan — "taxmin" (qadam 2a).* *(2026-10-15: foydalanuvchi qarori)* **Markirovkalangan tovarni qaytarish faqat internet bor paytda (online) amalga oshiriladi** — offline rejimda bu jarayon butunlay bloklanadi (`03-modullar-talablari.md`, M02 Offline xatti-harakati; `spec/tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #5).
+Manba: `02-kassa-ofd-markirovka.md` (korrektsiya cheki tushunchasi fiskal chek talablaridan kelib chiqadi). *Eslatma: markirovkalangan tovarni Asl belgisi tizimida qanday "qaytarish" qilish kerakligi texnik API hujjatlari yopiq bo'lgani sababli ochiq manbada tasdiqlanmagan — "taxmin" (qadam 2a).* **Markirovkalangan tovarni qaytarish faqat internet bor paytda (online) amalga oshiriladi** — offline rejimda bu jarayon butunlay bloklanadi (`03-modullar-talablari.md`, M02 Offline xatti-harakati; `spec/tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #5).
 
 ---
 
@@ -159,9 +160,9 @@ flowchart TD
 |---|---|---|---|---|---|
 | Naqd | Kassir | M01 | Fiskal chek | Virtual kassa/OFD | Kassadagi naqd pul ortadi |
 | Karta | Kassir | M01 | Terminal cheki + fiskal chek | Virtual kassa/OFD (acquiring bank orqali) | Bank hisobidagi mablag' ortadi (kechikish muddati manbada ko'rsatilmagan — taxmin qilinmaydi) |
-| *(2026-10-15: foydalanuvchi qarori)* Karta — mustaqil terminal (qo'lda belgilangan) | Kassir | M01, M16 | Fiskal chek + ixtiyoriy terminal operatsiya raqami | Virtual kassa/OFD (kassa terminal bilan integratsiyalanmagan) | Online va offline'da ruxsat; Z-hisobotda "karta" jami alohida chiqadi, Egasi kun oxirida bank ko'chirmasi bilan solishtiradi |
+| Karta — mustaqil terminal (qo'lda belgilangan) | Kassir | M01, M16 | Fiskal chek + ixtiyoriy terminal operatsiya raqami | Virtual kassa/OFD (kassa terminal bilan integratsiyalanmagan) | Online va offline'da ruxsat; Z-hisobotda "karta" jami alohida chiqadi, Egasi kun oxirida bank ko'chirmasi bilan solishtiradi |
 | QR/Click/Payme | Kassir/mijoz | M01 | To'lov tasdiqlash + fiskal chek | Virtual kassa/OFD, (Click/Payme/Uzum API) | Mablag' vositachi orqali tushadi, komissiya ushlab qolinadi |
-| *(2026-10-14: tekshiruv)* Yagona QR (UzQR, bank) | Kassir/mijoz | M01 | To'lov tasdiqlash + fiskal chek | Virtual kassa/OFD, bank (yagona QR) | Mablag' bank orqali tushadi; yuridik shaxslar uchun 2026-07-01'dan majburiy (PF-246-son, 3-band "b"), YTT uchun ixtiyoriy, Click/Payme/Uzum'ning o'rnini bosmaydi |
+| Yagona QR (UzQR, bank) | Kassir/mijoz | M01 | To'lov tasdiqlash + fiskal chek | Virtual kassa/OFD, bank (yagona QR) | Mablag' bank orqali tushadi; yuridik shaxslar uchun 2026-07-01'dan majburiy (PF-246-son, 3-band "b"), YTT uchun ixtiyoriy, Click/Payme/Uzum'ning o'rnini bosmaydi |
 
 Manba: `03-efaktura-va-tolov.md` (Payme/Click/Uzum protokollari, komissiya jadvali, 2.5-band — chekni kim chiqarishi haqidagi huquqiy ziddiyat). *Ochiq savol: QR/Click/Payme orqali to'lovda fiskal chekni to'lov tizimi yoki merchant kassasi chiqarishi — ikki huquqiy talqin mavjud, aniqlashtirish kerak (quyidagi "Ochiq savollar"ga qarang).*
 
@@ -238,13 +239,12 @@ flowchart TD
 | 5a | Buxgalter | M12 | Tuzatish hujjati | E-IMZO, Soliq hisobotlari (my.soliq.uz) | — |
 | 5b | — | M12 | — | Soliq hisobotlari (my.soliq.uz) | Hisobot davlat shakllantirgan ko'rinishda topshirilgan hisoblanadi, keyingi tuzatish imkoni yo'qolishi mumkin |
 
-Manba: Soliq kodeksi 81-moddasi, O'RQ-1108-son Qonun (2025-12-25) — [lex.uz/docs/-7944527](https://lex.uz/docs/-7944527) *(2026-10-14: birlamchi manba qo'shildi)*; `00-xulosa-va-ochiq-savollar.md` (5-band, markaziy xulosa), `04-arxitektura-va-stack.md` (6.1–6.3-band, solishtirish oqimi), `09-soliq-integratsiyasi.md` ("Elektron hisobotlar" qatori), [uz.kursiv.media, 2025-12-30](https://uz.kursiv.media/uz/2025-12-30/1-yanvardan-ayrim-soliq-hisobotlari-avtomatik-shakllantiriladi/) (ikkinchi darajali, mazmunan mos).
+Manba: Soliq kodeksi 81-moddasi, O'RQ-1108-son Qonun (2025-12-25) — [lex.uz/docs/-7944527](https://lex.uz/docs/-7944527); `00-xulosa-va-ochiq-savollar.md` (5-band, markaziy xulosa), `04-arxitektura-va-stack.md` (6.1–6.3-band, solishtirish oqimi), `09-soliq-integratsiyasi.md` ("Elektron hisobotlar" qatori), [uz.kursiv.media, 2025-12-30](https://uz.kursiv.media/uz/2025-12-30/1-yanvardan-ayrim-soliq-hisobotlari-avtomatik-shakllantiriladi/) (ikkinchi darajali, mazmunan mos).
 
 *Ochiq savollar:*
 - *my.soliq.uz'dan dasturiy (API) o'qish yo'li topilmadi — qadam 2 MVP'da qo'lda yoki yarim-avtomatik (masalan, E-IMZO orqali shaxsiy kabinetga kirib yuklab olish) bo'lishi mumkin; bu avtomatlashtirish va'dasini kechiktiradi.*
-- *(2026-10-14: hal qilindi)* ~~"5 ish kuni" qoidasining aniq qonun/qaror raqami lex.uz'da topilmadi~~ — endi aniq: Soliq kodeksi 81-moddasi, O'RQ-1108 (2025-12-25), muddat **5 kalendar kun**.
-- *3-qadamda ichki solishtirish faqat QQS va aylanma solig'i uchun to'liq bajariladi* (2026-10-14: "foyda solig'i" olib tashlandi) *— mol-mulk, yer, JShDS va ijtimoiy soliq hisobotlari uchun kerakli ichki ma'lumot (asosiy vositalar hisobi, kadrlar/ish haqi) 18 MVP moduli qatorida yo'q (README.md); bu hisobotlar MVP'da faqat davlat bergan raqam sifatida ko'rsatiladi, ichki solishtirish keyingi bosqich.*
 - *5a-qadamdagi tuzatishning aniq shakli (alohida ariza? my.soliq.uz portalida to'g'ridan-to'g'ri tuzatish kiritish?) va kanali manbada tasvirlanmagan — bu qism hali **ochiq savol** (muddat va huquqiy asos aniqlangan bo'lsa ham).*
+- *3-qadamda ichki solishtirish faqat QQS va aylanma solig'i uchun to'liq bajariladi — mol-mulk, yer, JShDS va ijtimoiy soliq hisobotlari uchun kerakli ichki ma'lumot (asosiy vositalar hisobi, kadrlar/ish haqi) 18 MVP moduli qatorida yo'q (README.md); bu hisobotlar MVP'da faqat davlat bergan raqam sifatida ko'rsatiladi, ichki solishtirish keyingi bosqich.*
 
 ---
 
@@ -269,7 +269,7 @@ flowchart TD
 | 4 | Omborchi | M06, M04 | Kirim hujjati | — | — |
 | 5 | Tizim | M04, M14 | Avtomatik provodka | — | Qabul qiluvchi filial ombori ortadi, jo'natuvchi filial kamayadi (moddiy javobgarlik o'zgaradi) |
 
-Manba: `02-kassa-ofd-markirovka.md` (23-son qaror, 72 soat chegarasi). *Ochiq savol: filiallararo (bir yuridik shaxs ichidagi) ichki ko'chirish uchun E-TTN talab qilinishi aniq tasdiqlanmagan — tashqi tashish uchun majburiylik aniq, ichki ko'chirish uchun "taxmin" sifatida belgilanadi.* *(2026-10-15: foydalanuvchi qarori)* **Markirovkalangan tovarni o'z filiallar/omborlar orasida ko'chirish offline rejimda ruxsat etiladi** (jo'natish va qabul ikkisi ham) — keyin sinxronlanadi, audit bilan; sabab — ichki ko'chirishda tovar egasi o'zgarmaydi (`03-modullar-talablari.md`, M06 Offline xatti-harakati; `spec/tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #5).
+Manba: `02-kassa-ofd-markirovka.md` (23-son qaror, 72 soat chegarasi). *Ochiq savol: filiallararo (bir yuridik shaxs ichidagi) ichki ko'chirish uchun E-TTN talab qilinishi aniq tasdiqlanmagan — tashqi tashish uchun majburiylik aniq, ichki ko'chirish uchun "taxmin" sifatida belgilanadi.* **Markirovkalangan tovarni o'z filiallar/omborlar orasida ko'chirish offline rejimda ruxsat etiladi** (jo'natish va qabul ikkisi ham) — keyin sinxronlanadi, audit bilan; sabab — ichki ko'chirishda tovar egasi o'zgarmaydi (`03-modullar-talablari.md`, M06 Offline xatti-harakati; `spec/tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #5).
 
 ---
 
@@ -297,9 +297,7 @@ Manba: `08-mahsulot-modullari.md` ro'yxatidagi M05 moduli (`README.md` orqali um
 
 ---
 
-## BP-11: Nasiya qarzini undirish (debitorlikni yopish)
-
-*(2026-10-15: asoschi qarori, Q3 — avvalgi diagramma/jadval va ochiq savol almashtirildi; endi aniq: fiskal chek asl sotuvda emas, aynan shu bosqichda chiqadi)*
+## BP-11: Nasiya qarzini undirish (debitorlikni yopish) (qaror #30)
 
 ```mermaid
 flowchart TD
@@ -318,7 +316,7 @@ flowchart TD
 | 4 | Tizim | M01, M08 | **Fiskal chek** (`debt_settlement`) | Virtual kassa/OFD | Savdo daromadi va QQS majburiyati **shu bosqichda** hisoblanadi (⚠ standart ishchi qaror — aniq vaqt buxgalter/yurist tasdig'ini kutadi, `FiscalPolicy` sozlamasi) |
 | 5 | Tizim (AI) / Menejer | M08 | — | — | Effekt yo'q |
 
-Manba: `02-kassa-ofd-markirovka.md`, `09-soliq-integratsiyasi.md`; `spec/tarix/tekshiruv/asoschi-qarorlari-2026-10-15.md`, Q3. *(2026-10-15: asoschi qarori bilan hal qilindi, Q3)* ~~Ochiq savol: asl sotuvda fiskal chek allaqachon chiqarilgani uchun, keyinroq qarz to'langanda yangi fiskal chek kerak bo'lishi/kerak emasligi ochiq manbada ko'rsatilmagan~~ — endi aniq: asl nasiya sotuvida fiskal chek **chiqarilmaydi** (BP-03), **har bir qarz to'lovida yangi fiskal chek chiqariladi**. ⚠ Qolgan ochiq qism — QQS/daromadni tan olish vaqti (sotuv vs to'lov) va bu tartibning soliq qonunchiligiga mosligi, buxgalter va yurist tasdig'ini kutadi.
+Manba: `02-kassa-ofd-markirovka.md`, `09-soliq-integratsiyasi.md`; `spec/tarix/tekshiruv/asoschi-qarorlari-2026-10-15.md` (qaror #30): asl nasiya sotuvida fiskal chek **chiqarilmaydi** (BP-03), **har bir qarz to'lovida yangi fiskal chek chiqariladi**. ⚠ Qolgan ochiq qism — QQS/daromadni tan olish vaqti (sotuv vs to'lov) va bu tartibning soliq qonunchiligiga mosligi, buxgalter va yurist tasdig'ini kutadi.
 
 ---
 
@@ -345,7 +343,7 @@ Manba: `03-efaktura-va-tolov.md` (1.2-band — QQS krediti to'lovdan keyin beril
 
 ---
 
-## BP-13: Chek asosida keyinchalik e-faktura chiqarish *(2026-10-15: foydalanuvchi qarori — qo'shildi)*
+## BP-13: Chek asosida keyinchalik e-faktura chiqarish
 
 ```mermaid
 flowchart TD
@@ -362,12 +360,12 @@ flowchart TD
 | 1 | Kassir/Tizim | M01 | Fiskal chek | Virtual kassa/OFD | Savdo daromadi va QQS allaqachon hisoblangan (BP-02/03) |
 | 2 | Mijoz | M01 | So'rov (tizimdan tashqari, masalan qo'ng'iroq) | — | — |
 | 3 | Buxgalter | M01, M07 | Asl chek tanlovi | — | — |
-| 4 | Tizim | M01, M10 | Chiquvchi e-faktura (`einvoices.related_doc`) | — | Effekt yo'q — `ledger_entries`/`vat_moves`ga yangi yozuv qo'shilmaydi (append-only); bog'lanish faqat `einvoices.related_doc` orqali (`13-provodka-qoidalari.md` §2.22) *(2026-10-15: qabul-5 O13 bo'yicha aniqlashtirildi)* |
+| 4 | Tizim | M01, M10 | Chiquvchi e-faktura (`einvoices.related_doc`) | — | Effekt yo'q — `ledger_entries`/`vat_moves`ga yangi yozuv qo'shilmaydi (append-only); bog'lanish faqat `einvoices.related_doc` orqali (`13-provodka-qoidalari.md` §2.22) |
 | 5 | Buxgalter | M01 | PKCS#7 imzo | E-IMZO | — |
 | 6 | Tizim | M01 | Yuborilgan e-faktura | E-faktura (Faktura.uz — MVP'da yagona operator) | — |
-| 7 | Tizim | M10, M11 | — | — | QQS **ikkinchi marta hisoblanmaydi** — registr yozuvlari o'zgarmaydi (append-only), bog'lanish faqat hujjat darajasida (`einvoices.related_doc`, `13-provodka-qoidalari.md` §2.22) *(2026-10-15: qabul-5 O13 bo'yicha aniqlashtirildi)* |
+| 7 | Tizim | M10, M11 | — | — | QQS **ikkinchi marta hisoblanmaydi** — registr yozuvlari o'zgarmaydi (append-only), bog'lanish faqat hujjat darajasida (`einvoices.related_doc`, `13-provodka-qoidalari.md` §2.22) |
 
-Manba: `spec/kod-uchun/03-modullar-talablari.md` (US-M01-06, M01 chekka holatlar). *Eslatma: bu jarayon B2C sotuvdan keyin mijoz maqomi B2B'ga aniqlanganda (yoki boshidanoq B2B bo'lib, e-faktura keyin so'ralganda) ishlaydi.* *(2026-10-15: foydalanuvchi qarori)* **E-faktura operatori — MVP'da faqat Faktura.uz** (ochiq API hujjati tekshirilgan, REGOS ham ishlatadi); Didox — MVP'dan keyingi birinchi integratsiya (`spec/tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #4).
+Manba: `spec/kod-uchun/03-modullar-talablari.md` (US-M01-06, M01 chekka holatlar). *Eslatma: bu jarayon B2C sotuvdan keyin mijoz maqomi B2B'ga aniqlanganda (yoki boshidanoq B2B bo'lib, e-faktura keyin so'ralganda) ishlaydi.* **E-faktura operatori — MVP'da faqat Faktura.uz** (ochiq API hujjati tekshirilgan, REGOS ham ishlatadi); Didox — MVP'dan keyingi birinchi integratsiya (`spec/tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #4).
 
 ---
 
@@ -377,7 +375,7 @@ Manba: `spec/kod-uchun/03-modullar-talablari.md` (US-M01-06, M01 chekka holatlar
 |---|---|---|---|---|---|---|---|---|
 | BP-01 Xarid | — | ✓ | ✓ | ✓ (qabulda) | ✓ | ✓ | ? (ochiq savol, vakil orqali qabulda) | — |
 | BP-02 Sotuv (kassa) | ✓ | — | — | ✓ | ✓ | — | — | — |
-| BP-03 Sotuv (nasiya) | **— (BP-11'da, Q3)** *(2026-10-15: asoschi qarori — avvalgi ✓ xato edi)* | ✓ (B2B bo'lsa, asl sotuv vaqtida) | — | ✓ | ✓ | ✓ (B2B e-faktura) | — | — |
+| BP-03 Sotuv (nasiya) | **— (BP-11'da, qaror #30)** | ✓ (B2B bo'lsa, asl sotuv vaqtida) | — | ✓ | ✓ | ✓ (B2B e-faktura) | — | — |
 | BP-04 Qaytarish | ✓ | — | — | ✓ | ✓ | — | — | — |
 | BP-05 To'lov qabul qilish | ✓ | — | — | — | — | — | — | — |
 | BP-06 Buxgalteriya provodkalari | — | — | — | — | — | — | — | — |
@@ -387,7 +385,7 @@ Manba: `spec/kod-uchun/03-modullar-talablari.md` (US-M01-06, M01 chekka holatlar
 | BP-10 Inventarizatsiya | — | — | — | — | — | — | — | — |
 | BP-11 Nasiya qarzini undirish | ✓ (BP-05 bilan bir xil) | — | — | — | — | — | — | — |
 | BP-12 Yetkazib beruvchiga to'lov | — | ✓ (holat kuzatish) | — | — | — | — | — | — |
-| BP-13 Chek asosida keyinchalik e-faktura *(2026-10-15)* | — | ✓ (chiquvchi, chekka bog'langan) | — | — | — | ✓ | — | — |
+| BP-13 Chek asosida keyinchalik e-faktura | — | ✓ (chiquvchi, chekka bog'langan) | — | — | — | ✓ | — | — |
 
 Matritsa talab qilingan 6 majburiy davlat tizimining barchasini kamida bitta jarayonda qoplaydi: Virtual kassa/OFD (BP-02, 03, 04, 05, 11), E-faktura (BP-01, 03, 07, 12, 13), E-TTN (BP-01), Asl belgisi (BP-01…04, 09), MXIK (BP-01…04), E-IMZO (BP-01, 03, 08, 13). Qo'shimcha ikki ustun — E-ishonchnoma (Vakolat.uz, 8 majburiy tizim ro'yxatidan, `09-fayl` 14-qator) va Soliq hisobotlari (my.soliq.uz) — markaziy oqim/vakillik holatlari uchun kiritildi.
 
@@ -395,18 +393,16 @@ Matritsa talab qilingan 6 majburiy davlat tizimining barchasini kamida bitta jar
 
 ## Ochiq savollar
 
-1. Onlayn/QR to'lovda (Click/Payme/Uzum) fiskal chekni kim chiqarishi — to'lov tizimi "komissioner" sifatida (ГНК amaliy pozitsiyasi) yoki merchant o'zi (buxgalter.uz huquqiy tahlili) — ikki talqin ziddiyatli, aniqlashtirish kerak (`03-efaktura-va-tolov.md`, 2.5-band).
-2. Davlat tuzgan hisobotni (my.soliq.uz) dasturiy (API) o'qish uchun rasmiy yo'l yo'q — BP-08'ning 2-qadami MVP'da qo'lda/yarim-avtomatik bo'lishi mumkin, bu avtomatlashtirish va'dasini kechiktiradi (`00-xulosa-va-ochiq-savollar.md`).
-3. *(2026-10-15: to'liq hal qilindi — foydalanuvchi qarori)* Offline rejimda Asl belgisi kodini real-vaqtda tekshirish mumkin emas (CRPT Turon markaziy tizimga bog'liq), lekin endi barcha uchta harakat uchun siyosat aniq: **sotish** — narx qurilmada ma'lum bo'lsa ruxsat, bo'lmasa taqiq (US-M01-03); **ko'chirish** — o'z filiallar/omborlari orasida offline ruxsat (BP-09); **qaytarish** — faqat internet bor paytda, offline'da bloklanadi (BP-04). Huquqiy tasdiq (huquqshunos bilan) hamon tavsiya etiladi, lekin mahsulot qarori allaqachon qabul qilingan (`spec/tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #5).
-4. Markirovkalangan tovarni Asl belgisida "qaytarish" (BP-04) va inventarizatsiya kamchiligini "yopish" (BP-10) operatsiyalarining texnik tartibi ochiq manbada topilmadi — CRPT Turon integrator API hujjatlari 403 bilan yopiq (`02-kassa-ofd-markirovka.md`).
-5. Bir yuridik shaxs ichidagi filiallararo (ichki) ko'chirish uchun E-TTN talab qilinishi aniq tasdiqlanmagan — faqat tashqi tashish uchun majburiylik aniq (taxmin, BP-09).
-6. B2C (jismoniy shaxsga) nasiya savdosida e-faktura talab qilinishi/qilinmasligi aniq ko'rsatilmagan — faqat B2B (yuridik shaxslar orasida) uchun e-faktura shart ekani tasdiqlangan (taxmin, BP-03).
-7. *(2026-10-14: qisman hal qilindi)* Virtual kassa dasturini Davlat reyestriga kiritish **muddati endi aniq**: VMQ-943 4-ilova — Soliq qo'mitasi qarori 20 ish kuni, Kiberxavfsizlik markazi xulosasi 15 ish kuni, fiskal ma'lumotlar operatori xulosasi 10 ish kuni, texnik tartibga solish agentligi/"O'zeltexsanoat" xulosasi 5 ish kuni (bosqichlar ketma-ket bo'lsa, jami jarayon bir necha oy davom etishi mumkin). **Narx qisman aniq**: zaxira mablag' talabi (100/500/1000 BHM) virtual kassaga **tegishli emas**. Bu BP-02…05'ning amaliy ishga tushish jadvaliga ta'sirini kamaytiradi, lekin jadvalni hali ham aniqlashtirish kerak (bosqichlar ketma-ketmi, parallelmi — manbada ko'rsatilmagan).
-8. *(2026-10-14: hal qilindi)* ~~"5 ish kuni" qoidasining aniq qonun/qaror raqami lex.uz'da topilmadi~~ — endi aniq: Soliq kodeksi 81-moddasi, O'RQ-1108-son Qonun (2025-12-25), muddat **5 kalendar kun** ([lex.uz/docs/-7944527](https://lex.uz/docs/-7944527)).
-9. BP-08, 5a-qadamdagi tuzatishning aniq shakli (ariza? portalda to'g'ridan-to'g'ri tuzatish?) va yuborish kanali manbada tasvirlanmagan — faqat "tuzatish, qo'lda, E-IMZO bilan" deyilgan (`04-fayl`, 6.3-band); muddat (5 kalendar kun) va huquqiy asos (Soliq kodeksi 81-moddasi) endi aniq.
-10. E-ishonchnoma (Vakolat.uz) AIOS'ga qanday integratsiya qilinishi va BP-01'da aniq qachon talab qilinishi (har doim vakil orqali qabulda, yoki faqat ba'zi holatlarda) ochiq manbada ko'rsatilmagan — API hujjati topilmadi (`09-soliq-integratsiyasi.md`, 14-qator).
-11. BP-01, 3-qadamda davlat xavf-baholash natijasi (yashil/qizil) AIOS'ga qaysi kanal orqali yetib kelishi (EDO operatori — Didox/Faktura.uz orqali, yoki boshqa yo'l) ochiq manbada ko'rsatilmagan.
-12. *(2026-10-15: asoschi qarori bilan hal qilindi, Q3)* ~~BP-11'da nasiya qarzi to'langanda yangi fiskal chek chiqarilishi kerakligi/kerak emasligi ochiq manbada javobsiz qoldi~~ — endi aniq: **ha**, BP-11'da har bir to'lovga yangi fiskal chek (`debt_settlement`) chiqariladi, asl BP-03 sotuvida chek chiqarilmaydi. ⚠ Qolgan ochiq qism: QQS/daromadni tan olish vaqti va bu tartibning qonuniyligi — buxgalter/yurist tasdig'ini kutadi (`spec/tarix/tekshiruv/asoschi-qarorlari-2026-10-15.md`, Q3).
+- **1.** Onlayn/QR to'lovda (Click/Payme/Uzum) fiskal chekni kim chiqarishi — to'lov tizimi "komissioner" sifatida (ГНК amaliy pozitsiyasi) yoki merchant o'zi (buxgalter.uz huquqiy tahlili) — ikki talqin ziddiyatli, aniqlashtirish kerak (`03-efaktura-va-tolov.md`, 2.5-band).
+- **2.** Davlat tuzgan hisobotni (my.soliq.uz) dasturiy (API) o'qish uchun rasmiy yo'l yo'q — BP-08'ning 2-qadami MVP'da qo'lda/yarim-avtomatik bo'lishi mumkin, bu avtomatlashtirish va'dasini kechiktiradi (`00-xulosa-va-ochiq-savollar.md`).
+- **4.** Markirovkalangan tovarni Asl belgisida "qaytarish" (BP-04) va inventarizatsiya kamchiligini "yopish" (BP-10) operatsiyalarining texnik tartibi ochiq manbada topilmadi — CRPT Turon integrator API hujjatlari 403 bilan yopiq (`02-kassa-ofd-markirovka.md`).
+- **5.** Bir yuridik shaxs ichidagi filiallararo (ichki) ko'chirish uchun E-TTN talab qilinishi aniq tasdiqlanmagan — faqat tashqi tashish uchun majburiylik aniq (taxmin, BP-09).
+- **6.** B2C (jismoniy shaxsga) nasiya savdosida e-faktura talab qilinishi/qilinmasligi aniq ko'rsatilmagan — faqat B2B (yuridik shaxslar orasida) uchun e-faktura shart ekani tasdiqlangan (taxmin, BP-03).
+- **7.** Virtual kassa dasturini Davlat reyestriga kiritish bosqichlari (VMQ-943 4-ilova: Soliq qo'mitasi 20 ish kuni, Kiberxavfsizlik markazi 15 ish kuni, fiskal ma'lumotlar operatori 10 ish kuni, texnik tartibga solish agentligi/"O'zeltexsanoat" 5 ish kuni) ketma-ket yoki parallel borishi manbada ko'rsatilmagan; ketma-ket bo'lsa, jami jarayon bir necha oy davom etishi mumkin — bu BP-02…05'ning amaliy ishga tushish jadvaliga ta'sir qiladi. Zaxira mablag' talabi (100/500/1000 BHM) virtual kassaga **tegishli emas**.
+- **9.** BP-08, 5a-qadamdagi tuzatishning aniq shakli (ariza? portalda to'g'ridan-to'g'ri tuzatish?) va yuborish kanali manbada tasvirlanmagan — faqat "tuzatish, qo'lda, E-IMZO bilan" deyilgan (`04-fayl`, 6.3-band); muddat (5 kalendar kun) va huquqiy asos (Soliq kodeksi 81-moddasi) aniq.
+- **10.** E-ishonchnoma (Vakolat.uz) AIOS'ga qanday integratsiya qilinishi va BP-01'da aniq qachon talab qilinishi (har doim vakil orqali qabulda, yoki faqat ba'zi holatlarda) ochiq manbada ko'rsatilmagan — API hujjati topilmadi (`09-soliq-integratsiyasi.md`, 14-qator).
+- **11.** BP-01, 3-qadamda davlat xavf-baholash natijasi (yashil/qizil) AIOS'ga qaysi kanal orqali yetib kelishi (EDO operatori — Didox/Faktura.uz orqali, yoki boshqa yo'l) ochiq manbada ko'rsatilmagan.
+- **12.** BP-11'dagi `debt_settlement` fiskal chekning QQS/daromadni tan olish vaqti (sotuv vs to'lov) va bu tartibning soliq qonunchiligiga mosligi hali buxgalter/yurist tasdig'ini kutadi (qaror #30, `FiscalPolicy` sozlamasi).
 
 ## Manbalar
 
@@ -420,8 +416,8 @@ Matritsa talab qilingan 6 majburiy davlat tizimining barchasini kamida bitta jar
 - [lex.uz/docs/4603329](https://lex.uz/docs/4603329) — VM 943-son qaror, 1-ilova 31-band (48 soat offline qoidasi)
 - [lex.uz/docs/8012407](https://www.lex.uz/docs/8012407) — 23-son qaror (2026-01-23), Asl belgisi 72 soat ko'chirish chegarasi
 - [lex.uz/uz/docs/-7962143](https://lex.uz/docs/-7962143) — VM Qarori №830-son, e-faktura davlat xavf-baholashi
-- [lex.uz/docs/-7944527](https://lex.uz/docs/-7944527) — Soliq kodeksi 81-moddasi, O'RQ-1108-son Qonun (2025-12-25) — davlat hisobot shakllantirish, 5 kalendar kunlik tuzatish qoidasi *(2026-10-14: qo'shildi)*
+- [lex.uz/docs/-7944527](https://lex.uz/docs/-7944527) — Soliq kodeksi 81-moddasi, O'RQ-1108-son Qonun (2025-12-25) — davlat hisobot shakllantirish, 5 kalendar kunlik tuzatish qoidasi
 - [uz.kursiv.media, 2025-12-30](https://uz.kursiv.media/uz/2025-12-30/1-yanvardan-ayrim-soliq-hisobotlari-avtomatik-shakllantiriladi/) — 5 kunlik va avtomatik qabul qoidasi (ikkinchi darajali manba, endi birlamchi qonun bilan tasdiqlangan)
-- `research_notes/texnik/tekshiruv-2026-10-14/` — 2026-10-14 fakt-tekshiruv natijalari
-- Foydalanuvchi qarori, 2026-10-15 — BP-13 (chek asosida keyinchalik e-faktura) qo'shildi (US-M01-06, `03-modullar-talablari.md`)
-- `spec/tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md` — 2026-10-15, tavsiya #5 (offline qaytarish/ko'chirish) va #6 (mustaqil terminal bilan karta)
+- `research_notes/texnik/tekshiruv-2026-10-14/` — fakt-tekshiruv natijalari
+- `spec/kod-uchun/01-qarorlar.md` — qaror #18 (BP-13, chekdan keyingi e-faktura), #30 (BP-03/BP-11, qarzga sotuvda fiskal chek)
+- `spec/tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md` — tavsiya #5 (offline qaytarish/ko'chirish) va #6 (mustaqil terminal bilan karta)

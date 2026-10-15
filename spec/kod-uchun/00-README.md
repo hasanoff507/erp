@@ -7,8 +7,9 @@ Bu papka — ilovani yozish uchun **yagona va to'liq** spetsifikatsiya. Kod faqa
 1. **Avval spec, keyin kod.** Spec'da yo'q yoki noaniq narsa kodda o'zboshimchalik bilan hal qilinmaydi: avval tegishli faylga yoziladi (yoki `26-ochiq-savollar-reestri.md` ga qo'shiladi), keyin kod yoziladi.
 2. **Spec o'zgarsa** — shu commit'da bog'liq fayllar ham yangilanadi (masalan maydon qo'shilsa: `11` model → `12` DB → `17–20` API → `07` ekran) va `01-qarorlar.md` ga qator qo'shiladi.
 3. **Ziddiyat bo'lsa** ustunlik tartibi: `01-qarorlar.md` → mavzu bo'yicha asosiy fayl (masalan DB uchun `12`, API uchun `17–20`) → boshqalar.
-4. Belgilar: *taxmin* — tasdiqlanmagan raqam; *ochiq savol* — tashqi javob kutilmoqda (kod sozlama/adapter ortida yoziladi); *(sana: …)* — o'zgarish izi.
-5. Tashqi buxgalteriya/ERP tizimlari bilan hech qanday bog'liqlik yo'q — mahsulot noldan quriladi.
+4. Belgilar: *taxmin* — tasdiqlanmagan raqam; *ochiq savol* — tashqi javob kutilmoqda (kod sozlama/adapter ortida yoziladi); *(qaror #N)* — `01-qarorlar.md` dagi qarorga havola. Fayllarda faqat **joriy haqiqat** yoziladi — o'zgarishlar tarixi git'da va `spec/tarix/` da.
+5. Har fayl boshida standart blok: **Maqsad · Kim uchun · Bog'liq fayllar · Holat**.
+6. Tashqi buxgalteriya/ERP tizimlari bilan hech qanday bog'liqlik yo'q — mahsulot noldan quriladi.
 
 ## O'qish tartibi
 
@@ -44,12 +45,17 @@ Bu papka — ilovani yozish uchun **yagona va to'liq** spetsifikatsiya. Kod faqa
 | 26 | `26-ochiq-savollar-reestri.md` | Har ochiq savol + qaror yoki vaqtinchalik taxmin | Noaniqlik bo'lganda |
 | 27 | `27-backlog.md` | Bosqichlar ketma-ketligi va "tayyor" ta'rifi (jamoa: asoschi + Claude) | Ish rejasi |
 | 28 | `28-android-pos.md` | Kotlin POS — MVP'dan keyin | Keyinroq |
+| | **Dasturchi uchun yordamchi hujjatlar** | | |
+| 29 | `29-atamalar-lugati.md` | Atamalar: o'zbekcha / ruscha / inglizcha / koddagi nom | Doim yonida |
+| 30 | `30-izchillik-matritsasi.md` | US → BP → ekran → API → jadval → ruxsat → bosqich; teskari indekslar va bo'shliqlar | Har vazifa oldidan |
+| 31 | `31-qabul-testlari.md` | Qabul ssenariylari (Berilgan/Qachonki/Unda) → pytest/Playwright | Har vazifa oxirida |
+| 32 | `32-kod-qoidalari.md` | Repo tuzilmasi, nomlash, test, git oqimi, Definition of Done | Kod yozishdan oldin |
 
 ## Bosqich bo'yicha minimal o'qish to'plami
 
 | Bosqich | O'qiladigan fayllar |
 |---|---|
-| Skelet + auth | 01, 10, 23, 24, 12 (§1–5), 14, 15, 17 |
+| Skelet + auth | 01, 32, 10, 23, 24, 12 (§1–5), 14, 15, 17, 31 (§1) |
 | Katalog va ombor | 03 (M04–M07, M09), 04, 11, 12, 13, 19, 07 (BO-02…05, BO-18) |
 | Kassa (veb) | 03 (M01–M03, M08, M16), 04, 13, 16, 18, 07 (POS-01…15), 08 |
 | Moliya, hisobot, obuna | 03 (M10–M12, M15, M17, M18), 13, 20, 07 (BO-06…21) |

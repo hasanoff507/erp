@@ -1,6 +1,11 @@
 # Veb frontend arxitekturasi (back-office + veb-kassa)
 
-*2026-10-14 · Foydalanuvchi qarori: React + Vite + TypeScript, FSD strukturasi, Effector, shadcn/ui, iloji boricha tayyor kutubxonalar. Namuna loyiha: `E:/Project/monorepo/projects/metadata management/src/client` (bundan keyin — "namuna").*
+**Maqsad:** Frontend (back-office + veb-kassa) papka strukturasi, holat boshqaruvi (Effector), API qatlami, kutubxona tanlovlari va platforma/chop etish strategiyasini belgilash.
+**Kim uchun:** Frontend ishlab chiquvchi.
+**Bog'liq fayllar:** `14-autentifikatsiya-oauth2.md`, `16-offline-sync.md`, `06-ekranlar-umumiy.md`, `25-nofunksional-talablar.md`.
+**Holat:** joriy, 2026-10-15.
+
+*Stack: React + Vite + TypeScript, FSD strukturasi, Effector, shadcn/ui, iloji boricha tayyor kutubxonalar. Namuna loyiha: `E:/Project/monorepo/projects/metadata management/src/client` (bundan keyin — "namuna").*
 
 ## Asosiy xulosalar
 
@@ -11,7 +16,7 @@
 5. **Qo'lda yozish o'rniga kutubxona** — har bir vazifa uchun tanlangan kutubxona quyidagi jadvalda; yangi narsa qo'shishdan oldin avval shu ro'yxat va keyin tayyor kutubxona qidiriladi.
 6. **Veb-kassa offline ishlaydi**: PWA (vite-plugin-pwa) + IndexedDB (Dexie) + append-only outbox; tafsiloti `16-offline-sync.md` da.
 7. Namunadagi kamchiliklar takrorlanmaydi: `console.log` qoldirilmaydi, sana formatlash qo'lda yozilmaydi (dayjs), xato xabari `JSON.stringify` bilan foydalanuvchiga ko'rsatilmaydi (tarjima qilingan matn).
-8. **Autentifikatsiya — BFF (Backend-for-Frontend) naqshi, OAuth 2.0 token hech qachon brauzer JS'iga chiqmaydi**: login `features/auth-provider` orqali backend'ning `/auth/login`iga POST qiladi, backend ichida OAuth Authorization Code+PKCE almashinuvini bajaradi va faqat `HttpOnly` sessiya cookie qaytaradi; access/refresh token faqat serverda. To'liq protokol — `14-autentifikatsiya-oauth2.md`. Login sahifasi obuna muddati tugagan holatni alohida ko'rsatadi (to'lov havolasi bilan). *(2026-10-15: foydalanuvchi qarori)*
+8. **Autentifikatsiya — BFF (Backend-for-Frontend) naqshi, OAuth 2.0 token hech qachon brauzer JS'iga chiqmaydi**: login `features/auth-provider` orqali backend'ning `/auth/login`iga POST qiladi, backend ichida OAuth Authorization Code+PKCE almashinuvini bajaradi va faqat `HttpOnly` sessiya cookie qaytaradi; access/refresh token faqat serverda. To'liq protokol — `14-autentifikatsiya-oauth2.md`. Login sahifasi obuna muddati tugagan holatni alohida ko'rsatadi (to'lov havolasi bilan).
 
 ---
 
@@ -109,9 +114,9 @@ Qoidalar:
 
 ## 3. API qatlami
 
-- **Generatsiya:** FastAPI `/openapi.json` → **orval** (axios mutator bilan) → `@shared/api/generated` (funksiyalar) va `@shared/models/generated` (tiplar). `npm run api:gen` buyrug'i; CI'da sxema o'zgarsa generatsiya qayta tekshiriladi. Shu bilan backend va frontend tiplari doim mos. orval: `client: "axios-functions"`, `mode: "tags-split"`, `mutator` — umumiy axios instance; `override.operationName` `operation_id`dagi teg prefiksini olib tashlaydi (`debts_list_debtors` → `listDebtors`). `@shared/api/index.ts`: `export * as debts from "./generated/debts/debts";` — bundan `api.debts.listDebtors(...)` kelib chiqadi (qo'lda o'ram kodi yo'q, faqat ESM namespace re-export). *(2026-10-14: tekshiruv)*
-- **Instance** (namunadagi `_base` kabi): `withCredentials: true` (HttpOnly sessiya cookie), interceptorlar: CSRF tokeni (`GET /auth/csrf` dan, xotirada keshlanadi — namunadagi `getCsrfToken`) (POST/PUT/PATCH/DELETE), `X-Tenant-Id` emas — tenant sessiyadan olinadi, `X-Branch-Id` (tanlangan filial), `Idempotency-Key` (barcha yozuvchi so'rovlarda — offline qayta yuborishda takror yozuvdan himoya), `Accept-Language`. *(2026-10-14: tekshiruv)*
-- **Xatolar:** 401 → BFF avval jim refresh qiladi (`14-autentifikatsiya-oauth2.md` §7), muvaffaqiyatsiz bo'lsa qayta autentifikatsiya oynasi (POS'da outbox/Dexie saqlanadi; to'liq logout faqat foydalanuvchi tanlovi bilan); 403 `PERMISSION_DENIED` → "huquq yo'q"; **403 `SUBSCRIPTION_RESTRICTED`** → `/login?reason=subscription_expired`ga yo'naltirish, login sahifasida "Obuna muddati tugagan" banner + Click/Payme to'lov havolasi (javobdagi `pay_url`/`amount_due` bilan, `14-autentifikatsiya-oauth2.md` §16) — to'lov o'tgach kirish darhol tiklanadi; 409/422 → forma maydonlariga xato (zod bilan bir xil format); tarmoq xatosi → `$isOnline=false` va kassa offline rejimga o'tadi. `409 IDEMPOTENCY_IN_PROGRESS` — forma xatosi emas: effekt `Retry-After`dan keyin xuddi shu kalit bilan avtomatik takrorlanadi (maks. 3 marta). `422 IDEMPOTENCY_KEY_REUSED` — dasturiy xato, Sentry'ga. Foydalanuvchiga xom JSON ko'rsatilmaydi — backend xato kodi i18n kalitiga tarjima qilinadi. *(2026-10-15: foydalanuvchi qarori — subscription-expired holati qo'shildi)*
+- **Generatsiya:** FastAPI `/openapi.json` → **orval** (axios mutator bilan) → `@shared/api/generated` (funksiyalar) va `@shared/models/generated` (tiplar). `npm run api:gen` buyrug'i; CI'da sxema o'zgarsa generatsiya qayta tekshiriladi. Shu bilan backend va frontend tiplari doim mos. orval: `client: "axios-functions"`, `mode: "tags-split"`, `mutator` — umumiy axios instance; `override.operationName` `operation_id`dagi teg prefiksini olib tashlaydi (`debts_list_debtors` → `listDebtors`). `@shared/api/index.ts`: `export * as debts from "./generated/debts/debts";` — bundan `api.debts.listDebtors(...)` kelib chiqadi (qo'lda o'ram kodi yo'q, faqat ESM namespace re-export).
+- **Instance** (namunadagi `_base` kabi): `withCredentials: true` (HttpOnly sessiya cookie), interceptorlar: CSRF tokeni (`GET /auth/csrf` dan, xotirada keshlanadi — namunadagi `getCsrfToken`) (POST/PUT/PATCH/DELETE), `X-Tenant-Id` emas — tenant sessiyadan olinadi, `X-Branch-Id` (tanlangan filial), `Idempotency-Key` (barcha yozuvchi so'rovlarda — offline qayta yuborishda takror yozuvdan himoya), `Accept-Language`.
+- **Xatolar:** 401 → BFF avval jim refresh qiladi (`14-autentifikatsiya-oauth2.md` §7), muvaffaqiyatsiz bo'lsa qayta autentifikatsiya oynasi (POS'da outbox/Dexie saqlanadi; to'liq logout faqat foydalanuvchi tanlovi bilan); 403 `PERMISSION_DENIED` → "huquq yo'q"; **403 `SUBSCRIPTION_RESTRICTED`** → `/login?reason=subscription_expired`ga yo'naltirish, login sahifasida "Obuna muddati tugagan" banner + Click/Payme to'lov havolasi (javobdagi `pay_url`/`amount_due` bilan, `14-autentifikatsiya-oauth2.md` §16) — to'lov o'tgach kirish darhol tiklanadi; 409/422 → forma maydonlariga xato (zod bilan bir xil format); tarmoq xatosi → `$isOnline=false` va kassa offline rejimga o'tadi. `409 IDEMPOTENCY_IN_PROGRESS` — forma xatosi emas: effekt `Retry-After`dan keyin xuddi shu kalit bilan avtomatik takrorlanadi (maks. 3 marta). `422 IDEMPOTENCY_KEY_REUSED` — dasturiy xato, Sentry'ga. Foydalanuvchiga xom JSON ko'rsatilmaydi — backend xato kodi i18n kalitiga tarjima qilinadi.
 - Runtime konfiguratsiya: `window.__ERP_CONFIG__` (namunadagi `window.metadataApiConfig` kabi) — bitta build turli muhitlarda ishlaydi.
 
 ## 4. Kutubxonalar (qo'lda yozish o'rniga)
@@ -131,17 +136,17 @@ Qoidalar:
 | Raqam/pul formatlash | `Intl.NumberFormat("uz-UZ")` + kichik `formatMoney` | pul hisob-kitobi frontendda qilinmaydi — backend beradi |
 | Xabarlar (toast) | sonner (shadcn) | |
 | Grafiklar | recharts (shadcn charts) | dashboard, hisobotlar |
-| Sana tanlash | react-day-picker **^9.14** (shadcn calendar; v10 — `@daypicker/react`, v9 moslik API'lari olib tashlangan, alohida sinovdan keyin) | shadcn calendar `date-fns` ni tranzitiv olib keladi — UI formatlash baribir dayjs *(2026-10-14: tekshiruv)* |
-| UUIDv7 (`client_event_id`, lokal hujjat ID) | uuid (`v7()`, ≥10) | `crypto.randomUUID()` faqat v4 beradi — ishlatilmaydi *(2026-10-14: tekshiruv)* |
+| Sana tanlash | react-day-picker **^9.14** (shadcn calendar; v10 — `@daypicker/react`, v9 moslik API'lari olib tashlangan, alohida sinovdan keyin) | shadcn calendar `date-fns` ni tranzitiv olib keladi — UI formatlash baribir dayjs |
+| UUIDv7 (`client_event_id`, lokal hujjat ID) | uuid (`v7()`, ≥10) | `crypto.randomUUID()` faqat v4 beradi — ishlatilmaydi |
 | Buyruq paneli / tez qidiruv | cmdk (shadcn command) | kassada tovar qidiruvi |
 | Tarjima | i18next + react-i18next | uz (lotin) asosiy, ru |
 | Offline baza | Dexie (IndexedDB) | veb-kassa, outbox |
 | PWA / offline yuklash | vite-plugin-pwa (Workbox) | |
-| Shtrix-kod chizish | bwip-js (MIT; EAN-13, Code128, GS1 DataMatrix — asosiy yorliq renderer) | yorliqlar, ichki kodlar *(2026-10-14: tekshiruv)* |
-| Shtrix-kod skaner | o'z kichik hook'i `useBarcodeWedge` (`shared/lib/scanner`: belgilar orasidagi interval < ~30 ms + Enter suffiksi, input fokusidan mustaqil) | onScan.js 2020 dan beri yangilanmagan — ishlatilmaydi *(2026-10-14: tekshiruv)* |
+| Shtrix-kod chizish | bwip-js (MIT; EAN-13, Code128, GS1 DataMatrix — asosiy yorliq renderer) | yorliqlar, ichki kodlar |
+| Shtrix-kod skaner | o'z kichik hook'i `useBarcodeWedge` (`shared/lib/scanner`: belgilar orasidagi interval < ~30 ms + Enter suffiksi, input fokusidan mustaqil) | onScan.js 2020 dan beri yangilanmagan — ishlatilmaydi |
 | Kamera orqali skaner/foto | @zxing/browser | telefon kamerasi bilan kod o'qish; AI-03 foto |
 | Excel eksport/import | exceljs (yoki SheetJS) | boshlang'ich tovar/qarz importi (US-M04-04, US-M08-07) |
-| Chop etish (A4, yorliq) | react-to-print | chek printeri (ESC/POS) — `shared/lib/printer` adapteri: Chromium (WebUSB/Web Serial/Web Bluetooth/tarmoq) + bulut printer (iOS uchun yagona yo'l) — §6, D3 *(2026-10-15)* |
+| Chop etish (A4, yorliq) | react-to-print | chek printeri (ESC/POS) — `shared/lib/printer` adapteri: Chromium (WebUSB/Web Serial/Web Bluetooth/tarmoq) + bulut printer (iOS uchun yagona yo'l) — §6 |
 | Testlar | vitest, @testing-library/react, msw, playwright | |
 | Kod sifati | eslint + @feature-sliced/eslint-config, prettier, typescript strict | |
 
@@ -149,13 +154,13 @@ Qoidalar:
 
 - Kassa sahifasi (`@pages/pos`) — to'liq ekran, klaviatura/skaner bilan ishlaydi (F-tugmalar, Enter, Esc), sichqonchasiz ham.
 - Ma'lumot manbai: Dexie'dagi lokal katalog (tovarlar, narxlar, mijozlar, qarzlar) — server bilan fon rejimida sinxronlanadi.
-- Har bir amal (chek, qaytarish, qarz, kassa pul harakati) — avval Dexie outbox'ga yoziladi, keyin serverga yuboriladi (har voqeada `client_event_id` (UUIDv7) — server `sync_receipts` bilan dedupe qiladi; POS hujjatlari uchun alohida REST endpoint yo'q). Internet holati `$isOnline` da, UI'da doimiy ko'rsatkich. *(2026-10-14: tekshiruv)*
-- Fiskal chek: veb-kassa uchun fiskal modul (virtual kassa) server orqali ishlaydi — offline paytda 48 soat qoidasi (`16-offline-sync.md`). Fiskal chek raqami (`receipt_seq`) qurilmada, outbox yozuvi bilan bir Web Lock ichida beriladi. *(2026-10-14: tekshiruv)*
+- Har bir amal (chek, qaytarish, qarz, kassa pul harakati) — avval Dexie outbox'ga yoziladi, keyin serverga yuboriladi (har voqeada `client_event_id` (UUIDv7) — server `sync_receipts` bilan dedupe qiladi; POS hujjatlari uchun alohida REST endpoint yo'q). Internet holati `$isOnline` da, UI'da doimiy ko'rsatkich.
+- Fiskal chek: veb-kassa uchun fiskal modul (virtual kassa) server orqali ishlaydi — offline paytda 48 soat qoidasi (`16-offline-sync.md`). Fiskal chek raqami (`receipt_seq`) qurilmada, outbox yozuvi bilan bir Web Lock ichida beriladi.
 - Android POS (Kotlin) keyingi bosqichda xuddi shu backend API va sync protokolidan foydalanadi (`28-android-pos.md`).
 
-## 6. Qo'llab-quvvatlanadigan platformalar va chop etish strategiyasi *(2026-10-15: foydalanuvchi qarori, D3 — "faqat Chromium" qarorini almashtiradi)*
+## 6. Qo'llab-quvvatlanadigan platformalar va chop etish strategiyasi
 
-Avvalgi qaror ("veb-kassa faqat Chromium — Chrome/Edge/Android Chrome, Safari/iOS qo'llab-quvvatlanmaydi") **bekor qilindi**. iPhone/iPad endi o'rnatilgan PWA sifatida qo'llab-quvvatlanadi, lekin chop etish imkoniyati platformaga qarab farqlanadi:
+iPhone/iPad o'rnatilgan PWA sifatida qo'llab-quvvatlanadi; chop etish imkoniyati platformaga qarab farqlanadi:
 
 | Platforma | Qo'llab-quvvatlash darajasi | Chop etish |
 |---|---|---|
@@ -171,13 +176,12 @@ Avvalgi qaror ("veb-kassa faqat Chromium — Chrome/Edge/Android Chrome, Safari/
 
 ## Ochiq savollar
 
-1. ~~Chromium-only sababli WebUSB/Web Serial asosiy yo'l~~ — 2026-10-15'da D3 bilan almashtirildi (6-bo'lim): endi platformaga qarab ikki yo'l (Chromium — WebUSB/Serial/Bluetooth + tarmoq/bulut; iOS — faqat bulut/elektron chek). QZ Tray/tizim printeri — Chromium uchun hamon zaxira, pilot uskunasida sinab tasdiqlanadi.
-2. ~~Veb-kassa faqat Chromium~~ — 2026-10-15'da **bekor qilindi** (D3, 6-bo'lim): iPhone/iPad endi o'rnatilgan PWA sifatida qo'llab-quvvatlanadi, chop etish faqat bulut printer/elektron chek orqali. Ochiq qolgan qism: bulut printer narxi/mavjudligi, faqat-elektron chek qonuniyligi.
-3. orval vs openapi-typescript + openapi-fetch — birinchi sprintda sinab tanlanadi (orval axios bilan namunaga yaqinroq).
+1. Bulut printer (Star CloudPRNT / Epson Server Direct Print klassi) narxi/mavjudligi O'zbekiston bozorida va faqat-elektron chekning (qog'ozsiz) qonuniyligi — `25-nofunksional-talablar.md` §6–7.2. QZ Tray/tizim printeri — Chromium uchun zaxira, pilot uskunasida sinab tasdiqlanadi.
+2. orval vs openapi-typescript + openapi-fetch — 0-bosqichda sinab tanlanadi (orval axios bilan namunaga yaqinroq).
 
 ## Manbalar
 
-- `spec/kod-uchun/14-autentifikatsiya-oauth2.md` — BFF login oqimi, OAuth token, obuna-lokaut holati. *(2026-10-15: foydalanuvchi qarori)*
+- `spec/kod-uchun/14-autentifikatsiya-oauth2.md` — BFF login oqimi, OAuth token, obuna-lokaut holati.
 - Namuna: `E:/Project/monorepo/projects/metadata management/src/client` — `package.json` (workspaces, effector, patronum, axios), `packagess/pages/list-metadata/src/pages/notification/model/*` (events/stores/effects/connections naqshi), `packagess/shared/api/src/_base/metadata-management.ts` va `interceptors.ts` (axios instance, CSRF, xato), `apps/shell/src/main.tsx`.
 - `spec/kod-uchun/06-ekranlar-umumiy.md` — ekranlar ro'yxati (POS-xx, BO-xx).
 - `research_notes/texnik/04-arxitektura-va-stack.md` — offline-first, PWA + IndexedDB.

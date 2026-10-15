@@ -1,6 +1,9 @@
 # Dizayn tizimi — AIOS (brand-neutral, shadcn/ui asosida)
 
-*UX dizayner · 2026-10-15 · Asos: `06-ekranlar-umumiy.md` (37 ekran, UX qoidalari §1), `24-frontend-arxitekturasi.md` (React+Vite+TS, FSD, Effector, shadcn/ui, kutubxonalar jadvali §4), `16-offline-sync.md`, `14-autentifikatsiya-oauth2.md`, `kod-uchun/01-qarorlar.md`.*
+**Maqsad:** Brand-neutral dizayn tizimi — token, komponent, layout, formatlash va chop etish qoidalari, shadcn/ui asosida.
+**Kim uchun:** Frontend dasturchilar, UX dizaynerlar.
+**Bog'liq fayllar:** `06-ekranlar-umumiy.md`, `24-frontend-arxitekturasi.md`, `16-offline-sync.md`, `14-autentifikatsiya-oauth2.md`, `01-qarorlar.md`.
+**Holat:** joriy, 2026-10-15.
 
 Bu hujjat brendsiz (neutral) boshlang'ich dizayn tizimi — mijoz logotipi/rang palettasi keyin ustiga qo'yiladi. Barcha token `shadcn/ui` (Radix + Tailwind) ustida ishlaydi, `apps/shell` va `packages/shared/ui`da yashaydi.
 
@@ -8,9 +11,9 @@ Bu hujjat brendsiz (neutral) boshlang'ich dizayn tizimi — mijoz logotipi/rang 
 
 ## 0. Asosiy qarorlar (qisqa)
 
-1. **Pul qoidasi** *(2026-10-15: qabul-6/7)*: saqlash/API darajasida pul har doim **kasr-satr (decimal string)**, masalan `"12000.00"` (`NUMERIC(18,2)`, tiyingacha); narx/tannarx satrlari 4 xonali kasr (`"8333.3333"`), miqdor satrlari 3 xonali kasr (`"1.250"`) — pul uchun JSON `number` turi **taqiqlanadi**. Frontendda pul hisob-kitobi **faqat ikki holatda** ruxsat etiladi: offlayn POS chek jami va submitdan oldingi forma jami — `decimal.js`/`big.js` bilan, satr-satr amal (`Number`/`parseFloat` pul uchun taqiqlanadi, lint qoidasi). Dumalaklashtirish backend bilan **aynan bir xil** bo'lishi shart, yagona funksiya `shared/lib/money`da: `line_total = ROUND_HALF_UP(qty × unit_price − chegirma, 0)` (chek qatori butun so'mgacha, chunki narxlar butun so'm va naqdda tiyin yo'q), QQS summasi (soliq ichida) `= ROUND_HALF_UP(line_total × r/(100+r), 2)` (tiyingacha) — bu `SalePostingService` mantig'iga aynan mos, ikki tomonda umumiy test vektorlari (`shared/money-vectors.json`) bilan tasdiqlanadi (chek qatorini butun so'mgacha dumalaklashtirish buxgalter tasdig'ini talab qiladi). Ko'rsatish: `formatMoney(value: string)` **faqat ko'rsatish uchun** — butun so'mgacha ROUND_HALF_UP qiladi, bu qiymat hech qachon API'ga qaytarilmaydi va keyingi hisoblashda ishlatilmaydi; jadvaldagi jami har doim backend qaytargan jami, allaqachon dumalaklashtirilgan qatorlar yig'indisi emas. Istisno: fiskal chek va buxgalteriya/QQS hisobotlari OFD/buxgalteriya talab qiladigan aniqlikda (2 xonali kasr) kerak bo'ladi — `formatMoney(value, { precision: 2 })` orqali, aniq format OFD texnik spetsifikatsiyasi bilan yakunlanadi (pastda 13.1/Ochiq savollar №6).
+1. **Pul qoidasi** (qaror #26): saqlash/API darajasida pul har doim **kasr-satr (decimal string)**, masalan `"12000.00"` (`NUMERIC(18,2)`, tiyingacha); narx/tannarx satrlari 4 xonali kasr (`"8333.3333"`), miqdor satrlari 3 xonali kasr (`"1.250"`) — pul uchun JSON `number` turi **taqiqlanadi**. Frontendda pul hisob-kitobi **faqat ikki holatda** ruxsat etiladi: offlayn POS chek jami va submitdan oldingi forma jami — `decimal.js`/`big.js` bilan, satr-satr amal (`Number`/`parseFloat` pul uchun taqiqlanadi, lint qoidasi). Dumalaklashtirish backend bilan **aynan bir xil** bo'lishi shart, yagona funksiya `shared/lib/money`da: `line_total = ROUND_HALF_UP(qty × unit_price − chegirma, 0)` (chek qatori butun so'mgacha, chunki narxlar butun so'm va naqdda tiyin yo'q), QQS summasi (soliq ichida) `= ROUND_HALF_UP(line_total × r/(100+r), 2)` (tiyingacha) — bu `SalePostingService` mantig'iga aynan mos, ikki tomonda umumiy test vektorlari (`shared/money-vectors.json`) bilan tasdiqlanadi (chek qatorini butun so'mgacha dumalaklashtirish buxgalter tasdig'ini talab qiladi). Ko'rsatish: `formatMoney(value: string)` **faqat ko'rsatish uchun** — butun so'mgacha ROUND_HALF_UP qiladi, bu qiymat hech qachon API'ga qaytarilmaydi va keyingi hisoblashda ishlatilmaydi; jadvaldagi jami har doim backend qaytargan jami, allaqachon dumalaklashtirilgan qatorlar yig'indisi emas. Istisno: fiskal chek va buxgalteriya/QQS hisobotlari OFD/buxgalteriya talab qiladigan aniqlikda (2 xonali kasr) kerak bo'ladi — `formatMoney(value, { precision: 2 })` orqali, aniq format OFD texnik spetsifikatsiyasi bilan yakunlanadi (pastda 13.1/Ochiq savollar №6).
 2. **Sana/vaqt**: `DD.MM.YYYY`, vaqt `HH:mm` (24 soat), `dayjs` + uz-latn lokal konfiguratsiyasi (tayyor `dayjs/locale/uz-latn` yo'q bo'lsa, `shared/lib/date` ichida qo'lda bir marta ro'yxatdan o'tkaziladi — bu "qo'lda formatlash" emas, lokal sozlama).
-3. **Til**: o'zbek (lotin) — standart va majburiy birinchi til; rus — ikkinchi, almashtiriladigan. Chekda ikki til ko'rsatish — ochiq savol (`06-ekranlar-umumiy.md` Ochiq savol 1), UI darajasida hozircha faqat interfeys tili almashadi.
+3. **Til**: o'zbek (lotin) — standart va majburiy birinchi til; rus — ikkinchi, almashtiriladigan. Fiskal chek har doim ikki tilli — o'zbek qatori birinchi, rus (`products.name_ru`) ikkinchi (qaror #29, chek shabloni); UI tili almashtirgichi faqat interfeys matnini almashtiradi, chekka ta'sir qilmaydi.
 4. **Zichlik (density)**: ikki rejim — `touch` (POS, ≥48×48px nishon) va `compact` (back-office, ≥36×36px). Bitta komponent kutubxonasi, zichlik Tailwind context/`data-density` atributi orqali.
 5. **Platformalar**: POS — to'liq ekran, klaviatura/skaner-birinchi; Back-office — sidebar+header, ish stoli birinchi, mobil brauzerda responsive; iOS/iPhone/iPad — o'rnatilgan PWA (Home Screen), chop etish faqat bulut-printer/elektron chek (`24-frontend-arxitekturasi.md` §6).
 
@@ -58,9 +61,7 @@ shadcn standart nomlashiga qo'shimcha semantik tokenlar qo'shiladi: `success`, `
   --fiscal-pending-foreground: 0 0% 100%;
 }
 
-/* (2026-10-15: qabul-6/7) Tuzatildi: ":root[data-theme=dark]" avval "@media (prefers-color-scheme: dark)" ichida edi —
-   bu OS yorug' rejimda bo'lsa, foydalanuvchi qo'lda tanlagan dark-mode'ni sukut bilan buzardi.
-   Endi ikki alohida blok: (1) qo'lda tanlangan dark — OS rejimidan qat'i nazar doim ishlaydi;
+/* Ikki alohida blok: (1) qo'lda tanlangan dark — OS rejimidan qat'i nazar doim ishlaydi;
    (2) OS dark preferensi — faqat foydalanuvchi aniq "light"ni tanlamagan bo'lsa. */
 :root[data-theme="dark"] {
   --background: 222 20% 10%;
@@ -227,12 +228,12 @@ Standart: `lucide-react`, 20px (compact) / 24px (touch) o'lcham, `stroke-width=2
 
 Amalga oshirish: `<html data-density="touch">` POS shell'ida, `data-density="compact"` back-office shell'ida; Tailwind `data-[density=touch]:h-14` variant guruhi yoki CSS custom property orqali (`--tap-min: 48px`).
 
-> **Eslatma (mobil back-office teginish nishoni)** *(2026-10-15: qabul-6/7)*: yuqoridagi jadvaldagi `compact` 36×36px qiymati **desktop** back-office uchun vakolatli standart (sichqoncha-birinchi, kursor aniq). 6.3-bo'limdagi mobil PWA (Egasi telefonida) — bu kursorsiz teginish ekrani, shuning uchun unga alohida **`compact-mobile/touch`** rejimi kerak: `@media (pointer: coarse)` yoki `<768px` breakpointda `data-density="touch"`ga o'tadi, lekin POS'ning 48px/56px emas, balki WCAG 2.5.5 bo'yicha **minimal 44×44px** teginish nishoniga mo'ljallanadi (desktop 36px kompakt qiymatidan katta, lekin POS'ning 48px'idan kichik — mobil veb-sahifa zichligi uchun amaliy minimum).
+> **Eslatma (mobil back-office teginish nishoni)**: yuqoridagi jadvaldagi `compact` 36×36px qiymati **desktop** back-office uchun vakolatli standart (sichqoncha-birinchi, kursor aniq). 6.3-bo'limdagi mobil PWA (Egasi telefonida) — bu kursorsiz teginish ekrani, shuning uchun unga alohida **`compact-mobile/touch`** rejimi kerak: `@media (pointer: coarse)` yoki `<768px` breakpointda `data-density="touch"`ga o'tadi, lekin POS'ning 48px/56px emas, balki WCAG 2.5.5 bo'yicha **minimal 44×44px** teginish nishoniga mo'ljallanadi (desktop 36px kompakt qiymatidan katta, lekin POS'ning 48px'idan kichik — mobil veb-sahifa zichligi uchun amaliy minimum).
 
 | Rejim | Min. teginish nishoni | Qo'llaniladi |
 |---|---|---|
 | `compact` (desktop) | 36×36px | Back-office, sichqoncha/klaviatura-birinchi ekran |
-| `compact-mobile` / `touch` (mobil) *(2026-10-15: qabul-6/7)* | **44×44px** | Egasi mobil PWA (`@media (pointer: coarse)` yoki `<768px`) |
+| `compact-mobile` / `touch` (mobil) | **44×44px** | Egasi mobil PWA (`@media (pointer: coarse)` yoki `<768px`) |
 | `touch` (POS) | 48×48px (asosiy — 56×56px) | POS qurilmasi |
 
 ---
@@ -288,8 +289,8 @@ Bitta ustun, pastki tab-bar (`Bosh sahifa / Hisobotlar / Qarzlar / AI / Sozlamal
 | Komponent | Vazifa | Asosiy proplar |
 |---|---|---|
 | **`MoneyInput`** | Pul kiritish — ekranda butun son, minglik ajratgich avtomatik, so'm belgisi suffiks; chiqishda kasr-satr (`"12000.00"`) | `value: string`, `onChange`, `max?`, `allowNegative?` |
-| **`PriceInput`** *(2026-10-15: qabul-6/7)* | Tannarx/xarid narxi kiritish — 4 xonagacha kasr (xarid qatori narxi, ochilish qoldig'i tannarxi kabi joylarda) | `value: string`, `onChange`, `max?`, `precision?: 4` |
-| **`QtyInput`** | Miqdor kiritish — o'lchov birligiga qarab butun/kasr (dona=butun, kg=**3 xonali kasr** *(2026-10-15: qabul-6/7)*), +/− stepper tugmalari | `value`, `unit: "dona"\|"kg"\|"litr"...`, `step`, `onChange` |
+| **`PriceInput`** | Tannarx/xarid narxi kiritish — 4 xonagacha kasr (xarid qatori narxi, ochilish qoldig'i tannarxi kabi joylarda) | `value: string`, `onChange`, `max?`, `precision?: 4` |
+| **`QtyInput`** | Miqdor kiritish — o'lchov birligiga qarab butun/kasr (dona=butun, kg=**3 xonali kasr**), +/− stepper tugmalari | `value`, `unit: "dona"\|"kg"\|"litr"...`, `step`, `onChange` |
 | **`BarcodeField`** (`useBarcodeWedge` hook asosida) | Skaner-fokus maydoni — belgilar orasi <30ms + Enter suffiksini HID skaner sifatida taniydi, qo'lda yozishdan ajratadi | `onScan(code: string)`, `autoFocus`, `placeholder` |
 | **`PinPad`** | 4–6 xonali PIN kiritish, raqamli grid, mahalliy/server tasdiqlash | `length`, `onComplete(pin)`, `loading`, `error` |
 | **`OfflineBadge`** | Status panelidagi 🟢/🟡/🔴 ko'rsatkich + sinxronlanmagan son + 48 soat hisoblagichi | `status: "online"\|"offline"\|"offline-critical"`, `pendingCount`, `hoursLeft?` |
@@ -302,15 +303,15 @@ Bitta ustun, pastki tab-bar (`Bosh sahifa / Hisobotlar / Qarzlar / AI / Sozlamal
 | **`SubscriptionRestrictedState`** | `403 SUBSCRIPTION_RESTRICTED` — to'liq ekran banner, to'lov havolasi, eksport havolasi (D2) | `payUrl`, `amountDue` |
 | **`MarkingBadge`** | Markirovka holati belgisi: `pending_verification` (fiscal-pending), `verified`, `verify_failed` | `status` |
 | **`MoneyDisplay`** | Faqat ko'rsatish uchun (formatlangan, rangli — musbat/manfiy) | `value: string`, `currency="UZS"`, `tone?` |
-| **`ReceiptPreview`** | 58/80mm chek oldindan ko'rish (ekranda, chop etishdan oldin); *(2026-10-15: asoschi qarori, Q2)* har bir qatorni ikki tilda ("{name} / {name_ru}") render qiladi | `receipt`, `width: 58\|80` |
+| **`ReceiptPreview`** | 58/80mm chek oldindan ko'rish (ekranda, chop etishdan oldin); (qaror #29) har bir qatorni ikki tilda ("{name} / {name_ru}") render qiladi | `receipt`, `width: 58\|80` |
 
 ---
 
 ## 8. Son/pul/sana formatlash qoidalari
 
-- **Pul** *(2026-10-15: qabul-6/7)*: saqlash/API — har doim kasr-satr (`"12000.00"`, `NUMERIC(18,2)`, tiyingacha; narx/tannarx 4 xonali, miqdor 3 xonali), JSON `number` pul uchun taqiqlanadi. Frontend hisob-kitobi faqat offlayn POS chek jami va submitdan oldingi forma jamida ruxsat etiladi (`decimal.js`/`big.js`, satr-satr; `Number`/`parseFloat` taqiqlanadi). Dumalaklashtirish `shared/lib/money`dagi yagona funksiyada, backend (`SalePostingService`) bilan aynan bir xil: `line_total = ROUND_HALF_UP(qty × unit_price − chegirma, 0)`, QQS `= ROUND_HALF_UP(line_total × r/(100+r), 2)` — `shared/money-vectors.json` test vektorlari bilan tasdiqlanadi (§0 band 1). Ko'rsatish: `formatMoney(value: string): string` → `Intl.NumberFormat("uz-UZ", { maximumFractionDigits: 0 })` + `" so'm"` suffiks qo'lda qo'shiladi (chunki `currency: "UZS"` formatlagich standart "сум"/"UZS" belgisini beradi, bizga "so'm" so'zi lotin orfografiyasida kerak) — bu natija **faqat ko'rsatish uchun**, hech qachon API'ga qaytarilmaydi. Natija: `1 240 000 so'm`. Manfiy: `−1 240 000 so'm` (minus belgisi, qavs ishlatilmaydi). Istisno: fiskal chek/QQS hisobotlari — `formatMoney(value, { precision: 2 })` (OFD spetsifikatsiyasi bilan yakunlanadi).
-- **Kasr kerak bo'lgan joy** (foiz, kurs, AVECO o'rtacha narx ichki hisob-kitobda): vergul kasr ajratgich — `12,5%`. *(2026-10-15: qabul-6/7)* Backend API har doim `.` (nuqta) bilan kasr-**satr** qaytaradi (masalan `"12.50"`, JSON `number` emas — §0 band 1), frontend ko'rsatishda `,`ga aylantiradi — bu faqat ko'rsatish-formatlash qadami, hisoblash emas.
-- **Miqdor** *(2026-10-15: qabul-6/7)*: o'lchov birligiga ko'ra — `dona`/`quti` butun son, `kg`/`litr` **3 xonali kasr** (vergul bilan: `1,250 kg`; API maydoni `NUMERIC(18,3)`, tarozi-shtrixkod aniqligiga — grammgacha — mos).
+- **Pul** (qaror #26): saqlash/API — har doim kasr-satr (`"12000.00"`, `NUMERIC(18,2)`, tiyingacha; narx/tannarx 4 xonali, miqdor 3 xonali), JSON `number` pul uchun taqiqlanadi. Frontend hisob-kitobi faqat offlayn POS chek jami va submitdan oldingi forma jamida ruxsat etiladi (`decimal.js`/`big.js`, satr-satr; `Number`/`parseFloat` taqiqlanadi). Dumalaklashtirish `shared/lib/money`dagi yagona funksiyada, backend (`SalePostingService`) bilan aynan bir xil: `line_total = ROUND_HALF_UP(qty × unit_price − chegirma, 0)`, QQS `= ROUND_HALF_UP(line_total × r/(100+r), 2)` — `shared/money-vectors.json` test vektorlari bilan tasdiqlanadi (§0 band 1). Ko'rsatish: `formatMoney(value: string): string` → `Intl.NumberFormat("uz-UZ", { maximumFractionDigits: 0 })` + `" so'm"` suffiks qo'lda qo'shiladi (chunki `currency: "UZS"` formatlagich standart "сум"/"UZS" belgisini beradi, bizga "so'm" so'zi lotin orfografiyasida kerak) — bu natija **faqat ko'rsatish uchun**, hech qachon API'ga qaytarilmaydi. Natija: `1 240 000 so'm`. Manfiy: `−1 240 000 so'm` (minus belgisi, qavs ishlatilmaydi). Istisno: fiskal chek/QQS hisobotlari — `formatMoney(value, { precision: 2 })` (OFD spetsifikatsiyasi bilan yakunlanadi).
+- **Kasr kerak bo'lgan joy** (foiz, kurs, AVECO o'rtacha narx ichki hisob-kitobda): vergul kasr ajratgich — `12,5%`. Backend API har doim `.` (nuqta) bilan kasr-**satr** qaytaradi (masalan `"12.50"`, JSON `number` emas — §0 band 1), frontend ko'rsatishda `,`ga aylantiradi — bu faqat ko'rsatish-formatlash qadami, hisoblash emas.
+- **Miqdor** (qaror #26): o'lchov birligiga ko'ra — `dona`/`quti` butun son, `kg`/`litr` **3 xonali kasr** (vergul bilan: `1,250 kg`; API maydoni `NUMERIC(18,3)`, tarozi-shtrixkod aniqligiga — grammgacha — mos).
 - **Sana**: `dayjs(value).format("DD.MM.YYYY")`; vaqt bilan birga `DD.MM.YYYY HH:mm`. Nisbiy vaqt (masalan "5 daqiqa oldin") — `dayjs().fromNow()` faqat "oxirgi yangilanish" kabi meta-matnlarda, hech qachon hujjat sanasi o'rnida.
 - **Telefon**: `+998 XX XXX XX XX` maska (`react-hook-form` + input mask, qo'lda regex emas — `shared/lib/phone`).
 - Har qanday formatlash **faqat** `shared/lib/format` orqali (`formatMoney`, `formatQty`, `formatDate`, `formatPhone`) — komponent ichida qo'lda `toLocaleString`/shablon satr taqiqlanadi (namunadagi kamchilikni takrorlamaslik, `24-frontend-arxitekturasi.md` Asosiy xulosa #7).
@@ -353,7 +354,7 @@ Back-office'da F-tugmalar band qilinmaydi (brauzer standart xatti-harakati saqla
 6. **Jadval**: `DataTable` klaviatura bilan qator o'tish (yuqori/past strelka) va `Enter` bilan ochish qo'llab-quvvatlaydi.
 7. **Shrift o'lchami**: brauzer/OS darajasidagi zoom (`rem` asosida, `px` qulflanmagan) ishlaydi, maksimal 200% zoomda layout buzilmaydi (asosan back-office uchun, POS qurilmasi odatda qulflangan ekranda).
 8. Rasmiy WCAG audit MVP'dan oldin o'tkazilmagan — **ochiq savol/tavsiya**, pilotdan oldin `design:accessibility-review` bilan tekshiriladi.
-9. *(2026-10-15: qabul-6/7)* **Kritik/shoshilinch matn o'lchami**: `text-caption` (11px) offlayn 48 soatlik hisoblagich yoki boshqa kritik/shoshilinch holat matnini chiqarishda **hech qachon** ishlatilmaydi — bunday matn uchun minimal o'lcham `text-small` (13px), og'irligi 600.
+9. **Kritik/shoshilinch matn o'lchami**: `text-caption` (11px) offlayn 48 soatlik hisoblagich yoki boshqa kritik/shoshilinch holat matnini chiqarishda **hech qachon** ishlatilmaydi — bunday matn uchun minimal o'lcham `text-small` (13px), og'irligi 600.
 
 ---
 
@@ -378,7 +379,7 @@ settings:users.resetPinConfirm
 Qoidalar:
 - Tugma matnlari — `actions.*` (umumiy) yoki `<ekran>.<nom>Button`.
 - Validatsiya xabarlari — `common:validation.required`, `common:validation.maxLength`, `common:validation.phoneFormat` (zod `errorMap` shu kalitlarga bog'lanadi).
-- *(2026-10-15: qabul-6/7)* Server xatosi HTTP javobida `error.message_key` maydonini qaytaradi (masalan `"errors.debt_limit_exceeded"`) — bu satr **o'zgarishsiz** `common` namespace ichida i18n kalit sifatida ishlatiladi: `t('common:' + message_key)`. Agar kalit tarjima fayllarida topilmasa — `common:errors.internal_error`ga zahira qilinadi. Maydon darajasidagi validatsiya xatolari (`details[].message_key`, har bir noto'g'ri maydon uchun bitta) `validation.*` prefiksi bilan keladi — bu frontend zod `errorMap`i ishlatadigan kalitlar bilan bir xil. **Hech qachon** xom kod/JSON ekranga chiqmaydi.
+- Server xatosi HTTP javobida `error.message_key` maydonini qaytaradi (masalan `"errors.debt_limit_exceeded"`) — bu satr **o'zgarishsiz** `common` namespace ichida i18n kalit sifatida ishlatiladi: `t('common:' + message_key)`. Agar kalit tarjima fayllarida topilmasa — `common:errors.internal_error`ga zahira qilinadi. Maydon darajasidagi validatsiya xatolari (`details[].message_key`, har bir noto'g'ri maydon uchun bitta) `validation.*` prefiksi bilan keladi — bu frontend zod `errorMap`i ishlatadigan kalitlar bilan bir xil. **Hech qachon** xom kod/JSON ekranga chiqmaydi.
 - Rus tarjimasi har doim o'zbek kalit bilan bir fayl tuzilmasida (`uz.json`/`ru.json`, bir xil kalitlar), tarjima yo'q qolganda **o'zbekcha** fallback (hech qachon kalit nomi ko'rsatilmaydi).
 
 ---
@@ -389,7 +390,7 @@ Qoidalar:
 
 ### Standart xabarlar (uz / ru)
 
-*(2026-10-15: qabul-6/7)* `message_key` ustuni qo'shildi — §11'dagi qoidaga mos, server javobidagi `error.message_key` bilan bir xil kalit (yoki client-side holat uchun "—", server kaliti yo'q).
+`message_key` ustuni §11'dagi qoidaga mos — server javobidagi `error.message_key` bilan bir xil kalit (yoki client-side holat uchun "—", server kaliti yo'q).
 
 | # | Holat | O'zbek (lotin) | Rus | message_key |
 |---|---|---|---|---|
@@ -432,7 +433,7 @@ Qoidalar:
 | 37 | OTP noto'g'ri | Kod noto'g'ri yoki eskirgan | Код неверный или устарел | `errors.otp_invalid` (shuningdek `errors.otp_expired`ni ham qamrab oladi) |
 | 38 | Davlat hisoboti mos keldi | Davlat hisoboti ichki hisob bilan mos keldi | Отчёт государства совпал с внутренним учётом | `tax.reconciliation_matched` |
 | 39 | Davlat hisobotida farq | Farq topildi — ko'rib chiqing | Обнаружено расхождение — проверьте | `tax.reconciliation_diff_found` |
-| 26\* | Markirovkalangan tovarni offline qaytarish taqiqi *(2026-10-15: qabul-6/7, qo'shilgan qator)* | Qaytarish uchun internet kerak | Для возврата нужен интернет | `errors.marking_return_requires_online` |
+| 26\* | Markirovkalangan tovarni offline qaytarish taqiqi | Qaytarish uchun internet kerak | Для возврата нужен интернет | `errors.marking_return_requires_online` |
 | 40 | Imtiyoz davri | Obuna muddati o'tdi. {vaqt} ichida to'lang, aks holda kassa to'xtaydi | Подписка просрочена. Оплатите в течение {время}, иначе касса остановится | `billing.grace_banner` |
 | 41 | Davr yopilgan | Bu oy yopilgan. Tuzatishni joriy oyda kiriting | Этот месяц закрыт. Внесите исправление в текущем месяце | `errors.period_closed` |
 | 42 | Soat orqaga surilgan | Qurilma soatini to'g'rilang va internetga ulaning | Исправьте время на устройстве и подключитесь к интернету | `errors.device_clock_invalid` |
@@ -441,7 +442,7 @@ Qoidalar:
 | 45 | Offline nasiya limitdan oshdi | Limitdan oshdi — sotuv saqlandi, Egasiga xabar beriladi | Лимит превышен — продажа сохранена, владелец будет уведомлён | `debts.limit_exceeded_offline` |
 | 46 | iOS o'rnatilmagan | Kassani ishlatish uchun uni Home ekranga o'rnating | Установите кассу на экран «Домой», чтобы работать | `install.ios_required` |
 
-*(2026-10-15: qabul-6/7)* Qator `26\*` — №26 ("Qaytarish offlaynda yopiq") dan farqli, maxsus holat: markirovkalangan tovarni offline qaytarish umuman taqiqlanadi (oddiy qaytarish faqat internet talab qiladi, lekin markirovka uchun bu qattiqroq qoida). Raqamlash ketma-ketligi 1–39 o'zgarmasin degan maqsadda bu qator jadval oxirida qo'shildi.
+Qator `26\*` — №26 ("Qaytarish offlaynda yopiq") dan farqli, maxsus holat: markirovkalangan tovarni offline qaytarish umuman taqiqlanadi (oddiy qaytarish faqat internet talab qiladi, lekin markirovka uchun bu qattiqroq qoida). Raqamlash ketma-ketligi 1–39 o'zgarmasin degan maqsadda bu qator jadval oxirida qo'shildi.
 
 ---
 
@@ -451,7 +452,7 @@ Adapter: `shared/lib/printer` — `WebUsbPrinterAdapter` / `WebSerialPrinterAdap
 
 ### 13.1 Fiskal chek — 58mm / 80mm ESC/POS shablon
 
-*(2026-10-15: asoschi qarori, Q2 — avvalgi "faqat o'zbek" shablon ikki tilli qilib qayta yozildi)* Har bir tovar qatori, shuningdek sarlavha/yakun yorliqlari **"o'zbekcha / ruscha"** formatida (`name_ru` bo'sh bo'lsa faqat o'zbekcha qator qoladi, ikkinchi qator chiqmaydi). Fiskal rekvizitlar (STIR, MXIK, fiskal belgi, QR) OFD talab qilgan formatda — bular tarjima qilinmaydi.
+(qaror #29) Har bir tovar qatori, shuningdek sarlavha/yakun yorliqlari **"o'zbekcha / ruscha"** formatida (`name_ru` bo'sh bo'lsa faqat o'zbekcha qator qoladi, ikkinchi qator chiqmaydi). Fiskal rekvizitlar (STIR, MXIK, fiskal belgi, QR) OFD talab qilgan formatda — bular tarjima qilinmaydi.
 
 ```
        [Do'kon nomi]                 ← markazda, bold, 80mm: 32 belgi / 58mm: 24 belgi
@@ -486,7 +487,7 @@ Adapter: `shared/lib/printer` — `WebUsbPrinterAdapter` / `WebSerialPrinterAdap
 
 **To'lov turi yorliqlari (ikki tilda)**: Naqd/Наличные, Karta/Карта, UzQR/UzQR, Payme/Payme, Click/Click, Uzum/Uzum, Nasiya/В долг (faqat `debt_settlement` chekida ko'rinadi, oddiy sotuv chekida "Nasiya" qatori chiqmaydi — Q3, nasiya sotuvida bu shablonning o'zi chiqarilmaydi).
 
-> *(2026-10-15: qabul-6/7)* **QQS qatori aniqligi**: yuqoridagi shablonda `QQS (12%, ichida): 7 393 so'm` butun so'mda ko'rsatilgan, lekin fiskal chekning QQS summasi tiyin darajasidagi aniqlikni talab qilishi mumkin — bu pul qoidasining istisnosiga bog'liq (§0 band 1, p.5: fiskal chek/QQS hisobotlari OFD-talab aniqligida). Hozircha 2 xonali kasrga (`formatMoney(value, { precision: 2 })`) mo'ljallangan, aniq format OFD texnik spetsifikatsiyasi bilan yakunlanadi (pastda Ochiq savollar №6).
+> **QQS qatori aniqligi** (qaror #26): yuqoridagi shablonda `QQS (12%, ichida): 7 393 so'm` butun so'mda ko'rsatilgan, lekin fiskal chekning QQS summasi tiyin darajasidagi aniqlikni talab qilishi mumkin — bu pul qoidasining istisnosiga bog'liq (§0 band 1, p.5: fiskal chek/QQS hisobotlari OFD-talab aniqligida). Hozircha 2 xonali kasrga (`formatMoney(value, { precision: 2 })`) mo'ljallangan, aniq format OFD texnik spetsifikatsiyasi bilan yakunlanadi (pastda Ochiq savollar №6).
 
 **Markirovka qatori** (agar tovar markirovkalangan): qator ostida kichik qatorda `Markirovka: ✓ tekshirildi` yoki `⚠ offlayn, tekshiruv kutilmoqda`.
 
@@ -511,12 +512,11 @@ Render: `bwip-js` (brauzerda SVG/canvas) → `react-to-print` orqali 58×40mm sh
 
 ## Ochiq savollar
 
-1. Chekni ikki tilda (uz/ru) chop etish — tadqiqotda tasdiqlanmagan (`06-ekranlar-umumiy.md` Ochiq savol 1).
-2. O'zbek lotin/kirill+rus aralash matn uchun maxsus shrift tanlovi — hozircha tizim shrifti, pilotda ko'rib chiqiladi.
-3. Rasmiy WCAG 2.1 AA auditi hali o'tkazilmagan.
-4. Fiskal chekdagi MXIK/fiskal rekvizitlarning aniq joylashuv formati — OFD texnik spetsifikatsiyasi bilan yakunlanishi kerak (`kod-uchun/21-integratsiyalar.md`).
-5. Bulut-print printerlarining O'zbekistonda narxi/mavjudligi — `24-frontend-arxitekturasi.md` §6 bilan bir xil ochiq savol.
-6. *(2026-10-15: qabul-6/7)* Fiskal chekdagi QQS qatorining aniqlik darajasi (butun so'm yoki tiyingacha) — OFD texnik spetsifikatsiyasi bilan yakunlanishi kerak (§0 band 1 p.5, §13.1).
+- **2.** O'zbek lotin/kirill+rus aralash matn uchun maxsus shrift tanlovi — hozircha tizim shrifti, pilotda ko'rib chiqiladi.
+- **3.** Rasmiy WCAG 2.1 AA auditi hali o'tkazilmagan.
+- **4.** Fiskal chekdagi MXIK/fiskal rekvizitlarning aniq joylashuv formati — OFD texnik spetsifikatsiyasi bilan yakunlanishi kerak (`kod-uchun/21-integratsiyalar.md`).
+- **5.** Bulut-print printerlarining O'zbekistonda narxi/mavjudligi — `24-frontend-arxitekturasi.md` §6 bilan bir xil ochiq savol.
+- **6.** Fiskal chekdagi QQS qatorining aniqlik darajasi (butun so'm yoki tiyingacha) — OFD texnik spetsifikatsiyasi bilan yakunlanishi kerak (§0 band 1 p.5, §13.1, qaror #26).
 
 ## Manbalar
 

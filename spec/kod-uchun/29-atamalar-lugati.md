@@ -12,6 +12,7 @@
 3. **Ruscha/Inglizcha ustunlar — ishchi tarjima**, rasmiy atama lug'ati emas; UX-yozuvchi/tarjimon final matnni `08-dizayn-tizimi.md` va i18n fayllarida tasdiqlaydi (bu jadval — dasturchi uchun yo'naltiruvchi, UI matni manbai emas).
 4. Jadval **domenlar bo'yicha guruhlangan**: Savdo/kassa, Ombor, Qarz, Pul/kassa puli, Buxgalteriya/soliq, Fiskal/markirovka/e-hujjat, Auth/obuna, Sync/offline, AI, Texnik, 1C integratsiyasi.
 5. Yangi atama/jadval/ustun qo'shilganda — shu faylga ham qator qo'shiladi (`10-umumiy-arxitektura.md` §Qoidalar, 2-band mantiqiga mos).
+6. Ba'zi texnik atamalar (masalan "posting service", "outbox") uchun o'zbekcha tarjima qasddan berilmagan — kod/spec'da ingliz nomi aynan ishlatiladi, jadvalda faqat tushuntirish uchun o'zbekcha izoh. `message_key` uz/ru yakuniy matni — `08` UX-yozuv qoidalari bo'yicha (qaror #58 a).
 
 ---
 
@@ -80,6 +81,7 @@
 | Baholash usuli tarixi | История метода оценки | Valuation method history | `valuation_method_history` | FIFO/AVECO tanlovi va o'zgarish tarixi (faqat yil boshidan) | 12 |
 | MXIK kodi | Код ИКПУ | MXIK code | `products.mxik_code` | 17 xonali davlat tovar/xizmat klassifikatori kodi | 12 |
 | Kam qoldiq chegarasi | Минимальный остаток | Minimum stock | `products.min_stock` | Shundan past tushsa ogohlantirish beriladigan chegara | 12 |
+| Ombor hisobi | Счёт учёта склада | Inventory account | `warehouses.inventory_account` (`2910`/`2920`) | Do'kon savdo zali — 2920, ombor — 2910 (26 #160) | 12, 13 |
 | Yaroqlilik muddati | Срок годности | Expiry date | `receipt_lines.expiry_date` | Partiyaning yaroqlilik sanasi | 12 |
 | Og'irlik tovar | Весовой товар | Weighed product | `products.is_weighed` | Donada emas, og'irlikda sotiladigan tovar belgisi | 12 |
 | Markirovkalangan tovar | Маркированный товар | Marked product | `products.is_marked` | Asl belgisi/CRPT markirovkasi talab qilinadigan tovar belgisi | 12 |
@@ -123,6 +125,7 @@
 | 1CClientBankExchange | 1CClientBankExchange | 1C bank exchange format | — | O'zbekiston bank-klientlarining de-fakto ko'chirma formati (`.txt`) | 20 |
 | Ekvayring komissiyasi | Комиссия эквайринга | Acquiring commission | `bank_settlements.commission_amount`; `settings.payment_org_commission_account` (`'9430'` standart) | Bank/to'lov tashkiloti ushlagan summa — `Dt 9430 / Kt 5710` (NSBU №21 §410); inkassa xizmati komissiyasi — 9410 (qaror #42) | 12, 13 |
 | Inkasso | Инкассация | Cash collection | `cash_movements.reason = 'collection'` | Kassadagi naqdni bankka topshirish — 5710 orqali | 11, 13 |
+| Bank ko'chirmasi import yozuvi | Журнал импорта выписок | Bank statement import | `bank_statement_imports` (`file_sha256` tenant ichida yagona, `status`: `parsed`/`failed`); `bank_settlements.statement_import_id` | Har yuklangan ko'chirma fayli va uning natijasi (yaratilgan qoralamalar, dublikatlar, mos kelmagan qatorlar) (qaror #42) | 12, 20 |
 
 ## 5. Buxgalteriya/soliq
 
@@ -130,7 +133,7 @@
 |---|---|---|---|---|---|
 | Bank komissiyasi (9430) | Комиссия банка | Bank commission | hisob `9430` | Bank/ekvayring/to'lov tizimi komissiyasi — boshqa operatsion xarajat (qaror #42) | 13 |
 | Ortiqcha daromadi (9390) | Прочие операционные доходы | Other operating income | hisob `9390` | Inventarizatsiya/smena ortiqchasi, hisobdan chiqarilgan qarz qaytishi | 13 |
-| Texnik hisob 0000 | Вспомогательный счёт 000 | Opening balance offset | hisob `0000` | Boshlang'ich qoldiqlarni kiritishda qarshi hisob, kiritilgach qoldig'i nol (26 #36) | 13 |
+| Texnik hisob 0000 | Вспомогательный счёт 0000 | Opening balance offset | hisob `0000` | Boshlang'ich qoldiqlarni kiritishda qarshi hisob, kiritilgach qoldig'i nol (26 #36) | 13 |
 | Soliq hisob-kitobi | Расчёт налога | Tax settlement | `tax_settlements` (kod `ST`, `tax_kind`: `vat_offset`/`turnover_tax`) | QQS hisobga olish `Dt 6410 / Kt 4410` (§2.26) va aylanma solig'i `Dt 9430 / Kt 6410` hujjati | 13, 20 |
 | Ish kuni (5 ish kuni) | Рабочий день | Business day | `tenants.settings` eslatmalari | Davlat hisobotini tasdiqlash/tuzatish muddati — 5 ish kuni, eslatmalar 1/3/4-ish kuni (qaror #50) | 07, 13 |
 | Provodka | Проводка | Ledger entry | `ledger_entries` | Hujjat bo'yicha yoziladigan Dt/Kt buxgalteriya yozuvi | 11, 13 |
@@ -161,7 +164,10 @@
 | Fiskal chek raqami (qurilma) | Номер фискального чека (устройство) | Receipt sequence | `fiscal_receipts.receipt_seq` | Qurilma beradigan, smena ichida ketma-ket ichki idempotentlik raqami (qaror #12); FM raqami — `fm_receipt_seq` | 11 |
 | Fiskal belgi | Фискальный признак | Fiscal sign | `fiscal_receipts.fiscal_sign` | OFD qaytargan fiskal tasdiq belgisi | 12 |
 | Z-hisobot | Z-отчёт | Z-report | `fiscal_receipts.kind = 'z_report'` | Smena yopilganda chiqariladigan kunlik fiskal hisobot | 11 |
-| Qarz to'lovi cheki | Чек по оплате долга | Debt settlement receipt | `fiscal_receipts.kind = 'debt_settlement'` | Nasiya to'lovi uchun chiqariladigan alohida fiskal chek | 11 |
+| Qarz to'lovi cheki | Чек по оплате долга | Debt settlement receipt | `fiscal_receipts.kind = 'debt_settlement'` | Nasiya to'lovi uchun chiqariladigan fiskal chek — bitta to'lov = bitta chek (qaror #30, #45) | 11, 12 |
+| Kredit cheki | Чек кредита | Credit sale receipt | `fiscal_receipts.kind = 'credit_sale'`; `tenants.settings.fiscal_policy.credit_sale_receipt` (`none` standart / `credit_type`) | Qarzga sotuv paytidagi chek — faqat `credit_type` rejimida (26 #9 (OQ-002)) | 12 |
+| Chek yetkazish usuli | Способ выдачи чека | Receipt delivery | `fiscal_receipts.delivery` (`printed` standart / `electronic`) + `delivery_reason` | Elektron chek — zaxira, sabab bilan (26 #112 (OQ-018)) | 12 |
+| Fiskal port | Фискальный порт | Fiscal port | `FiscalPort` (`FISCAL_PROVIDER=fake` MVP'da) | Fiskal chek chiqarishning yagona interfeysi — hamkor bulut API yoki Do'kon ko'prigi adapterlari ortida (qaror #60) | 21, 23 |
 | Fiskal modul (FM) | Фискальный модуль | Fiscal module | `FiscalPort`, `cash_registers.fm_state` | Chekni imzolovchi va OFD'ga yuboruvchi apparat/virtual modul (JavaCard applet, USB yoki SAM) | 21 |
 | FM chek raqami | Номер чека ФМ | FM receipt sequence | `fiscal_receipts.fm_receipt_seq`, `fm_terminal_id` | Fiskal modul bergan raqam (`ReceiptSeq`), qurilmaning `receipt_seq`idan alohida (qaror #12) | 12, 21 |
 | FM holati | Состояние ФМ | FM state | `cash_registers.fm_state` (`ok`/`locked`/`ack_overdue`/`memory_full`/`unknown`) | `locked` → sotuv `FISCAL_DEVICE_LOCKED` bilan to'xtaydi (26 #89) | 12, 17 |
@@ -176,7 +182,7 @@
 | DataMatrix kod | Код DataMatrix | DataMatrix code | `marking_codes.code` | Markirovka shtrix-kodining fizik formati | 03, 12 |
 | CRPT Turon | ЦРПТ Turon | CRPT Turon | — | Markirovka kodlarini tasdiqlaydigan markaziy davlat tizimi | 03, 21 |
 | Markirovka holati | Статус кода маркировки | Marking status | `marking_codes.status` | `in_stock`/`sold`/`returned`/`written_off`/`returned_to_supplier`/`pending_verification` | 12 |
-| Markirovka fon ishi | Фоновое задание маркировки | Marking job | `outbox_jobs.kind = 'marking_sell'` | Chakana sotuv kodi CRPT'ga alohida yuborilmaydi — fiskal chek ichida OFD orqali boradi (qaror #62); enum qiymati `12` CHECK ro'yxatida saqlanadi, CRPT API faqat `verify`/`writeoff`/qabul uchun | 12, 21 |
+| Markirovka fon ishi | Фоновое задание маркировки | Marking job | `outbox_jobs.kind IN ('marking_verify','marking_accept','marking_return')` | Chakana sotuv kodi CRPT'ga alohida yuborilmaydi — fiskal chek ichida OFD orqali boradi (qaror #62); CRPT API faqat tekshiruv, qabul, qaytarish va hisobdan chiqarish uchun | 12, 21 |
 | E-faktura | Электронный счёт-фактура | E-invoice | `einvoices` | Elektron soliq hisob-faktura hujjati | 12 |
 | E-faktura operatori | Оператор ЭСФ | E-invoice provider | `einvoices.operator` | `didox`/`faktura` (Faktura.uz — MVP'da yagona) | 12, 21 |
 | E-faktura xavf bayrogi | Флаг риска счёт-фактуры | E-invoice risk flag | `einvoices.risk_flag` | Davlat xavf-baholash (VM 830) natijasi: `unknown` (standart — QQS krediti to'lovgacha kechiktiriladi) / `green` / `red` (26 #47) | 12 |
@@ -190,6 +196,7 @@
 | O'zbekcha atama | Ruscha | Inglizcha | Koddagi nom | Ta'rif | Manba fayl |
 |---|---|---|---|---|---|
 | Foydalanish shartlariga rozilik | Согласие с условиями | Terms acceptance / consent | `tenants.accepted_terms_version`, `accepted_terms_at`, `accepted_terms_ip` | Ro'yxatdan o'tishda qabul qilingan oferta versiyasi va chegaradan tashqari uzatishga rozilik (qaror #61, 26 #127) | 11, 14 |
+| Rozilik yozuvi | Согласие | Consent | `consents` (`purpose`: `terms`/`ai_cross_border`/`ai_training`, `accepted`), `platform.terms_versions`; `POST /tenant/consents` | Append-only rozilik/qaytarib olish tarixi (qaror #61) | 12, 20 |
 | Chegaradan tashqari AI | Трансграничная передача | Cross-border AI | `tenants.settings.ai_cross_border_enabled` (standart `false`) | Tenant rozilik bermaguncha AI-03 rasmlari Claude'ga yuborilmaydi (qaror #61) | 15, 22 |
 | Avtorizatsiya serveri | Сервер авторизации | Authorization Server (AS) | `app/modules/auth` | O'z OAuth 2.0 AS+RS implementatsiyasi (uchinchi tomon auth xizmati yo'q) | 10, 14, 23 |
 | BFF | BFF | Backend-for-Frontend | `/auth/*` | Veb SPA uchun cookie-based login vositachi qatlami, token brauzerga chiqmaydi | 14, 23, 24 |
@@ -226,6 +233,7 @@
 | Sinxronlash kvitansiyasi | Квитанция синхронизации | Sync receipt | `sync_receipts` | Qabul qilingan `client_event_id` natijasining serverdagi yozuvi | 12 |
 | Idempotentlik kaliti | Ключ идемпотентности | Idempotency key | `idempotency_keys`, `Idempotency-Key` | Back-office yozuvchi so'rovlarini qayta yuborishdan himoya | 12, 17, 23 |
 | Sync drain skopi | Скоуп слива синхронизации | Sync drain scope | `scope=sync.drain` | Lokautdan oldingi voqealarni yuborish uchun maxsus token skopi | 14, 17 |
+| Sinxron istisnosi | Исключение синхронизации | Sync exception | `sync_exceptions` (`reviewed_at`/`reviewed_by`/`review_note`) | Server qabul qilgan, lekin qoidaga zid voqea (overselling va b.) — BO-14 da "Ko'rib chiqildi" (qaror #56 b) | 12, 16, 20 |
 | Offline rejim | Офлайн-режим | Offline mode | `is_offline`, `$isOnline` | Internet yo'qligida lokal yozuv + keyin sinxronlash rejimi | 10, 11, 24 |
 
 ## 9. AI
@@ -242,6 +250,7 @@
 | AI fikr-mulohazasi | Отзыв по AI | AI feedback | `ai_feedback` | Foydalanuvchining AI natijasiga baho/tuzatishi | 12 |
 | AI o'qitish namunasi | Обучающий пример AI | AI training sample | `ai_training_samples` | Anonimlashtirilgan, rozilik bilan yig'ilgan o'qitish namunasi | 12 |
 | Past ishonchli maydon | Поле с низкой уверенностью | Low confidence field | `ai_ocr_jobs.low_confidence_fields` | AI ishonch darajasi chegaradan past bo'lgan OCR maydoni | 12 |
+| Valyuta kursi | Курс валюты | FX rate | `platform.fx_rates` | CBU kunlik kursi — AI xarajatini so'mga o'tkazish (qaror #55) | 12, 22 |
 | AiProvider porti | Порт AiProvider | AiProvider port | `AiProvider` | `fake`/`cli`/`api` rejimlari ortidagi yagona AI interfeysi | 10, 22, 23 |
 
 ## 10. Texnik
@@ -302,8 +311,7 @@
 
 ## Ochiq savollar
 
-1. Hal qilingan: `message_key` uz/ru yakuniy matnini Claude tayyorlaydi, asoschi pilotdan oldin ko'zdan kechiradi (qaror #58, 26 #161).
-2. Ba'zi texnik atamalar (masalan "posting service", "outbox") uchun o'zbekcha tarjima qasddan berilmagan — kod/spec'da ingliz nomi aynan ishlatiladi, bu jadvalda faqat tushuntirish uchun o'zbekcha izoh berildi.
+Yo'q — bu faylda tashqi javob kutayotgan band yo'q.
 
 ## Manbalar
 

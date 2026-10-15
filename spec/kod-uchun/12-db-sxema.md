@@ -5,7 +5,7 @@
 **Bog'liq fayllar:** `11-malumotlar-modeli.md` (barcha jadval/ustun/holatlar), `13-provodka-qoidalari.md` (registrlar, hisob raqamlari), `14-autentifikatsiya-oauth2.md` §19 (auth jadvallari), `15-xavfsizlik-va-audit.md` §3 (RLS qoidalari, istisnolar, SECURITY DEFINER), §2.1–2.2 (huquqlar/limitlar), §6.2 (audit_log o'zgarmasligi), `16-offline-sync.md` (`sync_receipts`, `devices`, `client_event_id`), `23-backend-arxitekturasi.md` (`tenant_transaction`, `idempotency_keys`, posting naqshi), `22-ai-qatlami.md` (`ai_requests` maydonlari), `33-1c-integratsiya.md` §5 (`onec_*` jadvallari, 2.11-bo'lim), `01-qarorlar.md`.
 **Holat:** joriy, 2026-10-16.
 
-Loyiha ildizi: `E:/Project/erp`. Bu faylda "01", "01-hujjat", "01-model" — `11-malumotlar-modeli.md`ning qisqa nomi (`01-qarorlar.md` emas). 01-hujjatdagi jadval/ustun nomlari **o'zgarishsiz** saqlanadi; qayerda 01 noaniq/ziddiyatli bo'lsa — aniq qaror qabul qilinadi va oxirgi bo'limda ("01 bilan farqlar / aniqlashtirishlar") ro'yxatga olinadi, 01-hujjatning o'zi tahrirlanmaydi.
+Loyiha ildizi: `E:/Project/erp`. Bu faylda "11", "11-model" — `11-malumotlar-modeli.md`ning qisqa nomi. 11 dagi jadval/ustun nomlari **o'zgarishsiz** saqlanadi; 11 umumiy qoidani bergan joyda DDL uchun qabul qilingan aniq qaror oxirgi bo'limda ("11 bilan aniqlashtirishlar") ro'yxatga olingan.
 
 **Sxema tashkiloti**: uch PostgreSQL sxemasi — `app` (tenant-scoped biznes jadvallari + `tenants`/`users`/`memberships` kabi "yarim-global" jadvallar maxsus RLS siyosati bilan), `auth` (login/token jadvallari — ilova roliga to'g'ridan-to'g'ri kirish yo'q, faqat `SECURITY DEFINER` funksiyalar orqali), `platform` (tenant'siz, haqiqiy global ma'lumotnomalar: tariflar, qo'shimchalar, birliklar, OAuth mijozlari, imzolash kalitlari, platforma adminlari).
 
@@ -41,7 +41,7 @@ CREATE SCHEMA IF NOT EXISTS auth;
 CREATE SCHEMA IF NOT EXISTS platform;
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto; -- gen_random_bytes/gen_random_uuid — uuidv7() va parol-siz tasodifiy qiymatlar uchun
-CREATE EXTENSION IF NOT EXISTS pg_trgm; -- mahsulot/kontragent nomi bo'yicha qidiruv indeksi (01-model §1)
+CREATE EXTENSION IF NOT EXISTS pg_trgm; -- mahsulot/kontragent nomi bo'yicha qidiruv indeksi (11-model §1)
 
 ALTER SCHEMA app OWNER TO erp_migrator;
 ALTER SCHEMA auth OWNER TO erp_migrator;
@@ -111,7 +111,7 @@ END;
 $$;
 ```
 
-Har bir `updated_at` ustuniga ega jadvalga shu trigger avtomatik qo'llanadi — 2-bo'lim oxirida bitta `DO $$ ... $$` bloki orqali (barcha jadvallar yaratilgandan keyin, qo'lda 90 marta yozish o'rniga). `version INT NOT NULL DEFAULT 1` — faqat ma'lumotnomalarda (optimistik qulflash, `01-model` band 27); hujjatlarda shart emas (`posted`dan keyin umuman o'zgarmaydi).
+Har bir `updated_at` ustuniga ega jadvalga shu trigger avtomatik qo'llanadi — 2-bo'lim oxirida bitta `DO $$ ... $$` bloki orqali (barcha jadvallar yaratilgandan keyin, qo'lda 90 marta yozish o'rniga). `version INT NOT NULL DEFAULT 1` — faqat ma'lumotnomalarda (optimistik qulflash, `11-model` band 27); hujjatlarda shart emas (`posted`dan keyin umuman o'zgarmaydi).
 
 ### 1.5 Enum strategiyasi — CHECK, PG ENUM emas, lookup jadval emas
 
@@ -198,6 +198,18 @@ CREATE TABLE platform.label_templates (
   fields     JSONB NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- (qaror #63) Markirovkalangan tovar guruhlari — egalik o'tishi xabarnomasi (kirimda qabul) muddati guruhga bog'liq:
+-- umumiy — 3 ish kuni (VM 833 66–67-band), suv/ichimlik (VM 631), dori (VM 149), o'simlik yog'i (VM 23) — 72 soat.
+-- Global ma'lumotnoma (RLS istisnosi), seed 5.1; products.marking_group_code shu yerga ishora qiladi.
+CREATE TABLE platform.marking_product_groups (
+  code                TEXT PRIMARY KEY, -- 'general','water_beverages','medicines','vegetable_oil'
+  name                TEXT NOT NULL,
+  acceptance_deadline TEXT NOT NULL CHECK (acceptance_deadline IN ('3_business_days','72_hours')),
+  legal_ref           TEXT NULL,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- (qaror #55) Markaziy bankning kunlik rasmiy kursi — scheduler `fetch_fx_rates` har kuni 09:30 (Toshkent)
@@ -517,7 +529,7 @@ CREATE TABLE app.role_permissions (
   tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
   role_id         UUID NOT NULL REFERENCES app.roles(id),
   permission_code TEXT NOT NULL,
-  limit_value     NUMERIC(18,4) NULL, -- ma'nosi permission_code'ga bog'liq: foiz YOKI summa (3-bo'lim, aniqlashtirish #11);
+  limit_value     NUMERIC(18,4) NULL, -- ma'nosi permission_code'ga bog'liq: foiz YOKI summa (3-bo'lim, aniqlashtirish #6);
   -- API'da 4 xonali satr ("5.0000"), UI foiz/so'mni permission_code'ga qarab formatlaydi
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -660,16 +672,18 @@ CREATE TABLE app.products (
   mxik_code        TEXT NULL CHECK (mxik_code IS NULL OR mxik_code ~ '^[0-9]{17}$'), -- yaratishda bloklamaydi, sotuvdan oldin shart
   package_code     TEXT NULL CHECK (package_code IS NULL OR length(package_code) <= 20),
                    -- tasnif.soliq.uz qadoq kodi; mxik_code kabi yaratishda bloklamaydi, fiskal chekdan oldin shart (OFD PackageCode)
-  vat_rate         NUMERIC(5,2) NULL, -- 12.00 / 0.00 (aniqlashtirish #10: vat_exemption_code bilan birga)
+  vat_rate         NUMERIC(5,2) NULL, -- 12.00 / 0.00 (aniqlashtirish #8: vat_exemption_code bilan birga)
   vat_exemption_code TEXT NULL, -- imtiyoz kodi, vat_rate o'rniga/bilan
   is_marked        BOOLEAN NOT NULL DEFAULT false,
+  marking_group_code TEXT NULL REFERENCES platform.marking_product_groups(code), -- is_marked=true bo'lsa majburiy (qabul muddati, qaror #63)
   is_weighed       BOOLEAN NOT NULL DEFAULT false,
   min_stock        NUMERIC(18,3) NULL,
   archived_at      TIMESTAMPTZ NULL,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   version          INT NOT NULL DEFAULT 1,
-  CHECK (vat_rate IS NOT NULL OR vat_exemption_code IS NOT NULL)
+  CHECK (vat_rate IS NOT NULL OR vat_exemption_code IS NOT NULL),
+  CHECK (NOT is_marked OR marking_group_code IS NOT NULL)
 );
 CREATE INDEX idx_products_name_trgm ON app.products USING gin (name gin_trgm_ops);
 CREATE INDEX idx_products_tenant_archived ON app.products (tenant_id) WHERE archived_at IS NULL;
@@ -721,7 +735,7 @@ CREATE TABLE app.discount_rules (
   scope       TEXT NOT NULL CHECK (scope IN ('product','category','all')),
   target_ids  UUID[] NOT NULL DEFAULT '{}',
   kind        TEXT NOT NULL CHECK (kind IN ('percent','amount','n_plus_m')),
-  value       NUMERIC(18,4) NOT NULL, -- kind='percent' bo'lsa foiz, aks holda summa (aniqlashtirish #12)
+  value       NUMERIC(18,4) NOT NULL, -- kind='percent' bo'lsa foiz, aks holda summa (aniqlashtirish #7)
   branch_ids  UUID[] NOT NULL DEFAULT '{}', -- bo'sh = hammasi
   valid_from  DATE NOT NULL,
   valid_to    DATE NULL,
@@ -813,7 +827,7 @@ CREATE TABLE app.approval_requests (
                          CHECK (status IN ('pending','approved','rejected','expired','consumed')),
   requested_by         UUID NOT NULL REFERENCES app.users(id),
   requested_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
-  expires_at           TIMESTAMPTZ NOT NULL, -- requested_at + 15 daqiqa (taxmin)
+  expires_at           TIMESTAMPTZ NOT NULL, -- requested_at + 15 daqiqa (standart, sozlanadi — 26 #87)
   resolved_by          UUID NULL REFERENCES app.users(id),
   resolved_at          TIMESTAMPTZ NULL,
   reject_reason        TEXT NULL,
@@ -928,7 +942,7 @@ CREATE TABLE app.sales (
   shift_id         UUID NOT NULL REFERENCES app.shifts(id),
   cash_register_id UUID NOT NULL REFERENCES app.cash_registers(id),
   counterparty_id  UUID NULL REFERENCES app.counterparties(id), -- nasiya/qarzga sotuvda
-  total_amount     NUMERIC(18,2) NULL, -- hisoblangan jami (aniqlashtirish #13 — tezkor o'qish uchun qo'shimcha)
+  total_amount     NUMERIC(18,2) NULL, -- hisoblangan jami (aniqlashtirish #10 — tezkor o'qish uchun qo'shimcha)
   is_offline          BOOLEAN NOT NULL DEFAULT false,
   debt_limit_exceeded BOOLEAN NOT NULL DEFAULT false, -- offline nasiya limitdan oshgan (tavsiya #7) — xato emas, bayroq
   created_by       UUID NOT NULL REFERENCES app.users(id),
@@ -1108,7 +1122,7 @@ CREATE TABLE app.goods_receipts (
   supplier_id      UUID NOT NULL REFERENCES app.counterparties(id),
   po_id            UUID NULL REFERENCES app.purchase_orders(id),
   warehouse_id     UUID NOT NULL, -- FK app.warehouses(id)
-  paid_immediately BOOLEAN NOT NULL DEFAULT false, -- aniqlashtirish #14: 2.6/2.8-provodka yo'lini tanlaydi
+  paid_immediately BOOLEAN NOT NULL DEFAULT false, -- aniqlashtirish #9: 2.6/2.8-provodka yo'lini tanlaydi
   kind             TEXT NOT NULL DEFAULT 'purchase' CHECK (kind IN ('purchase','gratuitous')),
                    -- gratuitous — tekin olingan tovar: Dt inv_acct / Kt 8530 bozor qiymatida, QQS va kreditorlik yo'q (13 §2.6a)
   source           TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual','purchase_order','einvoice','ocr')),
@@ -1196,7 +1210,8 @@ CREATE TABLE app.transfers (
   number           TEXT NULL,
   temp_number      TEXT NULL,
   doc_date         DATE NOT NULL,
-  status           TEXT NOT NULL CHECK (status IN ('draft','sent','received','discrepancy','cancelled')) DEFAULT 'draft',
+  status           TEXT NOT NULL CHECK (status IN ('draft','posted','sent','received','discrepancy','cancelled')) DEFAULT 'draft',
+                   -- posted = hujjat o'tkazildi + e-TTN yaratildi (qoldiq o'zgarmaydi); sent = stock_moves jo'natuvchida −
   from_branch_id   UUID NOT NULL REFERENCES app.branches(id),
   to_branch_id     UUID NOT NULL REFERENCES app.branches(id),
   from_warehouse_id UUID NOT NULL, -- FK app.warehouses(id)
@@ -1280,11 +1295,13 @@ CREATE TABLE app.count_lines (
   expected   NUMERIC(18,3) NOT NULL, -- yaratishda = snapshot_qty; post'da qayta hisoblanadi (qaror #53, 13 X-02):
              -- snapshot_qty + Σ stock_moves.qty (started_at < moved_at <= counted_at)
   counted    NUMERIC(18,3) NULL, -- sanash tugamaguncha NULL (19-api-ombor.md `counted:null`)
-  counted_at TIMESTAMPTZ NOT NULL DEFAULT now(), -- counted kiritilgan vaqt: qurilma vaqti (offline sanashda ham;
-             -- server_time ofseti bilan tuzatilgan), online kiritishda — server vaqti
+  counted_at TIMESTAMPTZ NULL, -- counted kiritilgan vaqt (qaror #53): qurilma vaqti (offline sanashda ham —
+             -- voqeaning recorded_at'i, server_time ofseti bilan tuzatilgan), online kiritishda — server vaqti;
+             -- counted NULL bo'lsa NULL
   diff       NUMERIC(18,3) GENERATED ALWAYS AS (counted - expected) STORED,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (count_id, line_no)
+  UNIQUE (count_id, line_no),
+  CHECK ((counted IS NULL) = (counted_at IS NULL))
 );
 
 CREATE TABLE app.write_offs (
@@ -1687,7 +1704,7 @@ CREATE TABLE app.bank_statement_imports (
   status             TEXT NOT NULL CHECK (status IN ('parsed','failed')),
   rows_total         INT NOT NULL DEFAULT 0,
   drafts_created     INT NOT NULL DEFAULT 0,
-  duplicates         INT NOT NULL DEFAULT 0, -- skipped_duplicates
+  duplicates         INT NOT NULL DEFAULT 0, -- takror qatorlar (bank_ref + doc_date + summa bo'yicha)
   ignored_outgoing   INT NOT NULL DEFAULT 0,
   unmatched_lines    JSONB NOT NULL DEFAULT '[]',
   error_code         TEXT NULL,
@@ -1806,7 +1823,7 @@ CREATE UNIQUE INDEX uq_tax_settlements_active ON app.tax_settlements (tenant_id,
 
 ### 2.7 Registrlar
 
-`stock_moves`, `debt_moves`, `cash_moves`, `ledger_entries`, `vat_moves` — **haqiqiy append-only** (3-bo'limda `REVOKE`+trigger bilan mahkamlanadi). `stock_lots`, `avg_costs`, `stock_balances`, `debt_balances` — "balans/ishchi" jadvallar: qiymatlari shu registrlardan hisoblanadi, lekin qatorlari FIFO/AVECO qulfi ostida **UPDATE** qilinadi (aniqlashtirish #1 — 01-model bu jadvallarni "Registrlar" sarlavhasi ostida bersa ham, `stock_lots.qty_left` jismonan mutatsiya qilinadi, `23-backend-arxitekturasi.md` §2.1).
+`stock_moves`, `debt_moves`, `cash_moves`, `ledger_entries`, `vat_moves` — **haqiqiy append-only** (3-bo'limda `REVOKE`+trigger bilan mahkamlanadi). `stock_lots`, `avg_costs`, `stock_balances`, `debt_balances` — "balans/ishchi" jadvallar: qiymatlari shu registrlardan hisoblanadi, lekin qatorlari FIFO/AVECO qulfi ostida **UPDATE** qilinadi (aniqlashtirish #2 — 11-model bu jadvallarni "Registrlar" sarlavhasi ostida bersa ham, `stock_lots.qty_left` jismonan mutatsiya qilinadi, `23-backend-arxitekturasi.md` §2.1).
 
 ```sql
 CREATE TABLE app.stock_moves (
@@ -1834,7 +1851,7 @@ CREATE TABLE app.stock_lots (
   product_id      UUID NOT NULL REFERENCES app.products(id),
   receipt_line_id UUID NULL REFERENCES app.receipt_lines(id), -- faqat source_doc_type='goods_receipt'
   source_doc_type TEXT NOT NULL CHECK (source_doc_type IN ('goods_receipts','stock_openings','transfers','stock_counts')),
-                  -- aniqlashtirish #2; stock_counts — inventarizatsiya ortiqchasi partiyasi (13 §2.11)
+                  -- aniqlashtirish #3; stock_counts — inventarizatsiya ortiqchasi partiyasi (13 §2.11)
   source_doc_id   UUID NOT NULL,
   source_line_id  UUID NOT NULL,
   received_at     TIMESTAMPTZ NOT NULL,
@@ -2044,7 +2061,8 @@ ALTER TABLE app.sale_lines ADD CONSTRAINT fk_sl_marking
   FOREIGN KEY (tenant_id, marking_code) REFERENCES app.marking_codes(tenant_id, code) DEFERRABLE INITIALLY DEFERRED;
 -- SalePostingService sale_lines'dan oldin, shu tranzaksiyada INSERT INTO marking_codes ...
 -- ON CONFLICT (tenant_id, code) DO UPDATE SET status=..., last_doc_id=... bajaradi
--- (online — 'sold', offline — 'pending_verification'); FK DEFERRABLE shu tartibni kafolatlaydi.
+-- (status='pending_verification'; chek OFD tasdig'ini olgach — fiscal_receipts.ofd_acked_at — 'sold', qaror #62,
+-- 18 §4.2, 16 §7); FK DEFERRABLE shu tartibni kafolatlaydi.
 
 CREATE TABLE app.einvoices (
   id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
@@ -2086,7 +2104,7 @@ CREATE UNIQUE INDEX uq_gr_einvoice_active ON app.goods_receipts (tenant_id, einv
   WHERE einvoice_id IS NOT NULL AND status <> 'cancelled';
 
 -- e-TTN: kiruvchi xaridda EHF bilan birlashtirilgan (einvoice_id); ichki ko'chirishda ("Ombordan omborga")
--- yozuvchi — transfer `send` (transfer_id).
+-- yozuvchi — transfer `post` (transfer_id; qaror #63, 19 §13).
 CREATE TABLE app.ettn_documents (
   id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
   tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
@@ -2167,7 +2185,7 @@ CREATE TABLE app.outbox_jobs (
   id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
   tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
   kind            TEXT NOT NULL CHECK (kind IN ('ofd_send','einvoice_send','einvoice_accept','ettn_send',
-                     'ettn_accept','marking_verify','marking_sell','marking_accept','marking_return',
+                     'ettn_accept','marking_verify','marking_accept','marking_return',
                      'state_report_reminder','sms','telegram','ai','report_export','label_pdf')),
   payload         JSONB NOT NULL,
   status          TEXT NOT NULL CHECK (status IN ('queued','running','done','retry','failed')) DEFAULT 'queued',
@@ -2331,7 +2349,7 @@ CREATE TABLE app.ai_ocr_jobs (
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
   finished_at           TIMESTAMPTZ NULL,
   confirmed_at          TIMESTAMPTZ NULL,
-  expires_at            TIMESTAMPTZ NOT NULL, -- created_at + 7 kun (taxmin), keyin 'expired' va fields tozalanadi
+  expires_at            TIMESTAMPTZ NOT NULL, -- created_at + 7 kun (standart, sozlanadi), keyin 'expired' va fields tozalanadi
   CHECK (status <> 'confirmed' OR (created_doc_id IS NOT NULL AND confirmed_at IS NOT NULL))
 );
 CREATE INDEX idx_ai_ocr_jobs_expiry ON app.ai_ocr_jobs (expires_at) WHERE status IN ('processing','done');
@@ -2402,7 +2420,7 @@ CREATE TABLE app.doc_sequences (
 );
 ```
 
-**Hujjat raqami generatori** (aniqlashtirish #15 — 01-model faqat `K-01-2026-000154` namunasini beradi, to'liq `doc_type` kod jadvali ro'yxatlanmagan):
+**Hujjat raqami generatori** (aniqlashtirish #12 — 11-model faqat `K-01-2026-000154` namunasini beradi, to'liq `doc_type` kod jadvali ro'yxatlanmagan):
 
 ```sql
 CREATE OR REPLACE FUNCTION app.next_doc_number(
@@ -2421,7 +2439,7 @@ END;
 $$;
 ```
 
-`doc_type` kodlari (aniqlashtirish #15): `K`=sales, `V`=returns, `Z`=purchase_orders, `M`=goods_receipts, `MV`=supplier_returns, `P`=transfers, `I`=stock_counts, `L`=write_offs, `C`=price_changes, `OO`=stock_openings, `OD`=debt_openings, `DP`=debt_payments, `DW`=debt_writeoffs, `SP`=supplier_payments, `E`=expenses, `CM`=cash_movements, **`BX`=ledger_adjustments**, **`BT`=bank_settlements** (qaror #42), **`ST`=tax_settlements**. Ro'yxat — standart (qaror #54), yangi kod — append-only seed.
+`doc_type` kodlari (aniqlashtirish #12): `K`=sales, `V`=returns, `Z`=purchase_orders, `M`=goods_receipts, `MV`=supplier_returns, `P`=transfers, `I`=stock_counts, `L`=write_offs, `C`=price_changes, `OO`=stock_openings, `OD`=debt_openings, `DP`=debt_payments, `DW`=debt_writeoffs, `SP`=supplier_payments, `E`=expenses, `CM`=cash_movements, **`BX`=ledger_adjustments**, **`BT`=bank_settlements** (qaror #42), **`ST`=tax_settlements**. Ro'yxat — standart (qaror #54), yangi kod — append-only seed.
 
 ### 2.10 `updated_at` trigger'larini ommaviy ulash
 
@@ -2700,8 +2718,8 @@ CREATE TABLE app.onec_catalog_items (
   full_name      TEXT NULL,
   name_norm      TEXT NOT NULL,          -- §6.13 normallashtirish
   inn            TEXT NULL,              -- ИНН (STIR, 9 raqam)
-  pinfl          TEXT NULL,              -- ПИНФЛ (14 raqam) — rekvizit nomi taxmin (P-04)
-  ikpu           TEXT NULL,              -- ИКПУ/MXIK (17 raqam) — rekvizit nomi taxmin (P-04)
+  pinfl          TEXT NULL,              -- ПИНФЛ (14 raqam) — 1C rekvizit nomi metadata o'qishda tasdiqlanadi (26 #132)
+  ikpu           TEXT NULL,              -- ИКПУ/MXIK (17 raqam) — 1C rekvizit nomi metadata o'qishda tasdiqlanadi (26 #132)
   article        TEXT NULL,              -- Артикул
   barcodes       TEXT[] NOT NULL DEFAULT '{}',
   parent_guid    UUID NULL,
@@ -3366,12 +3384,12 @@ CREATE POLICY memberships_scope ON app.memberships
 
 ### 4.4 Global/platforma jadvallari — RLS o'rniga GRANT cheklovi
 
-`plans`, `addons`, `units`, `oauth_clients`, `signing_keys`, `label_templates`, `terms_versions`, `fx_rates` — `tenant_id`siz, RLS **yoqilmaydi**; o'rniga faqat `SELECT` beriladi (yozish — faqat `erp_migrator`/admin yo'li orqali). `platform_admins` — `erp_app`ga **umuman** grant yo'q (platforma admin BFF alohida, yuqori ishonchli yo'l orqali ishlaydi, `15-xavfsizlik-va-audit.md` §3.4).
+`plans`, `addons`, `units`, `oauth_clients`, `signing_keys`, `label_templates`, `marking_product_groups`, `terms_versions`, `fx_rates` — `tenant_id`siz, RLS **yoqilmaydi**; o'rniga faqat `SELECT` beriladi (yozish — faqat `erp_migrator`/admin yo'li orqali). `platform_admins` — `erp_app`ga **umuman** grant yo'q (platforma admin BFF alohida, yuqori ishonchli yo'l orqali ishlaydi, `15-xavfsizlik-va-audit.md` §3.4).
 
 ```sql
 GRANT SELECT ON platform.plans, platform.addons, platform.units,
                 platform.oauth_clients, platform.signing_keys, platform.label_templates,
-                platform.terms_versions
+                platform.marking_product_groups, platform.terms_versions
   TO erp_app;
 -- kurs scheduler'i (erp_app ulanishi) yozadi (qaror #55)
 GRANT SELECT, INSERT, UPDATE ON platform.fx_rates TO erp_app;
@@ -3509,16 +3527,113 @@ GRANT EXECUTE ON FUNCTION app.public_statement_by_token(text) TO erp_app;
 ```
 Telegram ulash kodi (20-api-moliya-admin.md #66) — DB emas, Redis `tg_link:{code}` (TTL 10 daqiqa).
 
-`14-autentifikatsiya-oauth2.md` §19'da nomlangan qo'shimcha `SECURITY DEFINER` funksiyalar (`auth_consume_code`, `auth_rotate_refresh`, `auth_revoke_tenant`, `auth_suspend_tenant`) — xuddi shu naqsh bilan (`erp_system` egaligida, `SET search_path = app, auth, pg_temp`), `auth.*` jadvallarni yozadi/o'qiydi; imzolari:
+`14-autentifikatsiya-oauth2.md` §7, §16.1.3, §19 dagi token oqimlari uchun 4 ta `SECURITY DEFINER` funksiya — xuddi shu naqsh bilan (`erp_system` egaligida, `SET search_path = app, auth, pg_temp`), `auth.*` jadvallarni yozadi/o'qiydi. Parol/OTP/sessiya yaratish kabi qolgan AS yozuvlari ham shu naqshda (`auth_` prefiksli funksiyalar) `auth` modulida qo'shiladi; CI ro'yxati (§6.2) quyidagi minimal to'plamni tekshiradi.
 
 ```sql
--- CREATE FUNCTION app.auth_consume_code(p_code_hash text) RETURNS TABLE (...);
--- CREATE FUNCTION app.auth_rotate_refresh(p_token_hash text) RETURNS TABLE (...);
--- CREATE FUNCTION app.auth_revoke_tenant(p_tenant_id uuid) RETURNS void;
--- CREATE FUNCTION app.auth_suspend_tenant(p_tenant_id uuid) RETURNS void;
-```
+-- Authorization Code — bir martalik iste'mol (atomik): yaroqli bo'lsa used_at qo'yiladi va qator qaytadi,
+-- aks holda bo'sh natija (AS: invalid_grant). PKCE tekshiruvi (code_verifier → S256) ilovada.
+CREATE OR REPLACE FUNCTION app.auth_consume_code(p_code_hash text)
+RETURNS TABLE (client_id uuid, user_id uuid, tenant_id uuid, code_challenge text,
+               code_challenge_method text, redirect_uri text, scope text)
+LANGUAGE sql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+  UPDATE auth.authorization_codes c
+     SET used_at = now()
+   WHERE c.code_hash = p_code_hash AND c.used_at IS NULL AND c.expires_at > now()
+  RETURNING c.client_id, c.user_id, c.tenant_id, c.code_challenge, c.code_challenge_method, c.redirect_uri, c.scope;
+$$;
 
-To'liq tanasi `auth` modulining ishga tushirish bosqichida yoziladi (bu — DB-sxema hujjati, auth-oqim logikasi `14-autentifikatsiya-oauth2.md`da).
+-- Refresh rotatsiyasi (14 §7): outcome —
+--   'rotated'      — eski token used_at, yangi token yozildi (p_new_token_hash), sessiya yangi tokenga ko'chdi;
+--   'grace_replay' — eski token ≤ 30 s oldin ishlatilgan va vorisi hali ishlatilmagan: hech narsa o'zgarmaydi,
+--                    voris id qaytadi (AS javobni single-flight keshidan beradi; 14 §7, standart 30 s);
+--   'reuse_revoked'— qayta ishlatish: butun oila va sessiyalar bekor qilinadi (audit: refresh_token_reuse_detected);
+--   'invalid'      — topilmadi / muddati o'tgan / bekor qilingan.
+-- suspended_at bo'lsa ham 'rotated' qaytadi, `suspended=true` — AS faqat scope=sync.drain beradi (14 §16.4).
+CREATE OR REPLACE FUNCTION app.auth_rotate_refresh(p_token_hash text, p_new_token_hash text, p_new_expires_at timestamptz)
+RETURNS TABLE (outcome text, refresh_token_id uuid, family_id uuid, client_id uuid, user_id uuid,
+               tenant_id uuid, device_id uuid, scope text, suspended boolean)
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+DECLARE
+  r   auth.refresh_tokens%ROWTYPE;
+  nxt auth.refresh_tokens%ROWTYPE;
+  new_id uuid;
+BEGIN
+  SELECT * INTO r FROM auth.refresh_tokens t WHERE t.token_hash = p_token_hash FOR UPDATE;
+  IF NOT FOUND OR r.revoked_at IS NOT NULL OR r.expires_at <= now() THEN
+    RETURN QUERY SELECT 'invalid'::text, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::uuid, NULL::text, NULL::boolean;
+    RETURN;
+  END IF;
+  IF r.used_at IS NOT NULL THEN
+    SELECT * INTO nxt FROM auth.refresh_tokens t WHERE t.id = r.replaced_by_id;
+    IF now() - r.used_at <= interval '30 seconds' AND nxt.id IS NOT NULL AND nxt.used_at IS NULL AND nxt.revoked_at IS NULL THEN
+      RETURN QUERY SELECT 'grace_replay'::text, nxt.id, nxt.family_id, nxt.client_id, nxt.user_id, nxt.tenant_id,
+                          nxt.device_id, nxt.scope, (nxt.suspended_at IS NOT NULL);
+      RETURN;
+    END IF;
+    UPDATE auth.refresh_tokens t SET revoked_at = now(), revoked_reason = 'reuse_detected'
+     WHERE t.family_id = r.family_id AND t.revoked_at IS NULL;
+    UPDATE auth.sessions s SET revoked_at = now(), revoked_reason = 'reuse_detected'
+     WHERE s.revoked_at IS NULL
+       AND s.current_refresh_token_id IN (SELECT t.id FROM auth.refresh_tokens t WHERE t.family_id = r.family_id);
+    RETURN QUERY SELECT 'reuse_revoked'::text, r.id, r.family_id, r.client_id, r.user_id, r.tenant_id, r.device_id, r.scope, NULL::boolean;
+    RETURN;
+  END IF;
+  INSERT INTO auth.refresh_tokens (token_hash, family_id, client_id, user_id, tenant_id, device_id, scope,
+                                   expires_at, suspended_at)
+  VALUES (p_new_token_hash, r.family_id, r.client_id, r.user_id, r.tenant_id, r.device_id, r.scope,
+          p_new_expires_at, r.suspended_at)
+  RETURNING id INTO new_id;
+  UPDATE auth.refresh_tokens t SET used_at = now(), replaced_by_id = new_id WHERE t.id = r.id;
+  UPDATE auth.sessions s SET current_refresh_token_id = new_id, last_seen_at = now()
+   WHERE s.current_refresh_token_id = r.id AND s.revoked_at IS NULL;
+  RETURN QUERY SELECT 'rotated'::text, new_id, r.family_id, r.client_id, r.user_id, r.tenant_id, r.device_id,
+                      r.scope, (r.suspended_at IS NOT NULL);
+END;
+$$;
+
+-- Tenantning barcha sessiya/refresh tokenlarini to'liq bekor qilish (tenant yopilishi, xavfsizlik hodisasi).
+CREATE OR REPLACE FUNCTION app.auth_revoke_tenant(p_tenant_id uuid, p_reason text)
+RETURNS void
+LANGUAGE sql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+  UPDATE auth.refresh_tokens SET revoked_at = now(), revoked_reason = p_reason
+   WHERE tenant_id = p_tenant_id AND revoked_at IS NULL;
+  UPDATE auth.sessions SET revoked_at = now(), revoked_reason = p_reason
+   WHERE tenant_id = p_tenant_id AND revoked_at IS NULL;
+$$;
+
+-- Obuna lokauti (14 §16.1.3): p_suspend=true — suspended_at=now(), revoked_reason='subscription'
+-- (to'liq bekor emas); p_suspend=false — to'lovdan keyin tozalash (§16.1.5).
+CREATE OR REPLACE FUNCTION app.auth_suspend_tenant(p_tenant_id uuid, p_suspend boolean)
+RETURNS void
+LANGUAGE sql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+  UPDATE auth.refresh_tokens
+     SET suspended_at   = CASE WHEN p_suspend THEN now() ELSE NULL END,
+         revoked_reason = CASE WHEN p_suspend THEN 'subscription' ELSE NULL END
+   WHERE tenant_id = p_tenant_id AND revoked_at IS NULL
+     AND (CASE WHEN p_suspend THEN suspended_at IS NULL ELSE revoked_reason = 'subscription' END);
+$$;
+
+ALTER FUNCTION app.auth_consume_code(text) OWNER TO erp_system;
+ALTER FUNCTION app.auth_rotate_refresh(text, text, timestamptz) OWNER TO erp_system;
+ALTER FUNCTION app.auth_revoke_tenant(uuid, text) OWNER TO erp_system;
+ALTER FUNCTION app.auth_suspend_tenant(uuid, boolean) OWNER TO erp_system;
+REVOKE ALL ON FUNCTION app.auth_consume_code(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_rotate_refresh(text, text, timestamptz) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_revoke_tenant(uuid, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_suspend_tenant(uuid, boolean) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION app.auth_consume_code(text) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_rotate_refresh(text, text, timestamptz) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_revoke_tenant(uuid, text) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_suspend_tenant(uuid, boolean) TO erp_app;
+```
 
 #### 1C integratsiyasi funksiyalari (`0028 onec_integration`)
 
@@ -3699,11 +3814,17 @@ INSERT INTO platform.units (code, is_fractional) VALUES
 
 INSERT INTO platform.plans (code, price_month, price_year, limits) VALUES
   ('standard', 99000.00, 950400.00, -- 950 400 = 99 000 × 12 × 0,8 (−20% yillik chegirma)
-   '{"included_cash_registers": 1, "ai_monthly_tokens": 200000}'::jsonb);
-  -- ai_monthly_tokens — taxmin, 05-mvp-chegarasi.md'da yakunlanadi (`11-malumotlar-modeli.md` §2 izohi)
+   '{"included_cash_registers": 1, "ai_monthly_tokens": 2500000}'::jsonb);
+  -- ai_monthly_tokens — standart, sozlanadi (`22-ai-qatlami.md` §5, 26 #54)
 
 INSERT INTO platform.addons (code, name, price_month) VALUES
   ('extra_register', 'Qo''shimcha virtual kassa', 39000.00);
+
+INSERT INTO platform.marking_product_groups (code, name, acceptance_deadline, legal_ref) VALUES
+  ('general',         'Umumiy (boshqa markirovkalangan tovarlar)', '3_business_days', 'VM 833 66–67-band'),
+  ('water_beverages', 'Suv va ichimliklar',                        '72_hours',        'VM 631'),
+  ('medicines',       'Dori vositalari',                           '72_hours',        'VM 149'),
+  ('vegetable_oil',   'O''simlik yog''i (pilot)',                  '72_hours',        'VM 23');
 
 -- kamida bitta standart yorliq shabloni
 INSERT INTO platform.label_templates (code, name, width_mm, height_mm, fields) VALUES
@@ -3732,7 +3853,7 @@ INSERT INTO platform.oauth_clients (client_id, client_type, name, allowed_grant_
 
 ### 5.2 Tenant-provisioning shabloni (har ro'yxatdan o'tishda qo'llaniladi, global emas)
 
-`15-xavfsizlik-va-audit.md` §1.5: `roles`/`role_permissions`/`expense_categories`/`doc_sequences` **tenant-scoped** jadvallar — bular bir martalik global seed emas, balki **har signup tranzaksiyasida** ilova kodi tomonidan quyidagi shablon bo'yicha yaratiladi (aniqlashtirish #16). **Standart filial** — `branches.code='01'`; keyingi filiallar — keyingi bo'sh ikki xonali raqam (API'da ixtiyoriy kiritiladi).
+`15-xavfsizlik-va-audit.md` §1.5: `roles`/`role_permissions`/`expense_categories`/`doc_sequences` **tenant-scoped** jadvallar — bular bir martalik global seed emas, balki **har signup tranzaksiyasida** ilova kodi tomonidan quyidagi shablon bo'yicha yaratiladi (aniqlashtirish #13). **Standart filial** — `branches.code='01'`; keyingi filiallar — keyingi bo'sh ikki xonali raqam (API'da ixtiyoriy kiritiladi).
 
 ```sql
 -- 5 standart rol (parametr :tenant_id)
@@ -3795,36 +3916,36 @@ INSERT INTO app.expense_categories (tenant_id, code, name, default_account, sour
 |---|---|---|
 | 0001 | `extensions_roles_schemas` | Sxemalar, kengaytmalar, rollar, `app.uuidv7()`, `app.set_updated_at()`, `app.forbid_mutation()` |
 | 0002 | `core_tenant_user` | `tenants` (+`legal_form`, `go_live_date`, `accepted_terms_*`), `users`, `branches` (+`code`), `branch_tax_settings`, `warehouses` (+`inventory_account`), `cash_registers` (+`ofd_status`, `fm_state`, `last_unacked_receipt_at`, `fm_receipts_pending`, `tax_registered_at`, `outlet_address_snapshot`, `txkm_contract_ref`), `devices` (`kind` ichida `onec_agent`, qaror #58), `memberships`, `roles`, `role_permissions` |
-| 0003 | `auth_schema` | `auth.*` (6 jadval, **+`otp_challenges.channel`** — qaror #34) + ularning `app.users`/`tenants`/`devices`ga FK'lari, `app.license_tokens`, **`app.user_identities`** (Google OIDC bog'lash, qaror #34) |
-| 0004 | `label_templates` | **YANGI** — `platform.label_templates` |
-| 0005 | `valuation_method_history` | **YANGI** — `app.valuation_method_history` |
-| 0006 | `counterparty_statement_links` | **YANGI** — `app.counterparty_statement_links` |
+| 0003 | `auth_schema` | `auth.*` (6 jadval, `otp_challenges.channel` — qaror #34) + ularning `app.users`/`tenants`/`devices`ga FK'lari, `app.license_tokens`, **`app.user_identities`** (Google OIDC bog'lash, qaror #34) |
+| 0004 | `label_templates` | `platform.label_templates`, `platform.marking_product_groups` (qaror #63) |
+| 0005 | `valuation_method_history` | `app.valuation_method_history` |
+| 0006 | `counterparties` | `counterparties` (+`debt_due_date`, `is_founder`), `debt_doubtful_flags` |
 | 0007 | `platform_global` | `platform.plans`, `addons`, `units`, `oauth_clients` (+`status`, `pending_secret` CHECK), `signing_keys` (`purpose` ichida `onec_task`/`agent_update`), `platform_admins`, `fx_rates` (qaror #55), `terms_versions` (qaror #61) + `app.subscriptions`, `tenant_addons`, `billing_payments` (davr/kvitansiya ustunlari, +`kind`/`reason`/`actor_user_id`, qaror #56), `tenant_tax_regimes`, `consents` (qaror #61) |
-| 0008 | `catalog_pricing` | `product_categories`, `products` (**`mxik_code` endi NULL**; **+`name_ru` nullable — qaror #29**), `product_barcodes`, `product_prices`, `label_print_queue`, `internal_barcode_seq`, `discount_rules`; `products.package_code` uzunlik CHECK |
-| 0009 | `counterparties` | `counterparties` (+`debt_due_date`, `is_founder`), `debt_doubtful_flags` |
-| 0010 | `approval_payment_infra` | **YANGI** — `approval_requests`, `doc_approvals`, `payment_checkouts` — `docs_sales`dan **oldin**, `sale_payments.checkout_ref` FK uchun |
-| 0011 | `docs_sales` | `shifts` (**to'liq qayta yozildi — `shift_no`/`variance`**), `sales` (**+`is_offline`/`debt_limit_exceeded`**), `sale_lines` (**+chegirma/QQS ustunlari**), `sale_payments` (+`due_date`/`checkout_ref`, `card_type`/`card_mask`/`rrn` va UzQR CHECK'lari — qaror #64) |
-| 0012 | `docs_returns` | `returns` (**+smena/kassa/qaytarish usuli**), `return_lines` (+QQS/marking, `restock` — qaror #48) |
-| 0013 | `docs_purchasing` | `purchase_orders` (**+`warehouse_id`**), `po_lines` (**`price` endi ixtiyoriy**), `goods_receipts` (+`source`/`einvoice_id`/`ai_ocr_job_id`/`ettn_ref`/`poa_number`/`kind`), `receipt_lines` (**+`vat_exemption_code`**) |
-| 0014 | `docs_inventory` | `transfers` (**+`sent_at/by`, `received_at/by`**), `transfer_lines` (**`lot_id` yo'q, `lot_allocations` JSONB**), `transfers` (+`transport_mode`/`ettn_ref`/`vehicle_plate`/`driver_name`), `stock_counts` (+`started_at`/`responsible_user_id`), `count_lines` (`counted` NULL, +`snapshot_qty`/`counted_at` — qaror #53), `write_offs` (+`responsible_user_id`/`promo_order_ref`/`source_return_id`), `write_off_lines` (+`expired_return`, `gift_kind`), `stock_openings`, `opening_lines` |
-| 0015 | `registers` | `stock_moves`, `stock_lots` (`source_doc_type` ko'plik, +`stock_counts`) (+ `supplier_returns` (**+`reason`**) / `supplier_return_lines` endi yaratiladi), `avg_costs`, `stock_balances`, `debt_moves` (**+`limit_exceeded`**), `debt_balances`, `cash_moves` (**`method` CHECK + bank_account_id izohi**), `ledger_entries` (+`branch_id`, hisob kodi formati CHECK), `vat_moves`; append-only `REVOKE`+trigger (3-bo'lim, **+`app.doc_approvals`**) |
+| 0008 | `catalog_pricing` | `product_categories`, `products` (`mxik_code` NULL ruxsat; `name_ru` nullable — qaror #29; `marking_group_code` — qaror #63), `product_barcodes`, `product_prices`, `label_print_queue`, `internal_barcode_seq`, `discount_rules`; `products.package_code` uzunlik CHECK |
+| 0009 | `counterparty_statement_links` | `app.counterparty_statement_links` (`counterparties`dan keyin) |
+| 0010 | `approval_payment_infra` | `approval_requests`, `doc_approvals`, `payment_checkouts` — `docs_sales`dan **oldin**, `sale_payments.checkout_ref` FK uchun |
+| 0011 | `docs_sales` | `shifts` (`shift_no`/`variance`), `sales` (+`is_offline`/`debt_limit_exceeded`), `sale_lines` (chegirma/QQS ustunlari), `sale_payments` (+`due_date`/`checkout_ref`, `card_type`/`card_mask`/`rrn` va UzQR CHECK'lari — qaror #64) |
+| 0012 | `docs_returns` | `returns` (+smena/kassa/qaytarish usuli), `return_lines` (+QQS/marking, `restock` — qaror #48) |
+| 0013 | `docs_purchasing` | `purchase_orders` (+`warehouse_id`), `po_lines` (`price` ixtiyoriy), `goods_receipts` (+`source`/`einvoice_id`/`ai_ocr_job_id`/`ettn_ref`/`poa_number`/`kind`), `receipt_lines` (+`vat_exemption_code`) |
+| 0014 | `docs_inventory` | `transfers` (+`sent_at/by`, `received_at/by`), `transfer_lines` (`lot_id` yo'q, `lot_allocations` JSONB), `transfers` (+`transport_mode`/`ettn_ref`/`vehicle_plate`/`driver_name`), `stock_counts` (+`started_at`/`responsible_user_id`), `count_lines` (`counted` NULL, +`snapshot_qty`/`counted_at` — qaror #53), `write_offs` (+`responsible_user_id`/`promo_order_ref`/`source_return_id`), `write_off_lines` (+`expired_return`, `gift_kind`), `stock_openings`, `opening_lines` |
+| 0015 | `registers` | `stock_moves`, `stock_lots` (`source_doc_type` ko'plik, +`stock_counts`) (+ `supplier_returns` (+`reason`) / `supplier_return_lines`), `avg_costs`, `stock_balances`, `debt_moves` (+`limit_exceeded`), `debt_balances`, `cash_moves` (`method` CHECK + bank_account_id izohi), `ledger_entries` (+`branch_id`, hisob kodi formati CHECK), `vat_moves`; append-only `REVOKE`+trigger (3-bo'lim, **+`app.doc_approvals`) |
 | 0016 | `ledger_adjustments` | `app.ledger_adjustments` (doc_sequences kodi `BX`, +`analytics`) |
-| 0017 | `docs_pricing_debts` | `price_changes`, `price_change_lines` (**+`valid_from`**), `debt_openings` (**+`due_date`**), `debt_payments` (`method` to'liq ro'yxat + checkout/promise_date, +`card_type`/`card_mask`/`rrn`/`qr_type`), `debt_payment_allocations` (`target_doc_type` CHECK, +`debt_writeoffs`), `debt_writeoffs` (+`reason`, `account_choice` default, `tax_writeoff_basis`), `supplier_payments` (+`cash_register_id`/`shift_id`), `supplier_payment_allocations` (`target_doc_type` CHECK) |
-| 0018 | `docs_expenses_cash` | `expense_categories` (+`version`, `code`/`default_account`/`source_ref`), `recurring_expenses` (**to'liq qayta yozildi**), `attachments` (**+`content_type`/`original_name`/`sha256`/`kind` CHECK**), `expenses` (+`tax_type`), `cash_movements` (+`counterparty_id`), `bank_statement_imports`, `bank_settlements` (qaror #42, `attachments`dan keyin; +`variance_amount`, `statement_import_id`), `tax_settlements` (kod `ST`); shu revizionda `attachments` mavjud bo'lgach `ALTER TABLE billing_payments ADD CONSTRAINT fk_bp_invoice_attachment ...` |
+| 0017 | `docs_pricing_debts` | `price_changes`, `price_change_lines` (+`valid_from`), `debt_openings` (+`due_date`), `debt_payments` (`method` to'liq ro'yxat + checkout/promise_date, +`card_type`/`card_mask`/`rrn`/`qr_type`), `debt_payment_allocations` (`target_doc_type` CHECK, +`debt_writeoffs`), `debt_writeoffs` (+`reason`, `account_choice` default, `tax_writeoff_basis`), `supplier_payments` (+`cash_register_id`/`shift_id`), `supplier_payment_allocations` (`target_doc_type` CHECK) |
+| 0018 | `docs_expenses_cash` | `expense_categories` (+`version`, `code`/`default_account`/`source_ref`), `recurring_expenses`, `attachments` (+`content_type`/`original_name`/`sha256`/`kind` CHECK), `expenses` (+`tax_type`), `cash_movements` (+`counterparty_id`), `bank_statement_imports`, `bank_settlements` (qaror #42, `attachments`dan keyin; +`variance_amount`, `statement_import_id`), `tax_settlements` (kod `ST`); shu revizionda `attachments` mavjud bo'lgach `ALTER TABLE billing_payments ADD CONSTRAINT fk_bp_invoice_attachment ...` |
 | 0019 | `doc_sequences` | `doc_sequences`, `app.next_doc_number()`; kod ro'yxatiga `BX`=ledger_adjustments, `BT`=bank_settlements, `ST`=tax_settlements |
-| 0020 | `fiscal_marking_edocs` | `fiscal_receipts` (`kind` + `debt_settlement`/`credit_sale`, `debt_payment_id`, `fm_terminal_id`/`fm_receipt_seq`/`fiscal_at`/`ofd_acked_at`, `payment_form`, `delivery`; qaror #30, #43, #45), `marking_codes`, `einvoices` (status CHECK + summalar + `uq_einvoice_out_per_doc`, `risk_flag` + `unknown`, `factura_type`/`related_einvoice_id`), `ettn_documents` (+`transfer_id`/`transport_type`/`direction`, `status` CHECK — qaror #63), `state_reports` (**+solishtirish ustunlari**), `state_report_diffs`; shu revizionda `einvoices` mavjud bo'lgach `fk_gr_einvoice` |
-| 0021 | `ai_ocr_jobs` | **YANGI** — `app.ai_ocr_jobs` + `fk_gr_ocr_job` (`goods_receipts.ai_ocr_job_id` → `ai_ocr_jobs.id`) |
-| 0022 | `integration_sync` | `app.tenant_secrets` (integratsiya hisob ma'lumotlari, +`cash_register_id` — UzQR kaliti); `outbox_jobs` (kind ro'yxati + `ettn_accept`/`marking_accept`/`marking_return`/`report_export`/`label_pdf`, job-progress ustunlari), `sync_receipts`, `sync_exceptions` (qaror #56), `idempotency_keys`, `recost_jobs`, `import_jobs` (**holatlar + `result`**) |
-| 0023 | `notifications_ai` | `telegram_links`, `notification_settings`, `notifications_log`, `ai_requests`, `ai_training_samples`, `ai_feedback`, `tenant_glossary` |
+| 0020 | `fiscal_marking_edocs` | `fiscal_receipts` (`kind` + `debt_settlement`/`credit_sale`, `debt_payment_id`, `fm_terminal_id`/`fm_receipt_seq`/`fiscal_at`/`ofd_acked_at`, `payment_form`, `delivery`; qaror #30, #43, #45), `marking_codes`, `einvoices` (status CHECK + summalar + `uq_einvoice_out_per_doc`, `risk_flag` + `unknown`, `factura_type`/`related_einvoice_id`), `ettn_documents` (+`transfer_id`/`transport_type`/`direction`, `status` CHECK — qaror #63), `state_reports` (+solishtirish ustunlari), `state_report_diffs`; shu revizionda `einvoices`/`marking_codes` mavjud bo'lgach `fk_gr_einvoice`, `fk_vm_einvoice`, `fk_sl_marking` |
+| 0021 | `ai_ocr_jobs` | `app.ai_requests` (`ai_ocr_jobs.ai_request_id` FK uchun oldin), `app.ai_ocr_jobs` + `fk_gr_ocr_job` (`goods_receipts.ai_ocr_job_id` → `ai_ocr_jobs.id`) |
+| 0022 | `integration_sync` | `app.tenant_secrets` (integratsiya hisob ma'lumotlari, +`cash_register_id` — UzQR kaliti); `outbox_jobs` (kind ro'yxati + `ettn_accept`/`marking_accept`/`marking_return`/`report_export`/`label_pdf`, job-progress ustunlari), `sync_receipts`, `sync_exceptions` (qaror #56), `idempotency_keys`, `recost_jobs`, `import_jobs` (holatlar + `result`) |
+| 0023 | `notifications_ai` | `telegram_links`, `notification_settings`, `notifications_log`, `ai_training_samples`, `ai_feedback`, `tenant_glossary` |
 | 0024 | `audit_periods` | `audit_log`, `period_closings` |
 | 0025 | `updated_at_triggers` | 2.10-bo'limdagi `DO` bloki |
-| 0026 | `rls_policies` | 4.2–4.4-bo'limlardagi `DO` bloki + maxsus siyosatlar + GRANT/REVOKE (+`platform.label_templates`/`terms_versions` SELECT, `platform.fx_rates` SELECT/INSERT/UPDATE) |
-| 0027 | `security_definer_functions` | 4.5-bo'limdagi 4 funksiya + `auth_consume_code`/`auth_rotate_refresh`/`auth_revoke_tenant`/`auth_suspend_tenant` + **4 yangi** (`payments_checkout_by_provider_tx`, `payments_checkout_by_ref`, `billing_payment_by_id`, `public_statement_by_token`) — jami 12; ular o'qiydigan `app` jadvallariga `erp_system` uchun nomma-nom `GRANT SELECT` |
+| 0026 | `rls_policies` | 4.2–4.4-bo'limlardagi `DO` bloki + maxsus siyosatlar + GRANT/REVOKE (+`platform.label_templates`/`marking_product_groups`/`terms_versions` SELECT, `platform.fx_rates` SELECT/INSERT/UPDATE) |
+| 0027 | `security_definer_functions` | 4.5-bo'limdagi 4 funksiya + `auth_consume_code`/`auth_rotate_refresh`/`auth_revoke_tenant`/`auth_suspend_tenant` + (`payments_checkout_by_provider_tx`, `payments_checkout_by_ref`, `billing_payment_by_id`, `public_statement_by_token`) — jami 12; ular o'qiydigan `app` jadvallariga `erp_system` uchun nomma-nom `GRANT SELECT` |
 | 0028 | `onec_integration` | 1C integratsiyasi (2.11-bo'lim, `33-1c-integratsiya.md` §5): 18 ta `app.onec_*` jadval (FK tartibida: `onec_agents` → `onec_bases` → `onec_settings`, `onec_branch_bindings`, `onec_metadata_snapshots`, `onec_catalog_items`, `onec_mappings`, `onec_value_mappings`, `onec_ref_create_requests` → `onec_export_batches` → `onec_export_items` → `onec_export_item_sources`, `onec_object_refs` → `onec_agent_tasks` → `onec_task_results`, `onec_reconciliations`, `onec_events`, `onec_agent_logs`) + `auth.onec_device_authorizations`; `onec_forbid_namespace_change` trigger'i; kechiktirilgan FK'lar; `updated_at` trigger'lari (2.10, 13 jadval); RLS uchligi (4.2); grantlar (4.4); 6 ta `SECURITY DEFINER` funksiya (4.5). `onec_metadata_snapshots`/`onec_reconciliations`/`onec_events` `task_id` FK'lari `ON DELETE SET NULL` (o'qish vazifalari 30 kunda tozalanadi). `0002`/`0007`/`0018` dagi `devices`, `signing_keys`, `attachments`ga bog'liq. Bosqich 7 |
 
 Seed (5-bo'lim) — **Alembic revizion emas** (`23-backend-arxitekturasi.md` §11: "bazani versiyalash bilan aralashtirmaslik uchun"), `migrate` konteyneridan keyin alohida `scripts/seed.py` bosqichi, faqat 5.1 (global) qismini bir marta ishga tushiradi; 5.2 (tenant-provisioning) — har signup'da ilova kodi tomonidan.
 
-> Diqqat: yuqoridagi tartib 2-bo'limning **o'qish tartibidan** farq qiladi (masalan `supplier_returns`/`supplier_return_lines` 2-bo'limda purchasing ostida ko'rsatilgan, lekin `stock_lots`ga FK'i borligi sababli 0015-revizionda, registrlardan keyin yaratiladi). Bu — FK bog'liqligini hal qilish uchun zarur qayta tartiblash, 01-model mazmuniga ta'sir qilmaydi.
+> Diqqat: yuqoridagi tartib 2-bo'limning **o'qish tartibidan** farq qiladi (masalan `supplier_returns`/`supplier_return_lines` 2-bo'limda purchasing ostida ko'rsatilgan, lekin `stock_lots`ga FK'i borligi sababli 0015-revizionda, registrlardan keyin yaratiladi). Bu — FK bog'liqligini hal qilish uchun zarur qayta tartiblash, 11-model mazmuniga ta'sir qilmaydi.
 
 ### 6.2 CI tekshiruvi — RLS'siz jadvallar
 
@@ -3834,6 +3955,7 @@ WITH exempt AS (
     'platform.plans', 'platform.addons', 'platform.units',
     'platform.oauth_clients', 'platform.signing_keys', 'platform.platform_admins',
     'platform.label_templates', 'platform.fx_rates', 'platform.terms_versions',
+    'platform.marking_product_groups',
     'auth.user_credentials', 'auth.otp_challenges', 'auth.login_attempts',
     'auth.authorization_codes', 'auth.refresh_tokens', 'auth.sessions',
     'auth.onec_device_authorizations', -- 1C agent device grant: tenant tasdiqqacha noma'lum, faqat SECURITY DEFINER orqali
@@ -3884,26 +4006,26 @@ WHERE n.nspname = 'app' AND p.prosecdef
 
 ---
 
-## 7. 01 bilan farqlar / aniqlashtirishlar
+## 7. 11 bilan aniqlashtirishlar
 
-11-malumotlar-modeli.md jadval/ustun nomlarini o'zgartirmagan holda, DDL yozish uchun quyidagi aniq qarorlar qabul qilindi (01 tahrirlanmadi):
+`11-malumotlar-modeli.md` jadval/ustun nomlari saqlangan holda DDL uchun qabul qilingan aniq qarorlar:
 
 1. **UUID generatsiyasi**: ilova tomonida (offline-first talabi, §1.2), DB `DEFAULT app.uuidv7()` — faqat zaxira.
-2. **`stock_lots`/`avg_costs`/`stock_balances`/`debt_balances`ning append-only emasligi**: 01 §7 ularni "Registrlar (append-only)" sarlavhasi ostida bersa ham, bular jismoniy mutatsiya qilinadigan balans-keshlari; haqiqiy append-only — `stock_moves`/`debt_moves`/`cash_moves`/`ledger_entries`/`vat_moves` (3-bo'lim).
-3. **`stock_lots.receipt_line_id`ning umumlashtirilishi**: 01 faqat `receipt_line_id`ni ko'rsatadi, lekin `stock_openings`/`transfers` ham yangi partiya yaratadi (goods_receipt'siz). Shuning uchun `receipt_line_id` (faqat kirim uchun, nullable) ustiga `source_doc_type`/`source_doc_id`/`source_line_id` polimorfik ustunlari qo'shildi.
-4. **Sxema taqsimoti** (`app`/`auth`/`platform`): 01'da umuman yo'q — bu hujjat tomonidan kiritildi, `15-xavfsizlik-va-audit.md` §3.3/§19'dagi RLS istisnolari mantiqiga mos ravishda.
-5. **Hisob-kitob ustunlarining aniq `NUMERIC` kategoriyasi**: 01 faqat uchta umumiy kategoriya beradi (pul/miqdor/narx-tannarx); har bir aniq ustun (masalan `sale_lines.price` → narx 18,4; `sale_lines.line_total` → pul 18,2; `sale_lines.cost_amount` → pul 18,2, chunki bu qatorning **jami** tannarxi, birlik tannarxi emas) shu uchta toifaga ushbu hujjat tomonidan taqsimlangan.
-6. **`role_permissions.limit_value` birligi**: 01 aniqlashtirmaydi (foiz yoki summa) — bu hujjat yagona `NUMERIC(18,4)` ustunni tanladi, ma'no `permission_code` konvensiyasi orqali aniqlanadi (masalan `discount.give` = foiz, `cash.withdraw` = so'm); alohida `limit_unit` ustuni **qo'shilmadi** (ilova darajasida kod-konstanta sifatida saqlanadi).
+2. **`stock_lots`/`avg_costs`/`stock_balances`/`debt_balances`ning append-only emasligi**: 11 §7 ularni "Registrlar (append-only)" sarlavhasi ostida bersa ham, bular jismoniy mutatsiya qilinadigan balans-keshlari; haqiqiy append-only — `stock_moves`/`debt_moves`/`cash_moves`/`ledger_entries`/`vat_moves` (3-bo'lim).
+3. **`stock_lots.receipt_line_id`ning umumlashtirilishi**: 11 faqat `receipt_line_id`ni ko'rsatadi, lekin `stock_openings`/`transfers` ham yangi partiya yaratadi (goods_receipt'siz). Shuning uchun `receipt_line_id` (faqat kirim uchun, nullable) ustiga `source_doc_type`/`source_doc_id`/`source_line_id` polimorfik ustunlari qo'shildi.
+4. **Sxema taqsimoti** (`app`/`auth`/`platform`): 11'da umuman yo'q — bu hujjat tomonidan kiritildi, `15-xavfsizlik-va-audit.md` §3.3/§19'dagi RLS istisnolari mantiqiga mos ravishda.
+5. **Hisob-kitob ustunlarining aniq `NUMERIC` kategoriyasi**: 11 faqat uchta umumiy kategoriya beradi (pul/miqdor/narx-tannarx); har bir aniq ustun (masalan `sale_lines.price` → narx 18,4; `sale_lines.line_total` → pul 18,2; `sale_lines.cost_amount` → pul 18,2, chunki bu qatorning **jami** tannarxi, birlik tannarxi emas) shu uchta toifaga ushbu hujjat tomonidan taqsimlangan.
+6. **`role_permissions.limit_value` birligi**: 11 aniqlashtirmaydi (foiz yoki summa) — bu hujjat yagona `NUMERIC(18,4)` ustunni tanladi, ma'no `permission_code` konvensiyasi orqali aniqlanadi (masalan `discount.give` = foiz, `cash.withdraw` = so'm); alohida `limit_unit` ustuni **qo'shilmadi** (ilova darajasida kod-konstanta sifatida saqlanadi).
 7. **`discount_rules.value`**: xuddi shunday, `kind='percent'` bo'lsa foiz, aks holda summa — bitta `NUMERIC(18,4)` ustun.
 8. **`products.vat_rate`**: 01 "12/0/imtiyoz kodi" deydi — bitta ustunda son va kod aralashishi mumkin emas, shuning uchun `vat_rate NUMERIC(5,2) NULL` + `vat_exemption_code TEXT NULL` ikkiga ajratildi (`CHECK` — kamida bittasi to'ldirilgan bo'lishi shart).
-9. **`goods_receipts.paid_immediately`**: 01'da yo'q, lekin `13-provodka-qoidalari.md` §2.6/§2.8 ikki xil provodka yo'li (nasiyaga / darhol to'langan) borligini aytadi — bu bayroq shu tanlovni saqlash uchun qo'shildi.
-10. **`sales.total_amount`**: 01'da yo'q, tezkor o'qish/hisobot uchun hisoblangan ustun sifatida qo'shildi (qatorlar yig'indisidan posting vaqtida to'ldiriladi, manba emas).
-11. **`debt_payment_allocations`/`supplier_payment_allocations`**: 01 faqat "`allocations` (qaysi qarzni yopdi)" deydi, alohida jadval nomini bermaydi — polimorfik `target_doc_type`/`target_doc_id` naqshi bilan modellashtirildi (registrlardagi `doc_type`/`doc_id` naqshiga mos).
-12. **`doc_sequences.doc_type` kodlari**: 01 faqat `K-01-2026-000154` namunasini beradi, to'liq kod jadvalini bermaydi — 2.9-bo'limdagi ro'yxat — standart (qaror #54), yangi kod append-only seed.
+9. **`goods_receipts.paid_immediately`**: 11'da yo'q, lekin `13-provodka-qoidalari.md` §2.6/§2.8 ikki xil provodka yo'li (nasiyaga / darhol to'langan) borligini aytadi — bu bayroq shu tanlovni saqlash uchun qo'shildi.
+10. **`sales.total_amount`**: 11'da yo'q, tezkor o'qish/hisobot uchun hisoblangan ustun sifatida qo'shildi (qatorlar yig'indisidan posting vaqtida to'ldiriladi, manba emas).
+11. **`debt_payment_allocations`/`supplier_payment_allocations`**: 11 faqat "`allocations` (qaysi qarzni yopdi)" deydi, alohida jadval nomini bermaydi — polimorfik `target_doc_type`/`target_doc_id` naqshi bilan modellashtirildi (registrlardagi `doc_type`/`doc_id` naqshiga mos).
+12. **`doc_sequences.doc_type` kodlari**: 11 faqat `K-01-2026-000154` namunasini beradi, to'liq kod jadvalini bermaydi — 2.9-bo'limdagi ro'yxat — standart (qaror #54), yangi kod append-only seed.
 13. **Global seed vs tenant-provisioning**: 01 `roles`/`role_permissions`/`expense_categories`/`doc_sequences`ni "seed" sifatida tilga oladi, lekin bu jadvallar `tenant_id NOT NULL` — demak **global** bir martalik seed emas, balki `15-xavfsizlik-va-audit.md` §1.5'dagi tenant-provisioning tranzaksiyasining bir qismi (5.2-bo'lim shu farqni aniq ajratadi).
-14. **`marking_codes` ↔ `sale_lines.marking_code` FK**: 01'da bu bog'lanish aniq FK sifatida ko'rsatilmagan — `(tenant_id, code)` composite UNIQUE + `DEFERRABLE` FK qo'shildi (chek va kod bir xil tranzaksiyada, lekin ikkisining yozilish tartibi ilova mantiqiga bog'liq bo'lishi mumkin, shuning uchun kechiktirilgan tekshiruv).
-15. **`shifts`ning umumiy hujjat sarlavhasidan mustasnoligi**: 01 §11 (raqamlash) shiftlarga `number` berilishini aytmaydi — shuning uchun `shifts` boshqa hujjatlardan farqli, `number`/`temp_number`siz maxsus sarlavha oldi.
-16. **`branch_tax_settings`/`tenant_tax_regimes.created_by`**: 01'da yo'q, audit izlanishi uchun qo'shildi (boshqa barcha hujjat/ma'lumotnoma yozuvlarida bor konvensiyaga moslashtirildi).
+14. **`marking_codes` ↔ `sale_lines.marking_code` FK**: 11'da bu bog'lanish aniq FK sifatida ko'rsatilmagan — `(tenant_id, code)` composite UNIQUE + `DEFERRABLE` FK qo'shildi (chek va kod bir xil tranzaksiyada, lekin ikkisining yozilish tartibi ilova mantiqiga bog'liq bo'lishi mumkin, shuning uchun kechiktirilgan tekshiruv).
+15. **`shifts`ning umumiy hujjat sarlavhasidan mustasnoligi**: 11 §11 (raqamlash) shiftlarga `number` berilishini aytmaydi — shuning uchun `shifts` boshqa hujjatlardan farqli, `number`/`temp_number`siz maxsus sarlavha oldi.
+16. **`branch_tax_settings`/`tenant_tax_regimes.created_by`**: 11'da yo'q, audit izlanishi uchun qo'shildi (boshqa barcha hujjat/ma'lumotnoma yozuvlarida bor konvensiyaga moslashtirildi).
 17. **Hisob kodlari**: `ledger_entries`/`ledger_adjustments`dagi `account_dt`/`account_kt` — 4 raqamli `TEXT` (`CHECK ~ '^[0-9]{4}$'`); ruxsat etilgan kodlar ro'yxati (texnik `0000` bilan) — `13-provodka-qoidalari.md` §1, ilova konstantasi. Alohida hisoblar rejasi jadvali yo'q.
 18. **Inventarizatsiya qatorlari** jadvali nomi — `count_lines` (qaror #53 dagi "stock_count_lines" shu jadval).
 
@@ -3911,5 +4033,5 @@ WHERE n.nspname = 'app' AND p.prosecdef
 
 ## Yakuniy eslatma
 
-Bu hujjat — `11-malumotlar-modeli.md`ning DDL proyeksiyasi; 01 o'zi o'zgarmadi. Buxgalteriya hisob raqamlari (`account_dt`/`account_kt` qiymatlari) BHMS №21 rasmiy matni bo'yicha `13-provodka-qoidalari.md` §1 da belgilangan — bu hujjat ularni 4 raqamli `TEXT` sifatida saqlaydi, ruxsat etilgan ro'yxatni ilova konstantasi tekshiradi.
+Bu hujjat — `11-malumotlar-modeli.md`ning DDL proyeksiyasi. Buxgalteriya hisob raqamlari (`account_dt`/`account_kt` qiymatlari) BHMS №21 rasmiy matni bo'yicha `13-provodka-qoidalari.md` §1 da belgilangan — bu hujjat ularni 4 raqamli `TEXT` sifatida saqlaydi, ruxsat etilgan ro'yxatni ilova konstantasi tekshiradi.
 

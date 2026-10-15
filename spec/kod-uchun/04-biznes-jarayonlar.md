@@ -15,7 +15,7 @@
 4. Offline rejim majburiy: kassa internetsiz chek shakllantiradi, **48 soat ichida** OFD'ga yuborishi shart (VMQ-943 1-ilova 31-band); OFD tasdig'ini olmagan eng eski chekdan 48 soat o'tsa kassa yangi fiskal chek chiqarmaydi (`FISCAL_OFFLINE_48H_BLOCKED`, VMQ-943 2-ilova 6-band), ogohlantirishlar 24/40/46 soatda (qaror #43). Markirovkalangan tovar kodi chakana sotuvda fiskal chek ichida OFD orqali Asl belgisiga ketadi — offline **sotish** ruxsat (FM chekni offline imzolaydi), oldindan onlayn tekshiruv faqat internet bo'lsa (`MARKING_PRECHECK=warn`), lokal takror-kod nazorati majburiy (qaror #17, #62; US-M01-03); offline **qaytarish** — faqat online (BP-04); offline **ko'chirish** — o'z filiallari ichida ruxsat, lekin avtotransportda tashishdan oldin e-TTN rasmiylashtiriladi (BP-09, qaror #63).
 5. Markirovkalangan tovar (Asl belgisi) kirim, sotuv va qaytarishda alohida qadam talab qiladi: sotuv va xaridordan qaytarishda kod chekda OFD orqali uzatiladi (VM 833 75–77, 90-band); kirimda qabul xabarnomasi tovar guruhi muddatida — umumiy **3 ish kuni** (VM 833 66–67-band), suv/ichimlik, dori va o'simlik yog'i sxemalarida **72 soat** (BP-01). O'z filiallari orasidagi ko'chirish Asl belgisiga xabar qilinmaydi (egalik o'zgarmaydi), lekin e-TTN majburiy (BP-09).
 6. Do'kondagi har qanday elektron to'lovda (QR, Click/Payme/Uzum, UzQR, karta) fiskal chekni **merchant kassasi** (bizning tizim) chiqaradi (VMQ-943 1-ilova 6-band; 1a-ilova 2-band); to'lov tizimi chek chiqarishi faqat masofaviy savdoga tegishli. Ikki marta fiskallashtirmaslik uchun provayder tomonidagi avto-fiskallashtirish o'chirilgan bo'ladi, provayderga faqat chek havolasi yuboriladi (BP-05).
-7. Buxgalteriya provodkalari faqat **mahsulot darajasida** (qaysi hodisa qaysi hisob guruhiga ta'sir qiladi — so'z bilan, hisob raqamlarisiz) tasvirlandi; to'liq hisob rejasi (NSBU №21 asosida) Arxitektura teamining ishi.
+7. Buxgalteriya provodkalari asosan **mahsulot darajasida** (qaysi hodisa qaysi hisob guruhiga ta'sir qiladi) tasvirlangan, hisob raqamlari faqat qaror bilan belgilangan joylarda (5710/5110, 9430/9410, 6410/4410); to'liq hisob rejasi va Dt/Kt (NSBU №21) — `13-provodka-qoidalari.md`.
 8. Bozorda ayrim mahsulotlar (eng muhimi — **MoySklad**, o'z saytida "Регистрация продаж в налоговой Узбекистана через один клик" va Asl belgisi/AslBelgisi integratsiyasini ochiq da'vo qiladi) virtual kassa + e-faktura + Asl belgisi integratsiyasining ko'pini uchinchi tomon ulanishlari orqali ta'minlaydi — shuning uchun "hech kim integratsiya qilmagan" degan tezis noto'g'ri. Tizimning haqiqiy farqlanish nuqtasi: (a) bu integratsiyalar **bitta tizimda ichki**, tashqi kassa/EDO dasturiga bog'lanish shart emas; (b) **davlat tuzgan soliq hisobotini ichki hisob bilan avtomatik solishtirish** (BP-08) — bu 2026-01-01'dan boshlangan yangi talab bo'lib, tekshirilgan 9 ta raqobatchining birortasida ham rasmiy sahifada bunday funksiya haqida da'vo topilmadi; (c) offline-first + markirovka maxsus holatlari; (d) o'zbek tilidagi AI. Jarayonlar shu to'rtta nuqta asosida loyihalashtirildi (`research_notes/texnik/tekshiruv-2026-10-14/4-raqobat-bozor.md`).
 9. QQS krediti endi shartli: agar e-faktura davlat xavf-baholashda "yuqori xavfli" (qizil) toifaga tushsa, QQS krediti faqat to'lovdan keyin beriladi va bunday fakturalar ulushi davr uchun ≤10% bilan cheklanadi (VM Qarori №830-son, 2025-12-26 — `03-efaktura-va-tolov.md`). Bu BP-01, BP-07 va BP-12'ga (yetkazib beruvchiga to'lov) ta'sir qiladi.
 10. **"5 ish kuni"** hisoblagichi davlat hisoboti shaxsiy kabinetga joylashtirilgan kundan keyingi kundan boshlanadi (farq topilgan paytdan emas), hisobot topshirish muddatidan oshmaydi (QQS — keyingi oyning 20-sanasi, SK 273-modda; aylanma — 15-sana, SK 470-modda); muddat ichida javob berilmasa hisobot **davlat shakllantirgan ko'rinishda topshirilgan** hisoblanadi (Soliq kodeksi 81-moddasi 6–7-qism, O'RQ-1108-son Qonun, [lex.uz/docs/-7944527](https://lex.uz/docs/-7944527)).
@@ -52,7 +52,7 @@ flowchart TD
 | 2 | Buxgalter / tizim | M07 | E-faktura (EHF) | E-faktura, E-IMZO | Kreditorlik qarzi paydo bo'ladi |
 | 3 | Davlat (tashqi) | M07, M10 | E-faktura risk-belgisi (`risk_flag`: `green`/`red`/`unknown`) | E-faktura (davlat xavf-baholashi, VM Qarori №830-son) | "Qizil" yoki "noma'lum" — QQS krediti to'lovgacha kechiktiriladi; Buxgalter `unknown`ni kabinetdan ko'rib BO-15 da qo'lda belgilaydi |
 | 4 | Omborchi | M07, M04 | E-TTN (sotuv bilan jo'natishda e-faktura tarkibida keladi) | E-TTN, E-IMZO | Effekt yo'q |
-| 5 | Omborchi | M04, M07 | Asl belgisi qabul xabarnomasi (EHF shaklida) — muddat `marking_product_groups.acceptance_deadline`: umumiy 3 ish kuni, suv/ichimlik, dori, o'simlik yog'i — 72 soat; tizim kuzatadi va ogohlantiradi, bloklamaydi | Asl belgisi (CRPT API) | Effekt yo'q |
+| 5 | Omborchi | M04, M07 | Asl belgisi qabul xabarnomasi (EHF shaklida) — muddat tovar guruhi bo'yicha sozlanadi (qaror #63): umumiy 3 ish kuni, suv/ichimlik, dori, o'simlik yog'i — 72 soat; tizim kuzatadi va ogohlantiradi, bloklamaydi | Asl belgisi (CRPT API) | Effekt yo'q |
 | 6 | Omborchi | M04 | Ichki kirim hujjati | MXIK | Ombor qoldig'i ortadi |
 | 7 | Buxgalter | M11 | Provodka (avtomatik) | — | Ombor (aktiv) ortadi, kreditorlik qarzi (passiv) ortadi |
 
@@ -110,7 +110,7 @@ flowchart TD
 | 1-3 | Kassir | M01, M04, M03 | — | Asl belgisi, MXIK | BP-02 bilan bir xil |
 | 4 | Kassir | M08 | Mijoz kartasi | — | — |
 | 5a | Tizim | M08, M10 | E-faktura (agar B2B) | E-faktura, E-IMZO | — |
-| 6 | Tizim | M01, M08 | Sotuv hujjati (`deferred`) — fiskal chek to'lovda chiqadi (qaror #30); sotuv paytidagi "kredit" turidagi chek — `FiscalPolicy.credit_sale_receipt` (standart `none`) | — | Ombor kamayadi; savdo daromadi va QQS majburiyati **sotuv kuni** tan olinadi (SK 242, 78-modda; BHMS 2; `13-provodka-qoidalari.md` §2.14, qaror #42). Provodka sanasi (sotuv kuni) ≠ fiskal chek sanasi (to'lov kuni, BP-11) |
+| 6 | Tizim | M01, M08 | Sotuv hujjati (`deferred`) — fiskal chek to'lovda chiqadi (qaror #30); sotuv paytidagi "kredit" turidagi chek — `FiscalPolicy.credit_sale_receipt` (standart `none`) | — | Ombor kamayadi; savdo daromadi va QQS majburiyati **sotuv kuni** tan olinadi (SK 242, 78-modda; BHMS 2; `13-provodka-qoidalari.md` §2.14, qaror #30). Provodka sanasi (sotuv kuni) ≠ fiskal chek sanasi (to'lov kuni, BP-11) |
 | 7 | Tizim | M08 | Nasiya hujjati | — | Debitorlik qarzi ortadi (pul o'rniga) |
 | 8 | Tizim (AI) / Menejer | M08 | Eslatma matni (loyiha) | — | Effekt yo'q — AI faqat matn loyihasini tayyorlaydi, odam tasdiqlagandan keyin yuboriladi (AI-06, `09-ai-funksiyalar.md`) |
 | 9 | — | M08 | **Fiskal chek shu yerda chiqadi** | — | Davomi BP-11'da (nasiya qarzini undirish) |
@@ -165,7 +165,7 @@ flowchart TD
 | Karta | Kassir | M01 | Terminal cheki + fiskal chek | Virtual kassa/OFD (acquiring bank orqali) | **Yo'ldagi pul mablag'lari** ortadi; ekvayer bankka o'tkazgani bank ko'chirmasi bo'yicha **bank tushumi tasdig'i** (`bank_settlements`) bilan bank hisobiga o'tadi, komissiya 9430 xarajatiga yoziladi (qaror #42) |
 | Karta — mustaqil terminal (qo'lda belgilangan) | Kassir | M01, M16 | Fiskal chek (to'lov shakli "bank kartalari" + karta turi `card_type`: `personal`/`corporate`/`social`/`unknown`); ijtimoiy kartada `card_mask` va `rrn` majburiy (qaror #64) | Virtual kassa/OFD (kassa terminal bilan integratsiyalanmagan — VMQ-943 1-ilova 6-band bo'yicha qonuniy) | Online va offline'da ruxsat; Z-hisobotda "karta" jami alohida chiqadi; yo'ldagi pul mablag'lari → bank tushumi tasdig'i (BP-15) |
 | QR/Click/Payme/Uzum | Kassir/mijoz | M01 | To'lov tasdiqlash (`provider_tx_id`) + fiskal chek (to'lov shakli "QR-kodli to'lov"); chek havolasi provayderga yuboriladi (Click `submit_qrcode`) | Virtual kassa/OFD, Click/Payme/Uzum API | Mablag' vositachi orqali tushadi, komissiya ushlab qolinadi — avval yo'ldagi pul mablag'lari, bank tushumi tasdig'ida bank hisobi + komissiya (9430) xarajati (qaror #42) |
-| Yagona QR (UzQR, bank) | Kassir/mijoz | M01 | Statik QR (`qr_type='static'`) — kassir qo'lda tasdiqlaydi, ixtiyoriy tranzaksiya raqami; dinamik QR (`qr_type='dynamic'`) — `UzqrPort`, `provider_tx_id` majburiy; fiskal chek (to'lov shakli "QR-kodli to'lov") | Virtual kassa/OFD, bank (yagona QR, operator — CBU MUNIS) | Mablag' bank orqali tushadi — avval yo'ldagi pul mablag'lari, bank tushumi tasdig'ida bank hisobi (qaror #42); yuridik shaxslar uchun bank UzQR majburiy (PF-246 3-band "b"; CBU 5/11-son qoidalari), YaTT (`legal_form='sole_proprietor'`) uchun to'lov tashkiloti platformasidagi maxsus QR (Click/Payme/Uzum) majburiy (PQ-247 7-band "a") (qaror #64) |
+| Yagona QR (UzQR, bank) | Kassir/mijoz | M01 | Statik QR (`qr_type='static'`) — faqat online, kassir qo'lda tasdiqlaydi, ixtiyoriy tranzaksiya raqami; dinamik QR (`qr_type='dynamic'`) — `UzqrPort`, `provider_tx_id` majburiy; fiskal chek (to'lov shakli "QR-kodli to'lov") | Virtual kassa/OFD, bank (yagona QR, operator — CBU MUNIS) | Mablag' bank orqali tushadi — avval yo'ldagi pul mablag'lari, bank tushumi tasdig'ida bank hisobi (qaror #42); yuridik shaxslar uchun bank UzQR majburiy (PF-246 3-band "b"; CBU 5/11-son qoidalari), YaTT (`legal_form='sole_proprietor'`) uchun to'lov tashkiloti platformasidagi maxsus QR (Click/Payme/Uzum) majburiy (PQ-247 7-band "a") (qaror #64) |
 
 Manba: `03-efaktura-va-tolov.md` (Payme/Click/Uzum protokollari), `research_notes/ochiq-savollar/P1-soliq-fiskal.md` (OQ-001), `P3-tolovlar-bank.md` (OQ-032, OQ-033, §7.2). Fiskalizatsiya qoidasi: do'kon sotuvida chekni har doim bizning kassa chiqaradi (VMQ-943 1-ilova 6-band; 1a-ilova 2-band — UzQR uchun ham); tenant provayder kabinetida provayder tomonidagi avto-fiskallashtirishni o'chiradi (BO-14 tekshiruv bandi). 2026-10-22 dan chekda to'lov shakli va karta turi majburiy (VMQ-943 1-ilova 7-band). Dinamik UzQR POS API spetsifikatsiyasi — Tashqi javob kerak: 26 #49 (OQ-032).
 
@@ -183,14 +183,14 @@ flowchart TD
 
 | Qadam | Rol | Modul | Hujjat | Davlat tizimi | Buxgalteriya effekti |
 |---|---|---|---|---|---|
-| 1-2 | Tizim | M11 | Avtomatik provodkalar | — | Xarid → ombor va kreditorlik qarzi ortadi; sotuv → ombor kamayadi, daromad va QQS ortadi (nasiyada ham sotuv kuni — qaror #42); to'lov → pul mablag'i o'zgaradi (naqdsiz tushum va inkassa avval yo'ldagi pul mablag'lariga, bank ko'chirmasi tasdiqlanganda bank hisobiga — qaror #42); qaytarish → teskari yozuv |
+| 1-2 | Tizim | M11 | Avtomatik provodkalar | — | Xarid → ombor va kreditorlik qarzi ortadi; sotuv → ombor kamayadi, daromad va QQS ortadi (nasiyada ham sotuv kuni — qaror #30); to'lov → pul mablag'i o'zgaradi (naqdsiz tushum va inkassa avval yo'ldagi pul mablag'lariga, bank ko'chirmasi tasdiqlanganda bank hisobiga — qaror #42); qaytarish → teskari yozuv |
 | 3 | Kassir/tizim | M01, M11 | Z-hisobot | Virtual kassa/OFD | Kunlik savdo yakunlanadi |
 | 4 | Buxgalter | M11 | Kunlik hisobot | — | Xatolar/tafovutlar aniqlanadi |
 | 5 | Buxgalter | M11, M12 | Oylik/choraklik yopish | — | Davr natijasi shakllanadi |
 
 Naqdsiz tushum va inkassaning yo'ldagi pul mablag'laridan bank hisobiga o'tishi — alohida jarayon BP-15 (bank tushumi tasdig'i).
 
-*Eslatma: bu yerda faqat qaysi hodisa qaysi hisob guruhiga (aktiv/passiv/daromad/xarajat) ta'sir qilishi ko'rsatilgan — aniq hisob raqamlari va to'liq hisob rejasi (NSBU №21 asosida) Arxitektura teamining `spec/kod-uchun/` hujjatida bo'ladi (`00-xulosa-va-ochiq-savollar.md`, "MVP uchun eng muhim texnik qarorlar" jadvali).*
+*Eslatma: bu yerda faqat qaysi hodisa qaysi hisob guruhiga (aktiv/passiv/daromad/xarajat) ta'sir qilishi ko'rsatilgan — aniq hisob raqamlari va to'liq hisob rejasi (NSBU №21 asosida) — `13-provodka-qoidalari.md`.*
 
 Manba: `00-xulosa-va-ochiq-savollar.md`.
 
@@ -321,7 +321,7 @@ flowchart TD
 | 1 | Mijoz/Kassir | M08 | — | — | — |
 | 2 | Kassir | M01, M08 | To'lov kvitansiyasi | Virtual kassa/OFD (BP-05 bilan bir xil) | Pul mablag'i ortadi (naqd — kassa; karta/QR — yo'ldagi pul mablag'lari; bank o'tkazmasi — bank hisobi; qaror #42) |
 | 3 | Tizim | M08 | Avtomatik provodka | — | Debitorlik qarzi kamayadi |
-| 4 | Tizim | M01, M08 | **Fiskal chek** (`debt_settlement`, qaror #30) — bitta to'lov = bitta chek, qatorlar yopilgan sotuvlardan proporsional (qaror #45); karta to'lovida `card_type`/`card_mask`/`rrn` (qaror #64) | Virtual kassa/OFD (VMQ-943 1-ilova 30-band — majburiy) | Effekt yo'q — savdo daromadi va QQS sotuv kuni (BP-03, 6-qadam) tan olingan (`13-provodka-qoidalari.md` §2.14, qaror #42); chek faqat to'langan summani fiskal rasmiylashtiradi |
+| 4 | Tizim | M01, M08 | **Fiskal chek** (`debt_settlement`, qaror #30) — bitta to'lov = bitta chek, qatorlar yopilgan sotuvlardan proporsional (qaror #45); karta to'lovida `card_type`/`card_mask`/`rrn` (qaror #64) | Virtual kassa/OFD (VMQ-943 1-ilova 30-band — majburiy) | Effekt yo'q — savdo daromadi va QQS sotuv kuni (BP-03, 6-qadam) tan olingan (`13-provodka-qoidalari.md` §2.14, qaror #30); chek faqat to'langan summani fiskal rasmiylashtiradi |
 | 5 | Tizim (AI) / Menejer | M08 | — | — | Effekt yo'q |
 
 Manba: `research_notes/ochiq-savollar/P1-soliq-fiskal.md` (OQ-002); qaror #30, #42, #45: asl nasiya sotuvida fiskal chek to'lovgacha chiqarilmaydi (BP-03), **har bir qarz to'lovida fiskal chek chiqariladi**; daromad/QQS — sotuv kuni. Joriy qarzdan ortiq summa rad etiladi (`422 VALIDATION_ERROR`, `message_key=debt_payment_exceeds_balance`), mijoz avansi MVP'da yo'q (qaror #45). 48 soatlik offline blokda `debt_settlement` cheki ham chiqarilmaydi (qaror #43).
@@ -357,23 +357,23 @@ Manba: `03-efaktura-va-tolov.md` (1.2-band — QQS krediti to'lovdan keyin beril
 flowchart TD
     A["1. Tovar fiskal chek bilan\nallaqachon sotilgan (BP-02/03)"] --> B["2. Keyinroq mijoz (endi yuridik\nshaxs sifatida) e-faktura so'raydi"]
     B --> C["3. Buxgalter BO-15'da asl\nchekni tanlaydi"]
-    C --> D["4. Yangi chiquvchi e-faktura\nyaratiladi, chekka bog'lanadi\n(einvoices.related_doc)"]
+    C --> D["4. Yangi chiquvchi e-faktura\nyaratiladi, chekka bog'lanadi\n(einvoices.related_doc_type/related_doc_id)"]
     D --> E["5. Buxgalter E-IMZO bilan\nimzolaydi"]
-    E --> F["6. EDO operatoriga (Faktura.uz,\nMVP'da yagona — Didox keyinroq)\nyuboriladi"]
+    E --> F["6. EDO operatoriga (Faktura.uz,\nMVP'da yagona operator)\nyuboriladi"]
     F --> G["7. QQS qayta hisoblanmaydi —\nfaqat hujjat rasmiylashtiriladi,\nchekdagi QQS yozuviga havola qo'shiladi"]
 ```
 
 | Qadam | Rol | Modul | Hujjat | Davlat tizimi | Buxgalteriya effekti |
 |---|---|---|---|---|---|
-| 1 | Kassir/Tizim | M01 | Fiskal chek | Virtual kassa/OFD | Savdo daromadi va QQS allaqachon hisoblangan (BP-02 — chek kuni; BP-03 — sotuv kuni, `13-provodka-qoidalari.md` §2.14, qaror #42) |
+| 1 | Kassir/Tizim | M01 | Fiskal chek | Virtual kassa/OFD | Savdo daromadi va QQS allaqachon hisoblangan (BP-02 — chek kuni; BP-03 — sotuv kuni, `13-provodka-qoidalari.md` §2.14, qaror #30) |
 | 2 | Mijoz | M01 | So'rov (tizimdan tashqari, masalan qo'ng'iroq) | — | — |
 | 3 | Buxgalter | M01, M07 | Asl chek tanlovi | — | — |
-| 4 | Tizim | M01, M10 | Chiquvchi e-faktura (`einvoices.related_doc`) | — | Effekt yo'q — `ledger_entries`/`vat_moves`ga yangi yozuv qo'shilmaydi (append-only); bog'lanish faqat `einvoices.related_doc` orqali (`13-provodka-qoidalari.md` §2.22) |
+| 4 | Tizim | M01, M10 | Chiquvchi e-faktura (`einvoices.related_doc_type`/`related_doc_id`) | — | Effekt yo'q — `ledger_entries`/`vat_moves`ga yangi yozuv qo'shilmaydi (append-only); bog'lanish faqat `einvoices.related_doc_type`/`related_doc_id` orqali (`13-provodka-qoidalari.md` §2.22) |
 | 5 | Buxgalter | M01 | PKCS#7 imzo | E-IMZO | — |
 | 6 | Tizim | M01 | Yuborilgan e-faktura | E-faktura (Faktura.uz — MVP'da yagona operator) | — |
-| 7 | Tizim | M10, M11 | — | — | QQS **ikkinchi marta hisoblanmaydi** — registr yozuvlari o'zgarmaydi (append-only), bog'lanish faqat hujjat darajasida (`einvoices.related_doc`, `13-provodka-qoidalari.md` §2.22) |
+| 7 | Tizim | M10, M11 | — | — | QQS **ikkinchi marta hisoblanmaydi** — registr yozuvlari o'zgarmaydi (append-only), bog'lanish faqat hujjat darajasida (`einvoices.related_doc_type`/`related_doc_id`, `13-provodka-qoidalari.md` §2.22) |
 
-Manba: `spec/kod-uchun/03-modullar-talablari.md` (US-M01-06, M01 chekka holatlar). *Eslatma: bu jarayon B2C sotuvdan keyin mijoz maqomi B2B'ga aniqlanganda (yoki boshidanoq B2B bo'lib, e-faktura keyin so'ralganda) ishlaydi.* **E-faktura operatori — MVP'da faqat Faktura.uz** (ochiq API hujjati tekshirilgan, REGOS ham ishlatadi); Didox — MVP'dan keyingi birinchi integratsiya (`spec/tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #4).
+Manba: `spec/kod-uchun/03-modullar-talablari.md` (US-M01-06, M01 chekka holatlar). *Eslatma: bu jarayon B2C sotuvdan keyin mijoz maqomi B2B'ga aniqlanganda (yoki boshidanoq B2B bo'lib, e-faktura keyin so'ralganda) ishlaydi.* **E-faktura operatori — MVP'da faqat Faktura.uz** (ochiq API hujjati tekshirilgan, REGOS ham ishlatadi); `EInvoicePort` ikki adapterga tayyor (qaror #23 tavsiya #4); Didox'ni birinchi qilishni asoschi qayta ko'rishi tavsiya etiladi — 26 #167.
 
 ---
 
@@ -440,7 +440,7 @@ Manba: `33-1c-integratsiya.md` (§3.2 kunlik oqim, §6 eksport hujjatlari, §7 h
 
 ## BP-15: Bank tushumi tasdig'i (yo'ldagi pul → bank hisobi) (qaror #42)
 
-Karta, UzQR, Click, Payme, Uzum tushumlari (BP-02, BP-05, BP-11) va inkassa (M16 «Pul olish → Inkasso») avval **yo'ldagi pul mablag'lari** (5710) ga yoziladi. Bank ko'chirmasi yoki ekvayer/to'lov tashkiloti hisob-kitob hisoboti kelganda Buxgalter bank tushumi tasdig'ini (`bank_settlements`) yaratib o'tkazadi — summa bank hisobiga (5110) o'tadi, komissiya 9430 xarajatiga yoziladi (`13-provodka-qoidalari.md` §2.18a).
+Karta, UzQR, Click, Payme, Uzum tushumlari (BP-02, BP-05, BP-11) va inkassa (M16 «Pul olish → Inkasso») avval **yo'ldagi pul mablag'lari** (5710) ga yoziladi. Bank ko'chirmasi yoki ekvayer/to'lov tashkiloti hisob-kitob hisoboti kelganda Buxgalter bank tushumi tasdig'ini (`bank_settlements`) yaratib o'tkazadi — summa bank hisobiga (5110) o'tadi, bank/ekvayring va to'lov tizimi komissiyasi 9430, inkassa xizmati komissiyasi 9410 xarajatiga yoziladi (`13-provodka-qoidalari.md` §2.18a).
 
 ```mermaid
 flowchart TD
@@ -459,7 +459,7 @@ flowchart TD
 | 2 | Tashqi (bank, ekvayer) | — | Bank ko'chirmasi / hisob-kitob hisoboti | Bank-klient (tizimdan tashqari) | — |
 | 3a/3b | Buxgalter / Egasi (`bank_settlements.manage`) | M11 | Bank tushumi tasdig'i (`bank_settlements`, `source='manual'`/`statement_import`, `draft`); import — `POST /api/v1/bank-settlements/imports` (1CClientBankExchange .txt: faqat kirimlar o'qiladi, `method` to'lovchi STIR va to'lov maqsadi bo'yicha aniqlanadi, `gross_amount`ni Buxgalter 5710 qoldig'idan tanlaydi, `commission_amount = gross − kirim`) | — | Effekt yo'q (qoralama) |
 | 4 | Tizim | M11 | Tranzit qoldig'i (`GET /api/v1/bank-settlements/transit-balances` — usul × filial) | — | — |
-| 5 | Buxgalter / Egasi | M11 | Bank tushumi tasdig'i (`posted`) | — | Bank hisobi `net_amount` ga ortadi, yo'ldagi pul `gross_amount` ga kamayadi, komissiya (`commission_amount`) 9430 xarajatiga yoziladi; `cash_moves` yozilmaydi |
+| 5 | Buxgalter / Egasi | M11 | Bank tushumi tasdig'i (`posted`) | — | Bank hisobi `net_amount` ga ortadi, yo'ldagi pul `gross_amount` ga kamayadi, komissiya (`commission_amount`) 9430 xarajatiga (inkassa — 9410) yoziladi; `cash_moves` yozilmaydi |
 
 **Istisnolar:**
 

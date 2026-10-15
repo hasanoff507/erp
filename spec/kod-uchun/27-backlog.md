@@ -28,7 +28,7 @@
 - [ ] Backend skeleti: FastAPI, `app/core` (tenant konteksti, RLS, xatolar, idempotentlik), Alembic, SAQ worker, docker compose, CI (`23-backend-arxitekturasi.md`)
 - [ ] To'liq OAuth 2.0 AS+RS poydevori: `app/modules/auth/` — Authlib integratsiyasi, `/oauth/*`, `/auth/*` endpoint'lari, imzolash kaliti/JWKS, token/sessiya/litsenziya jadvallari (`14-autentifikatsiya-oauth2.md`, qaror #14) — Bosqich 0'da poydevor, Bosqich 1'da to'liq ishlaydigan holatga keltiriladi
 - [ ] Veb skeleti: Turborepo, `apps/shell`, `@shared/api` (orval), `@shared/ui` (shadcn), `@shared/state`, i18n uz/ru, PWA (`24-frontend-arxitekturasi.md`)
-- [ ] Seed: rollar, ruxsatlar, o'lchov birliklari, xarajat toifalari (`expense_categories.default_account` — 9410/9420/9430/6410, 26 #143), hisoblar rejasi (NSBU №21 subset + 9390, 2920, 4890, 6610, 8530, texnik `0000` — 26 #6/#36), aylanma solig'i stavkalari (26 #111), tariflar (`15-xavfsizlik-va-audit.md` §2.2 matritsasi)
+- [ ] Seed: rollar, ruxsatlar, o'lchov birliklari, xarajat toifalari (`expense_categories.default_account` — 9410/9420/9430/6410, 26 #143), hisoblar rejasi (NSBU №21 subset + 9390, 2920, 4890, 6610, 8530, texnik `0000` — 26 #6/#36), aylanma solig'i stavkalari (26 #111), rol-ruxsat matritsasi (`15-xavfsizlik-va-audit.md` §2.2), yagona tarif `plans.standard` + qo'shimcha kassa `addons` (qaror #22)
 - [ ] Bosqich 0 migratsiyasida: `devices.kind` + `'onec_agent'`, `signing_keys.purpose` + `'onec_task'`/`'agent_update'` (qaror #58 c)
 - [ ] Spike: `zxing-cpp` GS1 DataMatrix (FNC1) dekod/enkod — `tests/fixtures/datamatrix` test-vektorlari; mos kelmasa `bwip-js` server zahirasi (qaror #57, 26 #62)
 - [ ] Spike: U+02BB (`oʻ gʻ`) va kirill glif skrinshot-testi Windows/Android/iOS'da; yetishmasa self-hosted Noto Sans (qaror #57, 26 #141)
@@ -63,7 +63,7 @@
 - [ ] Do'kon sozlamalari (BO-21, BO-14), `tenants.legal_form` ("Egasi oldi" hisobi uchun, 26 #39); filial sozlamasida `branches.settlement_category` (`city_100k_plus`/`other`/`remote_mountain`, aylanma solig'i stavkasi uchun, SK 467-modda)
 - [ ] `/install` — autentifikatsiyasiz ochiq route, biznes ekranlardan tashqari; BO-21 ⑥ bosqichi va iOS o'rnatish yo'riqnomasi shu komponentni ichiga oladi (`07-ekran-tafsilotlari.md` UX-INSTALL, E-32)
 - [ ] M13/M14: xodim qo'shish, standart rollar, bitta filial va ombor avtomatik; yangi filial qo'shish (US-M14-03)
-- [ ] Admin foydalanuvchilar paneli (BO-11): xodim bloklash, rol/filial tayinlash, PIN/parolni qayta o'rnatish (US-M13-04, bir martalik taklif/tiklash kodi — Telegram bot birinchi, SMS faqat zaxira, qaror #34), sessiya/qurilmalarni bekor qilish (US-M13-06, `14-autentifikatsiya-oauth2.md` §18.2)
+- [ ] Admin foydalanuvchilar paneli (BO-11): xodim bloklash, rol/filial tayinlash, xodimni to'liq ma'lumoti bilan qo'shish (US-M13-04), PIN/parolni qayta o'rnatish (US-M13-06, bir martalik taklif/tiklash kodi — Telegram bot birinchi, SMS faqat zaxira, qaror #34), sessiya/qurilmalarni bekor qilish (US-M13-07, `14-autentifikatsiya-oauth2.md` §18.2)
 - [ ] M09: tovarlar, shtrix-kodlar, MXIK kodi, narx va narx tarixi
 - [ ] Import (US-M04-04): `import_jobs` orqali (yuklash → tekshirish/xatolar ro'yxati → tasdiqlash) va boshlang'ich qoldiq (`stock_openings`)
 - [ ] Telegram OTP adapter (`21-integratsiyalar.md` §11.1 — asosiy kanal) + SMS adapter (§10 — faqat zaxira); `FakeSms`/`FakeTelegram` faqat lokal dev'da flag bilan, staging/prod — har doim haqiqiy provayder; auth testlari OTP oqimini test-raqam yo'li orqali haqiqiy (mock'siz) oqimda tekshiradi (qaror #34)
@@ -120,11 +120,11 @@
 - [ ] M02 qaytarish; M03 chegirma (limit + PIN tasdiq)
 - [ ] Offline: Dexie keshi, outbox, `/sync/push`/`/sync/pull` (`16-offline-sync.md`)
 - [ ] BO-16 masofaviy tasdiq navbati (M02/M03/M08/M16 turlari) — `approval_requests` va `doc_approvals` (DB-09/DB-10); `GET /approval-requests?status=pending`, `POST /approval-requests/{id}/approve|reject`
-- [ ] BO-11 qurilmalar va bekor qilish; `sale.draft_voided`, qayta chop etish auditi
+- [ ] BO-11 "Qurilmalar" tabi — `GET /devices`, `POST /devices/{id}/revoke` (`devices.revoke`, qaror #56 a); `sale.draft_voided`, qayta chop etish auditi
 
 **O'qiladigan spec fayllari:** `18-api-kassa.md`, `16-offline-sync.md`, `08-dizayn-tizimi.md` §5, `24-frontend-arxitekturasi.md` §6, `03-modullar-talablari.md` M01/M02/M03/M16.
 
-**Hikoyalar:** US-M01-01, US-M01-02, US-M01-04, US-M01-05, US-M01-07, US-M02-01…03, US-M03-01, US-M09-06, US-M10-01, US-M13-03, US-M16-01…03.
+**Hikoyalar:** US-M01-01, US-M01-02, US-M01-04, US-M01-05, US-M01-07, US-M02-01…03, US-M03-01, US-M09-06, US-M10-01, US-M16-01…03.
 
 **Tayyor ta'rifi:** internet o'chirilganda 2 soat savdo, keyin barcha cheklar yo'qotishsiz va takrorsiz sinxronlanadi; `16-offline-sync.md`dagi konflikt qoidalari (overselling, qarz limiti, narx muzlatish) va 48 soat zinapoyasi (QT-OFFLINE48) test bilan qoplangan; printer matritsasi qabul testi (26 #139) o'tkazilgan.
 
@@ -150,7 +150,7 @@
 
 **O'qiladigan spec fayllari:** `03-modullar-talablari.md` M08/M12/M15/M18, `20-api-moliya-admin.md`, `13-provodka-qoidalari.md` §2.18a.
 
-**Hikoyalar:** US-M03-03, US-M04-02, US-M04-03, US-M07-04, US-M08-01…07, US-M08-09…11, US-M11-04, US-M12-01, US-M12-02, US-M14-01, US-M15-01…03, US-M18-01…03.
+**Hikoyalar:** US-M03-03, US-M04-02, US-M04-03, US-M07-04, US-M08-01, US-M08-02, US-M08-04…07, US-M08-09…11, US-M11-04, US-M12-01, US-M12-02, US-M14-01, US-M15-01…03, US-M18-01, US-M18-02.
 
 **Tayyor ta'rifi:** pilot do'kon qog'oz daftarsiz bir hafta ishlaydi; bank ko'chirmasi namunasi import qilinib 5710 tranzit qoldig'i yopiladi.
 
@@ -207,7 +207,7 @@
 
 **O'qiladigan spec fayllari:** `14-autentifikatsiya-oauth2.md` §16–18, `22-ai-qatlami.md`, `09-ai-funksiyalar.md`, `25-nofunksional-talablar.md` §11.
 
-**Hikoyalar:** US-M09-02, US-M09-04, US-M09-07, US-M10-02, US-M10-04, US-M12-03, US-M13-08, US-M17-02…04, US-M18-04.
+**Hikoyalar:** US-M08-03, US-M09-02, US-M09-04, US-M09-07, US-M10-02, US-M10-04, US-M12-03, US-M13-08, US-M17-02…04, US-M18-03, US-M18-04.
 
 **Tayyor ta'rifi:** obuna lokauti haqiqiy billing webhook bilan test qilingan; AI-01/03/05/06 pilot do'konlarida ishlaydi; 5–10 pilot do'kondan xarajat/AI sarfi bo'yicha xulosa yig'ilgan.
 
@@ -265,7 +265,7 @@
 
 ## Tashqi bog'liqliklar
 
-Javob kelmaguncha kod vaqtinchalik standart bilan yoziladi (26 Jadval B). Xatlar #130 (yuridik shaxs) dan keyin yuboriladi; har xat `letter_tracker` da (26 #71). "Ochiq savollar" o'rniga shu jadval (qaror #59 c): ilgari 1–5 bandlar — 26 #71, #42, #11/#112, qaror #49, 26 #93–#105.
+Javob kelmaguncha kod vaqtinchalik standart bilan yoziladi (26 Jadval B). Xatlar #130 (yuridik shaxs) dan keyin yuboriladi; har xat `letter_tracker` da (26 #71). Bu fayldagi tashqi javob kutayotgan bandlar faqat shu jadvalda (qaror #59 c).
 
 | Kim | Xat / so'rov | Nima so'raladi (26 #N) | Bloklaydigan bosqich |
 |---|---|---|---|

@@ -35,7 +35,7 @@ web/                                  # Turborepo (npm workspaces)
 │           └── main.tsx
 ├── packages/
 │   ├── pages/                        # har biri alohida paket (@pages/*)
-│   │   ├── pos/                      # veb-kassa (POS-01…15)
+│   │   ├── pos/                      # veb-kassa (POS-01…16)
 │   │   ├── catalog/                  # tovarlar, narxlar, yorliqlar (M09)
 │   │   ├── warehouse/                # qoldiq, kirim, ko'chirish, inventarizatsiya (M04-M07)
 │   │   ├── debts/                    # qarz daftari (M08)
@@ -212,9 +212,10 @@ Qoidalar:
 
 ### 6.4 Do'kon agenti bilan ishlash (`@shared/lib/agent`)
 
-- Agent lokal API'si: `http://127.0.0.1:<port>/v1/*` (fiskal: `FiscalPort` chaqiruvlari; printer: `print/raw`; holat: `status`). Brauzer `http://127.0.0.1` ni xavfsiz kontekst deb hisoblaydi (mixed content emas); Chrome 142+ birinchi murojaatda Local Network Access ruxsatini so'raydi — onboarding'da ko'rsatiladi.
-- Har so'rovda qurilma lokal tokeni (agent bilan bir martalik bog'lash, `21` §16); agent `Origin` oq ro'yxatini tekshiradi.
-- `$agentStatus` (`@shared/state`): `online | offline | not_installed`, agent versiyasi, yoqilgan imkoniyatlar (`fiscal_bridge`, `raw_printers`); `patronum/interval` bilan 10 s da holat so'rovi. Lokal ko'prik rejimida `$agentStatus != online` bo'lsa POS chekni yopmaydi ("Fiskal modul ulanmagan").
+- Agent lokal API'si: `http://127.0.0.1:<port>/v1/*` — `GET /v1/status`, `POST /v1/pair`, `POST /v1/fiscal/open-shift|close-shift|sale|refund`, `GET /v1/fiscal/device-status`, `GET /v1/fiscal/unsent`, `POST /v1/fiscal/resend`, `POST /v1/print/raw` (yagona ta'rif — `21` §16). Brauzer `http://127.0.0.1` ni xavfsiz kontekst deb hisoblaydi (mixed content emas); Chrome 142+ birinchi murojaatda Local Network Access ruxsatini so'raydi — onboarding'da ko'rsatiladi.
+- Himoya: agent faqat `127.0.0.1` da tinglaydi va `Origin` oq ro'yxatini (`https://app.<domen>`) tekshiradi; har so'rovda **qurilmaga bog'langan lokal token** (`Authorization: Bearer`) — POS-16 «Uskunalar sozlamasi»da agent tray'idagi 6 raqamli kod bilan bir marta bog'lanadi (`POST /v1/pair {code, device_id}`), token Dexie'da saqlanadi, serverga yuborilmaydi (`21` §16).
+- `$agentStatus` (`@shared/state`): `online | offline | not_installed | unpaired`, agent versiyasi, yoqilgan imkoniyatlar (`fiscal`, `print` — `34-1c-agent.md` §14.2 dagi nomlar), `fm_state`; `patronum/interval` bilan 10 s da `GET /v1/status`. Lokal ko'prik rejimida `$agentStatus != online` bo'lsa POS chekni **yopmaydi** — «Fiskal modul ulanmagan» holati (savat saqlanadi, agentni qayta ishga tushirish yo'riqnomasi); bu lokal holat, server xato kodi emas. `fm_state='locked'` → `FISCAL_DEVICE_LOCKED`; 48 soat → `FISCAL_OFFLINE_48H_BLOCKED` (`21` §1, `16-offline-sync.md`).
+- Sotuv paytidagi fiskal chek va chop etish faqat lokal API orqali; server navbatidagi agent vazifalari (`fiscal.status`, `fiscal.resend_unsent`, `fiscal.zreport`, `print.raw`, `scale.plu_upload`) frontend'ga tegishli emas (`21` §16).
 
 ## Ochiq savollar
 

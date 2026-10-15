@@ -429,6 +429,25 @@ Bu — **yagona manba**; `code` ustuni barqaror (frontend/mobil/test shu bo'yich
 | 1C integratsiyasi | `ONEC_DPAPI_FAILED` | — *(item/vazifa/tekshiruv natijasi)* | `errors.onec.dpapi_failed` | Kompyuterdagi saqlangan parol/kalit ochilmadi | Не удалось расшифровать сохранённый пароль/ключ | Sinf `config`, manba — agent. Harakat: 1C parolini qayta kiriting yoki kompyuterni qayta ulang |
 | 1C integratsiyasi | `ONEC_UNKNOWN` | — *(item/vazifa/tekshiruv natijasi)* | `errors.onec.unknown` | 1C xatosi tasniflanmadi: {onec_text} | Ошибка 1С не классифицирована: {onec_text} | Sinf `validation`, manba — agent/server. Harakat: Xom matnni o'qing; qo'llab-quvvatlash (profil regex jadvaliga qo'shiladi) |
 
+
+### 15.1 Kodga bog'lanmagan `message_key`'lar (maydon va klient)
+
+Quyidagi kalitlar xato **kodi emas** — katalogdagi kod bilan birga `details[].message_key` sifatida keladi yoki faqat klientda (POS/veb, serverga so'rovsiz) ishlatiladi; matnlari `08-dizayn-tizimi.md` §11 da.
+
+| message_key | Qayerda | Bog'liq kod / manba |
+|---|---|---|
+| `validation.required`, `validation.max_length`, `validation.phone_format` | `details[]` (har maydon), zod `errorMap` | `VALIDATION_ERROR` |
+| `validation.variance_note_required` | `details[].field="variance_note"` — smena yopishda farq bor, izoh yo'q (`18-api-kassa.md` §3) | `VALIDATION_ERROR` |
+| `validation.social_card_details_required` | `details[].field="payments[i].card_mask"`/`"rrn"` — `card_type="social"` (qaror #64) | `VALIDATION_ERROR` |
+| `validation.bank_settlement_exceeds_in_transit` | `details[].field="gross_amount"` — summa yo'ldagi pul (5710) qoldig'idan katta (`20-api-moliya-admin.md` §55c, §55e) | `VALIDATION_ERROR` |
+| `validation.exceeds_credit_limit` | `details[].field="payments[i].amount"` | `DEBT_LIMIT_EXCEEDED` |
+| `errors.debt_payment_exceeds_balance` | kod darajasidagi `message_key` (biznes qoida) | `VALIDATION_ERROR` (qaror #45) |
+| `fiscal.offline_block_soon` | POS modal, 46 soatdan keyin har chekdan oldin (qaror #43) | klient (`16-offline-sync.md` §6) |
+| `errors.device_clock_invalid` | POS — qurilma soati orqaga surilgan | klient (`16-offline-sync.md` §8) |
+| `errors.license_expired` | POS — offline litsenziya muddati tugagan | klient (`14-autentifikatsiya-oauth2.md` §17) |
+| `errors.product_not_found` | POS qidiruv/skaner — mahsulot topilmadi | klient (lokal katalog); serverda `NOT_FOUND`/`BARCODE_NOT_IN_CATALOG` |
+| `errors.return_requires_online` | POS — chekli qaytarish offline'da ochilmaydi | klient; markirovkali tovar uchun serverda `MARKING_RETURN_REQUIRES_ONLINE` |
+
 ---
 
 ## Ochiq savollar

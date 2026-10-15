@@ -6,7 +6,7 @@
 
 1. MVP uchun **5 rol** aniqlangan: **Egasi, Menejer, Kassir, Omborchi, Buxgalter**. Har biri uchun maqsad, og'riq, kundalik/haftalik/oylik ssenariy va huquqlar aniqlangan.
 2. Kichik do'konda (1-3 xodim) **bitta odam bir necha rolni bajaradi** — eng tipik kombinatsiya: Egasi = Menejer + Buxgalter (qisman), Kassir = Omborchi. Tizim rolni xodimga emas, **vazifaga** biriktiradi, shuning uchun bitta login bir nechta rol huquqiga ega bo'lishi mumkin (`03-modullar-talablari.md`, M13 — huquqlar).
-3. Kassir va Omborchi — **Android POS** qurilmasida ishlaydi (tez, offline-bardosh, bir qo'l bilan boshqariladigan interfeys talab qiladi); Menejer, Buxgalter, Egasi — asosan **back-office PWA** (brauzer, o'rnatishsiz) orqali, lekin Egasi mobilda ham tezkor ko'rish (dashboard) ehtiyojiga ega.
+3. Kassir va Omborchi — **veb-kassa (PWA)** da ishlaydi (tez, offline-bardosh, bir qo'l bilan boshqariladigan interfeys talab qiladi; Android POS — MVP'dan keyin, `28-android-pos.md`); Menejer, Buxgalter, Egasi — asosan **back-office PWA** (brauzer, o'rnatishsiz) orqali, lekin Egasi mobilda ham tezkor ko'rish (dashboard) ehtiyojiga ega.
 4. Eng katta umumiy og'riq — **mavjud buxgalteriya/ERP tizimlarining narxi va murakkabligi** (litsenziya millionlab so'm, joriy etish narxi litsenziyadan oshishi mumkin, qo'shimcha foydalanuvchi uchun alohida to'lov) va **qog'oz/Excel/WhatsApp orqali qo'lda yuritiladigan hisob** (`research_notes/AI ERP startap Ozbekistonda/04_sohalar.md`).
 5. Ikkinchi katta og'riq — **davlat tizimlaridagi texnik xatolar va jarima xavfi**: markirovkalangan yuklarning qabul qilinishida 80–90%i skanerlash xatosi bilan qaytadi — bu ko'rsatkich **bitta yirik ishlab chiqaruvchining tajribasi** (gazeta.uz, 2026-04-14), tizim bo'yicha umumiy statistika sifatida tasdiqlanmagan (`research_notes/texnik/tekshiruv-2026-10-14/1-fiskal-kassa-markirovka.md`); jarima **birinchi buzilishda** choraklik aylanmaning 2%i, **takroriy buzilishda** 20%igacha. Bu ayniqsa Omborchi (tovar qabulida) va Egasi (jarima javobgarligi) uchun kundalik xavf; kassada esa skanerlarning umuman ishlamay qolishi muammosi bor (11-fayl).
 6. 2026-yildan boshlangan yangi markaziy jarayon — davlat QQS, aylanma, mol-mulk, yer, JShDS va ijtimoiy soliq hisobotlarini **o'zi tuzadi** (Soliq kodeksi 81-moddasi, O'RQ-1108-son Qonun, 2025-12-25, 2026-01-01 dan kuchda — lex.uz/docs/-7944527), korxonaga **5 ish kuni** (SK 5-modda 7-qism; hisobot topshirish muddatidan kechiktirmay) ichida my.soliq.uz shaxsiy kabinetida tasdiqlash yoki tuzatib taqdim etish imkoni beriladi; javobsiz qolsa, davlat shakllantirgan ko'rinishda topshirilgan hisoblanadi (SK 81-modda 6–8-qism). **Foyda solig'i bu ro'yxatga kirmaydi** — u korxonaning o'z mas'uliyatida qoladi. Bu **Buxgalter** rolining markaziy kundalik/haftalik vazifasiga aylanadi.
@@ -80,7 +80,7 @@ Back-office PWA (asosiy), mobil brauzerda tezkor dashboard ko'rish.
 - Mijoz qarzdorligini kim qachon to'lamasligini oldindan bilish imkoni yo'q — `taxmin`: ulgurji distributor segmentida xuddi shunga o'xshash "Debtor prediction" ehtiyoji qayd etilgan (`research_notes/AI ERP startap Ozbekistonda/04_sohalar.md`, 102-qator), lekin bu to'g'ridan-to'g'ri chakana Menejer roli uchun tasdiqlangan manba emas.
 
 ### Qurilma
-Back-office PWA (asosiy); zarurat bo'lganda Android POS'da kassir sifatida ham ishlashi mumkin (rol birlashuvi).
+Back-office PWA (asosiy); zarurat bo'lganda veb-kassada kassir sifatida ham ishlashi mumkin (rol birlashuvi).
 
 ### Ssenariylar
 
@@ -113,7 +113,7 @@ Back-office PWA (asosiy); zarurat bo'lganda Android POS'da kassir sifatida ham i
 - Fiskal modul/OFD texnik xatosi tufayli chek bermaslik holatlari — bu kassirning shaxsiy javobgarligiga aylanishi mumkin (`research_notes/texnik/11-raqobatchilar-kamchiliklari.md`).
 
 ### Qurilma
-Android POS (asosiy va yagona ish quroli) — bir qo'l bilan, tez, offline-bardosh interfeys talab qilinadi.
+Veb-kassa (PWA, planshet/PK/Android Chrome; asosiy va yagona ish quroli) — bir qo'l bilan, tez, offline-bardosh interfeys talab qilinadi; Android POS ilovasi — MVP'dan keyin (`28-android-pos.md`).
 
 ### Ssenariylar
 
@@ -147,7 +147,7 @@ Android POS (asosiy va yagona ish quroli) — bir qo'l bilan, tez, offline-bardo
 - Tovar kelganda xaridnoma bilan solishtirish, farq (kam/ko'p yetkazib berilgan) ni qo'lda aniqlash vaqt oladi.
 
 ### Qurilma
-Android POS (mobil skanerlash uchun; ombor sharoitida qo'l terminal sifatida) va/yoki back-office PWA (katalog/hisobot ko'rish uchun).
+Veb-kassa / back-office PWA (Android Chrome'da mobil skanerlash — ombor sharoitida qo'l terminal sifatida; katalog/hisobot ko'rish).
 
 ### Ssenariylar
 
@@ -242,7 +242,7 @@ Belgilar: **K** = ko'rish, **Y** = yaratish, **T** = tasdiqlash. "–" = huquq y
 
 *M19 izohi (`33-1c-integratsiya.md` §11):* ruxsatlar `onec.view` (Egasi, Menejer, Buxgalter), `onec.settings.manage` (faqat Egasi — kompyuterni ulash/uzish, bazalar, «1C ga yozishga ruxsat», filial bog'lash, rejim/jadval), `onec.mapping.edit`, `onec.refs.create`, `onec.export.prepare`, `onec.export.approve`, `onec.export.correct` (Egasi, Buxgalter). Avto-tasdiqni yoqish — faqat Egasi (qaror #40). Egasi Buxgalterga `onec.settings.manage` ni BO-11 orqali qo'shishi mumkin. Kassir va Omborchi M19 ga kirmaydi.
 
-*M13 izohi (qaror #14):* M13 endi faqat rol/huquq emas — Egasi uchun to'liq foydalanuvchi boshqaruvi (xodim qo'shish, bloklash, parol/PIN tiklash, faol sessiya/qurilmalarni ko'rish va bekor qilish — US-M13-04…07) ham shu modulga kiradi; platforma admini (ADM-01) faqat tenant Egasi (owner) hisobi darajasida shu funksiyalarga ega (US-M13-08). Autentifikatsiya — o'z OAuth 2.0 implementatsiyasi, mock yo'q (`14-autentifikatsiya-oauth2.md`).
+*M13 izohi (qaror #14):* M13 rol/huquqdan tashqari Egasi uchun to'liq foydalanuvchi boshqaruvini (xodim qo'shish, bloklash, parol/PIN tiklash, faol sessiya/qurilmalarni ko'rish va bekor qilish — US-M13-04…07) ham o'z ichiga oladi; platforma admini (ADM-01) faqat tenant Egasi (owner) hisobi darajasida shu funksiyalarga ega (US-M13-08). Autentifikatsiya — o'z OAuth 2.0 implementatsiyasi, mock yo'q (`14-autentifikatsiya-oauth2.md`).
 
 ---
 

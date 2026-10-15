@@ -2,7 +2,7 @@
 
 **Maqsad:** POS kassa (smena, chek, qaytarish, chegirma), tasdiqlash navbati va qarz daftari uchun to'liq API kontrakti — voqea (event) payload'lari va REST resurslari.
 **Kim uchun:** Backend/frontend/Android ishlab chiquvchilar, QA.
-**Bog'liq fayllar:** `17-api-umumiy.md` (konventsiyalar), `11-malumotlar-modeli.md`, `13-provodka-qoidalari.md`, `21-integratsiyalar.md` (§1 OFD, §4 Asl belgisi, §9 Click/Payme/Uzum/UzQR), `16-offline-sync.md` (§3.1 `/sync/push`, §9), `15-xavfsizlik-va-audit.md`, `23-backend-arxitekturasi.md`, `33-1c-integratsiya.md` §7.3 (`outbox_state` — 1C eksporti tayyorligi), `34-1c-agent.md` (Do'kon agenti — fiskal modul ko'prigi, qaror #60), `03-modullar-talablari.md` (M01, M02, M03, M08, M16), `04-biznes-jarayonlar.md` (BP-03, BP-11, BP-12), `06-ekranlar-umumiy.md` (POS-01…15, BO-06, BO-16).
+**Bog'liq fayllar:** `17-api-umumiy.md` (konventsiyalar), `11-malumotlar-modeli.md`, `13-provodka-qoidalari.md`, `21-integratsiyalar.md` (§1 OFD, §4 Asl belgisi, §9 Click/Payme/Uzum/UzQR), `16-offline-sync.md` (§3.1 `/sync/push`, §9), `15-xavfsizlik-va-audit.md`, `23-backend-arxitekturasi.md`, `33-1c-integratsiya.md` §7.3 (`outbox_state` — 1C eksporti tayyorligi), `34-1c-agent.md` (Do'kon agenti — fiskal modul ko'prigi, qaror #60), `03-modullar-talablari.md` (M01, M02, M03, M08, M16), `04-biznes-jarayonlar.md` (BP-03, BP-11, BP-12), `06-ekranlar-umumiy.md` (POS-01…16, BO-06, BO-16).
 **Holat:** joriy, 2026-10-16.
 
 ## Asosiy xulosalar
@@ -183,7 +183,7 @@ Javob — `{results: PushResultEntry[]}` (§2.2). `outbox_state` asosida server 
 Server hisoblaydi: `expected_cash = opening_cash + Σcash_moves(shift_id)` (`stock`/`cash_moves` registridan, US-M16-02 formulasi). `variance = counted_cash − expected_cash`.
 
 **Javob** (`server`): `{id, shift_no, z_report: {expected_cash, counted_cash, variance, totals_by_method: {cash, card, uzqr, click, payme, uzum, debt}, vat_total, discount_total, returns_total, sales_count, returns_count}, fiscal: {status: "pending"}}`.
-**Xatolar**: `SHIFT_NOT_OPEN`, `SHIFT_DEVICE_MISMATCH`, `VALIDATION_ERROR` (`variance_note` yo'q).
+**Xatolar**: `SHIFT_NOT_OPEN`, `SHIFT_DEVICE_MISMATCH`, `VALIDATION_ERROR` (`variance_note` yo'q — `details[].message_key="validation.variance_note_required"`).
 **Idempotentlik**: `client_event_id`.
 **Offline**: to'liq ishlaydi; Z-hisobot `fiscal_receipts.status=pending` bilan OFD'ga navbatga qo'yiladi (internet qaytganda, `21-integratsiyalar.md` §1).
 **Bog'liq**: US-M01-04, US-M16-02, POS-07, POS-15.
@@ -273,7 +273,7 @@ Server hisoblaydi: `expected_cash = opening_cash + Σcash_moves(shift_id)` (`sto
 | `due_date` | ISO sana\|null | yo'q | Faqat `method=debt` — "va'da sanasi" (bitta, bo'lib to'lash grafigi yo'q); `debt_moves.due_date`/`counterparties.debt_due_date` manbasi |
 | `debt_approval` | `ApprovalRef`\|null | shartli | `method=debt` va joriy qarz+summa kredit limitidan oshsa (online rejimda majburiy; offline'da — §4.3) |
 
-Mos kelmagan shart (masalan `method=card` va `card_type` yo'q, `card_type=social` va `card_mask`/`rrn` yo'q, `uzqr` va `qr_type` yo'q) — `VALIDATION_ERROR`.
+Mos kelmagan shart (masalan `method=card` va `card_type` yo'q, `card_type=social` va `card_mask`/`rrn` yo'q, `uzqr` va `qr_type` yo'q) — `VALIDATION_ERROR` (ijtimoiy karta rekvizitlari yo'q bo'lsa `details[].message_key="validation.social_card_details_required"`).
 
 ### 4.2 Markirovka qatori qoidalari (qaror #62)
 
@@ -343,6 +343,8 @@ Fiskal chek `FiscalPort` orqali chiqariladi — hamkor bulut API'si yoki do'kon 
 |---|---|
 | Shu `cash_register_id`da `ofd_acked_at IS NULL` bo'lgan eng eski fiskal chekning `created_at`idan **≥ 48 soat** o'tgan (`cash_registers.last_unacked_receipt_at`) | Yangi fiskal chek talab qiladigan voqea (`sale.created`, `return.created`, `debt_payment.created`) rad etiladi — `409 FISCAL_OFFLINE_48H_BLOCKED`, `retryable:false`, `audit_log` + M18 xabari (qaror #43; VMQ-943 2-ilova 6-band). Fiskal bo'lmagan amallar (`/sync/push` bilan kutilayotgan cheklarni yuborish, smenani yopish, naqd sanash, qoldiq ko'rish) ishlayveradi; barcha kutilayotgan cheklar OFD tasdig'ini olgach blok avtomatik yechiladi; qo'lda chetlab o'tish yo'q |
 | `cash_registers.fm_state ≠ 'ok'` (`locked` / `ack_overdue` / `memory_full` / `unknown`) | Yangi fiskal chek rad etiladi — `409 FISCAL_DEVICE_LOCKED`, `retryable:false`, `params.fm_state` bilan |
+
+Lokal ko'prik rejimida POS fiskal chekni Do'kon agentining lokal API'si orqali chiqaradi (`127.0.0.1`, `Origin` oq ro'yxati + qurilmaga bog'langan token — `21-integratsiyalar.md` §16); agent/FM javob bermasa POS «Fiskal modul ulanmagan» holatida chekni yopmaydi (`24-frontend-arxitekturasi.md` §6.4) — bu server xato kodi emas, voqea serverga yuborilmaydi.
 
 Asosiy himoya — POS'ning o'zida: qurilma 24 soatda 🟡, 40 soatda 🔴 + Egasiga M18, 46 soatda har chek oldidan modal ko'rsatadi va 48 soatda yangi chekni lokal bloklaydi (`16-offline-sync.md` §6); server tekshiruvi — ikkinchi qatlam. Tekshiruv voqeaning `created_at`i bo'yicha: blokdan oldin yaratilib, keyin sinxronlangan voqea rad etilmaydi.
 
@@ -930,7 +932,7 @@ To'liq protokol — `16-offline-sync.md` §1–3 (bu fayl **qaytarib yozmaydi**,
 - `spec/kod-uchun/11-malumotlar-modeli.md`, `13-provodka-qoidalari.md`, `21-integratsiyalar.md` (§1, §4, §9), `16-offline-sync.md`, `15-xavfsizlik-va-audit.md`, `23-backend-arxitekturasi.md`.
 - `spec/kod-uchun/03-modullar-talablari.md` — M01, M02, M03, M08, M16.
 - `spec/kod-uchun/04-biznes-jarayonlar.md` — BP-03, BP-11, BP-12.
-- `spec/kod-uchun/06-ekranlar-umumiy.md` — POS-01…15, BO-06, BO-16.
+- `spec/kod-uchun/06-ekranlar-umumiy.md` — POS-01…16, BO-06, BO-16.
 - `spec/kod-uchun/01-qarorlar.md` — standart limitlar, offline siyosat qarorlari; #30, #42, #43, #45, #46, #48, #54, #59, #60, #62, #64.
 - `spec/kod-uchun/26-ochiq-savollar-reestri.md` — #87, #9, #40, #49, #89.
 - `research_notes/ochiq-savollar/` — P1 (OQ-002, OQ-004), P2 (OQ-026), P3 (OQ-032, OQ-033, §7.2), D-qarorlar.

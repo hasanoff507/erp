@@ -264,7 +264,7 @@ MVP darajasi (26 #52): semantik HTML va ARIA (shadcn/Radix komponentlari), narx/
 
 **Pilot davri (reyestr tasdiqlanguncha, fiskal hamkor orqali)**: hamkor kassa haqini biz to'laymiz — chakana narx **~123 600 so'm/oy/kassa** (Rahmat virtual kassa; ulgurji narx so'raladi); 20 kassa × 3 oy ≈ 7,4 mln so'm + ulanish (`21` §1). Bu davrda bitta kassali tenant bo'yicha marja manfiy — pilot xarajati sifatida qabul qilinadi.
 
-**Qo'shimcha kassa narxi (+39 000 so'm/oy) — qayta ko'riladi**: narx bizning kassa-boshiga fiskal xarajatimiz ~35–39 ming so'm degan taxminga qurilgan edi. Joriy faktlar: (a) o'z reyestrimizda bizning qo'shimcha kassa xarajatimiz deyarli nol (FM haqini do'kon to'laydi); (b) hamkor orqali ishlasak — hamkor narxi (chakana ~123 600) qo'shimcha kassa narxidan ancha yuqori, har qo'shimcha kassada zarar. Yakuniy narx hamkor ulgurji narxi va reyestr natijasidan keyin asoschi tomonidan belgilanadi (26 #168).
+**Qo'shimcha kassa narxi (+39 000 so'm/oy) — qayta ko'riladi**: narx kassa-boshiga fiskal xarajat ~35–39 ming so'm degan taxminga asoslangan. Faktlar: (a) o'z reyestrimizda bizning qo'shimcha kassa xarajatimiz deyarli nol (FM haqini do'kon to'laydi); (b) hamkor orqali ishlasak — hamkor narxi (chakana ~123 600) qo'shimcha kassa narxidan ancha yuqori, har qo'shimcha kassada zarar. Yakuniy narx hamkor ulgurji narxi va reyestr natijasidan keyin asoschi tomonidan belgilanadi (26 #168).
 
 **Ogohlantirish**: so'rovlar soni, sig'im va tenant soni — taxmin; birlik narxlar (UzCloud, Claude, Eskiz, SSL.com, BHM) — manbali (2026-10-16). Pilotdan keyin real `ai_requests`, infratuzilma hisob-fakturalari va support vaqti bilan qayta hisoblanadi (26 #24).
 

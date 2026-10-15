@@ -127,26 +127,35 @@ Deploy: Docker konteynerlar (api, worker, scheduler, web statik, bot) + PostgreS
 |---|---|---|
 | 10-umumiy-arxitektura.md | Shu hujjat | ✅ |
 | 11-malumotlar-modeli.md | Jadvallar, hujjatlar, registrlar, holatlar, raqamlash | ✅ |
-| 13-provodka-qoidalari.md | NSBU 21 hisoblar, har hujjat uchun Dt/Kt, FIFO/AVECO, davr yopish | ✅ — buxgalter tasdig'i kerak |
-| 21-integratsiyalar.md | Har tashqi tizim: adapter, navbat, qayta urinish, test muhiti holati | ✅ |
-| 16-offline-sync.md | Outbox protokoli, to'qnashuvlar, 48 soat, markirovka offline | ✅ |
-| 15-xavfsizlik-va-audit.md | Auth, RLS, rollar/ruxsatlar, audit jurnali, backup | ✅ |
-| 25-nofunksional-talablar.md | Tezlik, sig'im, uskunalar, mavjudlik | ✅ |
-| 22-ai-qatlami.md | AiProvider, limitlar, xarajat, eval, ma'lumot to'plash | ✅ |
-| 24-frontend-arxitekturasi.md | Veb: FSD, Effector, shadcn/ui, kutubxonalar | ✅ |
-| 23-backend-arxitekturasi.md | FastAPI modulli monolit, qatlamlar, kutubxonalar | ✅ |
-| 28-android-pos.md | Kotlin POS (keyingi bosqich) | ✅ |
-| 27-backlog.md | Ketma-ket bosqichlar (2 kishilik jamoa — asoschi + Claude), tartib | ✅ (qaror #35) |
+| 12-db-sxema.md | PostgreSQL 16 DDL, RLS, SECURITY DEFINER funksiyalar, seed, migratsiya tartibi | ✅ |
+| 13-provodka-qoidalari.md | BHMS №21 hisoblar, har hujjat uchun Dt/Kt, FIFO/AVECO, davr yopish | ✅ — buxgalter tasdig'i kerak |
 | 14-autentifikatsiya-oauth2.md | OAuth 2.0 AS+RS, token, admin panel, obuna lokauti, offline litsenziya | ✅ (qaror #14) |
+| 15-xavfsizlik-va-audit.md | Auth, RLS, rollar/ruxsatlar, audit jurnali, backup | ✅ |
+| 16-offline-sync.md | Outbox protokoli, to'qnashuvlar, 48 soat, markirovka offline | ✅ |
+| 17-api-umumiy.md | API konventsiyalari, xato konverti, yagona xato kodlari katalogi | ✅ |
+| 18-api-kassa.md | Kassa, sotuv, qaytarish, qarz, to'lov seanslari API | ✅ |
+| 19-api-ombor.md | Katalog, ombor, xarid, ko'chirish, inventarizatsiya, e-faktura (kiruvchi), e-TTN API | ✅ |
+| 20-api-moliya-admin.md | QQS, buxgalteriya, hisobotlar, sozlamalar, xarajat, kassa, bank, obuna, AI API | ✅ |
+| 21-integratsiyalar.md | Har tashqi tizim: adapter, navbat, qayta urinish, test muhiti holati | ✅ |
+| 22-ai-qatlami.md | AiProvider, limitlar, xarajat, eval, ma'lumot to'plash | ✅ |
+| 23-backend-arxitekturasi.md | FastAPI modulli monolit, qatlamlar, kutubxonalar | ✅ |
+| 24-frontend-arxitekturasi.md | Veb: FSD, Effector, shadcn/ui, kutubxonalar | ✅ |
+| 25-nofunksional-talablar.md | Tezlik, sig'im, uskunalar, mavjudlik | ✅ |
+| 26-ochiq-savollar-reestri.md | OQ-001…OQ-102 va 1C savollari: Yopildi / Tashqi javob kerak | ✅ |
+| 27-backlog.md | Ketma-ket bosqichlar (2 kishilik jamoa — asoschi + Claude), tartib | ✅ (qaror #35) |
+| 28-android-pos.md | Kotlin POS (keyingi bosqich) | ✅ |
+| 29-atamalar-lugati.md | Atamalar lug'ati (uz/ru/en ↔ kod) | ✅ |
+| 30-izchillik-matritsasi.md | US ↔ BP ↔ ekran ↔ endpoint ↔ jadval izchilligi | ✅ |
+| 31-qabul-testlari.md | Qabul testlari (QT-*) | ✅ |
+| 32-kod-qoidalari.md | Kod yozish qoidalari, CI | ✅ |
 | 33-1c-integratsiya.md | 1C integratsiyasi: `onec_integration` moduli, jadvallar, agent protokoli, veb API, ekranlar | ✅ (qaror #36–#42, Bosqich 7) |
 | 34-1c-agent.md | Do'kon agenti ichki tuzilishi (`agent-1c/`) — 1C imkoniyati; fiskal ko'prik, printer, tarozi — "Kengaytirish" bo'limi | ✅ (qaror #38, #60) |
-| 26-ochiq-savollar-reestri.md | OQ-001…OQ-102 va 1C savollari: Yopildi / Tashqi javob kerak | ✅ |
 
 ## Ochiq savollar
 
-- **2.** Hal qilingan: UzCloud'da S3-mos ombor bor (26 #27); shartnoma SLA va DBaaS PITR — 26 #51 (OQ-043).
-- **3.** Hal qilingan: minimizatsiya + majburiy maskalash va rozilik (26 #28, qaror #61); oferta matni — 26 #127 (OQ-042).
-- **4.** Fiskal yo'l: hamkor lokal ko'prikka ruxsat beradimi va bulut rejimi bormi (iOS) — 26 #109 (OQ-012); VMQ-393 "ikkilamchi tizim" xavfi — 26 #169.
+- Fiskal yo'l: hamkor lokal ko'prikka ruxsat beradimi va PK'siz bulut rejimi bormi (iOS) — 26 #109 (OQ-012); VMQ-393 "ikkilamchi tizim" xavfi — 26 #169. Vaqtinchalik standart: `FISCAL_PROVIDER=fake`, yo'l (a) asosiy.
+- UzCloud shartnoma SLA va DBaaS PITR — 26 #51 (OQ-043). Vaqtinchalik standart: o'z WAL PITR va boshqa provayderdagi zaxira nusxa (qaror #65).
+- Foydalanish shartlari / oferta matni (chegaradan tashqari uzatish roziligi bilan) — 26 #127 (OQ-042).
 
 ## Manbalar
 

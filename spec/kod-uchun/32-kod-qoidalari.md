@@ -13,7 +13,7 @@ Bu fayl **ikkinchi darajali manba**: ziddiyat bo'lsa `01-qarorlar.md` → mavzu 
 
 ## 1. Repo tuzilmasi
 
-Uchta kod papkasi: `backend/` (`23-backend-arxitekturasi.md` §1), `web/` (`24-frontend-arxitekturasi.md` §1) va Bosqich 7 dan — `agent-1c/` (Windows 1C agenti, .NET Framework 4.8; 1.3-band, `34-1c-agent.md`). Hujjatlar — `spec/kod-uchun/` (bu repo ichida, kod bilan bir joyda). Umumiy test-vektorlar — repo ildizidagi `shared/` (6.3-band).
+Uchta kod papkasi: `backend/` (`23-backend-arxitekturasi.md` §1), `web/` (`24-frontend-arxitekturasi.md` §1) va Bosqich 7 dan — `agent-1c/` (Do'kon agenti — fiskal ko'prik, printer, tarozi, 1C; .NET Framework 4.8; 1.3-band, `34-1c-agent.md`). Hujjatlar — `spec/kod-uchun/` (bu repo ichida, kod bilan bir joyda). Umumiy test-vektorlar — repo ildizidagi `shared/` (6.3-band).
 
 ### 1.1 Backend (`backend/`)
 
@@ -65,7 +65,7 @@ backend/
 
 Modul papkalari (`23-backend-arxitekturasi.md` §1 — 18 mahsulot moduli + kesishuvchi `integrations`/`sync`/`ai`; OpenAPI tag ↔ papka xaritasi — `17-api-umumiy.md` §11): `sales, returns, pricing, inventory, purchasing, debts, vat, accounting, reports, access, auth, branches, expenses, cash, billing, notifications, integrations, ai, sync` + Bosqich 7 da `onec_integration` (M19; ichki tuzilma — `33-1c-integratsiya.md` §4.1, ikki router: `router_web.py` — `/onec-*`, `router_agent.py` — `/onec-agent/*`). `integrations` — tag emas, faqat ichki modul (adapterlar). `bank_settlements` — `cash` moduli ichida (`23` §1).
 
-**Fiskal kod — alohida, kam o'zgaradigan paket** (qaror #60): `FiscalPort` va uning adapterlari (`FakeFiscalAdapter`, hamkor bulut adapteri, Do'kon ko'prigi adapterlari `multikassa_local`/`fiscaldrive_local`) `integrations/fiscal/` ichida, boshqa modullar faqat `FiscalPort` orqali murojaat qiladi; port chegarasida pul — butun son tiyinda (`int`), konvertatsiya bitta funksiyada (`01-qarorlar.md` #26). Sabab: virtual kassaning fiskal qismi o'zgarsa qayta xulosa talab qilinadi (VMQ-943 2-ilova 6-band) — fiskal paketga tegadigan PR alohida, kichik va CHANGELOG bilan. Tanlov — `FISCAL_PROVIDER` = `fake` / `cloud` / `multikassa_local` / `fiscaldrive_local` (MVP'da `fake`, real adapter Bosqich 5 da — `26-ochiq-savollar-reestri.md` #109).
+**Fiskal kod — alohida, kam o'zgaradigan paket** (qaror #60): `FiscalPort` va uning adapterlari (`FakeFiscalAdapter`, hamkor bulut adapteri, lokal ko'prik adapterlari `multikassa_local`/`fiscaldrive_local`) `integrations/fiscal/` ichida, boshqa modullar faqat `FiscalPort` orqali murojaat qiladi; port chegarasida pul — butun son tiyinda (`int`), konvertatsiya bitta funksiyada (`01-qarorlar.md` #26). Sabab: virtual kassaning fiskal qismi o'zgarsa qayta xulosa talab qilinadi (VMQ-943 2-ilova 6-band) — fiskal paketga tegadigan PR alohida, kichik va CHANGELOG bilan. Tanlov — `FISCAL_PROVIDER` = `fake` / `partner_cloud` / `multikassa_local` / `fiscaldrive_local` (`21-integratsiyalar.md` §1) (MVP'da `fake`, real adapter Bosqich 5 da — `26-ochiq-savollar-reestri.md` #109).
 
 **Eslatma**: bu daraxt `{api,service,repo,models,schemas,events}` kabi yassi papka to'plami emas — har modulda **to'rt qatlam** (`domain/application/infrastructure/api`) bor; `service`/`repo`/`models`/`schemas` nomlari mos ravishda `application/services.py`, `infrastructure/repositories.py`, `infrastructure/models.py`, `api/schemas.py` ichida yashaydi. Alohida `events/` papkasi yo'q: domen voqealari (`sale.created`, `shift.opened` — 2.3-bo'lim) `sync`/`outbox_jobs` orqali, fon ishlari esa har modulning `infrastructure/tasks.py`sida.
 
@@ -84,25 +84,27 @@ web/                                  # Turborepo (npm workspaces)
 
 Import qoidasi (FSD, `24-frontend-arxitekturasi.md` §1): `app → pages → features → entities → shared`, faqat pastga, sahifalar bir-birini import qilmaydi, paketlararo faqat `@shared/*`.
 
-### 1.3 Do'kon agenti (`agent-1c/`, asos — Bosqich 5, 1C — Bosqich 7)
+### 1.3 Do'kon agenti (`agent-1c/` — butun Do'kon agenti uchun repo papkasi nomi; asos — Bosqich 5, 1C — Bosqich 7)
 
-Alohida .NET Framework 4.8 solution (qarorlar #38, #60). Bu **bitta Do'kon agenti** asosi: fiskal ko'prik (POS → `127.0.0.1` lokal API → FM/hamkor lokal xizmati → OFD), xom TCP 9100 printer, tarozi va 1C moduli bir xil supervisor, ulash, avto-yangilanish, imzo va DPAPI qatlamidan foydalanadi; imkoniyatlar alohida loyihalar (`src/Fiscal/`, `src/Devices/` — Bosqich 5; `src/Worker/` (COM) — Bosqich 7) sifatida qo'shiladi, `Agent/`, `Protocol/`, `Common/` umumiy. Repo papkasi nomi `agent-1c/` saqlanadi (34 `34-dokon-agenti.md` ga kengaytirilganda nom qayta ko'riladi). ichki arxitektura, protokol bajarilishi va yozish algoritmi — `34-1c-agent.md` (ustun manba; quyidagi daraxt — repo darajasidagi konventsiya, loyiha nomlari 34 bilan izchil qilinadi).
+Alohida .NET Framework 4.8 solution (qarorlar #38, #60). Bu **bitta Do'kon agenti** asosi: fiskal ko'prik (POS → `127.0.0.1` lokal API → FM/hamkor lokal xizmati → OFD), xom TCP 9100 printer, tarozi va 1C moduli bir xil supervisor, ulash, avto-yangilanish, imzo va DPAPI qatlamidan foydalanadi. Ichki arxitektura, loyiha nomlari, protokol bajarilishi va yozish algoritmi — `34-1c-agent.md` §2.1 (ustun manba; quyidagi daraxt — o'sha daraxtning qisqa ko'rinishi):
 
 ```
 agent-1c/
 ├── ErpOneCAgent.sln
+├── Directory.Build.props   # net48, Nullable, TreatWarningsAsErrors, Deterministic, versiya
 ├── src/
-│   ├── Agent/            # supervisor: per-user tray ilova, ulash (device code), long-poll, lease/heartbeat,
-│   │                     # DPAPI (CurrentUser) sirlar, results.jsonl outbox, imzoli avto-yangilanish
-│   ├── Worker/           # COM worker: x86 va x64 build → OneCWorker.x86.exe / OneCWorker.x64.exe
-│   │                     # (V8x.COMConnector, stdin/stdout JSON, bitta bazaga bitta COM sessiya)
-│   ├── Protocol/         # 33 §9 DTO'lari: ObjectSpec/QuerySpec/Value, xato obyekti, vazifa turlari (oq ro'yxat)
-│   ├── Fiscal/           # fiskal ko'prik (qaror #60): localhost API, FM/hamkor lokal xizmati adapteri — Bosqich 5
-│   ├── Devices/          # xom TCP 9100 printer, tarozi (serial/TCP, PLU) — Bosqich 5
-│   └── Common/           # Ed25519 imzo tekshiruvi, UUIDv5 (onec_guid), JCS xesh, log maskalash
-├── tests/                # unit + protokol testlari (soxta server, soxta COM)
-├── installer/            # per-user o'rnatuvchi (admin huquqisiz; vosita — 34 da)
-└── build/                # imzolash va reliz skriptlari
+│   ├── Erp1C.Core/         # AnyCPU classlib: 33 §9 DTO'lari (ObjectSpec/QuerySpec/Value, ErrorObj, A-01…A-10),
+│   │                       # JCS, Ed25519/JWS, UUIDv5, JSON Schema, xato tasnifi, log maskalash
+│   ├── Erp1C.Worker/       # COM bajaruvchi classlib (V8x.COMConnector, bitta bazaga bitta COM sessiya) — Bosqich 7
+│   ├── Erp1C.Worker32/     # → OneCWorker.x86.exe
+│   ├── Erp1C.Worker64/     # → OneCWorker.x64.exe
+│   ├── Erp1C.Agent/        # supervisor (ErpOneCAgent.exe): tray, ulash, long-poll, lease/heartbeat,
+│   │                       # DPAPI sirlar, results.jsonl outbox, imzoli avto-yangilanish, lokal API (127.0.0.1)
+│   ├── Erp1C.Fiscal/       # fiskal ko'prik: FM/hamkor lokal xizmati adapterlari — Bosqich 5 (34 §14)
+│   └── Erp1C.Devices/      # xom TCP 9100 printer, tarozi PLU yuklash — Bosqich 5 (34 §14)
+├── tests/                  # Erp1C.*.Tests (soxta server, FakeOneC), IntegrationTests
+├── installer/              # Inno Setup 6, per-user (admin huquqisiz)
+└── tools/                  # gen-contracts, ReleaseTool (oflayn imzolash)
 ```
 
 - **Server bilan yagona kontrakt** — `33-1c-integratsiya.md` §9: `ObjectSpec`/`QuerySpec` JSON Schema backenddagi Pydantic modellaridan (`onec_integration/domain/object_spec.py`) eksport qilinadi va `agent-1c/` testlarida shu sxemaga qarshi tekshiriladi; agentda qo'lda «ikkinchi» sxema yozilmaydi (`openapi.json` → orval qoidasining agentdagi ekvivalenti).
@@ -194,7 +196,7 @@ Format — **`UPPER_SNAKE_CASE`**, ingliz tilida, biznes-semantik (texnik stack-
 Ikki alohida nomlash tizimi, aralashtirilmaydi:
 
 - **Domen hodisasi** (sync/outbox orqali uzatiladigan, `client_event_id` bilan dedupe qilinadigan): `<entity>.<action>` — `sale.created`, `shift.opened`, `transfer.received`, `sale.draft_voided`, `return.created` (`10-umumiy-arxitektura.md` §2, `11-malumotlar-modeli.md`).
-- **`outbox_jobs.kind`** (tashqi integratsiya/fon ishi): `snake_case`, fe'l+ot — `ofd_send`, `einvoice_send`, `ettn_send`, `marking_verify`, `marking_sell`, `state_report_reminder`, `report_export`, `label_pdf` (`12-db-sxema.md`).
+- **`outbox_jobs.kind`** (tashqi integratsiya/fon ishi): `snake_case`, fe'l+ot — `ofd_send`, `einvoice_send`, `ettn_send`, `marking_verify`, `marking_accept`, `state_report_reminder`, `report_export`, `label_pdf` (`12-db-sxema.md`).
 - **`audit_log.action`**: ikkisining aralashi, kontekstga qarab — `platform_admin_access`, `sync_drain_started`, `marking.offline_sold` (`15-xavfsizlik-va-audit.md` §6.1). Yangi audit action qo'shilganda mavjud uslubga (nuqta yoki pastki chiziq, o'sha domenda allaqachon ishlatilgan shaklga) moslashtiriladi.
 
 ---
@@ -456,12 +458,9 @@ Manba — `15-xavfsizlik-va-audit.md` §4, `23-backend-arxitekturasi.md` §7.3.
 
 ## Ochiq savollar
 
-1. Hal qilingan: factory + `Depends` (`26-ochiq-savollar-reestri.md` #59).
-2. Hal qilingan: GitHub Actions (`26-ochiq-savollar-reestri.md` #60).
-3. Hal qilingan: `mypy --strict` va frontend lint/test CI qadamlari — qaror #57 (7.5-band).
-4. Hal qilingan: ESLint pul qoidasi — qaror #57 (3.3-band).
-5. Hal qilingan: `.env.example`, `pip-audit`/`npm audit`/`gitleaks`, CSP — qaror #57 (10-bo'lim).
-6. `agent-1c/` o'rnatuvchi vositasi va test freymvorki — `34-1c-agent.md` da tanlanadi; OV kod-imzolash sertifikati — `26-ochiq-savollar-reestri.md` #105 (OQ-046).
+Faqat tashqi javob kerak bo'lgan bandlar:
+
+1. **Agent OV kod-imzolash sertifikati** (CA O'zbekiston MChJ'sini qabul qiladimi, kalit saqlash, muddat) — 26 #105; yuridik shaxs — 26 #130 (OQ-046). Interim: agent faqat ichki sinovda, reliz imzosi sertifikat olingach (1.3-band CI jadvali, 4-qadam).
 
 ## Manbalar
 

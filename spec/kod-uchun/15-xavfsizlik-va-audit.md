@@ -8,7 +8,7 @@
 ## Asosiy xulosalar
 
 1. **Autentifikatsiya — o'z OAuth 2.0 implementatsiyamiz**: backend ham Authorization Server, ham Resource Server; to'liq protokol, saqlash, rotatsiya, bekor qilish tafsiloti **`14-autentifikatsiya-oauth2.md`da** — bu bo'lim faqat xulosa va havola. Veb (back-office+veb-kassa) — BFF naqshi, token brauzerga chiqmaydi, **HttpOnly cookie + CSRF token** (3-bo'lim) OAuth sessiyasini bildiradi; Android — public OAuth mijoz, to'g'ridan-to'g'ri Bearer access token; kassir **PIN — OAuth grant emas**, mahalliy tezkor almashish/tasdiqlash vositasi (`14-autentifikatsiya-oauth2.md` §4.3).
-2. **Huquqlar — kod darajasidagi ruxsat (`permission_code`) + ixtiyoriy limit** (`role_permissions.limit_value`, `11-malumotlar-modeli.md`), 5 standart rol (Egasi, Menejer, Kassir, Omborchi, Buxgalter) uchun standart matritsa `02-rollar-va-ssenariylar.md` (6-bo'lim, K/Y/T) bilan izchil loyihalashtirilgan; aniq limit summalari **tadqiqotda yo'q — taxmin**, MVP oldidan biznes-qoida sifatida sozlanadi.
+2. **Huquqlar — kod darajasidagi ruxsat (`permission_code`) + ixtiyoriy limit** (`role_permissions.limit_value`, `11-malumotlar-modeli.md`), 5 standart rol (Egasi, Menejer, Kassir, Omborchi, Buxgalter) uchun standart matritsa `02-rollar-va-ssenariylar.md` (6-bo'lim, K/Y/T) bilan izchil loyihalashtirilgan; standart limitlar — qaror #23 (Kassir: `discount.give` 5%, `returns.approve` 100 000 so'm, `cash.withdraw` 50 000 so'm; qolganlari limitsiz), Egasi tenant darajasida o'zgartiradi (§2.3).
 3. **PostgreSQL Row-Level Security (RLS) — tenant izolyatsiyasining asosiy (DB darajasidagi) mexanizmi**; ilova filtri (SQLAlchemy `with_loader_criteria`) — ikkinchi qatlam (`23-backend-arxitekturasi.md`, 4-xulosa). Har tranzaksiya `tenant_transaction(session, tenant_id)` helper orqali ochiladi, ichida `SELECT set_config('app.tenant_id', :tid, true)` bajariladi, har jadvalda siyosat; CI'da **har jadvalda RLS yoqilganini tekshiruvchi test** majburiy (`04-arxitektura-va-stack.md`, 1-bo'lim).
 4. **Platform admin** (`platform_admins`) tenant RLS'ini **chetlab o'tadi**, lekin har bir kirish `audit_log`ga majburiy yoziladi (`11-malumotlar-modeli.md`, 2-bo'lim) — bu yagona qonuniy "bypass" yo'li.
 5. **AI'ga (Claude API) yuboriladigan ma'lumot cheklanadi va maskalanadi** (qaror #61): lokalizatsiya faqat biometrik/genetik/telekom ma'lumotga tegishli (ZRU-547 27-1-m.), lekin chet elga uzatish alohida qoida (ZRU-547 15-m., VMQ-415) — Anthropic (AQSh, DPF ishtirokchisi emas) uchun asos subyekt roziligi. Shuning uchun jismoniy shaxs identifikatorlarini **maskalash majburiy, tenant o'chira olmaydi**; maskalab bo'lmaydigan ma'lumot (AI-03 rasmlari) faqat tenant chegaradan tashqari uzatishga rozilik bergandan keyin (`tenants.settings.ai_cross_border_enabled=true`) yuboriladi (§5.2, `22-ai-qatlami.md` §7).
@@ -16,8 +16,8 @@
 7. **Backup — o'z WAL PITR + boshqa provayderdagi nusxa** (qaror #51, #65): RPO ≤ 5 daqiqa, RTO ≤ 4 soat, chorakda bir marta staging'da to'liq restore sinovi, arxiv ≥ 5 yil; UzCloud DBaaS PITR'iga tayanilmaydi (rasmiy tasdiqlanmagan), kamida bitta nusxa boshqa provayderda (§7).
 8. **Fiskal modul uchun kripto milliy standart aniq, umumiy dastur uchun majburiy kripto-algoritm standarti qonun darajasida topilmadi** — standart sanoat amaliyoti (TLS 1.2+, argon2) yetarli deb baholanadi (`07-fayl`, 3.2-bo'lim).
 9. **Muvofiqlik**: (a) ЗРУ-764 bo'yicha majburiy ekspertiza/sertifikatlash bizga **tegishli emas** (faqat davlat tizimlari va KAI reyestridagi tizimlar); yagona aniq talab — o'z virtual kassamizni Davlat reyestriga kiritishda "Kiberxavfsizlik markazi" ekspertiza xulosasi (OQ-011, §9.1); (b) shaxsiy ma'lumotlar qonuni (ZRU-547/ЗРУ-666/ЗРУ-1125) bo'yicha lokalizatsiya faqat biometrik/genetik/telekom ma'lumotga tegishli, tizimning odatiy ma'lumoti bu toifaga **kirmaydi**; vakolatli organ — IIV huzuridagi Migratsiya va personallashtirish departamenti (§9.2).
-10. **PCI DSS qamrovi minimal**: karta ma'lumoti hech qachon bizning tizimimizda saqlanmaydi/qayta ishlanmaydi — to'lovlar Click/Payme/bank terminali orqali, ular o'z PCI-sertifikatlangan muhitida ishlaydi (`research_notes/texnik/03-efaktura-va-tolov.md`, 2.1–2.3-bo'lim izidan, mantiqiy xulosa — manbada PCI so'zi yo'q, **taxmin**).
-11. **Obuna muddati — qattiq to'xtatish**: 24 soatlik imtiyoz tugagach tenantning barcha sessiya/tokenlari bekor qilinadi, login rad etiladi (to'lov havolasi bundan mustasno); offline qurilma imzolangan litsenziya tokeni (`valid_until = min(grace_ends_at, issued_at + 7 kun)`) bilan serversiz ham mahalliy bloklanadi — to'liq mexanizm va fiskal oqibat izohi `14-autentifikatsiya-oauth2.md` §16–17'da.
+10. **PCI DSS qamrovi minimal**: karta ma'lumoti hech qachon bizning tizimimizda saqlanmaydi/qayta ishlanmaydi — to'lovlar Click/Payme/bank terminali orqali, ular o'z PCI-sertifikatlangan muhitida ishlaydi (`research_notes/texnik/03-efaktura-va-tolov.md`, 2.1–2.3-bo'lim izidan, mantiqiy xulosa, manbada PCI so'zi yo'q; qabul qilingan standart — SAQ A darajasi, karta rekvizitlaridan faqat `card_mask`/`rrn`/`card_type` saqlanadi, qaror #64).
+11. **Obuna muddati — qattiq to'xtatish**: 24 soatlik imtiyoz tugagach tenantning barcha sessiya/refresh tokenlari `suspended` holatiga o'tadi (to'liq bekor emas — faqat `scope=sync.drain`, to'lovdan keyin tiklanadi), login rad etiladi (to'lov havolasi bundan mustasno); offline qurilma imzolangan litsenziya tokeni (`valid_until = min(grace_ends_at, issued_at + 7 kun)`) bilan serversiz ham mahalliy bloklanadi — to'liq mexanizm va fiskal oqibat izohi `14-autentifikatsiya-oauth2.md` §16–17'da.
 
 ---
 
@@ -68,7 +68,7 @@ Ro'yxatdan o'tish (US-M17-01) **bitta tranzaksiyada** quyidagilarni yaratadi: `t
 
 ### 2.1 Ruxsat kodlari (`permission_code`)
 
-Har bir kod `role_permissions.permission_code` sifatida saqlanadi, zarur bo'lsa `limit_value` bilan (masalan foiz, summa). Quyidagi katalog `02-rollar-va-ssenariylar.md` (6-bo'lim, modul × K/Y/T) va `03-modullar-talablari.md` (M01–M18) asosida, granular (amal darajasida) qayta loyihalangan — **bu jadval ham o'z navbatida MVP oldidan Egasi/arxitektor bilan tasdiqlanishi tavsiya etilgan loyihaviy taxmin** (manba hujjatning o'zi shunday belgilaydi, `02-rollar-va-ssenariylar.md`, 6-bo'lim izohi).
+Har bir kod `role_permissions.permission_code` sifatida saqlanadi, zarur bo'lsa `limit_value` bilan (masalan foiz, summa). Quyidagi katalog `02-rollar-va-ssenariylar.md` (6-bo'lim, modul × K/Y/T) va `03-modullar-talablari.md` (M01–M18) asosida, granular (amal darajasida) qayta loyihalangan — bu katalog standart (qaror #28), yangi kod faqat shu jadvalga qo'shish bilan kiritiladi. **Limit birligi** `permission_code` bo'yicha qat'iy: `discount.*` va `prices.approve` — foiz, qolganlari — so'm (`12-db-sxema.md` §7.6).
 
 | Kod | Modul | Ma'nosi | Limit |
 |---|---|---|---|
@@ -77,12 +77,12 @@ Har bir kod `role_permissions.permission_code` sifatida saqlanadi, zarur bo'lsa 
 | `shift.open` / `shift.close` | M01 | Smena ochish/yopish (Z-hisobot) | — |
 | `cash_register.manage` | M01 | Kassa/filial sozlash | — |
 | `returns.create` | M02 | Qaytarish boshlash | — |
-| `returns.approve` | M02 | Limitdan yuqori yoki asl cheksiz qaytarishni tasdiqlash | summa (taxmin) |
-| `discount.give` | M03 | Chekka chegirma berish | foiz/summa (taxmin) |
-| `discount.approve` | M03 | Limitdan yuqori chegirmani PIN bilan tasdiqlash | foiz/summa (taxmin) |
+| `returns.approve` | M02 | Limitdan yuqori yoki asl cheksiz qaytarishni tasdiqlash | so'm (Kassir standarti `100000.00`, qaror #23) |
+| `discount.give` | M03 | Chekka chegirma berish | foiz (Kassir standarti `5.00`, qaror #23) |
+| `discount.approve` | M03 | Limitdan yuqori chegirmani PIN bilan tasdiqlash | foiz (standart — limitsiz `NULL`) |
 | `discount.rule.manage` | M03 | Avtomatik chegirma/aksiya qoidasi | — |
 | `stock.view` | M04 | Qoldiqni ko'rish | — |
-| `stock.writeoff` | M04 | Hisobdan chiqarish | summa (taxmin) |
+| `stock.writeoff` | M04 | Hisobdan chiqarish | so'm (standart — limitsiz `NULL`, Egasi belgilaydi) |
 | `stock.count.create` | M05 | Inventarizatsiya boshlash, sanash | — |
 | `stock.count.post` | M05 | Sanash natijasini tasdiqlab balansga o'tkazish | — |
 | `transfer.create` | M06 | Ko'chirish hujjati yaratish (yuborish) | — |
@@ -94,7 +94,7 @@ Har bir kod `role_permissions.permission_code` sifatida saqlanadi, zarur bo'lsa 
 | `purchases.return` | M07 | Yetkazib beruvchiga qaytarish | — |
 | `einvoice.sign` | M07, M10 | E-IMZO bilan kiruvchi/chiquvchi e-fakturani imzolash | — |
 | `debts.create` | M08 | Mijozga nasiya/qarz yozish | — |
-| `debts.approve` | M08 | Kredit limitidan yuqori nasiyani tasdiqlash | summa (taxmin) |
+| `debts.approve` | M08 | Kredit limitidan yuqori nasiyani tasdiqlash | so'm (standart — limitsiz `NULL`) |
 | `debts.forgive` | M08 | Qarzni kechish/"undirib bo'lmaydigan" deb yopish | **faqat Egasi** (`03-modullar-talablari.md`, M08 qoidalari) |
 | `debts.limit.manage` | M08 | Mijoz kredit limitini belgilash/o'zgartirish | — |
 | `debts.payment.accept` | M08 | Qarz to'lovini qabul qilish | — |
@@ -119,9 +119,10 @@ Har bir kod `role_permissions.permission_code` sifatida saqlanadi, zarur bo'lsa 
 | `integrations.retry` | M01, M07, M10 | OFD/e-faktura/markirovka integratsiya ishini qo'lda qayta navbatga qo'yish (BO-14) | — |
 | `einvoice.create` | M01, M08, M10 | Chiquvchi e-faktura qoralamasini yaratish va yuborish (B2B, chekdan keyin — BP-03/BP-13) | — |
 | `expenses.create` | M15 | Xarajat yozish | — |
-| `expenses.approve` | M15 | Katta/takrorlanuvchi xarajatni tasdiqlash | summa (taxmin) |
-| `cash.deposit` / `cash.withdraw` | M16 | Kassaga pul qo'yish / kassadan olish | summa (taxmin, `cash.withdraw`) |
+| `expenses.approve` | M15 | Katta/takrorlanuvchi xarajatni tasdiqlash | so'm (standart — limitsiz `NULL`) |
+| `cash.deposit` / `cash.withdraw` | M16 | Kassaga pul qo'yish / kassadan olish | so'm (`cash.withdraw`: Kassir standarti `50000.00`, qaror #23) |
 | `cash.count.shift` | M16 | Smena yopishda naqdni sanash | — |
+| `devices.revoke` | M13 | BO-11 «Qurilmalar» tabi: qurilmalar ro'yxatini ko'rish (`GET /devices`) va qurilmani bekor qilish (`POST /devices/{id}/revoke`) (qaror #56) | — |
 | `bank_settlements.manage` | M11, M16 | Bank tushumi tasdig'i (`bank_settlements`, hujjat kodi `BT`): bank ko'chirmasi bo'yicha 5710 → 5110 o'tkazmasini yaratish, ko'rish, o'tkazish (`post`) va bekor qilish (`13-provodka-qoidalari.md` §2.18a, qaror #42) | — |
 | `billing.manage` | M17 | Tarif tanlash, to'lov, obuna holati | **faqat Egasi** |
 | `notifications.manage` | M18 | Telegram/ogohlantirish sozlamalari | — |
@@ -187,6 +188,7 @@ Quyidagi jadval `02-rollar-va-ssenariylar.md` (6-bo'lim) dagi K/Y/T matritsasi b
 | `cash.withdraw` | ✓ | ✓(limit) | ✓(limit, past) | – | – |
 | `cash.deposit` | ✓ | ✓ | ✓ | – | – |
 | `cash.count.shift` | ✓ | ✓ | ✓ | – | – |
+| `devices.revoke` | ✓ | ✓ | – | – | – |
 | `billing.manage` | ✓ | – | – | – | – |
 | `notifications.manage` | ✓ | – | – | – | – |
 | `telegram.link` | ✓ | ✓ | – | – | – |
@@ -301,12 +303,13 @@ Har jadval uchun:
 | OFD/virtual kassa fiskal moduli kalitlari | Har `cash_registers` yozuvi uchun | Fiskal modul o'z milliy kripto standartiga ega (`07-fayl`, 3.2-bo'lim) |
 | E-faktura operatori (Didox/Faktura.uz) hisob ma'lumoti | Tenant darajasida | API login/parol yoki token |
 | CRPT Turon (Asl belgisi) kaliti | Tenant darajasida (`crpt_api_key`, `tenant_secrets`) | Faqat tekshiruv/qabul/qaytarish/hisobdan chiqarish uchun; chakana sotuvda kod fiskal chek ichida OFD orqali ketadi (qaror #62); integrator shartlari — tashqi javob (26 #40, OQ-025) |
-| Click/Payme/Uzum/UzQR merchant sirlari (SECRET_KEY, MD5/JSON-RPC imzosi, Basic Auth) | **Tenant darajasida** (`tenant_payment_credentials`; UzQR kaliti — har kassa uchun, `tenant_secrets.cash_register_id`) — sotuv to'lovlari, har do'kon o'z merchant hisobi (qaror #46) | Payme JSON-RPC, Click Prepare/Complete+MD5, Uzum JSON webhook + Basic Auth (`research_notes/texnik/tekshiruv-2026-10-14/2-efaktura-tolov-hosting.md`) |
+| Click/Payme/Uzum/UzQR merchant sirlari (SECRET_KEY, MD5/JSON-RPC imzosi, Basic Auth) | **Tenant darajasida** (`tenant_secrets`, `kind` `click`/`payme`/`uzum`/`uzqr`; UzQR kaliti — har kassa uchun, `tenant_secrets.cash_register_id`) — sotuv to'lovlari, har do'kon o'z merchant hisobi (qaror #46) | Payme JSON-RPC, Click Prepare/Complete+MD5, Uzum JSON webhook + Basic Auth (`research_notes/texnik/tekshiruv-2026-10-14/2-efaktura-tolov-hosting.md`) |
 | Platforma merchant kaliti (obuna billing, M17) | Platforma darajasida, alohida sir | Faqat M17 billing uchun; tenant sotuv puli bilan aralashmaydi (qaror #46) |
 | E-IMZO sertifikat/parol | Brauzerda foydalanuvchi tomonida (E-IMZO plagin/dastur) | Server faqat imzolangan hujjatni oladi, **xususiy kalit serverga tushmaydi** (`10-umumiy-arxitektura.md`, 1-bo'lim izohi) |
 | Claude API kaliti | Platforma darajasida (bitta kalit, mijoz qurilmasiga hech qachon tushmaydi) | `09-ai-funksiyalar.md`, 5-bo'lim, "Arxitektura qoidalari" |
 | SMS provayder kaliti (Eskiz) | Platforma darajasida | Eskiz.uz — `OtpPort` ortidagi `EskizSmsAdapter`, faqat zaxira kanal; OTP asosiy kanali — Telegram bot (01 #34); token keshi har 25 kunda yangilanadi; shartnoma — tashqi javob (26 #45, OQ-102) |
 | 1C agenti maxfiy kaliti (Ed25519) va 1C foydalanuvchi paroli | Faqat do'kon PK'sida (DPAPI `CurrentUser`) | **Serverga hech qachon kelmaydi va saqlanmaydi** — server faqat agentning ochiq kalitini (`onec_agents.public_jwk`), ulanish satri xeshini (`connect_fingerprint`) va maskalangan ko'rinishini saqlaydi (`33-1c-integratsiya.md` §15.3) |
+| Do'kon agenti lokal API tokeni va fiskal lokal ko'prik siri (masalan `X-POS-Auth` SecretKey) | Faqat do'kon PK'sida (agent — DPAPI; POS — Dexie, faqat lokal token) | **Serverga chiqmaydi** (qaror #60). Lokal API himoyasi uchalasi birga: faqat `127.0.0.1`, `Origin` oq ro'yxati (`https://app.<domen>`, boshqasi → `403`), qurilmaga bog'langan lokal token (POS-16 da 6 raqamli kod bilan `POST /v1/pair`); yagona ta'rif — `21-integratsiyalar.md` §16 |
 | E-faktura operatori (Faktura.uz) do'kon login/secret'i | Tenant darajasida (`tenant_secrets`, shifrlangan) | §4.2 envelope encryption |
 | 1C vazifa imzo kaliti (`signing_keys.purpose='onec_task'`) va agent yangilanish ildiz kaliti (`agent_update`) | Platforma darajasida | `onec_task` — `14-autentifikatsiya-oauth2.md` §6 mexanizmi (DEK/KEK, 90 kun rotatsiya); `agent_update` — oflayn saqlanadi (CI'da emas), vazifa kalitlari to'plami va yangilanish manifestini imzolaydi (`33-1c-integratsiya.md` §9.4) |
 
@@ -370,7 +373,7 @@ Har bir sir yozuvida: `tenant_id`, `kind` (masalan `click_secret`, `didox_token`
 - **Qo'shimcha voqealar**: `sync_drain_started`/`sync_drain_completed` (lokautdan oldingi offline cheklarni drenaj qilish, `14-autentifikatsiya-oauth2.md` §16.4), `data_export_during_restriction` (lokaut paytida to'lov-sahifa orqali eksport, §16.5), `platform_admin_mfa_failed` (§18.1).
 - **1C integratsiyasi voqealari** (`33-1c-integratsiya.md` §11.3, `entity` — tegishli `onec_*` jadvali): `onec.agent.paired`, `onec.agent.revoked`, `onec.agent.unpaired`, `onec.agent.machine_changed`, `onec.agent.updated`; `onec.base.registered`, `onec.base.updated`, `onec.base.write_enabled_changed`, `onec.base.reassigned`, `onec.base.archived`; `onec.binding.changed`; `onec.settings.changed`, `onec.auto_approve.changed`; `onec.mapping.confirmed`, `onec.mapping.removed`, `onec.value_mapping.changed`; `onec.ref_create.approved`, `onec.ref_create.rejected`, `onec.ref_create.created`; `onec.export.prepared`, `onec.export.approved`, `onec.export.auto_approved`, `onec.export.cancelled`, `onec.export.resent`, `onec.export.item_skipped`, `onec.export.accepted`, `onec.export.revision_created`, `onec.export.correction_created`, `onec.export.devices_excluded`; `onec.item.written`, `onec.item.failed`, `onec.item.unposted_marked`; `onec.verify.mismatch`, `onec.drift.detected`; `onec.task.rejected` (xavfsizlik signali — alert, `33-1c-integratsiya.md` §15.4); `onec.diagnostics.requested`. Agent amallari `user_id`siz, `device_id` (agent qurilmasi) bilan yoziladi.
 - **Bank tushumi tasdig'i** (`bank_settlements`, `bank_settlements.manage`): yaratish, o'tkazish va bekor qilish (sabab bilan) — `entity='bank_settlements'`, `after`: `method`, `gross_amount`, `commission_amount`, `bank_ref`.
-- **Markirovkalangan tovar offline audit voqealari**: `marking.offline_sold` (actor_user_id, device_id, code, sale_id, price_source=`cache`, created_at), `marking.offline_refused_no_price`, `marking.verify_failed` (sinxronlanishdan keyin: noto'g'ri/takroriy kod yoki CRPT xatosi — Egasi/Buxgalterga M18 ogohlantirishi bilan birga) — to'liq siyosat `16-offline-sync.md` §7'da.
+- **Markirovkalangan tovar offline audit voqealari**: `marking.offline_sold` (actor_user_id, device_id, code, sale_id, price_source=`cache`, created_at), `marking.offline_refused_no_price`, `marking.verify_failed` (sinxronlanishdan keyin: noto'g'ri/takroriy kod yoki CRPT xatosi — Egasi/Buxgalterga M18 ogohlantirishi bilan birga), `marking.manual_entry` (DataMatrix kodi qo'lda kiritildi — faqat online, `POST /marking-codes/verify` bilan; actor_user_id, device_id, code), `marking.precheck_failed` (`MARKING_PRECHECK=warn`da oldindan tekshiruv o'tmadi yoki CRPT javob bermadi, sotuv davom etdi — qaror #62), `marking.duplicate_rejected` (lokal takror-kod tekshiruvi) — to'liq siyosat `16-offline-sync.md` §7'da.
 
 ### 6.2 O'zgarmaslik (immutability)
 
@@ -420,7 +423,7 @@ Bazaviy daraja — OWASP ASVS L2 (qonuniy talab emas, ichki standart; TLS, argon
 | CSP (Content Security Policy) | Qat'iy CSP: `default-src 'self'`, `frame-ancestors 'none'` | Majburiy (qaror #57) |
 | Kirish nazorati (input validation) | Pydantic v2 (backend), zod (frontend) | `10-umumiy-arxitektura.md`, `24-frontend-arxitekturasi.md` — ikkalasi ham allaqachon tanlangan |
 | Dependency va sir skanerlash | CI'da `pip-audit`, `npm audit --audit-level=high`, `gitleaks`; `.env.example` majburiy (haqiqiy sir repozitoriyga tushmaydi) | Majburiy (qaror #57); kod sifati — `32-kod-qoidalari.md` |
-| Penetratsion test | **Ikki bosqich** (qaror #23 — tavsiya #14): (1) **pilotdan oldin** — bepul avtomatik DAST skaner (masalan OWASP ZAP) + ichki OAuth/to'lov/fiskal tekshiruv ro'yxati; (2) **ommaviy sotuvdan oldin** — Celion yoki ONESEC'dan (ikkalasidan narx so'rab) OWASP ASVS L2 bo'yicha to'liq pentest (veb, API, OAuth, Android). Byudjet rezervi: **~60 mln so'm (~$5 000)** | Standart/qamrov — yuqori ishonch; narx — xalqaro ma'lumotdan taxmin ($1 500–7 000), mahalliy firmalar (Celion, ONESEC, Toshkent) narxni ochiq bermaydi — rasmiy taklif so'ralishi kerak |
+| Penetratsion test | **Ikki bosqich** (qaror #23 — tavsiya #14): (1) **pilotdan oldin** — bepul avtomatik DAST skaner (masalan OWASP ZAP) + ichki OAuth/to'lov/fiskal tekshiruv ro'yxati; (2) **ommaviy sotuvdan oldin** — Celion yoki ONESEC'dan (ikkalasidan narx so'rab) OWASP ASVS L2 bo'yicha to'liq pentest (veb, API, OAuth, Android). Byudjet rezervi: **~60 mln so'm (~$5 000)** | Standart/qamrov — yuqori ishonch; narx — xalqaro ma'lumot bo'yicha baho ($1 500–7 000; aniq narx firmalar taklifidan), mahalliy firmalar (Celion, ONESEC, Toshkent) narxni ochiq bermaydi — rasmiy taklif so'ralishi kerak |
 | Shifrlash (tinch holatda) | (1) S3 ga yoziladigan hujjat va fotolar — ilova darajasida shifrlanadi (SSE-C yoki mijoz tomonida AES-GCM, kalit — §4.2 KEK zanjiri); (2) backup arxivlari — pgBackRest shifrlashi; (3) DBaaS disk shifrlashi UzCloud'dan so'raladi | UzCloud faqat BaaS uchun "encrypted during transfer and storage" deydi, S3/DBaaS/VM uchun bayonot yo'q (qaror #65) |
 
 ---
@@ -443,7 +446,7 @@ Bazaviy daraja — OWASP ASVS L2 (qonuniy talab emas, ichki standart; TLS, argon
 ### 9.3 PCI DSS
 
 - Tizim **hech qachon** to'liq karta raqami/CVV saqlamaydi yoki qayta ishlamaydi — to'lovlar Click/Payme (JSON-RPC/REST API, merchant tokenlashtirilgan oqim) yoki bank POS-terminali orqali amalga oshadi (`research_notes/texnik/tekshiruv-2026-10-14/2-efaktura-tolov-hosting.md`, Payme/Click protokollari).
-- Bu amaliyotda PCI DSS qamrovini **minimal** (odatda SAQ A darajasiga yaqin) qiladi — lekin manbada "PCI" so'zi to'g'ridan-to'g'ri tilga olinmagan, bu xulosa **mantiqiy natija, taxmin** sifatida belgilanadi.
+- Bu amaliyotda PCI DSS qamrovini **minimal** (odatda SAQ A darajasiga yaqin) qiladi — lekin manbada "PCI" so'zi to'g'ridan-to'g'ri tilga olinmagan, bu xulosa mantiqiy natija sifatida qabul qilingan standart (SAQ A).
 
 ---
 

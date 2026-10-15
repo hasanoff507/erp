@@ -46,6 +46,7 @@ Tur belgilari (S1 1-ilova): **A** — aktiv, **P** — passiv, **KA** — kontr-
 | 6410 | Byudjetga to'lovlar bo'yicha qarzlar (turlari bo'yicha) | P | soliq turi (`tax_type`: QQS / aylanma solig'i / boshqa) | S1 §274–275, §378 |
 | 6610 | To'lanadigan dividendlar | P | ta'sischi | S1 |
 | 6710 | Ish haqi bo'yicha xodimlar bilan hisob-kitoblar | P | xodim | S1 — MVP'da ishlatilmaydi (qaror #52) |
+| 8330 | Ulushlar va paylar (ustav kapitali) | P | ta'sischi | S1 — faqat boshlang'ich balansda (§5.5, `ledger_adjustments`) |
 | 8530 | Tekinga olingan mulk | P | hujjat | S1 §154 |
 | 8710 | Hisobot davrining taqsimlanmagan foydasi (qoplanmagan zarari) | P | — | S1 |
 | 8720 | Jamg'arilgan foyda (qoplanmagan zarar) | P | — | S1 §364–365 |
@@ -162,7 +163,7 @@ S1 §154 6-qator. QQS va `vat_moves` yo'q, kreditorlik ochilmaydi (`paid_immedia
 
 2.6/2.7 bilan bir xil, faqat `Kt 6010` o'rniga `Kt 5010` yoki `Kt 5110` to'g'ridan-to'g'ri (kreditorlik ochilmaydi).
 
-**"Qizil" e-faktura qoidasi** (VM Qarori №830): faktura `einvoices.risk_flag` = `red` **yoki `unknown`** bo'lsa (operator xavf darajasini qaytarmagan — Buxgalter BO-15'da qo'lda belgilaguncha qizil kabi), 2-qator (`Dt 4410`) **to'lov amalga oshirilgunga qadar yozilmaydi** — QQS krediti faqat `supplier_payment` o'tkazilganda (2.16) qo'shiladi (US-M07-04, US-M10-03). `vat_moves(kind=input)` ham shu paytgacha yozilmaydi (4.1).
+**"Qizil" e-faktura qoidasi** (VM Qarori №830): faktura `einvoices.risk_flag` = `red` **yoki `unknown`** bo'lsa (operator xavf darajasini qaytarmagan — Buxgalter BO-15'da qo'lda belgilaguncha qizil kabi), 2-qator (`Dt 4410`) **to'lov amalga oshirilgunga qadar yozilmaydi** — QQS krediti faqat `supplier_payment` o'tkazilganda (2.16) qo'shiladi (US-M07-04, US-M10-03). `vat_moves(kind=input)` ham shu paytgacha yozilmaydi (4.1). Buxgalter kabinetda tekshirib `PATCH /einvoices/{id}/risk-flag` bilan `green` belgilasa — bog'langan `posted` kirimlarning hali yozilmagan QQS qismi shu tranzaksiyada `Dt 4410 / Kt 6010` va `vat_moves(kind=input)` bilan yoziladi; `green` → `red` o'zgarishi yozilgan QQS'ni avtomatik qaytarmaydi (Buxgalter `ledger_adjustments` bilan tuzatadi).
 
 ### 2.9 Ko'chirish — jo'natish (filiallararo)
 
@@ -217,7 +218,7 @@ Tovar tarkibisiz, chek chiqarilmaydi (US-M08-07). `entry_date` = `tenants.go_liv
 
 | # | Dt | Kt | Summa |
 |---|---|---|---|
-| 1 | 5010 (`cash`) / 5710 (`card`/`uzqr`/`click`/`payme`/`uzum`, qaror #42) / 5110 (`bank`) | 4010 | To'langan summa (eng eski qarzdan boshlab, `debt_payment_allocations`) |
+| 1 | 5010 (`cash`) / 5710 (`card`/`uzqr`/`click`/`payme`/`uzum`, qaror #42) / 5110 (`bank`) | 4010 | To'langan summaning `target_doc_type` `sales`/`debt_openings` allokatsiyalariga tushgan qismi (eng eski qarzdan boshlab, `debt_payment_allocations`) |
 | 1a (allokatsiya `target_doc_type='debt_writeoffs'` — ilgari hisobdan chiqarilgan qarz qaytdi) | 5010/5710/5110 | **9390** | Shu allokatsiya summasi (S1 §405 11-qator); `debt_moves` yozilmaydi (qarz qayta ochilmaydi) |
 
 Mijoz joriy qarzidan ortiq summa rad etiladi (`422 VALIDATION_ERROR`, `message_key=debt_payment_exceeds_balance`), qaytim naqd beriladi; mijoz avansi MVP'da yo'q (qaror #45).
@@ -312,7 +313,7 @@ Agar faktura "qizil"/`unknown` bo'lsa — shu tranzaksiyada 2.8'dagi kechiktiril
 
 | # | Dt | Kt | Summa | Analitika |
 |---|---|---|---|---|
-| 1 | 5110 | 5710 | `net_amount` = `gross_amount − commission_amount + variance_amount` (bankka haqiqatda tushgan) | `payment_method`, filial, `bank_ref` |
+| 1 | 5110 | 5710 | `net_amount` = `gross_amount − commission_amount + variance_amount` (bankka haqiqatda tushgan; DDL'da generated ustun, `> 0` CHECK) | `payment_method`, filial, `bank_ref` |
 | 2 (`commission_amount > 0`) | `commission_account(method)` | 5710 | `commission_amount` | `payment_method`, filial |
 | 3 (`variance_amount < 0`, faqat `collection`) | 5910 | 5710 | `|variance_amount|` — inkassa kamomadi; keyin `Dt 4730 / Kt 5910` (aybdor) yoki `Dt 9430 / Kt 5910` | hujjat |
 | 4 (`variance_amount > 0`, faqat `collection`) | 5710 | 9390 | `variance_amount` — inkassa ortiqchasi | hujjat |
@@ -374,7 +375,7 @@ Bir bosqichli hujjat (`POST /ledger-adjustments` darhol `status=posted` qaytarad
 
 ### 2.24 Chiquvchi e-faktura API yo'li — eslatma
 
-`POST /api/v1/einvoices` (`direction=out`) va `POST /einvoices/from-sale/{sale_id}` — **provodka yo'q**, 2.22 bilan bir xil qoida. Farqi faqat manba: 2.22 — chekdan **keyin** qo'lda yaratilgan e-faktura; bu band — B2B nasiya sotuvdan server avtomatik `draft` yaratadi. Ikkisi ham `einvoices.related_doc_type/related_doc_id` orqali bog'lanadi, `uq_einvoice_out_per_doc` bilan "bitta chekka bitta faol" cheklovi saqlanadi.
+`POST /api/v1/einvoices` (`direction=out`) va `POST /api/v1/einvoices/from-receipt` (`{sale_id, counterparty_id}`) — **provodka yo'q**, 2.22 bilan bir xil qoida. Farqi faqat manba: 2.22 — chekdan **keyin** qo'lda yaratilgan e-faktura; bu band — B2B nasiya sotuvdan server avtomatik `draft` yaratadi. Ikkisi ham `einvoices.related_doc_type/related_doc_id` orqali bog'lanadi, `uq_einvoice_out_per_doc` bilan "bitta chekka bitta faol" cheklovi saqlanadi.
 
 ### 2.26 Soliq davr hisob-kitobi (`tax_settlements`)
 
@@ -414,7 +415,7 @@ Oy yakunida Buxgalter yaratadi (server qoralamani hisoblab beradi) va `post` qil
 | 2.19 | `shifts` (farq provodkasi) | `shift.closed` | ✓ — X-01 pastda |
 | 2.20 | `supplier_returns` | `POST /supplier-returns/{id}/post` (+ `supplier_return.vat_adjusted`) | ✓ |
 | 2.21 | `stock_openings` | `POST /stock-openings/{id}/post` + import | ✓ |
-| 2.22/2.24 | `einvoices(out)` (provodkasiz) | `POST /einvoices`, `/from-sale/{id}` | ✓ |
+| 2.22/2.24 | `einvoices(out)` (provodkasiz) | `POST /einvoices`, `/einvoices/from-receipt` | ✓ |
 | 2.23 | `ledger_adjustments` | `POST /ledger-adjustments` | ✓ |
 | 2.26, 4.3 | `tax_settlements` | `POST /tax-settlements` + `POST /tax-settlements/{id}/post` | ✓ (faqat back-office) |
 | — | `price_changes` (registr: `product_prices`) | `POST /price-changes/{id}/post` | ✓ |

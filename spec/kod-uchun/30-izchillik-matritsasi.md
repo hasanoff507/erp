@@ -8,7 +8,7 @@
 ## Belgilar
 
 - **MVP**: `Must`/`Should`/`Could` — `05-mvp-chegarasi.md` §1.1 jadvalidan; `Keyin` — MVP'dan keyinga aniq surilgan (qaror #33); **— (gap)** — 05'da bu US yo'q (hozir bunday qator qolmagan).
-- **BP**: `04-biznes-jarayonlar.md`dagi BP-01…15 (BP-14 — kunni 1C ga yuborish, BP-15 — bank tushumi tasdig'i); **—** — bu US/modul uchun hech qanday BP yo'q (04 faqat 13 ta tranzaksion oqimni modellashtiradi — narx, hisobot, huquq, filial boshqaruvi, xarajat, kassa pul harakati, obuna, bildirishnoma kabi butun modullar BP qatlamida yo'q); **"?"** — modul BP'da bor, lekin bu aniq US BP matnida tilga olinmagan (xulosa chiqarilgan).
+- **BP**: `04-biznes-jarayonlar.md`dagi BP-01…15 (BP-14 — kunni 1C ga yuborish, BP-15 — bank tushumi tasdig'i); **—** — bu US/modul uchun hech qanday BP yo'q (04 faqat 15 ta tranzaksion oqimni modellashtiradi — narx, hisobot, huquq, filial boshqaruvi, xarajat, kassa pul harakati, obuna, bildirishnoma kabi butun modullar BP qatlamida yo'q); **"?"** — modul BP'da bor, lekin bu aniq US BP matnida tilga olinmagan (xulosa chiqarilgan).
 - **Bosqich**: `27-backlog.md`dagi 0–7 bosqich (7 — 1C integratsiyasi, MVP'dan keyin) yoki "MVP'dan keyin"; **"?"** — US aniq nomlanmagan, modul darajasidan xulosa qilingan.
 - **Ruxsat**: `15-xavfsizlik-va-audit.md` §2.1 kodi; **—** — ruxsatsiz ochiq amal (masalan autentifikatsiyasiz endpoint) yoki tegishli kod topilmadi.
 - **infratuzilma/admin** — US talab qilmaydigan funksiya (qaror #58 b): monitoring, sozlama, seed/ops yoki ichki quvur; bo'shliq hisoblanmaydi.
@@ -24,9 +24,9 @@
 |---|---|---|---|---|---|---|---|---|---|
 | US-M01-01 | Chek yaratish va to'lov qabul qilish | Must | BP-02, BP-05 | POS-02, POS-03, POS-04 | voqea `sale.created` (`18-api-kassa.md` §4); `GET /api/v1/sales` (chek qidiruv, §4.8); fiskal chek — `FiscalPort` (hamkor bulut API yoki Do'kon agenti → FM → OFD, qaror #60; MVP'da `FISCAL_PROVIDER=fake`); bloklar `409 FISCAL_OFFLINE_48H_BLOCKED` (qaror #43), `409 FISCAL_DEVICE_LOCKED` | `app.sales`, `app.sale_lines`, `app.sale_payments` (`card_type`, `card_mask`, `rrn`, `qr_type`, `provider_tx_id` — qaror #64), `app.stock_moves`, `app.stock_lots`, `app.vat_moves`, `app.ledger_entries`, `app.fiscal_receipts` (`fm_terminal_id`, `fm_receipt_seq`, `fiscal_at`, `ofd_acked_at`, `payment_form`, `delivery` — qaror #12, #43), `app.cash_registers` (`fm_state`, `last_unacked_receipt_at`, `fm_receipts_pending`) | §2.1–2.4 (naqdsiz → 5710, qaror #42) | `sales.create` | 3 (fiskal real adapter — 5, 26 #109 (OQ-012)) |
 | US-M01-02 | Offline savdo + avtomatik sinxronlanish | Must | BP-02 (offline variant) | POS-02, POS-12 | `POST /api/v1/sync/push`, `GET /api/v1/sync/pull` (§17, `16-offline-sync.md`) | `app.sync_receipts`, `app.idempotency_keys` | §2.1–2.4 | `sales.create` | 3 |
-| US-M01-03 | Markirovkalangan tovar kodini tekshirish | Must | BP-02 (qadam 5) | POS-02 | kod chek ichida OFD'ga (`FiscalPort` `items[].marking_codes`, qaror #17, #62); sotuvdan oldin `POST /api/v1/marking-codes/verify` (§15) — `MARKING_PRECHECK=warn` + lokal takror-kod tekshiruvi | `app.marking_codes`, `app.fiscal_receipts` | §2.1–2.4 (sale_lines ichida) | — (CRPT integratsiyasiga `integrations.retry` tegishli, sotuvda alohida kod yo'q) | 3 (UI) / 5 (CRPT `verify`/`writeoff` — 26 #40 (OQ-025)) |
+| US-M01-03 | Markirovkalangan tovar kodini tekshirish | Must | BP-02 (qadam 5) | POS-02 | kod chek ichida OFD'ga (`FiscalPort` `items[].marking_codes`, qaror #17, #62); sotuvdan oldin `POST /api/v1/marking-codes/verify` (§15) — `MARKING_PRECHECK=warn` + lokal takror-kod tekshiruvi | `app.marking_codes`, `app.fiscal_receipts` | §2.1–2.4 (sale_lines ichida) | — (CRPT integratsiyasiga `integrations.retry` tegishli, sotuvda alohida kod yo'q) | 5 (sotuv UI va `MARKING_PRECHECK` — Bosqich 3 vazifasi; CRPT `verify`/`writeoff` real adapteri — 26 #40 (OQ-025)) |
 | US-M01-04 | Smena ochish va yopish (Z-hisobot) | Must | **— (gap, BP yo'q)** | POS-01, POS-07 | voqea `shift.opened`/`shift.closed`; `GET /api/v1/shifts/{id}/z-report` (§3) | `app.shifts`, `app.cash_moves` | §2.19 (X-01) | `shift.open` / `shift.close` | 3 |
-| US-M01-05 | UzQR to'lov (yuridik shaxs, 2026-07-01'dan majburiy) | Must | BP-05 | POS-03 | statik UzQR — kassir qo'lda tasdiqlaydi (`qr_type='static'`); dinamik — `POST /api/v1/payments/checkouts`, `GET /{checkout_ref}`, `POST /payments/webhooks/{provider}` (§16), `UzqrPort` stub (qaror #64) | `app.payment_checkouts`, `app.sale_payments` (`qr_type`, `provider_tx_id` faqat `dynamic`da), `app.tenant_secrets` (`cash_register_id` — kassa UzQR kaliti) | §2.2 | `sales.create` | 3 (statik) / 5 (dinamik — 26 #49 (OQ-032)) |
+| US-M01-05 | UzQR to'lov (yuridik shaxs, 2026-07-01'dan majburiy) | Must | BP-05 | POS-03 | statik UzQR — kassir qo'lda tasdiqlaydi (`qr_type='static'`, faqat online); dinamik — `POST /api/v1/payments/checkouts`, `GET /{checkout_ref}`, `POST /payments/webhooks/{provider}` (§16), `UzqrPort` stub (qaror #64) | `app.payment_checkouts`, `app.sale_payments` (`qr_type`, `provider_tx_id` faqat `dynamic`da), `app.tenant_secrets` (`cash_register_id` — kassa UzQR kaliti) | §2.2 | `sales.create` | 3 (statik) / 5 (dinamik — 26 #49 (OQ-032)) |
 | US-M01-06 | Chekdan keyin chiquvchi e-faktura (B2B) | Must | BP-13 | POS-06, BO-15 | `POST /api/v1/einvoices` (`direction=out`), `POST /einvoices/from-receipt` (§14a) | `app.einvoices` | §2.22 (provodkasiz) | `einvoice.create` | 5 |
 | US-M01-07 | Kassada chek printeri va tarozini bir marta sozlash, sinov chek (qaror #60) | Must | **— (setup, BP yo'q)** | POS-16, POS-01, POS-04, BO-14 | qurilma-lokal (WebUSB/Web Serial/Web Bluetooth, tizim printeri); LAN 9100 printer va tarozi — Do'kon agenti lokal API (`127.0.0.1`); tarozi shablonlari — `PATCH /tenant/settings` (20 #40b) | `app.tenants` (`settings.weight_barcode_templates`); printer sozlamasi — qurilmada (Dexie) | — | — (sozlash; shablon — `settings.tenant`) | 3 (agent orqali LAN/tarozi — 5); transport sinovi — 26 #139 (OQ-060) |
 
@@ -44,7 +44,7 @@
 |---|---|---|---|---|---|---|---|---|---|
 | US-M03-01 | Kassir chegirma (limit ichida) | Must | BP-02 "?" | POS-02, BO-16 | voqea `sale.created` (chegirma qatorida, §8.1); limitdan oshsa `POST /approval-requests` | `app.sale_lines` (discount), `app.approval_requests` | §2.1–2.4 | `discount.give` | 3 |
 | US-M03-02 | Avtomatik chegirma qoidalari | Keyin (post-MVP) | BP-02 "?" | BO-05 | `GET/POST /api/v1/discount-rules`, `PATCH /{id}`, `POST /{id}/archive` (§8.2) | `app.discount_rules` | — (registrga ta'siri yo'q, qoida o'zi) | `discount.rule.manage` | MVP'dan keyin |
-| US-M03-03 | Chegirmalarning margin'ga ta'sirini hisobotda ko'rish | Could | **— (gap, BP yo'q)** | **— (GAP: hech qaysi ekranda yo'q)** | `GET /api/v1/reports/sales` "?" (aniq margin-hisobot endpointi yo'q) | `app.sale_lines`, `app.vat_moves` | — | `reports.sales.view` "?" | **— (gap, 27'da ham yo'q)** |
+| US-M03-03 | Chegirmalarning margin'ga ta'sirini hisobotda ko'rish | Could | **— (gap, BP yo'q)** | **— (GAP: hech qaysi ekranda yo'q)** | `GET /api/v1/reports/sales` "?" (aniq margin-hisobot endpointi yo'q) | `app.sale_lines`, `app.vat_moves` | — | `reports.sales.view` "?" | 4 |
 
 ### M04 — Ombor qoldig'i
 
@@ -54,7 +54,7 @@
 | US-M04-02 | Minimal zaxira chegarasida ogohlantirish | Should | **— (gap)** | BO-03 | `GET /api/v1/stock-balances?low_stock=` (§7) | `app.stock_balances` | — | `stock.view` | 4 |
 | US-M04-03 | Ko'p filial konsolidatsiyalangan qoldiq | Should | **— (gap)** | BO-03 | `GET /api/v1/reports/stock?branch_id=` (20 #20) | `app.stock_balances` | — | `stock.view` | 4 |
 | US-M04-04 | Boshlang'ich katalog/qoldiq kiritish (qo'lda/import/AI-03) | Must | **— (gap, onboarding, BP yo'q)** | BO-21 | `POST /api/v1/import-jobs` (`kind=products`/`opening_stock`), `POST /stock-openings`→`/post`, `POST /ai/ocr/jobs`→`/confirm` (AI-03 yo'li) | `app.import_jobs`, `app.stock_openings`, `app.opening_lines`, `app.ai_ocr_jobs` | §2.21 | `catalog.manage`, `stock.opening.manage` | 1 (yo'l 1–2) / 6 (yo'l 3 = AI-03) |
-| US-M04-05 | Tannarx usulini (FIFO/AVECO) tanlash | Must | **— (gap, BP yo'q)** | BO-14 | `GET/PATCH /api/v1/valuation-settings` (§17) | `app.valuation_method_history` | `13-provodka-qoidalari.md` §3 (COGS: FIFO/AVECO) | `valuation.settings.manage` | 2 (27, M04 qatorida) |
+| US-M04-05 | Tannarx usulini (FIFO/AVECO) tanlash | Must | **— (gap, BP yo'q)** | BO-14 | `GET/PATCH /api/v1/valuation-settings` (§17) | `app.valuation_method_history` | `13-provodka-qoidalari.md` §3 (COGS: FIFO/AVECO) | `valuation.settings.manage` | 2 |
 | US-M04-06 | Yaroqlilik muddati ogohlantirish + hisobdan chiqarish | Should | **— (gap)** "?" (BP-10'ga yaqin) | BO-03 | `POST /write-offs`, `POST /{id}/post` (§15) | `app.write_offs`, `app.write_off_lines`, `app.stock_lots` | §2.12 | `stock.writeoff` | 2 |
 
 ### M05 — Inventarizatsiya
@@ -79,7 +79,7 @@
 |---|---|---|---|---|---|---|---|---|---|
 | US-M07-01 | Yetkazib beruvchiga xaridnoma yaratish | Must | BP-01 | BO-04 | `POST /purchase-orders`, `POST /{id}/send` (§10) | `app.purchase_orders`, `app.po_lines` | — (provodkasiz, "ta'sir yo'q") | `purchases.create` | 2 |
 | US-M07-02 | Kelgan tovarni xaridnoma bilan solishtirib qabul qilish | Must | BP-01 | POS-08, BO-04 | `POST /goods-receipts`, `POST /{id}/post` (§8) | `app.goods_receipts`, `app.receipt_lines` | §2.6–2.8 | `purchases.receive` / `purchases.post` | 2 |
-| US-M07-03 | Yetkazib beruvchi e-fakturasini kiritib QQS kreditini hisoblash | Must | BP-01, BP-12 | BO-04, BO-15 | `GET /einvoices?direction=in`, `POST /{id}/accept` (birlashtirilgan e-TTN ham tasdiqlanadi), `POST /goods-receipts/from-einvoice/{id}` (§19); alohida kiruvchi e-TTN — `POST /ettn-documents/{id}/accept`\|`/reject` (§20) | `app.einvoices` (`risk_flag` standart `unknown` — 26 #47 (OQ-019), `factura_type`, `related_einvoice_id`), `app.ettn_documents`, `app.goods_receipts` | §2.6 | `einvoice.sign` / `purchases.post` | 5 |
+| US-M07-03 | Yetkazib beruvchi e-fakturasini kiritib QQS kreditini hisoblash | Must | BP-01, BP-12 | BO-04, BO-15 | `GET /einvoices?direction=in`, `POST /{id}/accept` (birlashtirilgan e-TTN ham tasdiqlanadi), `POST /goods-receipts/from-einvoice/{einvoice_id}` (§19); alohida kiruvchi e-TTN — `POST /ettn-documents/{id}/accept`\|`/reject` (§20) | `app.einvoices` (`risk_flag` standart `unknown` — 26 #47 (OQ-019), `factura_type`, `related_einvoice_id`), `app.ettn_documents`, `app.goods_receipts` | §2.6 | `einvoice.sign` / `purchases.post` | 5 |
 | US-M07-04 | Yetkazib beruvchiga kreditorlik qarzini to'lash | Must | BP-12 | BO-04 | `POST /supplier-payments` (§11) | `app.supplier_payments`, `app.supplier_payment_allocations`, `app.ledger_entries` | §2.16 | `purchases.pay` | 4 (ikkinchi mezoni — 5) |
 | US-M07-05 | Yetkazib beruvchiga tovar qaytarish | Should | **— (gap, BP yo'q)** | BO-04 | `POST /supplier-returns`, `POST /{id}/post` (§12) | `app.supplier_returns`, `app.supplier_return_lines`, `app.stock_moves`, `app.einvoices` (`factura_type='additional'` — QQS qo'shimcha EHF qabul qilinganda, 26 #115) | §2.20 | `purchases.return` | 2 |
 
@@ -87,13 +87,13 @@
 
 | US-id | Qisqa nomi | MVP | BP | Ekran(lar) | API | Jadvallar | Provodka | Ruxsat | Bosqich |
 |---|---|---|---|---|---|---|---|---|---|
-| US-M08-01 | Mijozga limit ichida nasiyaga sotish | Must | BP-03 | POS-03, POS-06, BO-16 | voqea `sale.created` (`sale_payments.method=debt`, §4); sotuvda chek yo'q (`FiscalPolicy.credit_sale_receipt='none'`; `credit_sale` cheki — 26 #9 (OQ-002)) | `app.sales`, `app.debt_moves`, `app.debt_balances`, `app.fiscal_receipts` (`kind='credit_sale'` — faqat `credit_type` rejimida) | §2.3 (daromad/QQS sotuv kuni, qaror #30) | `debts.create` | 3/4 (sotuv oqimi ichida) |
-| US-M08-02 | Mijoz kredit limitini belgilash/o'zgartirish | Must | **— (gap, setup)** | POS-06 | `PATCH /api/v1/counterparties/{id}` (§11.4) | `app.counterparties` | — | `debts.limit.manage` | 4 "?" |
+| US-M08-01 | Mijozga limit ichida nasiyaga sotish | Must | BP-03 | POS-03, POS-06, BO-16 | voqea `sale.created` (`sale_payments.method=debt`, §4); sotuvda chek yo'q (`FiscalPolicy.credit_sale_receipt='none'`; `credit_sale` cheki — 26 #9 (OQ-002)) | `app.sales`, `app.debt_moves`, `app.debt_balances`, `app.fiscal_receipts` (`kind='credit_sale'` — faqat `credit_type` rejimida) | §2.3 (daromad/QQS sotuv kuni, qaror #30) | `debts.create` | 4 (to'lov turi sotuv oqimida — 3) |
+| US-M08-02 | Mijoz kredit limitini belgilash/o'zgartirish | Must | **— (gap, setup)** | POS-06 | `PATCH /api/v1/counterparties/{id}` (§11.4) | `app.counterparties` | — | `debts.limit.manage` | 4 |
 | US-M08-03 | Muddati o'tgan qarzlar uchun avtomatik AI eslatma matni | Should | BP-11 | BO-06 | `POST /ai/debt-reminders/draft` (20 #77) | `app.ai_requests` | — | `ai.chat.use` (yuborishda `debts.remind`) | 6 |
 | US-M08-04 | Mijozning nasiya qarzini (qisman/to'liq) to'lashini qabul qilish | Must | BP-11 | BO-06 | voqea `debt_payment.created`; `POST /debt-payments`→`/post` (§12.2–12.3); ortiqcha summa — `422` `debt_payment_exceeds_balance` (qaror #45) | `app.debt_payments` (`card_type`, `card_mask`, `rrn`, `qr_type` — qaror #64), `app.debt_payment_allocations` (`target_doc_type`), `app.debt_moves`, `app.fiscal_receipts` (bitta `debt_settlement` chek, qaror #45) | §2.14 | `debts.payment.accept` | 4 |
 | US-M08-05 | Qarzga berishni 2–3 soniyada (offline) yozish | Must | BP-03 | POS-13 | voqea `sale.created` (`method=debt`) / voqea `counterparty.created` | `app.sales`, `app.counterparties` | §2.3 | `debts.create` | 4 |
 | US-M08-06 | Mijozning qarz daftarini qog'oz daftardek ko'rish | Must | BP-11 "?" | POS-13, BO-06 | `GET /counterparties/{id}/debt-ledger` (§12.1) | `app.debt_moves`, `app.debt_balances` | — | `debts.create`/`debts.payment.accept` yoki `reports.sales.view` | 4 |
-| US-M08-07 | Eski qog'oz daftardagi qarzlarni tizimga ko'chirish | Must | **— (gap, onboarding)** | BO-21 | `POST /debt-openings`→`/post`; `POST /import-jobs` (`kind=opening_debts`) (§12.4) | `app.debt_openings` | §2.13 | `stock.opening.manage` | 1 |
+| US-M08-07 | Eski qog'oz daftardagi qarzlarni tizimga ko'chirish | Must | **— (gap, onboarding)** | BO-21 | `POST /debt-openings`→`/post`; `POST /import-jobs` (`kind=opening_debts`) (§12.4) | `app.debt_openings` | §2.13 | `stock.opening.manage` | 4 |
 | US-M08-08 | Mijozga SMS/Telegram qarz xabari | Keyin (post-MVP) | BP-11 "?" | **— (GAP: ekran yo'q)** | `POST /ai/debt-reminders/send` (20 #78) | `app.notifications_log` | — | `debts.remind` | MVP'dan keyin |
 | US-M08-09 | Qarzlarni o'z vaqtida qaytarib olish (va'da sanasi, eslatma) | Must | BP-11 | POS-13, BO-06 | `PATCH /counterparties/{id}` / `debt_payments.promise_date` (§12.1) | `app.debt_moves` | — | `debts.payment.accept` | 4 |
 | US-M08-10 | Qarzlar holatini bir qarashda ko'rish | Must | BP-11 "?" | BO-06 | `GET /reports/debts-aging?direction=receivable` (§12.8 → 20 #21) | `app.debt_balances` | — | `reports.finance.view` | 4 |
@@ -108,17 +108,17 @@
 | US-M09-03 | Kassada joriy narxni ko'rish (o'zgartirib bo'lmaydi) | Must | **— (gap)** | POS-02, POS-11 | `GET /products/{id}/prices` yoki lokal kesh (Dexie `prices`) | `app.product_prices` | — | — (faqat o'qish) | 1 |
 | US-M09-04 | Narxi o'zgargan tovarlarning yorliqlarini qayta chop etish | Should | **— (gap)** | BO-18 | `GET /label-print-queue`, `GET /label-templates`, `POST /label-print-jobs` (§5) | `app.label_print_queue`, `platform.label_templates` | — | `labels.print` | 6 |
 | US-M09-05 | Shtrix-kodi yo'q tovarga ichki shtrix-kod berish | Should | **— (gap)** | BO-18 | `POST /products/{id}/barcodes/internal-generate` (§1) | `app.product_barcodes`, `app.internal_barcode_seq` | — | `catalog.manage` | 1 |
-| US-M09-06 | Tarozida tortilgan tovarni bitta skanerlash bilan sotish | Should | **— (gap)** | BO-14 | lokal: tarozi shtrix-kod formati `tenants.settings`dan (Dexie `settings`) | `app.products` (og'irlik qatori, lokal parsing) | — | `catalog.manage` (format sozlash) | 1 |
-| US-M09-07 | Doimiy/ulgurji mijozga standart chegirma % (mijoz kartasida) | Should | **— (gap)** | POS-02 | `PATCH /counterparties/{id}` "?" (`loyalty_discount_percent` kabi maydon katalogda aniq ko'rsatilmagan) | `app.counterparties` | — | `prices.edit` "?" | **— (gap, hech qaysi bosqichda yo'q)** |
+| US-M09-06 | Tarozida tortilgan tovarni bitta skanerlash bilan sotish | Should | **— (gap)** | BO-14 | lokal: tarozi shtrix-kod formati `tenants.settings`dan (Dexie `settings`) | `app.products` (og'irlik qatori, lokal parsing) | — | `catalog.manage` (format sozlash) | 3 |
+| US-M09-07 | Doimiy/ulgurji mijozga standart chegirma % (mijoz kartasida) | Should | **— (gap)** | POS-02 | `PATCH /counterparties/{id}` (`standing_discount_pct`, 18 §11) | `app.counterparties` (`standing_discount_pct`) | — | `prices.edit` "?" | 6 |
 
 ### M10 — QQS
 
 | US-id | Qisqa nomi | MVP | BP | Ekran(lar) | API | Jadvallar | Provodka | Ruxsat | Bosqich |
 |---|---|---|---|---|---|---|---|---|---|
-| US-M10-01 | Har bir sotuvdan QQS avtomatik hisoblash | Must | BP-07 | BO-07 | voqea `sale.created` (QQS qatori); `GET /vat-moves`, `GET /reports/vat-summary` (20 #1–2); oylik hisobga olish — `GET/POST /tax-settlements`, `/{id}/post`, `/{id}/cancel` (20 #8a–8d, `tax_kind='vat_offset'`) | `app.vat_moves`, `app.tax_settlements` | §2.1–2.4; §2.26 (`Dt 6410 / Kt 4410`) | `tax.vat.view`; `tax_settlements` — `accounting.post` | 2/3 (sotuv oqimi ichida); `tax_settlements` — 5 |
+| US-M10-01 | Har bir sotuvdan QQS avtomatik hisoblash | Must | BP-07 | BO-07 | voqea `sale.created` (QQS qatori); `GET /vat-moves`, `GET /reports/vat-summary` (20 #1–2); oylik hisobga olish — `GET/POST /tax-settlements`, `/{id}/post`, `/{id}/cancel` (20 #8a–8d, `tax_kind='vat_offset'`) | `app.vat_moves`, `app.tax_settlements` | §2.1–2.4; §2.26 (`Dt 6410 / Kt 4410`) | `tax.vat.view`; `tax_settlements` — `accounting.post` | 3; `tax_settlements` — 4 |
 | US-M10-02 | Davlat QQS hisobotini 5 ish kuni ichida solishtirish (qaror #50) | Must | BP-08 | BO-10 | `POST /state-reports`, `POST /{id}/compare`, `GET /{id}/diffs`, `POST /{id}/correction` (20 #3–8) | `app.state_reports`, `app.state_report_diffs` | `13-provodka-qoidalari.md` §4 | `tax.compare.review` / `tax.correction.submit` | 6 |
 | US-M10-03 | Yuqori xavfli ("qizil") fakturalarning QQS kreditiga ta'siri | Should | BP-07, BP-12 "?" | BO-07, BO-15 | `GET /einvoices?risk_flag=` (§19) | `app.einvoices` | — | `tax.compare.review` | 5 |
-| US-M10-04 | QQS to'lamaydigan (aylanma solig'i) biznes uchun davlat hisobotini solishtirish | Must | BP-08 "?" | BO-10, BO-07 | `POST /state-reports` (`tax_type=turnover`, 20 #3); oylik aylanma solig'i — `POST /tax-settlements` (`tax_kind='turnover_tax'`) → `/post` (20 #8b–8c) | `app.state_reports`, `app.tax_settlements` | §4, §4.3 (`Dt 9430\|9820 / Kt 6410` — `settings.turnover_tax_account`) | `tax.compare.review`; `tax_settlements` — `accounting.post` | 6 (`tax_settlements` — 5) |
+| US-M10-04 | QQS to'lamaydigan (aylanma solig'i) biznes uchun davlat hisobotini solishtirish | Must | BP-08 "?" | BO-10, BO-07 | `POST /state-reports` (`tax_type=turnover`, 20 #3); oylik aylanma solig'i — `POST /tax-settlements` (`tax_kind='turnover_tax'`) → `/post` (20 #8b–8c) | `app.state_reports`, `app.tax_settlements` | §4, §4.3 (`Dt 9430\|9820 / Kt 6410` — `settings.turnover_tax_account`) | `tax.compare.review`; `tax_settlements` — `accounting.post` | 6 (`tax_settlements` — 4) |
 
 ### M11 — Buxgalteriya
 
@@ -126,16 +126,16 @@
 |---|---|---|---|---|---|---|---|---|---|
 | US-M11-01 | Har bir sotuv/xariddan avtomatik provodka | Must | BP-06 | BO-08 | `GET /ledger-entries` (20 #9) — provodka posting paytida avtomatik yoziladi | `app.ledger_entries` | §2.1–2.21 (barcha hujjat turlari) | `accounting.post` | 2 |
 | US-M11-02 | Oy yakunida balans va daromad-xarajat hisoboti | Must | BP-06 "?" | BO-08 | `POST /period-closings`, `GET /reports/trial-balance`\|`/profit-and-loss`\|`/balance-sheet` (20 #11–16) | `app.period_closings`, `app.ledger_entries` | `13-provodka-qoidalari.md` §5 (davr yopish) | `accounting.period.close` | 5 |
-| US-M11-03 | Asosiy moliyaviy ko'rsatkichlarni sodda ko'rinishda ko'rish | Should | **— (gap)** | BO-02 | `GET /reports/dashboard` (20 #17) | `app.ledger_entries` (hosila) | — | `reports.sales.view` | 4 |
-| US-M11-04 | Bank tushumi tasdig'i: yo'ldagi pul (5710) → bank (5110) + komissiya (qaror #42) | Must | BP-15 | BO-24 | `GET/POST /bank-settlements`, `GET/PATCH /bank-settlements/{id}` (`draft`), `POST /bank-settlements/{id}/post`, `POST /bank-settlements/{id}/cancel`, `GET /bank-settlements/transit-balances` (5710 qoldig'i — filial × usul), `POST /bank-settlements/imports` (1CClientBankExchange `.txt` → qoralamalar) (20 #55a–55g; faqat back-office, sync voqeasi yo'q) | `app.bank_settlements` (`source='manual'\|'statement_import'`, `variance_amount` — faqat inkassa), `app.ledger_entries`, `app.attachments`, `app.doc_sequences` (`BT`) | §2.18a (komissiya `Dt 9430 / Kt 5710`, inkassa — 9410) | `bank_settlements.manage` | 4 |
+| US-M11-03 | Asosiy moliyaviy ko'rsatkichlarni sodda ko'rinishda ko'rish | Should | **— (gap)** | BO-02 | `GET /reports/dashboard` (20 #17) | `app.ledger_entries` (hosila) | — | `reports.sales.view` | 5 |
+| US-M11-04 | Bank tushumi tasdig'i: yo'ldagi pul (5710) → bank (5110) + komissiya (qaror #42) | Must | BP-15 | BO-24 | `GET/POST /bank-settlements`, `GET /bank-settlements/{id}`, `POST /bank-settlements/{id}/post`, `POST /bank-settlements/{id}/cancel`, `GET /bank-settlements/transit-balances` (5710 qoldig'i — filial × usul), `POST /bank-settlements/imports` (1CClientBankExchange `.txt` → qoralamalar) (20 #55a–55g; faqat back-office, sync voqeasi yo'q) | `app.bank_settlements` (`source='manual'\|'statement_import'`, `variance_amount` — faqat inkassa), `app.ledger_entries`, `app.attachments`, `app.doc_sequences` (`BT`) | §2.18a (komissiya `Dt 9430 / Kt 5710`, inkassa — 9410) | `bank_settlements.manage` | 4 |
 
 ### M12 — Hisobotlar *(modul darajasida BP yo'q)*
 
 | US-id | Qisqa nomi | MVP | BP | Ekran(lar) | API | Jadvallar | Provodka | Ruxsat | Bosqich |
 |---|---|---|---|---|---|---|---|---|---|
 | US-M12-01 | Kunlik savdo hisoboti (umumiy va filial bo'yicha) | Must | **— (gap)** | BO-02, BO-09 | `GET /reports/dashboard`, `GET /reports/sales` (20 #17–18) | `app.sales` (hosila) | — | `reports.sales.view` | 4 |
-| US-M12-02 | Eng ko'p/kam sotiladigan tovarlar hisoboti | Should | **— (gap)** | BO-09 | `GET /reports/top-products` (20 #19) | `app.sale_lines` (hosila) | — | `reports.sales.view` | 4 "?" |
-| US-M12-03 | QQS va davlat solishtirish hisobotini eksport qilish | Must | **— (gap)** | BO-09 | `POST /reports/{report-kod}/export`, `GET /export-jobs/{job_id}` (20 #22–23) | — (eksport fayli, `attachments`) | — | `reports.export` | 6 "?" |
+| US-M12-02 | Eng ko'p/kam sotiladigan tovarlar hisoboti | Should | **— (gap)** | BO-09 | `GET /reports/top-products` (20 #19) | `app.sale_lines` (hosila) | — | `reports.sales.view` | 4 |
+| US-M12-03 | QQS va davlat solishtirish hisobotini eksport qilish | Must | **— (gap)** | BO-09 | `POST /reports/{report-kod}/export`, `GET /reports/export-jobs/{job_id}` (20 #22–23) | — (eksport fayli, `attachments`) | — | `reports.export` | 6 |
 
 ### M13 — Huquqlar *(modul darajasida BP yo'q)*
 
@@ -147,7 +147,7 @@
 | US-M13-04 | Xodimni admin panel orqali to'liq ma'lumoti bilan qo'shish | Must | **— (gap)** | BO-11 | `POST /admin/users` (`purpose=invite`) (14 §20) | `app.users`, `auth.otp_challenges` | — | `settings.users` | 1 |
 | US-M13-05 | Xodimni vaqtincha bloklash/blokdan chiqarish | Must | **— (gap)** | BO-11 | `PATCH /admin/users/{id}` | `app.users` (blocked_at) | — | `settings.users` | 1 |
 | US-M13-06 | Xodimning parolini/PIN kodini qayta tiklash | Must | **— (gap)** | POS-01, BO-01, BO-11 | `POST /admin/users/{id}/reset-password`, `/reset-pin` (BO-11 manbai) | `auth.user_credentials`, `auth.otp_challenges` | — | `settings.users` | 1 |
-| US-M13-07 | Xodim sessiyalarini ko'rish va bekor qilish | Must | **— (gap)** | BO-11 ("Qurilmalar" tabi, qaror #56 a) | `GET /admin/users/{id}/sessions`, `GET /{id}/devices`, `POST /{id}/revoke-sessions`; `GET /devices`, `POST /devices/{id}/revoke` (20 #29a–29b) | `auth.sessions`, `app.devices` | — | `settings.users` | 1 "?" |
+| US-M13-07 | Xodim sessiyalarini ko'rish va bekor qilish | Must | **— (gap)** | BO-11 ("Qurilmalar" tabi, qaror #56 a) | `GET /admin/users/{id}/sessions`, `GET /{id}/devices`, `POST /{id}/revoke-sessions`; `GET /devices`, `POST /devices/{id}/revoke` (20 #29a–29b) | `auth.sessions`, `app.devices` | — | `settings.users`; qurilmalar — `devices.revoke` | 1 |
 | US-M13-08 | Platforma admini: tenant va Egasi hisobini boshqarish | Must | **— (gap)** | ADM-01, BO-11 | `GET/POST /platform/tenants/{id}/owner/...` (14 §18.1) | `platform.platform_admins`, `app.users` | — | `platform.admin` | 6 |
 
 ### M14 — Filiallar
@@ -261,17 +261,17 @@ Manba: `07-ekran-tafsilotlari.md` har bir ekrandagi **"Bog'liq US"** qatori (so'
 | BO-12 | US-M14-01, US-M14-03, US-M14-04 |
 | BO-13 | AI-01, US-M18-04 |
 | BO-14 | US-M04-05, US-M09-06, US-M01-03, US-M01-07, US-M17-01, US-M19-15 («1C» qatori, W-55); "Sinxron istisnolari" bloki — infratuzilma/admin (qaror #56 b) |
-| BO-15 | US-M07-03, US-M01-06, US-M10-03 |
+| BO-15 | US-M07-03, US-M07-05, US-M01-06, US-M10-03 |
 | BO-16 | US-M02-02, US-M03-01, US-M08-01, US-M09-02, US-M16-01 |
 | BO-17 | US-M15-01, US-M15-02, US-M15-03 |
-| BO-18 | US-M09-04, US-M09-05 |
+| BO-18 | US-M09-04, US-M09-05, US-M09-06 |
 | BO-19 | US-M17-02, US-M17-03 |
 | BO-20 | US-M18-01, US-M18-02, US-M18-03, US-M19-14 |
 | BO-21 | US-M17-01, US-M04-04, US-M08-07 |
-| BO-22 | US-M19-01, -02, -03, -04, -05, -13, -17 (`33` §13.1) |
+| BO-22 | US-M19-01, -02, -03, -04, -05, -13, -17, -18 («Jurnal» — drift) (`33` §13.1) |
 | BO-23 | US-M19-06…-12, -14, -15, -16, -18 (`33` §13.2) |
 | BO-24 | US-M11-04 |
-| UX-INSTALL (`/install`) | — (37 ta "biznes ekran"ga kirmaydi, o'z sarlavhasida aniq yozilgan; yordamchi route) |
+| UX-INSTALL (`/install`) | — (41 ekran ro'yxatiga kirmaydi; yordamchi route) |
 | ADM-01 | US-M13-08, US-M17-04 |
 
 **US→Ekran bo'shliqlari** (quyidagi US'larning hech bir ekranning "Bog'liq US" qatorida yo'qligi tasdiqlandi): **US-M03-03, US-M08-08, US-M14-02, US-M17-05** — batafsil §3da.
@@ -280,7 +280,7 @@ Manba: `07-ekran-tafsilotlari.md` har bir ekrandagi **"Bog'liq US"** qatori (so'
 
 Har bir fayl o'zining endpoint indeksidagi tartib raqami bilan berilgan (`18-api-kassa.md` §1, `20-api-moliya-admin.md` "Endpoint indeksi", `14-autentifikatsiya-oauth2.md` §20; `19-api-ombor.md`da rasmiy raqamlangan indeks yo'q — bo'lim raqami bilan ko'rsatilgan). **"— (gap)"** — hech qanday US-Mxx-nn topilmadi (aniq tekshirilgan, taxmin emas); **"?"** — modul orqali xulosa.
 
-#### 14-autentifikatsiya-oauth2.md (§20, 26 qator)
+#### 14-autentifikatsiya-oauth2.md (§20, 29 qator)
 
 | Endpoint | US |
 |---|---|
@@ -328,7 +328,7 @@ Har bir fayl o'zining endpoint indeksidagi tartib raqami bilan berilgan (`18-api
 | `sync/push`, `sync/pull` | US-M01-02 |
 | `GET /sales`, `/{id}` | US-M01-01, US-M02-01 |
 
-#### 19-api-ombor.md (bo'lim raqami bilan, ~89 endpoint)
+#### 19-api-ombor.md (bo'lim raqami bilan, ~110 endpoint)
 
 | Resurs guruhi | US |
 |---|---|
@@ -354,7 +354,7 @@ Har bir fayl o'zining endpoint indeksidagi tartib raqami bilan berilgan (`18-api
 | `einvoices` (direction=in) | US-M07-03 |
 | `ettn-documents` (§20: `sign-challenge`, `submit-signed`, `register-manual`, `accept`, `reject`) | US-M06-01, US-M06-02, US-M07-03 (qaror #63) |
 
-#### 20-api-moliya-admin.md ("Endpoint indeksi", 100+ qator)
+#### 20-api-moliya-admin.md ("Endpoint indeksi", 103 qator)
 
 | # | Endpoint | US |
 |---|---|---|
@@ -370,7 +370,7 @@ Har bir fayl o'zining endpoint indeksidagi tartib raqami bilan berilgan (`18-api
 | 19 | `GET /reports/top-products` | US-M12-02 |
 | 20 | `GET /reports/stock` | US-M04-03, US-M14-01 |
 | 21 | `GET /reports/debts-aging` | US-M08-10, US-M08-11 |
-| 22–23 | `reports/{kod}/export`, `export-jobs` | US-M12-03 |
+| 22–23 | `reports/{report-kod}/export`, `reports/export-jobs/{job_id}` | US-M12-03 |
 | 24 | `GET /roles` | US-M13-01, US-M13-02, US-M13-03 |
 | 25–26 | `POST /roles`, `PATCH /roles/{id}` (maxsus rol yaratish/tahrirlash) | infratuzilma/admin (US-M13-01/03 ga yordamchi; qaror #58 b) |
 | 27–29 | `roles/{id}/permissions`, `permissions-catalog` | US-M13-03 |
@@ -426,7 +426,7 @@ Har bir fayl o'zining endpoint indeksidagi tartib raqami bilan berilgan (`18-api
 
 | Endpoint | US |
 |---|---|
-| `GET/POST /bank-settlements`, `GET/PATCH /bank-settlements/{id}`, `POST /{id}/post`, `POST /{id}/cancel` | US-M11-04 |
+| `GET/POST /bank-settlements`, `GET /bank-settlements/{id}`, `POST /{id}/post`, `POST /{id}/cancel` | US-M11-04 |
 | `GET /bank-settlements/transit-balances` (20 #55b) | US-M11-04 (BO-24 tranzit qoldig'i) |
 | `POST /bank-settlements/imports` (20 #55g) | US-M11-04 (ko'chirma importi → qoralamalar) |
 
@@ -509,7 +509,7 @@ Asos — `13-provodka-qoidalari.md` §2.25 "Posting qamrovi" jadvali (hujjat↔A
 | `platform.label_templates` | seed (faqat `GET`; tenant o'zgartira olmaydi, 19 §5; qaror #58 b) | US-M09-04 |
 | `platform.plans`, `platform.addons`, `platform.oauth_clients`, `platform.signing_keys`, `platform.platform_admins` | seed/migratsiya/ops (`12` izohi; `devices.kind`/`signing_keys.purpose` kengaytmasi — Bosqich 0, qaror #58 c) | infratuzilma |
 
-**Qamrab olingan jadvallar**: barcha jadvallar yozuvchiga ega — endpoint/voqea (to'g'ridan-to'g'ri yoki registr sifatida), ichki quvur yoki seed/ops (qaror #58 b); yozuvchisiz jadval qolmagan (yangi: `tax_settlements`, `sync_exceptions`, `platform.fx_rates`).
+**Qamrab olingan jadvallar**: barcha jadvallar yozuvchiga ega — endpoint/voqea (to'g'ridan-to'g'ri yoki registr sifatida), ichki quvur yoki seed/ops (qaror #58 b); yozuvchisiz jadval yo'q (`tax_settlements`, `sync_exceptions`, `platform.fx_rates` ham).
 
 ---
 
@@ -517,11 +517,11 @@ Asos — `13-provodka-qoidalari.md` §2.25 "Posting qamrovi" jadvali (hujjat↔A
 
 ### A. US stories — MVP tier yo'q (05-mvp-chegarasi.md §1.1 jadvalida yo'q)
 
-**Hal qilindi** — 11 ta hikoya (US-M01-05/06, US-M04-04/05, US-M09-07, US-M13-04…08, US-M14-04) `05-mvp-chegarasi.md` §1.1 jadvaliga qo'shildi (US-M09-07 — Should, qolganlari — Must).
+Bo'shliq yo'q — MVP'dagi 86 ta US (M01–M18) `05-mvp-chegarasi.md` §1.1 jadvalida (61 tasi Must); M19 ning 18 tasi — `Keyin` (Bosqich 7).
 
 ### B. US stories — Bosqich (27-backlog.md) hech qaerda yo'q
 
-**Yopildi (qaror #58 b, 26 #164 (OQ-099)):** `27-backlog.md` har bosqichida aniq US-ID ro'yxati yuritiladi; jadval 1 dagi "?" belgili bosqich qiymatlari shu ro'yxat bilan tekshiriladi. Ochiq qolgan yagona hikoya — US-M03-03 (Could, Bosqich 4 hisobotlari).
+Bo'shliq yo'q (qaror #58 b, 26 #164 (OQ-099)): `27-backlog.md` har bosqichida aniq US-ID ro'yxati bor; jadval 1 ning "Bosqich" ustuni shu ro'yxat bilan bir xil. MVP'dan keyingi 4 ta US (US-M03-02, US-M08-08, US-M14-02, US-M17-05 — qaror #33) `27` ning "MVP'dan keyin" bo'limida.
 
 ### C. US stories — ekran yo'q
 
@@ -541,15 +541,15 @@ Mahsulot funksiyasi sifatida hali US'ga ega bo'lmaganlar (`03` egasiga taklif, M
 
 ### F. Ekranlar — mos US yo'q
 
-Yo'q — barcha 37 "biznes ekran"ning har birida kamida bitta `Bog'liq US` bor (§2a tasdiqlangan). `UX-INSTALL` o'zi ataylab istisno qilingan.
+Yo'q — barcha 41 ekranning (39 MVP + BO-22, BO-23) har birida kamida bitta `Bog'liq US` bor (§2a tasdiqlangan). `UX-INSTALL` o'zi ataylab istisno qilingan.
 
 ### G. Jadvallar — hech qanday endpoint tomonidan yozilmaydi
 
-**Yopildi:** `app.ettn_documents` — yozuvchi `POST /transfers/{id}/post` va `/ettn-documents/*` (qaror #63). Qolganlari `12-db-sxema.md` izohi bilan "seed/ops/ichki quvur yozadi" deb belgilangan (qaror #58 b): `app.ai_training_samples`, `app.ai_feedback`, `app.tenant_glossary` (ichki AI quvuri, qaror #61), `platform.fx_rates` (scheduler, qaror #55), `platform.label_templates` (seed, faqat `GET`), `platform.plans`, `platform.addons`, `platform.oauth_clients`, `platform.signing_keys`, `platform.platform_admins` (seed/migratsiya/ops). Yozuvchisiz jadval qolmagan.
+Bo'shliq yo'q: `app.ettn_documents` — yozuvchi `POST /transfers/{id}/post` va `/ettn-documents/*` (qaror #63). Qolganlari `12-db-sxema.md` izohi bilan "seed/ops/ichki quvur yozadi" deb belgilangan (qaror #58 b): `app.ai_training_samples`, `app.ai_feedback`, `app.tenant_glossary` (ichki AI quvuri, qaror #61), `platform.fx_rates` (scheduler, qaror #55), `platform.label_templates` (seed, faqat `GET`), `platform.plans`, `platform.addons`, `platform.oauth_clients`, `platform.signing_keys`, `platform.platform_admins` (seed/migratsiya/ops). Yozuvchisiz jadval qolmagan.
 
 ### H. Ruxsat kodlari — endpoint tomonidan ishlatiladi, lekin 15-katalogda yo'q / aksincha
 
-Tekshiruv (`15-xavfsizlik-va-audit.md` §2.1, 58 ta kod) va 18/19/20'dagi barcha `Ruxsat`/backtick-kod mentionlari solishtirildi — **nomuvofiqlik topilmadi**: 18 va 19'da ishlatilgan barcha ruxsat kodlari (`sales.*`, `returns.*`, `discount.*`, `stock.*`, `transfer.*`, `purchases.*`, `debts.*`, `prices.*`, `tax.*`, `catalog.manage`, `stock.opening.manage`, `valuation.settings.manage`, `labels.print`) 15-katalogda bor; 20'dagi barcha `Ruxsat` ustuni qiymatlari (`accounting.*`, `reports.*`, `settings.*`, `expenses.*`, `cash.*`, `billing.manage`, `notifications.manage`, `telegram.link`, `ai.*`, `platform.admin`) ham bor. **Hech qanday gap yo'q bu bo'limda** — ijobiy natija, alohida ta'kidlanadi.
+Tekshiruv (`15-xavfsizlik-va-audit.md` §2.1, 67 ta kod) va 18/19/20'dagi barcha `Ruxsat`/backtick-kod mentionlari solishtirildi — **nomuvofiqlik topilmadi**: 18 va 19'da ishlatilgan barcha ruxsat kodlari (`sales.*`, `returns.*`, `discount.*`, `stock.*`, `transfer.*`, `purchases.*`, `debts.*`, `prices.*`, `tax.*`, `catalog.manage`, `stock.opening.manage`, `valuation.settings.manage`, `labels.print`) 15-katalogda bor; 20'dagi barcha `Ruxsat` ustuni qiymatlari (`accounting.*`, `reports.*`, `settings.*`, `expenses.*`, `cash.*`, `billing.manage`, `notifications.manage`, `telegram.link`, `ai.*`, `platform.admin`) ham bor. **Hech qanday gap yo'q bu bo'limda** — ijobiy natija, alohida ta'kidlanadi.
 
 ### H2. 1C integratsiyasi, bank tushumi va yangi qarorlar — izchillik tekshiruvi
 
@@ -557,18 +557,18 @@ M19 ning 18 ta US'i BO-22/BO-23 ning «Bog'liq US» qatorlari (`33` §13), W-xx 
 
 ### I. MVP Must stories — hech qaysi backlog bosqichida yo'q
 
-Tekshirildi: barcha "Must" tegidagi US (05'da ro'yxatlangan 59 ta) `27-backlog.md`da kamida modul darajasida joy topadi (0–6 bosqich ichida). To'g'ridan-to'g'ri bo'shliq yo'q, lekin **band B** (aniq ID bilan sanalmagan ~20 ta "?" qator) shu yerga ham tegishli — ID darajasidagi aniqlik yetishmaydi, mazmun darajasida emas.
+Tekshirildi: barcha "Must" tegidagi US (05'da ro'yxatlangan 61 ta) `27-backlog.md` 1–6 bosqichlarining US-ID ro'yxatlarida aniq ID bilan bor. Bo'shliq yo'q.
 
 ---
 
 ## Yakuniy hisob
 
 - **US stories:** 104/104 jadvalga kiritilgan (M01 — 7, US-M01-07 printer/tarozi sozlamasi; M19 — 18 ta, Bosqich 7; US-M11-04 — bank tushumi tasdig'i).
-- **Ekranlar:** 42 (38 biznes + POS-16 + `/install` + BO-22, BO-23 (Bosqich 7), BO-24) — barchasi kamida bitta US'ga bog'langan (`/install`dan tashqari, bu qasddan).
-- **Endpointlar:** `14` (26), `18` (37, index qatorlari), `19` (~95, bo'lim bo'yicha, `ettn-documents` bilan), `20` (100+, index qatorlari: `tax-settlements` 8a–8d, `devices` 29a–29b, `sync-exceptions` 40f–40g, `tenant/consents` 40h, `bank-settlements` 55a–55g) — hammasi §2b'da US yoki "infratuzilma/admin" belgisi bilan; qo'shimcha `33` (W-01…W-55, A-01…A-10) va Do'kon agenti lokal API.
+- **Ekranlar:** 41 (POS-01…16, BO-01…24, ADM-01; 39 tasi MVP, BO-22/BO-23 — Bosqich 7) + yordamchi route `/install` — 41 ekranning barchasi kamida bitta US'ga bog'langan.
+- **Endpointlar:** `14` (29), `18` (37, index qatorlari), `19` (~110, bo'lim bo'yicha, `ettn-documents` bilan), `20` (103 index qatori: `tax-settlements` 8a–8d, `devices` 29a–29b, `sync-exceptions` 40f–40g, `tenant/consents` 40h, `bank-settlements` 55a–55g) — hammasi §2b'da US yoki "infratuzilma/admin" belgisi bilan; qo'shimcha `33` (W-01…W-55, A-01…A-10) va Do'kon agenti lokal API.
 - **Jadvallar:** barchasi yozuvchiga ega (endpoint/voqea, ichki quvur yoki seed/ops — §2c).
-- **Ruxsat kodlari:** 15-katalog + `onec.*` (7), `bank_settlements.manage`, `cash_register.manage` — nomuvofiqlik topilmadi.
+- **Ruxsat kodlari:** 15 §2.1 katalogi (67 ta, `onec.*` 7 ta, `bank_settlements.manage`, `cash_register.manage`, `devices.revoke` bilan) — nomuvofiqlik topilmadi.
 - **1C jadvallari:** 18 ta `app.onec_*` + `auth.onec_device_authorizations` — barchasi W/A endpointlari yoki `onec_*` job'lari orqali yoziladi (§2c).
 - **Sinxron voqea turlari:** `16-offline-sync.md` §2 ro'yxati — barchasi §1 va §2b'da US/endpoint bilan bog'langan.
 
-**Bo'shliqlar soni turlar bo'yicha:** A) MVP tier yo'q — 0; B) Bosqich yo'q — 1 (US-M03-03); C) Ekran yo'q — 4 (US-M03-03; post-MVP US-M08-08, US-M14-02, US-M17-05); D) BP qamrovi — bo'shliq emas (qaror #58 b); E) Endpoint→US yo'q — 2 mahsulot funksiyasi (qarzni kechish, shubhali qarz belgisi), qolganlari infratuzilma/admin; F) Ekran→US yo'q — 0; G) Jadval→yozuvchi yo'q — 0; H) Ruxsat kod nomuvofiqligi — 0; I) Must→bosqich yo'q — 0.
+**Bo'shliqlar soni turlar bo'yicha:** A) MVP tier yo'q — 0; B) Bosqich yo'q — 0; C) Ekran yo'q — 4 (US-M03-03; post-MVP US-M08-08, US-M14-02, US-M17-05); D) BP qamrovi — bo'shliq emas (qaror #58 b); E) Endpoint→US yo'q — 2 mahsulot funksiyasi (qarzni kechish, shubhali qarz belgisi), qolganlari infratuzilma/admin; F) Ekran→US yo'q — 0; G) Jadval→yozuvchi yo'q — 0; H) Ruxsat kod nomuvofiqligi — 0; I) Must→bosqich yo'q — 0.

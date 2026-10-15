@@ -112,7 +112,7 @@ Baza qo'shilgach va har `POST /onec-bases/{id}/checks` da server vazifalar zanji
 | `negative_stock_setting` | Администрирование → Проведение документов → «Разрешить списание запасов при отсутствии остатков по данным учета» holati (konstanta nomi profil faylida, *taxmin*, P-10) | `read_metadata` (`constants`); har partiya yozilishidan oldin qayta o'qiladi (§7.3) | yoqilgan → warn (qoldiqsiz hujjat o'tadi, lekin provodka «только в количественном выражении без суммы» — 1C tannarxi nol); o'chiq → pass (qoldiq yetmasa hujjat o'tmaydi — `ONEC_NEGATIVE_STOCK`, qoldiq preflight §6.10) | `ONEC_NEGATIVE_STOCK_ALLOWED` (warn) | Buxgalter bilan kelishish; `sales_only` rejimda kirim 1C'da kiritilganini tekshirish |
 | `marking_check` | 1C'da markirovka nazorati yoqilganmi | profil so'rovi (*taxmin*, P-04) | yoqilgan → warn | `ONEC_MARKING_CHECK_ENABLED` | Markirovkali tovar ОРП'si o'tmasligi mumkin — buxgalter bilan kelishish |
 | `license` | Ulanish 1C klienti shu PK'da ochiq turganda ham muvaffaqiyatli | `probe(base, license_test=true)` — foydalanuvchidan «1C'ni oching» so'raladi | ulanmadi → warn | `ONEC_LICENSE_UNAVAILABLE` | Bo'sh litsenziya; eksport 1C yopiq vaqtda |
-| `license_source` | Agent litsenziyani mahalliy klient litsenziyasidan oladimi | `probe(base)`: `connect_kind`, agent sessiyasi turi (RDP yoki konsol), litsenziya xatosi matni | `connect_kind='server'` va litsenziyani server tarqatadi, RDP sessiya, veb-server orqali baza → warn | `ONEC_LICENSE_SEPARATE_REQUIRED` | Agent uchun alohida klient litsenziyasi yoki eksportni 1C yopiq vaqtga qo'yish (BO-22 yo'riqnomasi) |
+| `license_source` | Agent litsenziyani mahalliy klient litsenziyasidan oladimi | `probe(base)`: `connect_kind`, agent sessiyasi turi (`data.base.session_kind`: `console`\|`rdp`, §9.5), litsenziya xatosi matni | `connect_kind='server'` va litsenziyani server tarqatadi, RDP sessiya, veb-server orqali baza → warn | `ONEC_LICENSE_SEPARATE_REQUIRED` | Agent uchun alohida klient litsenziyasi yoki eksportni 1C yopiq vaqtga qo'yish (BO-22 yo'riqnomasi) |
 | `user_rights` | 1C foydalanuvchisi «Полные права» emas va tashqi ulanish huquqi bor | `probe(base)` (*taxmin*, P-18) | tashqi ulanish huquqi yo'q → fail; to'liq huquqli → warn | `ONEC_NO_RIGHTS` / `ONEC_USER_TOO_PRIVILEGED` | Alohida `ERP integratsiya` foydalanuvchisi yaratish (§15.3) |
 
 `edition`, `retail_valuation`, `tax_regime`, `marking_check`, `negative_stock_setting`, `license_source`, `user_rights` uchun 1C so'rov matnlari va konstanta nomlari profil faylida (`profiles/bp30_uz/queries.yaml`), pilot testlari natijasiga ko'ra yoziladi; matn o'zgarsa agent yangilanmaydi.
@@ -2298,7 +2298,7 @@ Agent faqat shu 13 turni biladi; boshqasi → `ONEC_TASK_REJECTED`. **`delete` (
 
 | `kind` | Yozadimi | `base_id` | Standart `timeout_s` | Payload | Natija `data` |
 |---|---|---|---|---|---|
-| `probe` | yo'q | ixtiyoriy | 120 | `{"base_local_id": null, "license_test": false, "queries": [QuerySpec]\|null}` | `{"com": {"progids": [{"progid","bits","registered","dll","version"}]}, "base": null \| {"connect_ok", "connect_ms", "bits_used", "config_name", "config_synonym", "config_version", "platform_version", "user_name", "user_full_rights", "external_connection_right", "edition_hint": "prof\|basic\|unknown", "error": ErrorObj\|null}, "results": [QueryResult]}` |
+| `probe` | yo'q | ixtiyoriy | 120 | `{"base_local_id": null, "license_test": false, "queries": [QuerySpec]\|null}` | `{"com": {"progids": [{"progid","bits","registered","dll","version"}]}, "base": null \| {"connect_ok", "connect_ms", "bits_used", "config_name", "config_synonym", "config_version", "platform_version", "user_name", "user_full_rights", "external_connection_right", "edition_hint": "prof\|basic\|unknown", "session_kind": "console\|rdp", "error": ErrorObj\|null}, "results": [QueryResult]}` |
 | `discover_bases` | yo'q | yo'q | 60 | `{}` | `{"bases": [{"local_id","name","connect_kind","connect_display","connect_fingerprint","registered_base_id"}]}` (`ws=` chiqariladi) |
 | `read_metadata` | yo'q | ha | 600 | `{"classes": ["Документ","Справочник","Перечисление","ПланСчетов","РегистрСведений","РегистрБухгалтерии"] \| [], "names": null \| ["…"], "constants": null \| ["<konstanta nomi>"], "queries": null \| [QuerySpec]}` — `classes=[]` + `constants` — yengil «faqat sozlamalar» o'qishi (§7.3) | `{"config": {"name","synonym","version"}, "metadata_hash", "objects": [{"class","name","synonym","attributes":[{"name","types":["СправочникСсылка.Склады"]}],"tables":[{"name","attributes":[…]}],"values":["…"]}], "constants": {"<nom>": Value}, "results": [QueryResult]}` — profil `constants`: «Разрешить списание запасов при отсутствии остатков», «По кассам» (`Касса` rekviziti) va h.k.; `queries`: «Счета учета номенклатуры» registri yozuvlari (§6.1). Server: `objects` → `onec_metadata_snapshots`, `constants` → `onec_bases.checks`, registr yozuvlari → snapshot `data.account_rules` |
 | `read_refs` | yo'q | ha | 300 | `{"onec_type": "Справочник.Номенклатура", "query": QuerySpec, "page": {"after_guid": null, "size": 1000}}` | `{"result": QueryResult, "next_after_guid": null}` — ustunlar: `guid`, `code`, `name`, `full_name`, `inn`, `pinfl`, `ikpu`, `article`, `barcodes` (`\|` bilan), `parent_guid`, `owner_guid`, `is_folder`, `deletion_mark`, `extra_*` |
@@ -2314,12 +2314,14 @@ Agent faqat shu 13 turni biladi; boshqasi → `ONEC_TASK_REJECTED`. **`delete` (
 
 `Target = {"meta_kind": "Document"|"Catalog", "meta_name": "…", "guid": "…"}`.
 
+**Do'kon agenti kengaytmasi (qaror #60, Bosqich 5).** Yuqoridagi 13 tur — 1C modulining oq ro'yxati, u o'zgarmaydi; 1C protokoli (§9) ham o'zgarmaydi. Xuddi shu agent va shu bulut kanali (A-01…A-10, imzoli vazifa, lease) orqali server navbatga qo'yadigan Do'kon agenti xizmat vazifalari — alohida oila oq ro'yxati, `base_id = null` (1C bazasi talab qilinmaydi), agent `hello` da modulni e'lon qilgandagina: `fiscal.status`, `fiscal.resend_unsent`, `fiscal.zreport`, `print.raw`, `scale.plu_upload` (vazifa va natija — `21-integratsiyalar.md` §16, ishlovchi modullar — `23-backend-arxitekturasi.md` §4.2, agent tomoni — `34-1c-agent.md` §14). Sotuv paytidagi fiskallashtirish, chek chop etish va tortish — server vazifasi emas: POS ularni agentning lokal API'si (`127.0.0.1`, `Origin` oq ro'yxati + qurilmaga bog'langan token, `21` §16) orqali bajaradi.
+
 Turlar bo'yicha aniqliklar (agent 34 shu qoidalar bilan ishlaydi):
 
 - **`timeout_s`**: `ObjectSpec` turlarida (`write_object`, `preview_object`) watchdog `payload.timeout_s` ni ishlatadi (u `psh` orqali imzolangan), qolgan turlarda — konvertdagi `timeout_s`; ikkalasi `[10, 1800]` ga qisiladi.
-- **`probe`**: `user_full_rights` = `РольДоступна("ПолныеПрава")` ∨ `ПравоДоступа("Администрирование", Метаданные)`; `external_connection_right` = `ПравоДоступа("ВнешнееСоединение", Метаданные)`; aniqlab bo'lmasa `null` (*taxmin*, P-18). `edition_hint`: ulanish xatosi `ONEC_EDITION_NO_COM` → `basic`, `Метаданные.Синоним` da «базов» → `basic`, aks holda `prof`.
+- **`probe`**: `user_full_rights` = `РольДоступна("ПолныеПрава")` ∨ `ПравоДоступа("Администрирование", Метаданные)`; `external_connection_right` = `ПравоДоступа("ВнешнееСоединение", Метаданные)`; aniqlab bo'lmasa `null` (*taxmin*, P-18). `edition_hint`: ulanish xatosi `ONEC_EDITION_NO_COM` → `basic`, `Метаданные.Синоним` da «базов» → `basic`, aks holda `prof`. `session_kind` — agent Windows sessiyasi turi: `GetSystemMetrics(SM_REMOTESESSION) ≠ 0` → `rdp`, aks holda `console` (§2.3 `license_source` dalili; `rdp` → `ONEC_LICENSE_SEPARATE_REQUIRED` warn).
 - **`discover_bases`**: hali qo'shilmagan bazaning `local_id`si — agent bergan vaqtinchalik UUIDv4 (fingerprint bo'yicha barqaror); «Qo'shish» (A-02) aynan shu `local_id` bilan.
-- **`read_metadata`**: rekvizit turi `"<Sinf>Ссылка.<Nom>"` yoki primitiv `Строка|Число|Дата|Булево` (+ `number`/`string` kvalifikatorlari); standart rekvizitlar `standard: true`; registr maydonlarida `role` (o'lchov/resurs/rekvizit); `metadata_hash = SHA-256(JCS({config, objects}))` (tartiblangan).
+- **`read_metadata`**: profildagi konstanta bazada yo'q bo'lsa — `constants` da shu kalit `{"t":"null"}`, vazifa `done` (talqin serverda); yengil o'qishda (`classes=[]`) `objects=[]`, `metadata_hash=null` — server bu natija bilan `onec_metadata_snapshots` ni yangilamaydi. Rekvizit turi `"<Sinf>Ссылка.<Nom>"` yoki primitiv `Строка|Число|Дата|Булево` (+ `number`/`string` kvalifikatorlari); standart rekvizitlar `standard: true`; registr maydonlarida `role` (o'lchov/resurs/rekvizit); `metadata_hash = SHA-256(JCS({config, objects}))` (tartiblangan).
 - **`read_refs`**: sahifalash — matnda `&ПослеСсылки` parametri bo'lsa `page.after_guid` shunga beriladi, `max_rows = page.size`, `next_after_guid` — oxirgi qatordagi `guid`; tartib va filtr server matnida.
 - **`read_stock_balances`**: matnda `&НаДату` bo'lsa va `params` da berilmagan bo'lsa `НаДату = as_of`.
 - **`preview_object`**: `warnings[] = {code, message, …}`; §8.3 2(a)/(c)/(d) va 4–5-qadam farqlari → `outcome='done'` + `verify_ok=false`; 2(b) → `existed`; `dedupe` bitta topsa → `existed_foreign`.
@@ -2523,8 +2525,8 @@ Qo'shimcha qoidalar (sxemadan tashqari, server ham, agent ham tekshiradi): `writ
 | `не поддерживается` + `внешн`/`COM` / `базов` | `ONEC_EDITION_NO_COM` |
 | `Идентификация пользователя не выполнена`, `неправильн… пароль` | `ONEC_AUTH_FAILED` |
 | `Файл базы данных не обнаружен`, `не найден`, server ulanmadi | `ONEC_BASE_UNAVAILABLE` |
-| `Начало сеанса с информационной базой запрещено` («Блокировка работы пользователей»), `установлена блокировка` | `ONEC_BASE_LOCKED` |
 | `монопольн`, `Ошибка совместного доступа к файлу`, Konfigurator baza konfiguratsiyasini yangilamoqda | `ONEC_BASE_EXCLUSIVE` |
+| `Начало сеанса с информационной базой запрещено` («Блокировка работы пользователей»), `установлена блокировка` | `ONEC_BASE_LOCKED` |
 | `Внешнее соединение не разрешено` (foydalanuvchida «Внешнее соединение» huquqi yo'q) | `ONEC_NO_RIGHTS` |
 | `лиценз` | `ONEC_LICENSE_UNAVAILABLE` |
 | `Конфликт блокировок`, `Превышено максимальное время ожидания` | `ONEC_LOCK_CONFLICT` |
@@ -2550,6 +2552,8 @@ Qo'shimcha qoidalar (sxemadan tashqari, server ham, agent ham tekshiradi): `writ
 | Worker kutilmaganda chiqdi — **o'qishda** | `ONEC_WORKER_CRASHED` |
 | Yuqoridagi uchtasi — **yozish vazifasida** (`write`/`post` bosqichi boshlangandan keyin) | `ONEC_UNKNOWN_OUTCOME` (`outcome='unknown'`) |
 | DPAPI ochilmadi (parol/kalit) | `ONEC_DPAPI_FAILED` |
+
+Bu jadval — belgilar katalogi. Qoidalarning **tartibi va bosqich chegarasi** (`stage`) kanonik ravishda `34-1c-agent.md` §8.12 dagi raqamlangan jadvalda: birinchi mos qoida g'olib (masalan «недостаточно» + «прав» → `ONEC_ACCESS_DENIED` `ONEC_NEGATIVE_STOCK` dan oldin; «монопольн» → `ONEC_BASE_EXCLUSIVE` `ONEC_BASE_LOCKED` dan oldin; `ONEC_BASE_UNAVAILABLE` faqat `connect` bosqichida); server `error_patterns.yaml` qayta tekshiruvida ham shu tartib va bosqich chegarasini qo'llaydi; hech biri mos kelmasa `ONEC_UNKNOWN`. Natija `outcome`: `ONEC_DUPLICATE_REF` (sinf `unknown`) — `outcome='failed'` + kod (platforma aniq javob bergan, keyingi urinish §8.3 2(b) bilan GUID bo'yicha o'qiydi); `outcome='unknown'` faqat `ONEC_UNKNOWN_OUTCOME` bilan.
 
 ### 9.11 Agent har vazifada tekshiradi (rad → `ONEC_TASK_REJECTED`)
 
@@ -3869,9 +3873,9 @@ Natijalar `profiles/bp30_uz/names.yaml`, `queries.yaml` va shu faylning *taxmin*
 | P-21 | «По кассам» bayrog'i o'chiq va yoqilgan bazada ОРП/ПКО/РКО yozilishi (`Касса` bilan va usiz); COM o'tkazish fiskal uskunaga murojaat qilmasligi | Ikkala holatda o'tadi; uskunaga murojaat yo'q |
 | P-22 | AV (Kaspersky/ESET/Dr.Web) HTTPS skanerlashi bilan long-poll va imzo tekshiruvi | 24 soat uzluksiz ishlaydi, imzo xatosi 0 |
 
-### 16.2 Ochiq savollar — tashqi javob kerak (`26`, 1C bo'limi)
+### 16.2 Ochiq savollar — tashqi javob kerak (`26` Jadval B)
 
-Faqat tashqi javob talab qiladigan bandlar; har biri `26-ochiq-savollar-reestri.md` (1C bo'limi) dagi raqam bilan. Javob kelguncha vaqtinchalik qaror kodda sozlama ortida, Bosqich 7 ni bloklamaydi (#105 bundan mustasno).
+Faqat tashqi javob talab qiladigan bandlar; har biri `26-ochiq-savollar-reestri.md` Jadval B («Tashqi javob kerak») dagi raqam bilan. Javob kelguncha vaqtinchalik qaror kodda sozlama ortida, Bosqich 7 ni bloklamaydi (#105 bundan mustasno).
 
 | `26` | Savol | Kim | Vaqtinchalik qaror |
 |---|---|---|---|
@@ -3947,11 +3951,11 @@ Faqat tashqi javob talab qiladigan bandlar; har biri `26-ochiq-savollar-reestri.
 | `16-offline-sync.md` | §3.1 push so'rovida `outbox_state`; §9 — `devices.outbox_*` yangilanishi (§7.3 bilan izchil) |
 | `17-api-umumiy.md` | §15 — 81 ta `ONEC_*` kod (§12; `warn` sinfi — `warnings[]` ichida, 4xx emas); §2 kesishma resurslar ro'yxatiga `/onec-agent/*` (agent tokeni, CSRF'siz) |
 | `20-api-moliya-admin.md` | M19 bo'limida faqat havola (pointer); W-01…W-55 indeksi va tafsiloti uchun kanonik manba — shu faylning §10. `bank_settlements` importi (`POST /bank-settlements/imports`) va tranzit qoldig'i (`GET /bank-settlements/transit-balances`) — `20` da (§6.7 havola qiladi) |
-| `21-integratsiyalar.md` | Yangi §15 «1C integratsiyasi (COM agent)» — qisqa xulosa + `33` ga havola; `outbox_jobs` emas `onec_agent_tasks` istisnosi |
+| `21-integratsiyalar.md` | Yangi §15 «1C integratsiyasi (COM agent)» — qisqa xulosa + `33` ga havola; `outbox_jobs` emas `onec_agent_tasks` istisnosi; §16 Do'kon agenti — bulut vazifa turlari (`fiscal.status`, `fiscal.resend_unsent`, `fiscal.zreport`, `print.raw`, `scale.plu_upload`) shu fayl §9.5 izohi bilan bir xil |
 | `23-backend-arxitekturasi.md` | §1 modul `onec_integration` (§4.1), `workers/cron.py` ga 5 cron (§4.4), `OneCChangeTracker` porti |
 | `24-frontend-arxitekturasi.md` | `pages/onec-settings`, `pages/onec-exports` (FSD), polling 2 s |
 | `25-nofunksional-talablar.md` | §15.1 hajm/vaqt maqsadlari |
-| `26-ochiq-savollar-reestri.md` | 1C bo'limi: #94–#105 va OQ-049…OQ-057 (§16.2 — faqat tashqi javob kerak bandlari) |
+| `26-ochiq-savollar-reestri.md` | Jadval B: #94–#105, #132, #133, #135–#137 (OQ-049…OQ-057) (§16.2 — faqat tashqi javob kerak bandlari) |
 | `27-backlog.md` | Bosqich 7 (§17.1) |
 | `29`, `30`, `31` | Atamalar (§1.2), izchillik matritsasi (US → BP-14 → BO-22/23 → W-xx → jadval → ruxsat → Bosqich 7), qabul testlari (§14) |
-| `34-1c-agent.md` | Agent ichki tuzilishi — §9 protokoli, §8.3 algoritmi, §9.8 qiymat kodlash, §9.10 tasnif, §9.11 tekshiruvlar asosida; Do'kon agentiga (qaror #60) kengaytiriladi — 1C moduli shu faylning §9 protokoliga bo'ysunadi |
+| `34-1c-agent.md` | Agent ichki tuzilishi — §9 protokoli, §8.3 algoritmi, §9.8 qiymat kodlash, §9.10 tasnif, §9.11 tekshiruvlar asosida; Do'kon agentiga (qaror #60) kengaytiriladi — 1C moduli shu faylning §9 protokoliga bo'ysunadi; §14 bulut vazifa turlari — §9.5 izohidagi beshta tur bilan bir xil, sotuv paytidagi amallar — lokal API |

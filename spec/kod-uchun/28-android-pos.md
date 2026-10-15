@@ -11,16 +11,16 @@
 
 1. **Kotlin + Jetpack Compose**, lokal baza — **Room (SQLite)**; sinxronizatsiya — veb-kassa bilan **AYNAN BIR XIL** protokol va voqea formati (`16-offline-sync.md`: `client_event_id`, `device_id`, `seq`, `type`, `created_at`, `payload`; `POST /sync/push`, `GET /sync/pull?cursor=`) — ikki klient bitta backend kontraktini baham ko'radi, dublikat mantiq yozilmaydi.
 2. Fon sinxronizatsiya — **WorkManager**: tezkor (`expedited`) push — voqea yaratilganda darhol; davriy pull (**taxmin: 15 daqiqa**) + ulanish qaytganda darhol (NetworkCallback); `enqueueUniqueWork` bilan bir vaqtda ikki sync ishining yugurishi oldini oladi (veb'dagi Web Locks'ga mos vazifa).
-3. **Uskunalar**: fiskal modul — veb bilan bir xil **`FiscalPort`** kontrakti (Kotlin): `AndroidIntentFiscalAdapter` (vendor SDK/intent), `ApduFiscalAdapter` (SAM/NFC'dagi FM "0400" applet'iga APDU — keyin), `FakeFiscalAdapter`; FM javobi veb bilan bir xil (`fm_terminal_id`, `fm_receipt_seq`, `fiscal_sign`, `qr_url`). Ommaviy SDK yo'q — vendor/hamkor javobi kutiladi (26 #63 (OQ-063), Xat 9). Android'da Do'kon agenti (qaror #60) kerak emas — FM qurilmaning o'zida.
+3. **Uskunalar**: fiskal modul — veb bilan bir xil **`FiscalPort`** kontrakti (Kotlin): `AndroidIntentFiscalAdapter` (vendor SDK/intent), `ApduFiscalAdapter` (SAM/NFC'dagi FM "0400" applet'iga APDU — keyin), `FakeFiscalAdapter`; FM javobi veb bilan bir xil (`fm_terminal_id`, `fm_receipt_seq`, `fiscal_sign`, `qr_url`). Ommaviy SDK yo'q — vendor/hamkor javobi kutiladi (26 #63 (OQ-063), Xat 9). Android'da Do'kon agenti (qaror #60) kerak emas — FM qurilmaning o'zida. FM javob bermasa POS chekni **yopmaydi** — veb-kassadagi «Fiskal modul ulanmagan» holati bilan bir xil (`21-integratsiyalar.md` §1, §16).
 4. **ESC/POS** — chek/yorliq chop etish uchun de-fakto standart (Epson, `06-fayl` §3); **shtrix-kod/markirovka skaneri** — ichki kamera (CameraX + ZXing/ML Kit, veb'dagi `@zxing/browser`ga mos) va tashqi USB/Bluetooth HID "keyboard wedge" (klaviatura emulyatsiyasi, qo'shimcha drayversiz) ikkisi ham qo'llab-quvvatlanadi.
 5. **Tarozi** — og'irlik shtrix-kodi EAN-13 `PP CCCCC VVVVV K`, prefiks do'kon sozlamasi (`settings.weight_barcode_templates`; 22 = gramm, 21 = summa — 26 #31); jonli og'irlik — serial/Bluetooth adapter (keyin); **qo'lda og'irlik kiritish doimiy zahira**.
 6. **Karta to'lovi** — MVP'da mustaqil terminal, kassir `card_type` (`personal/corporate/social/unknown`, `method='card'` da majburiy), ijtimoiy kartada `card_mask` + `rrn` kiritadi — veb bilan bir xil (qaror #64, 26 #65/#121); integratsiyalangan NFC terminal — keyin.
-11. **48 soatlik fiskal blok** (qaror #43) Android'da ham bir xil: 24 soat 🟡, 40 soat 🔴 + M18, 46 soat modal, 48 soat — `ofd_acked_at IS NULL` eng eski chekdan hisoblanib yangi fiskal chek bloklanadi (`FISCAL_OFFLINE_48H_BLOCKED`); taymer **qurilmada ham** hisoblanadi (offline'da server yo'q), server qayta tekshiradi. Markirovka kodi chek ichida (qaror #62, `MARKING_PRECHECK=warn`).
-12. **Auth**: qurilma tokeni veb bilan bir xil — access 15 daqiqa, refresh sliding 14 / mutlaq 180 kun (qaror #44).
-7. **Modul tuzilishi** — clean architecture: `data` (Room, Retrofit/sync), `domain` (use case'lar, entity'lar), `ui` (Compose, ViewModel) qatlamlari, veb'dagi FSD'ga mos ravishda modul (Gradle modullari) bo'yicha ajratilgan (2-bo'lim).
-8. **Shifrlash**: butun Room bazasini **SQLCipher** bilan shifrlash tavsiya etiladi (standart amaliyot, POS SDK'lari ko'pincha qo'llab-quvvatlaydi); muqobil — Android Keystore asosida maydon darajasida shifrlash (5-bo'lim).
-9. **Tarqatish**: asosiy kanal — **MDM/APK** (vendor nazorati, GMS (Google Play Services) bo'lmagan PayDroid qurilmalarda ham ishlaydi); Play Store — faqat umumiy Android planshet/telefonlarda POS sifatida ishlatilsa, ikkinchi darajali kanal (6-bo'lim).
-10. **Qo'llab-quvvatlanadigan qurilmalar** (`06-raqobatchilar-texnik-va-uskunalar.md`, `02-kassa-ofd-markirovka.md`): PAX A930 va UZKASSA N5 — Android 7.1; UZKASSA P100 — Android 5.1 (eski). Tavsiya qilingan `minSdk` — **24 (Android 7.0)** — P100'ni qamrovdan chiqaradi, bu **ochiq savol/biznes qarori** (7-bo'lim).
+7. **48 soatlik fiskal blok** (qaror #43) Android'da ham bir xil: 24 soat 🟡, 40 soat 🔴 + M18, 46 soat modal, 48 soat — `ofd_acked_at IS NULL` eng eski chekdan hisoblanib yangi fiskal chek bloklanadi (`FISCAL_OFFLINE_48H_BLOCKED`); taymer **qurilmada ham** hisoblanadi (offline'da server yo'q), server qayta tekshiradi. Markirovka kodi chek ichida (qaror #62, `MARKING_PRECHECK=warn`).
+8. **Auth**: qurilma tokeni veb bilan bir xil — access 15 daqiqa, refresh sliding 14 / mutlaq 180 kun (qaror #44).
+9. **Modul tuzilishi** — clean architecture: `data` (Room, Retrofit/sync), `domain` (use case'lar, entity'lar), `ui` (Compose, ViewModel) qatlamlari, veb'dagi FSD'ga mos ravishda modul (Gradle modullari) bo'yicha ajratilgan (2-bo'lim).
+10. **Shifrlash**: butun Room bazasini **SQLCipher** bilan shifrlash tavsiya etiladi (standart amaliyot, POS SDK'lari ko'pincha qo'llab-quvvatlaydi); muqobil — Android Keystore asosida maydon darajasida shifrlash (5-bo'lim).
+11. **Tarqatish**: asosiy kanal — **MDM/APK** (vendor nazorati, GMS (Google Play Services) bo'lmagan PayDroid qurilmalarda ham ishlaydi); Play Store — faqat umumiy Android planshet/telefonlarda POS sifatida ishlatilsa, ikkinchi darajali kanal (6-bo'lim).
+12. **Qo'llab-quvvatlanadigan qurilmalar** (`06-raqobatchilar-texnik-va-uskunalar.md`, `02-kassa-ofd-markirovka.md`): PAX A930 va UZKASSA N5 — Android 7.1; UZKASSA P100 — Android 5.1 (eski). `minSdk` — **24 (Android 7.0)** (26 #64) — P100 qamrovdan chiqadi (7-bo'lim).
 
 ---
 
@@ -51,10 +51,11 @@ android/
 │   ├── domain/                 # Entity'lar, use case'lar, repository interfeyslari
 │   └── network/                # Retrofit klient, OpenAPI-generatsiya qilingan DTO'lar
 ├── feature/
-│   ├── pos/                    # POS-01…04, 07, 11, 14, 15 — M01, M03, M09, M16
+│   ├── pos/                    # POS-01…07, 11, 14, 15 — M01, M02, M03, M08 (nasiya), M09, M16
 │   ├── warehouse/               # POS-08, 09, 10 — M05, M06, M07
 │   ├── debts/                   # POS-13 — M08
-│   └── sync-status/              # POS-12
+│   ├── sync-status/              # POS-12
+│   └── devices/                  # POS-16 — uskunalar sozlamasi (printer, tarozi, skaner)
 └── hardware/
     ├── fiscal/                 # FiscalPort (veb bilan bir xil kontrakt) + AndroidIntent/Apdu/Fake adapterlari
     ├── scanner/                 # Kamera (CameraX+ZXing) va HID skaner abstraksiyasi
@@ -95,7 +96,7 @@ Farq faqat **klient tomonidagi saqlash mexanizmi** (Room o'rniga Dexie) va **UI 
 
 - Bozorda ustun qurilmalar: **PAX A930** (Android 7.1/PayDroid, PCI PTS/EMV sertifikatlangan, Kapitalbank orqali tarqatiladi) va **UZKASSA** (N5, P100) — `research_notes/texnik/02-kassa-ofd-markirovka.md` §4, `06-fayl` §4.
 - Ommaviy SDK yo'q; arxitektura ochiq: FM — JavaCard applet "0400" (SAM/NFC/USB), buyruqlar `RECEIPT_REGISTER`, `ZREPORT_OPEN/CLOSE`, `ACK`, `SYNC`, TLV chek (`TAG_LABEL` — markirovka kodi) — `github.com/qo0p/acrsim-android`. Sunmi P3 "terminal + fiskalizatsiya" to'plamlari bor, API yopiq. Vendor/hamkor javobi — 26 #63 (Xat 9).
-- `hardware/fiscal` modulida veb bilan bir xil **`FiscalPort`**: `openShift()`, `closeShift(): ZReport`, `registerSale(receipt): FiscalResult{terminalId, receiptSeq, fiscalDatetime, fiscalSign, qrUrl}`, `registerRefund(receipt, refundRef)`, `getDeviceStatus()` (`fm_state`), `listUnsent()`, `resendUnsent()`; summalar port chegarasida tiyinda (`Long`). Adapterlar: `AndroidIntentFiscalAdapter`, `ApduFiscalAdapter` (keyin), `FakeFiscalAdapter`; runtime'da qurilma modeli bo'yicha tanlanadi. FM bloki (`fm_state='locked'`) → `FISCAL_DEVICE_LOCKED`.
+- `hardware/fiscal` modulida veb bilan bir xil **`FiscalPort`**: `openShift()`, `closeShift(): ZReport`, `registerSale(receipt): FiscalResult{terminalId, fmReceiptSeq, fiscalAt, fiscalSign, qrUrl}` (veb `FiscalResult{terminal_id, fm_receipt_seq, fiscal_at, fiscal_sign, qr_url}` bilan bir xil; qurilma `receipt_seq` alohida), `registerRefund(receipt, refundRef)`, `getDeviceStatus()` (`fm_state`), `listUnsent()`, `resendUnsent()`; summalar port chegarasida tiyinda (`Long`). Adapterlar: `AndroidIntentFiscalAdapter`, `ApduFiscalAdapter` (keyin), `FakeFiscalAdapter`; runtime'da qurilma modeli bo'yicha tanlanadi. FM bloki (`fm_state='locked'`) → `FISCAL_DEVICE_LOCKED`; FM umuman javob bermasa — «Fiskal modul ulanmagan», chek yopilmaydi (fiskal cheksiz savdo yo'q).
 
 ### 4.2 ESC/POS chop etish
 
@@ -117,7 +118,7 @@ Farq faqat **klient tomonidagi saqlash mexanizmi** (Room o'rniga Dexie) va **UI 
 
 - MVP: mustaqil bank terminali bilan karta to'lovi kassada qo'lda belgilanadi (online va offline) — `card_type` majburiy, ijtimoiy kartada `card_mask` (`^[0-9]{4}\*+[0-9]{4}$`) va `rrn` (qaror #64, 26 #65/#121). Chekda to'lov shakli `payment_form` (`cash/card/qr/mixed`).
 - Integratsiyalangan terminal (bank SDK, `hardware/card-terminal`) — keyin. Virtual kassa reyestri talabi (karta/UzQR "shu qurilma orqali") — 26 #170.
-- UzQR: statik — qo'lda tasdiq; dinamik — `UzqrPort` (26 #49), veb bilan bir xil.
+- UzQR: **faqat online** (statik ham, qaror #64); statik — kassir qo'lda tasdiqlaydi; dinamik — `UzqrPort` (26 #49), veb bilan bir xil.
 
 ---
 
@@ -173,16 +174,10 @@ Farq faqat **klient tomonidagi saqlash mexanizmi** (Room o'rniga Dexie) va **UI 
 
 ## Ochiq savollar
 
-1. PAX/UZKASSA/Sunmi FM'iga uchinchi tomon ilovasidan kirish (SDK/intent/APDU), sertifikatlash talablari va test FM — 26 #63 (OQ-063), Xat 9. Android POS boshlanishini bloklaydi (MVP'dan keyin).
-2. Hal qilingan: minSdk 24 (26 #64).
-3. Hal qilingan: tarozi og'irlik shtrix-kodi formati (26 #31); jonli og'irlik protokoli — Faza 3.
-4. Hal qilingan: integratsiyalangan karta terminali MVP'da yo'q, `card_type`/`card_mask`/`rrn` qo'lda (26 #65, qaror #64).
-5. Hal qilingan: MDM/APK asosiy kanal (26 #66).
-6. Hal qilingan: openapi-generator (26 #67).
-7. Hal qilingan: Hilt (26 #68).
-8. Hal qilingan: SQLCipher (26 #69).
-9. Hal qilingan: bitta smena — bitta qurilma; FM raqami `fm_receipt_seq` alohida (qaror #12).
-10. Hal qilingan: qurilma tokeni veb bilan bir xil (qaror #44, 26 #165).
+Faqat tashqi javob kerak bo'lgan bandlar:
+
+1. **PAX/UZKASSA/Sunmi FM'iga uchinchi tomon ilovasidan kirish** (SDK/intent/APDU), sertifikatlash talablari va test FM — 26 #63 (OQ-063), Xat 9. Interim: `FakeFiscalAdapter`; Android POS boshlanishini bloklaydi (MVP'dan keyin).
+2. **Dinamik UzQR POS API** — 26 #49 (OQ-032). Interim: statik UzQR (faqat online).
 
 ## Manbalar
 

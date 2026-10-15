@@ -54,7 +54,7 @@ backend/
 │   │   ├── accounting/               # M11 buxgalteriya provodkasi, oy yopish
 │   │   ├── reports/                  # M12 hisobot va dashboard query'lari (faqat o'qish)
 │   │   ├── auth/                     # OAuth 2.0 AS+RS: /oauth/*, /auth/*, /admin/users, Authlib integratsiyasi, token/sessiya/litsenziya jadvallari (`14-autentifikatsiya-oauth2.md`)
-│   │   ├── access/                   # M13 rol/ruxsat katalogi, role_permissions (foydalanuvchi CRUD'i endi `auth/`da)
+│   │   ├── access/                   # M13 rol/ruxsat katalogi, role_permissions (foydalanuvchi CRUD'i — `auth/`da)
 │   │   ├── branches/                 # M14 filial, ombor, kassa apparati, qurilma ro'yxati
 │   │   ├── expenses/                 # M15 xarajat, toifa, takrorlanuvchi xarajat
 │   │   ├── cash/                     # M16 kassa naqd pul harakati, smena sanash; bank tushumi tasdig'i `bank_settlements` (5710 → 5110, BankSettlementPostingService, `/bank-settlements`, BO-24 — `13-provodka-qoidalari.md` §2.18a, qaror #42)
@@ -285,7 +285,7 @@ Agent ro'yxati, ulash, token va vazifa navbati — `onec_integration` modulidagi
 | `print.raw` | `notifications`/`reports` | back-office'dan LAN printerga chop etish | holat (yuborildi / printer xatosi) |
 | `scale.plu_upload` | `catalog` | narx/tovar o'zgargach yoki qo'lda | yuklangan qatorlar soni / xato |
 
-Sotuv paytidagi fiskallashtirish va chek chop etish bulut vazifasi **emas** — POS ularni agentning lokal API'si orqali bajaradi (`21` §16). Agent imkoniyatlari (`fiscal_bridge`, `raw_printers`, `scales`, `onec`) agent sozlamasida yoqiladi; yoqilmagan imkoniyat turiga vazifa berilmaydi.
+Sotuv paytidagi fiskallashtirish va chek chop etish bulut vazifasi **emas** — POS ularni agentning lokal API'si orqali bajaradi (`21` §16). Bu ro'yxat `21` §16, `33-1c-integratsiya.md` §9.5 va `34-1c-agent.md` §14.3 bilan aynan bir xil; vazifa konverti va 1C protokoli (`33` §9) o'zgarmaydi. Agent imkoniyatlari (`hello.capabilities`: `onec`, `fiscal`, `print`, `scale` — `34` §14.2) agent sozlamasida yoqiladi; yoqilmagan imkoniyat turiga vazifa berilmaydi.
 
 **Worker/scheduler'da tenant konteksti**: har job'ning birinchi argumenti — majburiy `tenant_id` (`outbox_jobs.tenant_id`dan); job tanasi `async with tenant_transaction(session, tenant_id):` ichida bajariladi, `tenant_id`'siz job darhol xato bilan tugaydi. Scheduler (cron) biznes so'rovi bajarmaydi: `SECURITY DEFINER` funksiyasi `list_active_tenant_ids()` orqali tenantlarni olib, **har tenant uchun alohida job** navbatga qo'yadi. Platformaviy job'lar (obuna holati, billing) ham shu fan-out orqali tenant kontekstida ishlaydi; RLS'ni chetlab o'tadigan worker roli yo'q.
 

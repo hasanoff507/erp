@@ -7,7 +7,7 @@ Bu papka — ilovani yozish uchun **yagona va to'liq** spetsifikatsiya. Kod faqa
 1. **Avval spec, keyin kod.** Spec'da yo'q yoki noaniq narsa kodda o'zboshimchalik bilan hal qilinmaydi: avval tegishli faylga yoziladi (yoki `26-ochiq-savollar-reestri.md` ga qo'shiladi), keyin kod yoziladi.
 2. **Spec o'zgarsa** — shu commit'da bog'liq fayllar ham yangilanadi (masalan maydon qo'shilsa: `11` model → `12` DB → `17–20` API → `07` ekran) va `01-qarorlar.md` ga qator qo'shiladi.
 3. **Ziddiyat bo'lsa** ustunlik tartibi: `01-qarorlar.md` → mavzu bo'yicha asosiy fayl (masalan DB uchun `12`, API uchun `17–20`) → boshqalar.
-4. Belgilar: *taxmin* — tasdiqlanmagan raqam; *(qaror #N)* — `01-qarorlar.md` dagi qarorga havola; **26 #N (OQ-0xx)** — `26-ochiq-savollar-reestri.md` dagi band (holati faqat **Yopildi** yoki **Tashqi javob kerak**; ikkinchisida kod vaqtinchalik standart bilan sozlama/adapter ortida yoziladi). Fayllarning "Ochiq savollar" bo'limlarida faqat tashqi javob kutayotgan bandlar 26 raqami bilan qoladi, yopilganlar raqami saqlangan holda "Hal qilingan: …" qatori (qaror #59). Fayllarda faqat **joriy haqiqat** yoziladi — o'zgarishlar tarixi git'da va `spec/tarix/` da.
+4. Belgilar: *taxmin* — tasdiqlanmagan raqam; *(qaror #N)* — `01-qarorlar.md` dagi qarorga havola; **26 #N (OQ-0xx)** — `26-ochiq-savollar-reestri.md` dagi band (holati faqat **Yopildi** yoki **Tashqi javob kerak**; ikkinchisida kod vaqtinchalik standart bilan sozlama/adapter ortida yoziladi). Fayllarning "Ochiq savollar" bo'limlarida faqat tashqi javob kutayotgan bandlar 26 raqami bilan qoladi; yopilgan savollarga matn to'g'ridan-to'g'ri 26 yoki qarorga havola qiladi (qaror #59). Fayllarda faqat **joriy haqiqat** yoziladi — o'zgarishlar tarixi git'da va `spec/tarix/` da.
 5. Har fayl boshida standart blok: **Maqsad · Kim uchun · Bog'liq fayllar · Holat**.
 6. Mahsulot noldan quriladi va yadro 1C'siz ishlaydi. 1C bilan bog'lanish faqat alohida **1C integratsiya moduli** orqali (qaror #36–#42): kanal faqat COM (Do'kon agentining 1C imkoniyati, bulutdan pull), ERP → 1C bir tomonlama, MVP'dan keyin Bosqich 7 — `33-1c-integratsiya.md` (server moduli `onec_integration`), `34-1c-agent.md` (agent); tadqiqot — `research_notes/1c-integratsiya/`.
 7. **Do'kon agenti** (qaror #60) — do'kon Windows PK'sidagi yagona lokal dastur: fiskal ko'prik (POS → FM → OFD) va LAN printer/tarozi — Bosqich 5, 1C — Bosqich 7. Ochiq bulut OFD API yo'q; MVP kodi `FISCAL_PROVIDER=fake` bilan yoziladi, real fiskal adapter fiskal hamkor javobidan keyin (26 #109).
@@ -19,11 +19,11 @@ Bu papka — ilovani yozish uchun **yagona va to'liq** spetsifikatsiya. Kod faqa
 | 01 | `01-qarorlar.md` | Barcha qabul qilingan qarorlar #1–#65 (tarif, auth, chek, fiskal — 48 soatlik blok #43, markirovka #62, e-TTN #63, karta/UzQR #64; Do'kon agenti #60, AI shaxsiy ma'lumot #61, hosting #65…) | **Har doim birinchi** |
 | | **Mahsulot — nima quriladi** | | |
 | 02 | `02-rollar-va-ssenariylar.md` | 5 rol, kundalik ssenariylar, huquqlar matritsasi | Boshida |
-| 03 | `03-modullar-talablari.md` | 18 modul + M19 (1C integratsiyasi, MVP'dan keyin), foydalanuvchi hikoyalari (US-Mxx-nn), qabul mezonlari | Har modul oldidan |
-| 04 | `04-biznes-jarayonlar.md` | BP-01…14 — hujjat oqimlari (BP-14 — kunni 1C ga yuborish) | Har modul oldidan |
+| 03 | `03-modullar-talablari.md` | 18 modul + M19 (1C integratsiyasi, MVP'dan keyin), 104 ta foydalanuvchi hikoyasi (US-Mxx-nn; 86 tasi M01–M18, 18 tasi M19), qabul mezonlari | Har modul oldidan |
+| 04 | `04-biznes-jarayonlar.md` | BP-01…15 — tranzaksion hujjat oqimlari (BP-14 — kunni 1C ga yuborish, BP-15 — bank tushumi tasdig'i) | Har modul oldidan |
 | 05 | `05-mvp-chegarasi.md` | Must/Should/Could, tarif (99 000), MVP'dan keyingilar | Boshida |
 | 06 | `06-ekranlar-umumiy.md` | Ekranlar ro'yxati va oqimlar (POS/BO/ADM) | Frontend oldidan |
-| 07 | `07-ekran-tafsilotlari.md` | 37 ekran: maydonlar, validatsiya, holatlar, API, ruxsatlar | Har ekranni yozishda |
+| 07 | `07-ekran-tafsilotlari.md` | 41 ekran (POS-01…16, BO-01…24, ADM-01; 39 tasi MVP, BO-22/23 — M19): maydonlar, validatsiya, holatlar, API, ruxsatlar | Har ekranni yozishda |
 | 08 | `08-dizayn-tizimi.md` | Tokenlar, komponentlar, formatlash, chek/yorliq shablonlari, matnlar | Frontend oldidan |
 | 09 | `09-ai-funksiyalar.md` | AI-01/03/05/06 — mahsulot talablari | AI bosqichi oldidan |
 | | **Arxitektura — qanday quriladi** | | |
@@ -61,7 +61,7 @@ Bu papka — ilovani yozish uchun **yagona va to'liq** spetsifikatsiya. Kod faqa
 |---|---|
 | Skelet + auth (Bosqich 0–1) | 01, 32, 10, 23, 24, 12 (§1–5), 14, 15 (maskalash, rozilik, sirlar — #61, #65), 17, 26, 27, 31 (§1) |
 | Katalog va ombor | 03 (M04–M07, M09), 04, 11, 12, 13, 19, 07 (BO-02…05, BO-18) |
-| Kassa (veb, Bosqich 3) | 01 #43/#62/#64, 03 (M01–M03, M08, M16), 04, 13, 16, 18, 07 (POS-01…15), 08, 24 §6 (printer matritsasi) |
+| Kassa (veb, Bosqich 3) | 01 #43/#62/#64, 03 (M01–M03, M08, M16), 04, 13, 16, 18, 07 (POS-01…16), 08, 24 §6 (printer matritsasi) |
 | Moliya, hisobot, obuna (Bosqich 4, 6) | 03 (M10–M12, M15, M17, M18), 13 (§2.18a `bank_settlements`, §2.26 `tax_settlements`), 20 (bank ko'chirmasi importi, tranzit qoldiq), 07 (BO-06…21, BO-24) |
 | Fiskal va integratsiyalar (Bosqich 5) | 01 #60/#62/#63, 10 §2, 21, 34 (Kengaytirish), 16, 18–20 tegishli bo'limlar, 26 Jadval B |
 | AI | 09, 22, 20 (AI bo'limi) |

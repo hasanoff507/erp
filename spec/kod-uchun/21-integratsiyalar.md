@@ -17,7 +17,7 @@
 8. **BO-14 "Integratsiyalar holati"** ekrani — har bir tashqi tizim va Do'kon agenti uchun: ulanganmi, oxirgi muvaffaqiyatli chaqiruv vaqti, navbatdagi/muvaffaqiyatsiz ishlar soni, qo'lda qayta urinish tugmasi.
 9. Qurilish tartibi (14-bo'lim): **FiscalPort + FakeFiscalAdapter → MXIK → E-IMZO/e-faktura (+ kiruvchi e-TTN) → Payme/Click (billing + do'kon) → Telegram/SMS → Claude API → Asl belgisi (verify/qabul/hisobdan chiqarish) → ichki e-TTN → real fiskal adapter va Do'kon agenti (Bosqich 5) → 1C (Bosqich 7)**.
 10. Tashqi javobni kutayotgan har bir band port + stub/flag ortida kodlanadi (interim standart bilan) va "Ochiq savollar" bo'limida `26-ochiq-savollar-reestri.md` raqami bilan ko'rsatilgan; MVP kodini (Bosqich 0–6) to'xtatadigan band yo'q, real fiskal adapter — Bosqich 5.
-11. **Google bilan kirish + Telegram OTP (qaror #34)**: Google OIDC — bizning OAuth AS'imizga ulangan tashqi identity provider (§9.1 Google); OTP/parol tiklash/taklif/eksport/qarz eslatmalari — asosiy kanal **Telegram bot** (telefon "share contact" orqali ulanadi, §11.1), **SMS (Eskiz) faqat zaxira** (§10, `OtpPort` ortida).
+11. **Google bilan kirish + Telegram OTP (qaror #34)**: Google OIDC — bizning OAuth AS'imizga ulangan tashqi identity provider (§9.3); OTP/parol tiklash/taklif/eksport/qarz eslatmalari — asosiy kanal **Telegram bot** (telefon "share contact" orqali ulanadi, §11.1), **SMS (Eskiz) faqat zaxira** (§10, `OtpPort` ortida).
 12. **1C integratsiyasi (qaror #36–#42, 15-bo'lim)**: kanal — **faqat COM**, Do'kon agentining 1C imkoniyati orqali, **pull** (faqat chiquvchi HTTPS); yo'nalish ERP → 1C bir tomonlama; kunlik sotuv (kassa × kun bitta «Отчет о розничных продажах») va boshqa birlamchi hujjatlar 1C'ga ketma-ket, takrorsiz yoziladi; provodka/QQS/tannarx yuborilmaydi. To'liq spetsifikatsiya — `33-1c-integratsiya.md`, agent — `34-1c-agent.md`.
 13. **Do'kon agenti (qaror #60, 16-bo'lim)** — bitta Windows agenti (C#/.NET Framework 4.8, `34-1c-agent.md` dagi bilan bir xil asos): fiskal modul ko'prigi, xom TCP 9100 LAN printerlar, tarozi va 1C. Brauzer xom TCP/UDP ocha olmaydi va FM'ga to'g'ridan-to'g'ri ulana olmaydi — shu uchun bu uskunalar faqat agent orqali.
 
@@ -25,7 +25,7 @@
 
 ## 0. Umumiy naqsh: outbox, holat mashinasi, o'lik xat, BO-14
 
-Barcha 12 integratsiya (Claude API va MXIK qidiruvidan tashqari — ular ko'pincha sinxron/kesh bilan ishlaydi, pastda izohlangan) **bitta umumiy mexanizm** orqali o'tadi:
+Barcha integratsiyalar (Claude API va MXIK qidiruvidan tashqari — ular ko'pincha sinxron/kesh bilan ishlaydi, pastda izohlangan) **bitta umumiy mexanizm** orqali o'tadi:
 
 1. Biznes amali (sotuv, faktura imzolash, ro'yxatdan o'tish to'lovi...) **bitta DB tranzaksiyada** hujjat + registr + `outbox_jobs` yozuvini yaratadi (`11-malumotlar-modeli.md`, 10-bo'lim).
 2. API darhol javob qaytaradi (tashqi tizimni kutmaydi) — foydalanuvchi "yuborilmoqda" holatini ko'radi.
@@ -200,7 +200,7 @@ class EInvoicePort(Protocol):
 **Chiquvchi e-faktura oqimi (qaror #18 — chekdan keyin e-faktura, BP-13/BP-03)**:
 
 1. `POST /api/v1/einvoices` — `{direction:"out", source:"sale"|"manual", sale_id|null, counterparty_id, lines[]}`. Server **avtomatik** `draft` yaratadi, agar `counterparty.kind IN ('company','individual_entrepreneur')` **yoki** to'lov usuli `bank_transfer` bo'lsa (jismoniy shaxs bank orqali to'lasa — ikki tomonlama EHF ogohlantirishi). Jismoniy shaxsga kassa cheki bilan savdoda e-faktura talab qilinmaydi (SK 47-modda 3-qism; VM 489 3-band). Ruxsat — **`einvoice.create`**.
-2. `POST /api/v1/einvoices/from-receipt` (yoki `from-sale/{sale_id}`) — `{sale_id, counterparty_id}`; chekdan keyin alohida chiquvchi faktura so'ralsa (BP-13), `related_doc` orqali asl chekka bog'lanadi, **QQS ikki marta hisoblanmaydi va provodka yozilmaydi** (`13-provodka-qoidalari.md` 2.22) — xatolar `EINVOICE_ALREADY_LINKED`, `EINVOICE_AMOUNT_EXCEEDS_RECEIPT`, `EINVOICE_COUNTERPARTY_INCOMPLETE`.
+2. `POST /api/v1/einvoices/from-receipt` — `{sale_id, counterparty_id}`; chekdan keyin alohida chiquvchi faktura so'ralsa (BP-13), `related_doc` orqali asl chekka bog'lanadi, **QQS ikki marta hisoblanmaydi va provodka yozilmaydi** (`13-provodka-qoidalari.md` 2.22) — xatolar `EINVOICE_ALREADY_LINKED`, `EINVOICE_AMOUNT_EXCEEDS_RECEIPT`, `EINVOICE_COUNTERPARTY_INCOMPLETE`.
 3. Imzolash/yuborish — kiruvchi fakturadagi bilan **bir xil** `sign-challenge`/`submit-signed` oqimi (E-IMZO, 5-bo'lim), ruxsat `einvoice.sign` (Buxgalter); yuborish `outbox_jobs(kind=einvoice_send)` orqali tenantning tanlangan operatori adapteri bilan.
 4. DB cheklovi — bitta hujjatga (chek/kirim) bitta **faol** chiquvchi faktura (`uq_einvoice_out_per_doc`).
 
@@ -312,7 +312,7 @@ Adapterlar: `CrptXtraceAdapter` (real, Bosqich 5), `FakeMarkingAdapter` (GS1 par
 
 **Offline**: **sotuv** — ruxsat (narx qurilmada ma'lum bo'lsa; kod chekka yoziladi, FM offline imzolaydi, chek 48 soat ichida OFD orqali Asl belgisi'ga yetadi; lokal takror-kod nazorati majburiy; narx noma'lum tovar offline sotilmaydi); **ichki ko'chirish** — ruxsat (audit bilan); **qaytarish** — **faqat online** (ichki ehtiyot tanlovi: kod holatini tekshirish, firibgarlik; qonun offline qaytarish chekini taqiqlamaydi — VM 833 84/90-band — kelajakda `FiscalPolicy.marking_offline_return=allow` bilan yumshatilishi mumkin). To'liq siyosat — `16-offline-sync.md` §7, qaror #17.
 
-**SLA**: kirim/yetkazib beruvchiga qaytarishda egalik o'tishi xabarnomasi (EHF shaklida) — **3 ish kuni**, lekin tovar uchinchi shaxsga berilgunga qadar (VM 833 66–67-band); suv/ichimlik (VM 631), dori (VM 149) va o'simlik yog'i pilot (VM 23) sxemalarida — **72 soat** (VM 631 dagi 3 ish kuni ↔ 72 soat ziddiyatida qat'iyrog'i — 72 soat). Muddat — `marking_product_groups.acceptance_deadline`. Ichki ko'chirish uchun CRPT muddati yo'q.
+**SLA**: kirim/yetkazib beruvchiga qaytarishda egalik o'tishi xabarnomasi (EHF shaklida) — **3 ish kuni**, lekin tovar uchinchi shaxsga berilgunga qadar (VM 833 66–67-band); suv/ichimlik (VM 631), dori (VM 149) va o'simlik yog'i pilot (VM 23) sxemalarida — **72 soat** (VM 631 dagi 3 ish kuni ↔ 72 soat ziddiyatida qat'iyrog'i — 72 soat). Muddat — `platform.marking_product_groups.acceptance_deadline` (`'3_business_days'|'72_hours'`; mahsulot `products.marking_group_code` orqali). Ichki ko'chirish uchun CRPT muddati yo'q.
 
 **Xavfsizlik**: CRPT API kaliti **tenant darajasida** (`tenant_secrets`, shifrlangan).
 
@@ -398,7 +398,7 @@ Server tomonidagi PKCS#7 tekshiruvi — E-IMZO-SERVER (shartnoma bo'yicha) orqal
 
 **Yo'nalish va trigger**: chiquvchi — Menejer/Buxgalter ishonchnoma yaratadi (yetkazib beruvchi, tovar, muddat, ishonchli shaxs), Omborchi imzolaydi → `outbox_jobs(kind=poa_send)`.
 
-**Ma'lumot moslashtirish**: `goods_receipts.poa_number`, `poa_date`, `poa_einvoice_id` (EDO hujjati); EHF'da `doverennost_number`, `doverennost_date`.
+**Ma'lumot moslashtirish**: `goods_receipts.poa_number` (e-ishonchnoma raqami, operator orqali); EHF'da `doverennost_number`, `doverennost_date`.
 
 **Idempotentlik kaliti**: `poa_number + tenant_id`.
 
@@ -528,7 +528,7 @@ class PaymentPort(Protocol):
 - Do'kon sotuvida: to'lov muvaffaqiyatsiz bo'lsa kassir boshqa usul (naqd/karta) taklif qiladi — sotuv to'xtamaydi.
 - Bizning billingda: to'lov o'tmasa — 24 soatlik imtiyozdan keyin (US-M17-03) tenant uchun kirish **to'liq to'xtaydi**: barcha faol sessiya/tokenlar bekor qilinadi, har bir ochiq ekran login sahifasiga qaytariladi, login sahifasida "Obuna muddati tugagan" xabari + Click/Payme to'lov havolasi, yangi login rad etiladi. To'lov kelgach darhol qayta ochiladi. Offline qurilma — mahalliy imzolangan litsenziya (`subscription_end + 24 soat`) muddati tugaganda o'zi qulflanadi. Xizmat shartlarida do'konning kirish to'xtatilgan davrdagi fiskal/soliq majburiyatlari uchun o'zi javobgar ekani yoziladi (qaror #15). Ikki tor istisno (`16-offline-sync.md` §3.5): **D1** — lokautdan oldin yaratilgan fiskal voqealar cheklangan `sync.drain` scope orqali baribir yetkaziladi (1-bo'lim); **D2** — lokautda ma'lumot eksporti faqat to'lov sahifasidan, SMS OTP tasdig'i bilan.
 
-**Offline**: Click/Payme/Uzum va dinamik UzQR — faqat online. Statik UzQR va mustaqil terminal (`card`) — qo'lda tasdiqlanadigan to'lov turlari (9.1, 9.2), kassa internetiga bog'liq emas.
+**Offline**: Click/Payme/Uzum va UzQR (statik ham, dinamik ham) — **faqat online** (qaror #64; `16-offline-sync.md` — to'lov turlarining offline siyosati). Mustaqil terminal (`card`) — qo'lda tasdiqlanadigan to'lov turi (9.2), online va offline'da ruxsat.
 
 **SLA**: qat'iy muddat yo'q; to'lov holati soniyalar ichida (Uzum — 30 daqiqalik tranzaksiya oynasi).
 
@@ -561,7 +561,7 @@ Adapterlar: `UzqrStubAdapter` (MVP — dinamik QR o'chiq), real adapter — POS 
 
 **Xato UX**: dinamik QR tasdig'i kelmasa — chek "to'lov kutilmoqda" holatida, kassir boshqa usulga o'tishi yoki bekor qilishi mumkin.
 
-**Offline**: dinamik UzQR — faqat online; statik UzQR — qo'lda tasdiq (mijoz o'z telefonidan to'laydi), tushum 5710 orqali `bank_settlements` bilan solishtiriladi (qaror #42).
+**Offline**: UzQR — **faqat online**, statik ham (qaror #64; `16-offline-sync.md` — to'lov turlarining offline siyosati): offline'da POS `uzqr` to'lov turini o'chirib ko'rsatadi. Statik QR'da kassir to'lovni mijoz telefonidan ko'rib qo'lda tasdiqlaydi; tushum 5710 orqali `bank_settlements` bilan solishtiriladi (qaror #42).
 
 **SLA**: hisob raqamga tushish ≤ 24 soat.
 
@@ -583,7 +583,7 @@ Adapterlar: `UzqrStubAdapter` (MVP — dinamik QR o'chiq), real adapter — POS 
 
 ---
 
-## 9.1 Google OIDC — Google bilan kirish (qaror #34)
+## 9.3 Google OIDC — Google bilan kirish (qaror #34)
 
 **Maqsad va modullar**: ro'yxatdan o'tish/kirish uchun qo'shimcha usul — telefon+parolni almashtirmaydi, bizning OAuth AS'imizga **tashqi identity provider** sifatida ulanadi (M17, `14-autentifikatsiya-oauth2.md` §2.2).
 
@@ -621,9 +621,9 @@ class GoogleOidcAdapter(Protocol):
 
 ## 10. SMS provayder — faqat zaxira kanal (qaror #34)
 
-**Maqsad va modullar** (qaror #34): OTP (ro'yxatdan o'tish, tiklash, taklif, eksport tasdig'i), mijozga qarz/to'lov eslatmasi — **faqat zaxira kanal**, asosiy kanal endi Telegram bot (§11.1). SMS ishlatiladi faqat: (a) foydalanuvchi Telegramga ulanmagan **va** Google bilan kirmagan, (b) Telegram yetkazib berish muvaffaqiyatsiz bo'lgan holatlarda.
+**Maqsad va modullar** (qaror #34): OTP (ro'yxatdan o'tish, tiklash, taklif, eksport tasdig'i), mijozga qarz/to'lov eslatmasi — **faqat zaxira kanal**, asosiy kanal — Telegram bot (§11.1). SMS ishlatiladi faqat: (a) foydalanuvchi Telegramga ulanmagan **va** Google bilan kirmagan, (b) Telegram yetkazib berish muvaffaqiyatsiz bo'lgan holatlarda.
 
-**Yo'nalish va trigger**: chiquvchi, `outbox_jobs(kind=sms)` — endi odatda faqat Telegram urinishi muvaffaqiyatsiz bo'lgandan keyin navbatga qo'yiladi.
+**Yo'nalish va trigger**: chiquvchi, `outbox_jobs(kind=sms)` — odatda faqat Telegram urinishi muvaffaqiyatsiz bo'lgandan keyin navbatga qo'yiladi.
 
 **API holati**: standart provayder — **Eskiz.uz** (`notify.eskiz.uz`): `POST /api/auth/login` → token 30 kun, `PATCH /api/auth/refresh`; `POST /api/message/sms/send` (`mobile_phone`, `message`, `from="4546"`, `callback_url`), `/sms/status_by_id/:id`, balans `/api/user/get-limit`; shablonlar `POST /api/user/template` (moderatsiya); statuslar `DELIVRD`/`UNDELIV`/`EXPIRED`/`REJECTD`. Narx 95 so'm/SMS, 100 ta bepul test SMS; test rejimida faqat ruxsat etilgan test matni yuboriladi. **Eskiz faqat O'zbekiston yuridik shaxslariga** xizmat qiladi — shartnoma kompaniya yuridik shaxsi tashkil etilgandan keyin. Muqobil: Telegram Gateway API (`sendVerificationMessage`, $0,01 yetkazilgan kod uchun) — `OtpPort` ortida keyin qo'shilishi mumkin.
 
@@ -802,7 +802,7 @@ Tanlov mezoni: (a) ochiq API/test muhiti birinchi, (b) qonuniy bosim (48 soat OF
 | Tayyorlik | Smenalar yopilgan, filialning barcha faol POS qurilmalari kun yopilgandan keyin sinxronlangan (`/sync/push` `outbox_state` — `16-offline-sync.md` §3.1, §9), oldingi kunlar tugagan, 1C'da sana taqiqlanmagan, moslashtirish to'liq (`33-1c-integratsiya.md` §7.3) |
 | Qamrovdan tashqari | «Базовая» versiyalar (COM yo'q), bulutdagi 1C (1С:Фреш, ijara), sotish narxida hisob (2920/2980) bazalari — onboarding tekshiruvi aniq aytadi (qaror #41) |
 | Sirlar | 1C paroli va agent maxfiy kaliti faqat PK'da (DPAPI `CurrentUser`); server ularni hech qachon olmaydi (`15-xavfsizlik-va-audit.md` §4.1) |
-| Xatolar va monitoring | 75 ta `ONEC_*` kod (`17-api-umumiy.md` §15, «1C integratsiyasi» domeni) — sinf `transient`/`unknown`/`config`/`validation` qayta urinishni belgilaydi; BO-14 «1C» qatori, BO-23 kunlar kalendari, Telegram shablonlari (`onec_export_result`, `onec_problems`) |
+| Xatolar va monitoring | 81 ta `ONEC_*` kod (`17-api-umumiy.md` §15, «1C integratsiyasi» domeni) — sinf `transient`/`unknown`/`config`/`validation` qayta urinishni belgilaydi; BO-14 «1C» qatori, BO-23 kunlar kalendari, Telegram shablonlari (`onec_export_result`, `onec_problems`) |
 | Test muhiti | Rasmiy sandbox yo'q — pilot oldi testlari real «Бухгалтерия для Узбекистана 3.0.64.x» bazada (P-01…P-22, `33-1c-integratsiya.md` §16.1); 1C rekvizit nomlari *taxmin* — profil faylidan, metadata snapshot bilan tekshiriladi |
 
 ---
@@ -819,7 +819,19 @@ Tanlov mezoni: (a) ochiq API/test muhiti birinchi, (b) qonuniy bosim (48 soat OF
 | **1C** | COM faqat Windows jarayonidan | `33-1c-integratsiya.md` §9.5 vazifalari | Bosqich 7 |
 
 **Ikki kanal**:
-1. **Lokal API (POS ↔ agent)** — `http://127.0.0.1:<port>/v1/*`, faqat loopback interfeysida tinglaydi. Kim ishlatadi: veb-kassa (fiskal chek, xom printer). Himoya: `Origin` oq ro'yxati (`https://app.<domen>`), CORS preflight va Private Network Access javobi (`Access-Control-Allow-Private-Network: true`), har so'rovda **qurilma lokal tokeni** (agent POS qurilmasi bilan bir marta bog'lanadi — server orqali almashtiriladigan `devices` yozuviga bog'liq qisqa muddatli token). Chrome 142+ da sahifa lokal tarmoq/loopback'ga birinchi murojaatda foydalanuvchidan ruxsat so'raydi (Local Network Access) — onboarding yo'riqnomasida. Lokal API internetsiz ham ishlaydi — offline savdoning asosiy sharti.
+1. **Lokal API (POS ↔ agent)** — `http://127.0.0.1:<port>/v1/*`, faqat loopback interfeysida tinglaydi (port agent sozlamasida, POS-16 «Uskunalar sozlamasi»da ko'rsatiladi). Kim ishlatadi: veb-kassa — sotuv paytidagi fiskal chek va xom printerga chop etish; internetsiz ham ishlaydi (offline savdoning asosiy sharti). Yo'llar:
+
+   | Yo'l | Vazifa |
+   |---|---|
+   | `GET /v1/status` | Agent versiyasi, yoqilgan imkoniyatlar (`fiscal`, `print` — `34-1c-agent.md` §14.2 dagi nomlar), fiskal provayder va FM holati (`fm_state`) |
+   | `POST /v1/pair` | POS qurilmasini agentga bog'lash (pastda) |
+   | `POST /v1/fiscal/open-shift`, `/close-shift`, `/sale`, `/refund` | `FiscalPort` amallari (`open_shift`, `close_shift`, `register_sale`, `register_refund`) — payload va natija 1-bo'limdagi port bilan bir xil, summalar tiyinda |
+   | `GET /v1/fiscal/device-status`, `GET /v1/fiscal/unsent`, `POST /v1/fiscal/resend` | `get_device_status`, `list_unsent`, `resend_unsent` |
+   | `POST /v1/print/raw` | ESC/POS baytlarini ro'yxatdagi LAN printerga (`host:9100`) uzatish |
+
+   **Himoya** (uchalasi birga majburiy): (a) faqat `127.0.0.1` — tashqi interfeysda port ochilmaydi; (b) **`Origin` oq ro'yxati** — faqat `https://app.<domen>` (dev'da `http://localhost:<vite-port>`), boshqa `Origin` yoki `Origin`siz so'rov → `403`; CORS preflight va Private Network Access javobi (`Access-Control-Allow-Private-Network: true`) faqat ro'yxatdagi `Origin` uchun; (c) **qurilmaga bog'langan lokal token** — `Authorization: Bearer <local_token>` har so'rovda. Bog'lash: agent tray'da 6 raqamli bir martalik kodni ko'rsatadi (5 daqiqa amal qiladi), kassir POS-16 da kiritadi → `POST /v1/pair {code, device_id}` → agent tasodifiy 256-bit `local_token` qaytaradi va uni POS `devices.id` bilan juft qilib DPAPI ostida saqlaydi; POS tokenni Dexie'da saqlaydi. Token boshqa `device_id` bilan ishlamaydi; tray «Ulangan kassalar» ro'yxatidan bog'lanish o'chiriladi; POS qurilmasi serverda bekor qilinsa (`POST /devices/{id}/revoke`) POS o'zi qulflanadi. Server bu tokenni ko'rmaydi va saqlamaydi. Chrome 142+ da sahifa loopback'ga birinchi murojaatda foydalanuvchidan ruxsat so'raydi (Local Network Access) — onboarding yo'riqnomasida.
+
+   **POS holati «Fiskal modul ulanmagan»**: lokal ko'prik rejimida (`FISCAL_PROVIDER` = `multikassa_local`/`fiscaldrive_local`) `GET /v1/status` javob bermasa, token rad etilsa yoki `fm_state` noma'lum bo'lsa — POS (`$agentStatus != online`, `24-frontend-arxitekturasi.md` §6.4) chekni **yopmaydi**, savatni saqlaydi va agentni qayta ishga tushirish yo'riqnomasini ko'rsatadi; bu lokal holat, server xato kodi emas. `fm_state='locked'` → `FISCAL_DEVICE_LOCKED`, 48 soat → `FISCAL_OFFLINE_48H_BLOCKED` (1-bo'lim).
 2. **Bulut kanali (agent ↔ server)** — `33-1c-integratsiya.md` §9 dagi **bir xil** identifikatsiya va protokol: OAuth mijozi `onec-agent` (RFC 8628 device grant bilan ulash, keyin `client_credentials` + `private_key_jwt`, access token 10 daqiqa), yo'llar `/api/v1/onec-agent/*` (long-poll pull, Ed25519 imzoli vazifalar, lease/heartbeat). Bitta do'kon PK'si — bitta agent yozuvi (`devices.kind='onec_agent'`), imkoniyatlar sozlamada yoqiladi.
 
 **Bulut vazifa turlari — Bosqich 5 kengaytmasi** (`33` §9.5 oq ro'yxatiga qo'shiladi; `base_id = null`, 1C bazasi talab qilinmaydi):
@@ -832,7 +844,7 @@ Tanlov mezoni: (a) ochiq API/test muhiti birinchi, (b) qonuniy bosim (48 soat OF
 | `print.raw` | Back-office'dan LAN printerga chop etish (masalan qayta chek nusxasi, kassa hisoboti) | yuborildi / printer xatosi |
 | `scale.plu_upload` | PLU ro'yxatini yorliqli taroziga yuklash | yuklangan qatorlar soni / xato |
 
-Imkoniyat yoqilmagan agentga bu turdagi vazifa berilmaydi; agent noma'lum turni `33` §9.11 qoidasi bo'yicha rad etadi. Sotuv paytidagi fiskallashtirish va chek chop etish **bulut vazifasi emas** — POS ularni lokal API orqali bajaradi (internetga bog'liq emas).
+Bu ro'yxat `23-backend-arxitekturasi.md` §4.2, `33-1c-integratsiya.md` §9.5 va `34-1c-agent.md` §14 bilan aynan bir xil. Imkoniyat yoqilmagan agentga bu turdagi vazifa berilmaydi; agent noma'lum turni `33` §9.11 qoidasi bo'yicha rad etadi. Sotuv paytidagi fiskallashtirish va chek chop etish **bulut vazifasi emas** — POS ularni lokal API orqali bajaradi (internetga bog'liq emas). 1C protokoli (`33` §9) o'zgarmaydi — bu turlar o'sha imzoli vazifa konvertida keladi.
 
 **Sirlar**: FM/hamkor lokal xizmat siri, 1C paroli, agent Ed25519 maxfiy kaliti — faqat PK'da (DPAPI `CurrentUser`); serverga chiqmaydi.
 

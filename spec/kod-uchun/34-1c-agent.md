@@ -2,7 +2,7 @@
 
 **Maqsad:** do'kon kompyuterida ishlaydigan «ERP 1C Agent» (supervisor tray-ilova + 32/64-bit COM worker'lar) ni kodga tayyor darajada belgilash: solution tuzilishi, jarayonlar va oqimlar, worker protokoli, o'rnatish va imzoli avto-yangilanish, ulash va token, bazalarni topish va onboarding, pull sikli, har vazifa turining COM ketma-ketligi, xato tasnifi, mahalliy jurnal, loglar, UI, xavfsizlik va testlar — `33-1c-integratsiya.md` §9 protokoliga to'liq bo'ysungan holda. · **Kim uchun:** agent dasturchisi · **Bog'liq fayllar:** `33-1c-integratsiya.md` (ustun: §2.3, §8, §9, §12, §15, §16.1), `14-autentifikatsiya-oauth2.md` (§5, §6), `15-xavfsizlik-va-audit.md`, `01-qarorlar.md` (#36–#41, #60), `26-ochiq-savollar-reestri.md` (#100, #102, #105, #109); tadqiqot — `research_notes/1c-integratsiya/01`, `04`, `06`; `research_notes/sonar-1c-integratsiya/01`, `02`, `04` (faqat g'oyalar, kod ko'chirilmaydi) · **Holat:** joriy, 2026-10-16.
 
-Bu fayl agent **ichini** yozadi; tashqi shartnoma (endpointlar A-01…A-10, vazifa turlari, `ObjectSpec`/`QuerySpec`, imzo, muddatlar, xato kodlari) — `33` da va shu yerda o'zgartirilmaydi. Ziddiyatda tartib: `01-qarorlar.md` → `33-1c-integratsiya.md` → shu fayl. `33` hali ochiq qoldirgan joylardagi agent tanlovi — §13.1 da. Agent — Do'kon agentining (qaror #60) 1C moduli; Do'kon agentining boshqa modullari — §14. Sonar AI dekompilyatsiya kodi **ko'chirilmaydi** (qaror #36: noldan yoziladi) — faqat naqshlar olinadi.
+Bu fayl agent **ichini** yozadi; tashqi shartnoma (endpointlar A-01…A-10, vazifa turlari, `ObjectSpec`/`QuerySpec`, imzo, muddatlar, xato kodlari) — `33` da va shu yerda o'zgartirilmaydi. Ziddiyatda tartib: `01-qarorlar.md` → `33-1c-integratsiya.md` → shu fayl. `33` bilan moslik jadvali — §13.1. Agent — Do'kon agentining (qaror #60) 1C moduli; Do'kon agentining boshqa modullari — §14. Sonar AI dekompilyatsiya kodi **ko'chirilmaydi** (qaror #36: noldan yoziladi) — faqat naqshlar olinadi.
 
 ---
 
@@ -18,7 +18,7 @@ Bu fayl agent **ichini** yozadi; tashqi shartnoma (endpointlar A-01…A-10, vazi
 8. **Faqat oq ro'yxat**: 13 vazifa turi (`33` §9.5), COM metod nomlari ham oq ro'yxatda (§8.1.2) — `Удалить`, global `Выполнить`/`Вычислить` va ixtiyoriy 1C kodi agent binarida umuman yo'q (CI tekshiradi).
 9. **Mahalliy jurnal** `actions.jsonl` — har vazifa (`task_id`, `attempt`) boshlanishi va natijasi; qayta kelgan vazifa 1C'ga bormasdan jurnaldagi natija bilan javob oladi; «boshlangan, tugamagan» yozish qayta ishga tushganda `unknown` sifatida yuboriladi.
 10. **Sirlar**: 1C paroli va agent kaliti — faqat DPAPI `CurrentUser` (+ entropy), serverga hech qachon chiqmaydi; loglarda `Pwd=`, `Bearer`, `client_assertion`, JWS va ulanish satri maskalanadi.
-11. **Do'kon agenti** (qaror #60): shu agent (bitta o'rnatish, bitta ulash, bitta pull sikli) Bosqich 5 da fiskal ko'prik (`fiscal.*`), raw TCP 9100 printer (`print.*`) va tarozi (`scale.*`) modullari bilan kengaytiriladi; 1C moduli chegaralari o'zgarmaydi (§14).
+11. **Do'kon agenti** (qaror #60): shu agent (bitta o'rnatish, bitta ulash, bitta pull sikli) Bosqich 5 da fiskal ko'prik, raw TCP 9100 printer va tarozi modullari bilan kengaytiriladi: sotuv paytidagi fiskal chek va chop etish — lokal API (`127.0.0.1`, `Origin` oq ro'yxati + qurilmaga bog'langan token); server vazifalari — `fiscal.status`, `fiscal.resend_unsent`, `fiscal.zreport`, `print.raw`, `scale.plu_upload` (`21` §16 bilan bir xil); 1C moduli va `33` §9 protokoli o'zgarmaydi (§14).
 
 ---
 
@@ -73,10 +73,10 @@ Bu fayl agent **ichini** yozadi; tashqi shartnoma (endpointlar A-01…A-10, vazi
 
 ### 2.1 Repo papkasi
 
-Agent kodi repo ildizida `agent/` papkasida (`backend/`, `web/` yonida; `32-kod-qoidalari.md` §1 ga qo'shiladi). Umumiy test vektorlari — `shared/` (backend bilan birga).
+Agent kodi repo ildizida `agent-1c/` papkasida (`backend/`, `web/` yonida; `32-kod-qoidalari.md` §1.3 bilan bir xil). Bosqich 5 modullari — `src/Erp1C.Fiscal/` va `src/Erp1C.Devices/` (§14.1 «Kod tuzilishi»). Umumiy test vektorlari — `shared/` (backend bilan birga).
 
 ```
-agent/
+agent-1c/
 ├── ErpOneCAgent.sln
 ├── Directory.Build.props          # net48, LangVersion 9, Nullable enable, TreatWarningsAsErrors, Deterministic, versiya
 ├── src/
@@ -1539,7 +1539,7 @@ Har vazifa yakuni bo'yicha bildirishnoma **yo'q** (natija Telegram va BO-23 da �
 
 | Ish | Runner | Qadamlar |
 |---|---|---|
-| `agent-build` (har PR, `agent/**` yoki `shared/**` o'zgarsa) | GitHub `windows-2022` | restore (lock fayl bilan) → `SchemaHash` tekshiruvi → build x86/x64/AnyCPU `Release` → unit testlar → qora ro'yxat grep (§8.1.2) → Inno compile (imzosiz) → artefakt |
+| `agent-build` (har PR, `agent-1c/**` yoki `shared/**` o'zgarsa) | GitHub `windows-2022` | restore (lock fayl bilan) → `SchemaHash` tekshiruvi → build x86/x64/AnyCPU `Release` → unit testlar → qora ro'yxat grep (§8.1.2) → Inno compile (imzosiz) → artefakt |
 | `agent-integration` (tunda, qo'lda) | self-hosted `onec` | §12.4 |
 | `agent-release` (teg `agent-v*`) | Imzolash PK'si (qo'lda tasdiq) | §2.5 qadamlari 2–6 |
 
@@ -1547,17 +1547,17 @@ Har vazifa yakuni bo'yicha bildirishnoma **yo'q** (natija Telegram va BO-23 da �
 
 ## 13. Agent tanlovlari, ochiq savollar, manbalar
 
-### 13.1 `33` hali ochiq qoldirgan joylar — agent tanlovi
+### 13.1 `33` bilan moslik
 
-`33` ga zid emas; `33` ning ko'rsatilgan bo'limiga ko'chirilishi kerak.
+Agentning quyidagi tanlovlari `33` da kanonik qilib yozilgan — ikki hujjat bir xil:
 
-| # | `33` joyi | Noaniqlik | Shu fayldagi tanlov |
+| # | Mavzu | `33` joyi | Shu fayl |
 |---|---|---|---|
-| 1 | §2.3 `license_source`, §9.5 `probe` natijasi | Dalil sifatida «agent sessiyasi turi (RDP yoki konsol)» tilga olingan, lekin `probe` natija sxemasida maydon yo'q | Agent `data.base.session_kind ∈ {"console","rdp"}` ni yuboradi (`GetSystemMetrics(SM_REMOTESESSION)`, §8.2); `33` §9.5 `probe` natijasiga shu maydon qo'shilishi kerak |
-| 2 | §9.5 `read_metadata` `constants` | Profildagi konstanta nomi bazada yo'q bo'lsa | Shu kalit `{"t":"null"}`, log `warn`, vazifa `done`; talqin serverda (§8.4) |
-| 3 | §9.5, §7.3 yengil `read_metadata` (`classes=[]`) | `objects` va `metadata_hash` qiymati | `objects=[]`, `metadata_hash=null`; server bu natija bilan `onec_metadata_snapshots` ni yangilamaydi (§8.4) |
-| 4 | §9.10 tasnif jadvali | Qoidalar tartibi va bosqich chegarasi berilmagan («недостаточно» — `ONEC_ACCESS_DENIED` va `ONEC_NEGATIVE_STOCK`; «конфигуратор»/«монопольн» — `ONEC_BASE_EXCLUSIVE` va `ONEC_BASE_LOCKED`) | §8.12 dagi tartiblangan jadval; birinchi mos qoida g'olib |
-| 5 | §8.3 6-qadam, §12 `ONEC_DUPLICATE_REF` (sinf `unknown`) | Agent natijasining `outcome` qiymati | `failed` + kod (platforma aniq javob bergan); `outcome='unknown'` faqat `ONEC_UNKNOWN_OUTCOME` uchun (`33` A-05) |
+| 1 | `data.base.session_kind ∈ {"console","rdp"}` (`GetSystemMetrics(SM_REMOTESESSION)`) — `license_source` dalili | §2.3, §9.5 `probe` | §8.2 |
+| 2 | Profildagi konstanta bazada yo'q → `{"t":"null"}`, log `warn`, vazifa `done` | §9.5 `read_metadata` | §8.4 |
+| 3 | Yengil `read_metadata` (`classes=[]`) → `objects=[]`, `metadata_hash=null`, snapshot yangilanmaydi | §9.5 | §8.4 |
+| 4 | Tasnif: raqamlangan tartib va bosqich chegarasi, birinchi mos qoida g'olib | §9.10 (katalog) | §8.12 (kanonik tartib) |
+| 5 | `ONEC_DUPLICATE_REF` → `outcome='failed'`; `outcome='unknown'` faqat `ONEC_UNKNOWN_OUTCOME` | §9.10, A-05 | §8.8, §8.13 |
 
 ### 13.2 Ochiq savollar
 
@@ -1568,7 +1568,7 @@ Faqat tashqi javob talab qiladigan bandlar, `26-ochiq-savollar-reestri.md` raqam
 | #105 | Authenticode OV kod-imzolash sertifikati — CA, kalit saqlash usuli, yuridik shaxs nomi (qaror #38) | Asoschi + CA | Olinmaguncha agent faqat ichki sinovda (tarqatilmaydi); imzolash qo'lda tasdiq bilan (§2.5) |
 | #100 | Agentning COM ulanishi alohida ish o'rni/litsenziya hisoblanadimi; parallel sessiyalar (`max_parallel_bases`) litsenziyani ortiqcha egallaydimi (P-14) | 1C rasmiy hamkori | `max_parallel_bases=2`; litsenziya xatosi ko'p bo'lsa 1 ga tushiriladi; `license_source` tekshiruvi |
 | #102 | «ERP integratsiya» 1C foydalanuvchisining minimal rollari (P-18) | Real БП UZ baza / 1C hamkori | §6.7 tavsiyasi; `user_rights` tekshiruvi |
-| #109 | Fiskal hamkor, lokal ko'prik (hamkor lokal xizmati/SDK), autentifikatsiya, sertifikatlash talabi (§14) | Fiskal hamkor | `FISCAL_PROVIDER=fake` (`FakeFiscalAdapter` + FM emulyatori); §14 vazifa turlari hamkor tanlangach aniqlanadi |
+| #109 | Fiskal hamkor, lokal ko'prik (hamkor lokal xizmati/SDK), autentifikatsiya, sertifikatlash talabi (§14) | Fiskal hamkor | `FISCAL_PROVIDER=fake` (`FakeFiscalAdapter` + FM emulyatori); §14.3 fiskal payload sxemalari hamkor tanlangach aniqlanadi |
 
 ### 13.3 Manbalar
 
@@ -1595,7 +1595,7 @@ Qaror #60: do'kon Windows kompyuteridagi **bitta** lokal dastur — «Do'kon age
 | Vazifa xavfsizligi | Har vazifa — §7.5 dagi kabi Ed25519 JWS (`knd` claim), `payload_sha256`, muddat, mahalliy jurnal (§8.14); har modulning o'z `kind` oq ro'yxati; noma'lum `kind` → rad |
 | Jarayon | Supervisor — tarmoq, sirlar, UI, rejalashtirish; har qurilma o'z yo'lagida (`DeviceLane` — qurilma bo'yicha FIFO), 1C `BaseLane` lari bilan bloklashmaydi: 1C'ga uzun yozish chek chiqarishni kechiktirmaydi |
 | 1C moduli chegaralari | O'zgarmaydi: 13 turli oq ro'yxat, COM metodlari oq ro'yxati, uch qulf (`33` §3.1); yangi modullar 1C COM'ga tegmaydi |
-| Lokal kanal | Qaror #60: agent `127.0.0.1` da lokal API ham beradi — POS (PWA) shu PK'dan internet uzilganda ham chek chiqarishi uchun. Port, POS ↔ agent autentifikatsiyasi va brauzer cheklovlari (CORS, Private Network Access) 26 #109 bilan birga yoziladi. 1C moduli lokal API'dan foydalanmaydi |
+| Lokal kanal | Qaror #60: agent `127.0.0.1:<port>` da lokal API beradi — POS (PWA) shu PK'dan internet uzilganda ham chek chiqarishi va xom printerga chop etishi uchun. Yo'llar (`/v1/status`, `/v1/pair`, `/v1/fiscal/*`, `/v1/print/raw`) va himoya — yagona ta'rif `21-integratsiyalar.md` §16: faqat loopback, `Origin` oq ro'yxati (`https://app.<domen>`), CORS/Private Network Access javobi faqat shu `Origin` uchun, qurilmaga bog'langan lokal token (tray'dagi 6 raqamli bir martalik kod → `POST /v1/pair {code, device_id}` → 256-bit token, `device_id` bilan juft holda DPAPI ostida; tray «Ulangan kassalar»dan o'chiriladi). Agent javob bermasa POS «Fiskal modul ulanmagan» holatida chekni yopmaydi (`24-frontend-arxitekturasi.md` §6.4). 1C moduli lokal API'dan foydalanmaydi |
 | Kod tuzilishi | Har modul alohida loyiha (`Erp1C.*` yonida); fiskal modul kodi — alohida, kam o'zgaradigan paket (VMQ-943 2-ilova 6-band: fiskal qism o'zgarsa qayta xulosa) |
 | Kod-imzolash | O'sha OV Authenticode va imzoli manifest (§2.5, §4.4); pilot tarqatish sharti — 26 #105 |
 
@@ -1615,14 +1615,27 @@ Qaror #60: do'kon Windows kompyuteridagi **bitta** lokal dastur — «Do'kon age
 - `provider` — fiskal ko'prik turi (`multikassa_local` / `fiscaldrive_local`, qaror #60); `devices[].status` ∈ `ok`, `error`, `offline`.
 - `hello` sxemasiga `capabilities` qo'shilishi — protokol o'zgarishi: avval kanonik protokol hujjati, keyin `X-Agent-Protocol` oshiriladi (`33` §9).
 
-### 14.3 Yangi vazifa turlari
+### 14.3 Lokal API amallari va server vazifa turlari
 
-Nomlar — oila prefiksi bilan; payload va natija sxemalari hamkor va qurilmalar tanlangach yoziladi.
+Ikki xil kanal — aralashtirilmaydi:
 
-| Oila | Turlar | Bajaruvchi | Qoidalar |
+**(a) Lokal API amallari** (POS → agent, `127.0.0.1`; sotuv paytida, internetsiz ham; server navbatiga tushmaydi):
+
+| Oila | Amallar | Bajaruvchi | Qoidalar |
 |---|---|---|---|
-| `fiscal.*` | `fiscal.sale`, `fiscal.refund`, `fiscal.x_report`, `fiscal.z_report`, `fiscal.status`, `fiscal.resend` | Fiskal ko'prik: hamkorning lokal dasturi yoki SDK'si orqali fiskal modul (FM) → OFD | `FiscalPort` chegarasida summalar butun son tiyinda (26 #84); FM bergan raqam — alohida `fm_receipt_seq`; 48 soatlik offline blok (qaror #43) `fiscal.status` dagi eng eski yuborilmagan chek vaqtidan; fiskal amal hech qachon avtomatik takrorlanmaydi — `fiscal.status`/`fiscal.resend` bilan tekshiriladi |
-| `print.*` | `print.raw`, `print.receipt`, `print.status` | Raw TCP 9100 (ESC/POS) LAN printer | Matn — `cp866` kod sahifasi (`ESC t`); cp866 da yo'q belgilar (o'zbek kirill `ў қ ғ ҳ`, `ʻ`) bo'lsa — raster (`GS v 0`); ulanish faqat ro'yxatdagi printerga (xususiy LAN manzili, port 9100) — ixtiyoriy host yo'q |
-| `scale.*` | `scale.read_weight`, `scale.upload_plu`, `scale.status` | Tarozi: serial (COM port) yoki TCP | Protokol — tarozi modeli bo'yicha drayver; vaznli shtrix kod prefiksi (EAN-13) — do'kon sozlamasi, POS tomonda |
+| fiskal | `open-shift`, `close-shift`, `sale`, `refund`, `device-status`, `unsent`, `resend` (`/v1/fiscal/*`) | Fiskal ko'prik: hamkorning lokal xizmati yoki SDK'si orqali fiskal modul (FM) → OFD | `FiscalPort` chegarasida summalar butun son tiyinda (26 #84); FM bergan raqam — alohida `fm_receipt_seq`; 48 soatlik offline blok (qaror #43) eng eski yuborilmagan chek vaqtidan; fiskal amal hech qachon avtomatik takrorlanmaydi — `device-status`/`unsent` bilan tekshiriladi, keyin `resend` |
+| chop etish | `print/raw` (`/v1/print/raw`) | Raw TCP 9100 (ESC/POS) LAN printer | Matn — `cp866` kod sahifasi (`ESC t`); cp866 da yo'q belgilar (o'zbek kirill `ў қ ғ ҳ`, `ʻ`) bo'lsa — raster (`GS v 0`); ulanish faqat ro'yxatdagi printerga (xususiy LAN manzili, port 9100) — ixtiyoriy host yo'q |
 
-Fiskal hamkor tanlangach (26 #109) aniqlanadi: `fiscal.*` payload/natija sxemalari va xato kodlari (`17` §15 ga yangi domen), hamkor lokal xizmati bilan aloqa (localhost API yoki SDK), lokal API, dasturni sertifikatlash talabi. `print.*` va `scale.*` sxemalari — qo'llab-quvvatlanadigan printer va tarozi modellari ro'yxati bilan birga.
+**(b) Server vazifa turlari** (server → agent, `33` §9 dagi o'sha imzoli vazifa konverti va pull sikli; `base_id = null`; ro'yxat `21-integratsiyalar.md` §16, `23-backend-arxitekturasi.md` §4.2 va `33-1c-integratsiya.md` §9.5 bilan aynan bir xil):
+
+| `kind` | Vazifa | Natija |
+|---|---|---|
+| `fiscal.status` | FM holati: `fm_state`, yuborilmagan cheklar soni, eng eski yuborilmagan chek vaqti (har 5 daqiqa) | `cash_registers.fm_state`, `fm_receipts_pending`, `last_unacked_receipt_at` |
+| `fiscal.resend_unsent` | Yuborilmagan cheklarni qayta yuborish (40 soatda server avtomatik qo'yadi, BO-14'da qo'lda ham) | `ResendResult` |
+| `fiscal.zreport` | Smena POS'siz yopilganda Z-hisobotni FM'dan olish | `ZReport` |
+| `print.raw` | Back-office'dan LAN printerga chop etish | yuborildi / printer xatosi |
+| `scale.plu_upload` | PLU ro'yxatini yorliqli taroziga yuklash (CAS TCP 20304, Shtrih-Print UDP 1111) | yuklangan qatorlar soni / xato |
+
+Kassadagi jonli og'irlik agent vazifasi emas — desktop Chrome'da Web Serial (MVP'dan keyin, `24-frontend-arxitekturasi.md` §6.3); vaznli shtrix kod prefiksi (EAN-13) — do'kon sozlamasi, POS tomonda.
+
+Fiskal hamkor tanlangach (26 #109) aniqlanadi: fiskal payload/natija sxemalari va hamkor xato kodlarining `fm_state`/`FISCAL_*` ga xaritasi, hamkor lokal xizmati bilan aloqa (localhost API yoki SDK), dasturni sertifikatlash talabi. `print.*` va `scale.*` sxemalari — qo'llab-quvvatlanadigan printer va tarozi modellari ro'yxati bilan birga.

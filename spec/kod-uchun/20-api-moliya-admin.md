@@ -54,8 +54,8 @@
 | 27 | `GET /roles/{id}/permissions` | M13 | Rolning ruxsat/limit ro'yxati | `settings.users` |
 | 28 | `PUT /roles/{id}/permissions` | M13 | Rol ruxsat/limitlarini belgilash | `settings.users` |
 | 29 | `GET /permissions-catalog` | M13 | To'liq ruxsat kodlari katalogi (statik) | `settings.users` |
-| 29a | `GET /devices` | M13 | Tenant qurilmalari ro'yxati (BO-11 «Qurilmalar» tabi) | `settings.users` |
-| 29b | `POST /devices/{id}/revoke` | M13 | Qurilmani bekor qilish | `settings.users` |
+| 29a | `GET /devices` | M13 | Tenant qurilmalari ro'yxati (BO-11 «Qurilmalar» tabi) | `devices.revoke` |
+| 29b | `POST /devices/{id}/revoke` | M13 | Qurilmani bekor qilish | `devices.revoke` |
 | 30 | `GET /branches` | M14 | Filiallar ro'yxati | `—` |
 | 31 | `POST /branches` | M14 | Yangi filial yaratish | `settings.branches` |
 | 32 | `GET /branches/{id}` | M14 | Filial tafsiloti | `—` |
@@ -612,7 +612,7 @@
 | | |
 |---|---|
 | Maqsad | BO-11 «Qurilmalar» tabi (qaror #56): tenantning barcha qurilmalari — oxirgi sinxron va sinxronlanmagan voqealar soni bilan (`14-autentifikatsiya-oauth2.md` §18.2 `GET /admin/users/{id}/devices` — xodim kesimidagi ko'rinish, bu — tenant kesimi) |
-| Ruxsat | `settings.users` |
+| Ruxsat | `devices.revoke` (Egasi, Menejer — qaror #56) |
 | So'rov | Page pagination; filtr `?branch_id=&kind=web\|android\|onec_agent&include_revoked=false` |
 | Javob | `{items: [{id, kind, app_version, cash_register_id, cash_register_name, branch_id (kassa orqali), last_seen_at, last_sync_at, pending_events (= devices.outbox_pending_count), outbox_oldest_pending_at, has_pending: bool, revoked_at}], total, page, size}` — `onec_agent` qurilmalari faqat ko'rinadi, bekor qilish — `33-1c-integratsiya.md` §10 |
 | Xatolar | `BRANCH_SCOPE_DENIED` |
@@ -625,7 +625,7 @@
 | | |
 |---|---|
 | Maqsad | Qurilmani bekor qilish: `devices.revoked_at`, qurilmaning refresh/access/litsenziya tokenlari bekor, shu qurilmada PIN bilan kirgan xodimlar PIN'i majburiy almashtiriladi (`16-offline-sync.md` §9, `14-autentifikatsiya-oauth2.md` §7/§17). Sinxronlanmagan voqea bo'lsa (`has_pending=true`) — `confirm_pending_loss=true` talab qilinadi; UI avval qurilmada `sync.drain`ni taklif qiladi (qaror #56) |
-| Ruxsat | `settings.users` (Egasi; Menejerga Egasi beradi) |
+| Ruxsat | `devices.revoke` (Egasi, Menejer — qaror #56) |
 | So'rov | `{reason: string (majburiy), confirm_pending_loss: bool (standart false)}` |
 | Javob | `200 {id, revoked_at, pending_events}` |
 | Xatolar | `NOT_FOUND`, `VALIDATION_ERROR` (`has_pending=true` va `confirm_pending_loss=false` — `details[].field="confirm_pending_loss"`, `params.pending_events`), `409 {code:"RESOURCE_ARCHIVED"}` (allaqachon bekor qilingan) |
@@ -823,9 +823,9 @@
 
 | | |
 |---|---|
-| Maqsad | Do'kon nomi/tili, yuridik shakli, bank hisobi va tenant siyosatlarini yangilash; soliq rejimi — 40c, integratsiya kalitlari — 40d, AI roziligi — 40h orqali |
+| Maqsad | Do'kon nomi (`tenants.name`), yuridik shakli, bank hisobi va tenant siyosatlarini (`tenants.settings`) yangilash; soliq rejimi — 40c, integratsiya kalitlari — 40d, AI roziligi — 40h orqali |
 | Ruxsat | `settings.tenant`; tanada faqat `settings.vat_diff_tolerance_amount` bo'lsa — `tax.compare.review` ham yetarli (Buxgalter, qaror #50) |
-| So'rov | `{store_name?, locale?, legal_form?, settings?: {bank_account?, bank_mfo?, supplier_overpay_policy?, vat_diff_tolerance_amount?, marking_precheck?, discount_posting?, owner_withdrawal_account?, payment_org_commission_account?, turnover_tax_account?, fiscal_policy?: {debt_receipt_split?, credit_sale_receipt?}}, version: int (majburiy)}` — qisman yangilash (merge); `ai_cross_border_enabled`, `go_live_date`, `accepted_terms_*` qabul qilinmaydi |
+| So'rov | `{name?, legal_form?, settings?: {bank_account?, bank_mfo?, supplier_overpay_policy?, vat_diff_tolerance_amount?, marking_precheck?, discount_posting?, owner_withdrawal_account?, payment_org_commission_account?, turnover_tax_account?, fiscal_policy?: {debt_receipt_split?, credit_sale_receipt?}}, version: int (majburiy)}` — qisman yangilash (merge); `ai_cross_border_enabled`, `go_live_date`, `accepted_terms_*` qabul qilinmaydi |
 | Javob | `200 TenantSettings` |
 | Xatolar | `VALIDATION_ERROR` (enum tashqarisidagi qiymat, `vat_diff_tolerance_amount < 0`, `bank_account` 20 raqam emas, `ai_cross_border_enabled` tanada), `VERSION_CONFLICT` |
 | Idempotency-Key | Majburiy |
@@ -880,7 +880,7 @@
 | Maqsad | BO-14 «Sinxron istisnolari» ro'yxati (qaror #56): offline sinxronda qabul qilingan, lekin ko'rib chiqishni talab qiladigan hodisalar (`sync_exceptions`, `16-offline-sync.md` §5 — chekdagi «qotirilgan» narx serverdagidan farq qiladi, sotuv vaqtida arxivlangan tovar va h.k.). Provodkaga ta'sir qilmaydi |
 | Ruxsat | `settings.tenant` **yoki** `accounting.post` |
 | So'rov | Cursor; filtr `?reviewed=true\|false&branch_id=&device_id=&created_at__gte=&created_at__lte=` |
-| Javob | `{items: [{id, kind, device_id, branch_id, doc_type, doc_id, details, created_at, reviewed_at, reviewed_by, review_note}], next_cursor}` |
+| Javob | `{items: [{id, kind, device_id, branch_id, doc_type, doc_id, details, created_at, reviewed_at, reviewed_by, review_note}], next_cursor}` — `branch_id` hosila (`devices.cash_register_id → cash_registers.branch_id`; `sync_exceptions`da ustun yo'q) |
 | Xatolar | `VALIDATION_ERROR` |
 | Idempotency-Key | Kerak emas |
 | Offline | Yo'q |
@@ -903,10 +903,10 @@
 
 | | |
 |---|---|
-| Maqsad | Egasi tomonidan AI provayderiga (chegaradan tashqari) ma'lumot uzatish roziligini qabul qilish yoki qaytarib olish: `consents` yozuvi (`subject` = tenant, `purpose`, `version`, `at`) + `tenants.settings.ai_cross_border_enabled` (qaror #61). Rozilik berilmaguncha AI-03 rasmlari yuborilmaydi (`AI_CONSENT_REQUIRED`); AI'ga yuboriladigan matnda shaxsiy maydonlarni maskalash rozilikdan qat'i nazar majburiy |
+| Maqsad | Egasi tomonidan AI provayderiga (chegaradan tashqari) ma'lumot uzatish roziligini qabul qilish yoki qaytarib olish: `consents` yozuvi (`subject='tenant'`, `user_id`, `purpose`, `terms_version`, `accepted`, `ip`, `at`; append-only) + `tenants.settings.ai_cross_border_enabled` (qaror #61). Rozilik berilmaguncha AI-03 rasmlari yuborilmaydi (`AI_CONSENT_REQUIRED`); AI'ga yuboriladigan matnda shaxsiy maydonlarni maskalash rozilikdan qat'i nazar majburiy |
 | Ruxsat | `settings.tenant` (**faqat Egasi**) |
 | So'rov | `{purpose: "ai_cross_border" (majburiy), terms_version: string (majburiy — joriy `terms_versions` versiyasi), accepted: bool (majburiy; `false` — qaytarib olish)}` |
-| Javob | `201 {purpose, terms_version, accepted, accepted_at, ai_cross_border_enabled}` |
+| Javob | `201 {purpose, terms_version, accepted, at, ai_cross_border_enabled}` (`at` = `consents.at`) |
 | Xatolar | `VALIDATION_ERROR` (noma'lum `purpose`; `terms_version` joriy versiya emas — `params.current_version`) |
 | Idempotency-Key | Majburiy |
 | Offline | Yo'q |
@@ -1121,7 +1121,7 @@
 
 > Hujjat jadvali `bank_settlements` (`doc_sequences` kodi `BT`, `12-db-sxema.md`), provodka — `13-provodka-qoidalari.md` §2.18a (qaror #42): 5710 (yo'ldagi pul) dagi tranzit summani bank hisobiga (5110) o'tkazadigan **yagona** hujjat. Komissiya hisobi `method` bo'yicha: `card`/`uzqr` (bank ekvayringi) — **9430**; `click`/`payme`/`uzum` (to'lov tashkiloti) — `tenants.settings.payment_org_commission_account` (standart `9430`); `collection` (inkassa xizmati) — **9410**. MVP'da tenantning **bitta** bank hisobi (5110, `tenants.settings.bank_account`; `cash_moves.bank_account_id` doim `NULL`, qaror #49). Standart uch bosqichli hujjat (`17-api-umumiy.md` §9: `draft → post → cancel`). **Faqat back-office**, sync voqeasi yo'q. `cash_moves` yozilmaydi — faqat `ledger_entries`. Modul papkasi `modules/cash` (`BankSettlementPostingService`), OpenAPI teg `cash`. Ekran — BO-24; jarayon — BP-15; hikoya — US-M11-04. `source='statement_import'` hujjatlari bank ko'chirmasi importidan (55g) `draft` holatida yaratiladi va xuddi shu 55e/55f bilan o'tkaziladi/bekor qilinadi — import hech qachon avtomatik `post` qilmaydi; 55c har doim `source='manual'` yaratadi.
 
-`BankSettlement` obyekti (javoblarda): `{id, number, branch_id, doc_date, status ("draft"|"posted"|"cancelled"), source ("manual"|"statement_import"), method ("card"|"uzqr"|"click"|"payme"|"uzum"|"collection"), settled_from, settled_to, gross_amount, commission_amount, variance_amount, net_amount, bank_ref, attachment_id, import_id, comment, created_by, created_at, posted_at, cancelled_at, cancelled_by, cancel_reason}` — pul o'nlik satr (`17-api-umumiy.md` §3); `variance_amount` — faqat `method="collection"` (standart `"0.00"`): inkassa summasi bilan bank sanog'i farqi, musbat — kamomad, manfiy — ortiqcha; `net_amount = gross_amount − commission_amount − variance_amount` (bank hisobiga tushgan summa, DB'da generated); `import_id` — 55g importi (`source='statement_import'` da).
+`BankSettlement` obyekti (javoblarda): `{id, number, branch_id, doc_date, status ("draft"|"posted"|"cancelled"), source ("manual"|"statement_import"), method ("card"|"uzqr"|"click"|"payme"|"uzum"|"collection"), settled_from, settled_to, gross_amount, commission_amount, variance_amount, net_amount, bank_ref, attachment_id, statement_import_id, comment, created_by, created_at, posted_at, cancelled_at, cancelled_by, cancel_reason}` — pul o'nlik satr (`17-api-umumiy.md` §3); `variance_amount` — faqat `method="collection"` (standart `"0.00"`): inkassa summasi bilan bank sanog'i farqi, musbat — kamomad, manfiy — ortiqcha; `net_amount = gross_amount − commission_amount − variance_amount` (bank hisobiga tushgan summa, DB'da generated); `statement_import_id` — 55g importi (`source='statement_import'` da).
 
 ### 55a. `GET /bank-settlements`
 
@@ -1155,9 +1155,9 @@
 |---|---|
 | Maqsad | Bank ko'chirmasi / ekvayer hisob-kitob hisoboti bo'yicha qoralama yaratish (`source='manual'`) |
 | Ruxsat | `bank_settlements.manage` |
-| So'rov | `{branch_id: UUID (majburiy), doc_date: date (majburiy — bankka tushgan sana, provodka sanasi), method: "card"\|"uzqr"\|"click"\|"payme"\|"uzum"\|"collection" (majburiy), settled_from: date, settled_to: date (majburiy, settled_from ≤ settled_to ≤ doc_date), gross_amount: string (majburiy, > 0 — 5710 dan yopiladigan summa), commission_amount: string (standart "0.00", ≥ 0 va < gross_amount), variance_amount: string (standart "0.00"; faqat `method="collection"`, `commission_amount + variance_amount < gross_amount`), bank_ref: string (ixtiyoriy), attachment_id: UUID (ixtiyoriy, `attachments.kind='import'` — ko'chirma fayli, `17-api-umumiy.md` §12), comment: string (ixtiyoriy)}` |
+| So'rov | `{branch_id: UUID (majburiy), doc_date: date (majburiy — bankka tushgan sana, provodka sanasi), method: "card"\|"uzqr"\|"click"\|"payme"\|"uzum"\|"collection" (majburiy), settled_from: date, settled_to: date (majburiy, settled_from ≤ settled_to ≤ doc_date), gross_amount: string (majburiy, > 0 — 5710 dan yopiladigan summa), commission_amount: string (standart "0.00", ≥ 0 va < gross_amount), variance_amount: string (standart "0.00"; faqat `method="collection"`; manfiy — kamomad, musbat — ortiqcha; `gross_amount − commission_amount + variance_amount > 0`), bank_ref: string (ixtiyoriy), attachment_id: UUID (ixtiyoriy, `attachments.kind='import'` — ko'chirma fayli, `17-api-umumiy.md` §12), comment: string (ixtiyoriy)}` |
 | Javob | `201 BankSettlement` (`status="draft"`, `number` — `BT-{filial}-{yil}-{ketma-ket}`, `11-malumotlar-modeli.md`) |
-| Xatolar | `VALIDATION_ERROR` (enum, sana tartibi, `commission_amount ≥ gross_amount`; `variance_amount ≠ 0` va `method ≠ "collection"`; `gross_amount` shu filial va usul bo'yicha `doc_date` holatidagi 5710 qoldig'idan katta — `details[].field="gross_amount"`, `params.available`), `PERIOD_CLOSED` (`doc_date` yopilgan davrda), `BRANCH_SCOPE_DENIED`, `NOT_FOUND` (`attachment_id`) |
+| Xatolar | `VALIDATION_ERROR` (enum, sana tartibi, `commission_amount ≥ gross_amount`; `variance_amount ≠ 0` va `method ≠ "collection"`; `gross_amount` shu filial va usul bo'yicha `doc_date` holatidagi 5710 qoldig'idan katta — `details[].field="gross_amount"`, `details[].message_key="validation.bank_settlement_exceeds_in_transit"`, `params.available`), `PERIOD_CLOSED` (`doc_date` yopilgan davrda), `BRANCH_SCOPE_DENIED`, `NOT_FOUND` (`attachment_id`) |
 | Idempotency-Key | Majburiy |
 | Offline | Yo'q |
 | Bog'langan | US-M11-04; BO-24 forma; BP-15; audit (`15-xavfsizlik-va-audit.md` §6.1) |
@@ -1179,7 +1179,7 @@
 
 | | |
 |---|---|
-| Maqsad | O'tkazish (`13-provodka-qoidalari.md` §2.18a): `Dt 5110 / Kt 5710 = net_amount`; komissiya > 0 bo'lsa `Dt {komissiya hisobi} / Kt 5710 = commission_amount` — `card`/`uzqr` → `9430`, `click`/`payme`/`uzum` → `payment_org_commission_account` (standart `9430`), `collection` → `9410`; inkassa farqi: kamomad (`variance_amount > 0`) `Dt 5910 / Kt 5710`, ortiqcha (`< 0`) `Dt 5710 / Kt 9390` (analitika `payment_method`, filial, `bank_ref`); `Kt 5710` sof jami = `gross_amount` |
+| Maqsad | O'tkazish (`13-provodka-qoidalari.md` §2.18a): `Dt 5110 / Kt 5710 = net_amount`; komissiya > 0 bo'lsa `Dt {komissiya hisobi} / Kt 5710 = commission_amount` — `card`/`uzqr` → `9430`, `click`/`payme`/`uzum` → `payment_org_commission_account` (standart `9430`), `collection` → `9410`; inkassa farqi: kamomad (`variance_amount < 0`) `Dt 5910 / Kt 5710 = |variance_amount|`, ortiqcha (`variance_amount > 0`) `Dt 5710 / Kt 9390 = variance_amount` (analitika `payment_method`, filial, `bank_ref`); `Kt 5710` sof jami = `gross_amount` |
 | Ruxsat | `bank_settlements.manage` |
 | So'rov | `{}` |
 | Javob | `200 BankSettlement` (`status="posted"`, `posted_at`) |
@@ -1212,7 +1212,7 @@
 | So'rov | `multipart/form-data`: `file` (.txt, ≤ 10 MB, ≤ 20 000 qator — qaror #54), `branch_id` (UUID, ixtiyoriy — qator filialini to'lov maqsadidan aniqlab bo'lmasa ishlatiladi; tenantda bitta filial bo'lsa standart shu) |
 | Parser | **Kodlash**: sarlavhadagi `Кодировка=` (`Windows` → windows-1251, `UTF-8`/`UTF8` → UTF-8); sarlavha yo'q bo'lsa — avval qat'iy UTF-8 (BOM bilan ham), muvaffaqiyatsiz bo'lsa windows-1251. Birinchi qator `1CClientBankExchange` bo'lishi shart. **`СекцияРасчСчет`** … `КонецРасчСчет`: `РасчСчет`, `ДатаНачала`, `ДатаКонца`, `НачальныйОстаток`, `ВсегоПоступило`, `ВсегоСписано`, `КонечныйОстаток`. **`СекцияДокумент=<вид>`** … `КонецДокумента`: `Номер`, `Дата`, `Сумма`, `ПлательщикСчет`, `Плательщик`/`Плательщик1`, `ПлательщикИНН`, `ПолучательСчет`, `Получатель`/`Получатель1`, `ПолучательИНН`, `ДатаПоступило`, `ДатаСписано`, `НазначениеПлатежа`. Faqat **kirim** qatorlari (`ПолучательСчет` = tenant hisobi) qayta ishlanadi; chiqimlar `ignored_outgoing` da sanaladi. `Сумма` — o'nlik satrga (`17-api-umumiy.md` §3), sana — `ДатаПоступило`, bo'lmasa `Дата` |
 | Moslashtirish | Har kirim qatori uchun: (1) `method` — to'lovchi (ekvayer bank / Click / Payme / Uzum / inkassa) va `НазначениеПлатежа` kalit so'zlari bo'yicha; (2) filial — to'lov maqsadidagi terminal/merchant identifikatori bo'yicha, aks holda `branch_id`; (3) `gross_amount` — shu filial va `method` bo'yicha 5710 qoldig'idan (55b hisobi) eski tushumlardan boshlab FIFO yig'indisi, kirim summasiga eng yaqin kelgan, `settled_from`/`settled_to` — shu tushumlar oralig'i, `doc_date` — kirim sanasi; (4) `commission_amount = gross_amount − kirim summasi`, `variance_amount = "0.00"` (inkassada kamomad/ortiqcha bo'lsa — Buxgalter qoralamani 55f bilan bekor qilib, 55c bilan `variance_amount` ni ajratib kiritadi). `bank_ref` = `Номер`, `attachment_id` — yuklangan fayl (`attachments.kind='import'`). Mos tranzit topilmasa yoki `commission_amount ≥ gross_amount` bo'lsa — qoralama yaratilmaydi, qator `unmatched_lines` ga tushadi (Buxgalter 55c bilan qo'lda kiritadi) |
-| Javob | `201 {import_id, file_sha256, account, period_from, period_to, created_drafts: int, draft_ids: [UUID], skipped_duplicates: int, ignored_outgoing: int, unmatched_lines: [{line_no, number, date, amount, payer_name, purpose, reason: "no_transit_match"\|"unknown_method"\|"branch_ambiguous"\|"commission_invalid"}]}` — `skipped_duplicates`: `bank_ref` + `doc_date` + summa bo'yicha avval yaratilgan (bekor qilinmagan) `bank_settlements` bilan mos qatorlar |
+| Javob | `201 {import_id, file_sha256, account, period_from, period_to, drafts_created: int, draft_ids: [UUID], duplicates: int, ignored_outgoing: int, unmatched_lines: [{line_no, number, date, amount, payer_name, purpose, reason: "no_transit_match"\|"unknown_method"\|"branch_ambiguous"\|"commission_invalid"}]}` — nomlar `bank_statement_imports` ustunlari bilan bir xil, `draft_ids` hosila (`bank_settlements.statement_import_id`); `duplicates`: `bank_ref` + `doc_date` + summa bo'yicha avval yaratilgan (bekor qilinmagan) `bank_settlements` bilan mos qatorlar |
 | Xatolar | `422 BANK_IMPORT_FILE_INVALID` (1CClientBankExchange sarlavhasi yo'q, kodlash aniqlanmadi, majburiy maydon yo'q yoki sintaksis xatosi — `params.line_no`), `422 BANK_IMPORT_ACCOUNT_MISMATCH` (`СекцияРасчСчет.РасчСчет` `tenants.settings.bank_account`ga teng emas, bir nechta hisob bor yoki tenant bank hisobi kiritilmagan — `params.file_account`), `409 BANK_IMPORT_DUPLICATE` (shu `file_sha256` bilan fayl allaqachon import qilingan — `params.import_id`), `FILE_TOO_LARGE`, `UNSUPPORTED_FILE_TYPE`, `BRANCH_SCOPE_DENIED` |
 | Idempotency-Key | Majburiy |
 | Offline | Yo'q |

@@ -220,6 +220,8 @@ Belgilar: **K** = ko'rish, **Y** = yaratish, **T** = tasdiqlash. "–" = huquq y
 
 *Izoh: jadvaldagi aniq huquq taqsimoti (masalan, Kassir M08'ga Y huquqiga ega) bozor/texnik tadqiqotda tayyor matritsa sifatida topilmagan — bu hujjat ERP ma'lumotlar modeli namunasi (`01-erp-modullar-va-malumot-modeli.md`) va modul funksiyalari (`08-mahsulot-modullari.md`) asosida, odatiy chakana savdo amaliyotidan kelib chiqib **loyihalashtirilgan**; MVP oldidan Egasi/arxitektor bilan tasdiqlanishi tavsiya etiladi (pastda, ochiq savol 1).*
 
+*Standart limitlar (2026-10-15: foydalanuvchi qarori)*: M03 (chegirma) — Kassir PIN'siz **5% gacha**; M02 (qaytarish) — chek bilan PIN'siz **100 000 so'mgacha** (chek yo'q bo'lsa har doim PIN); M16 (kassa pul harakati) — "Pul olish" PIN'siz **50 000 so'mgacha**; chekni bekor qilish (void) Kassirga limitsiz, audit bilan. Bu raqamlar **standart** qiymat — Egasi M13 (Huquqlar) orqali istalgan paytda o'zgartirishi mumkin (`02-modullar-talablari.md`, US-M02-02/US-M03-01/US-M16-01; `spec/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #1).
+
 *M15–M18 izohi (2026-10-14): Kassir xarajatni faqat M16 "Pul olish → Xarajat to'lovi" orqali yozadi (M15'ga avtomatik tushadi); M17 `billing.manage` faqat Egasi; platforma admini (ADM-01, `platform.admin`) tenant rollariga kirmaydi — `05-xavfsizlik-va-audit.md` §3.4.*
 
 *M13 izohi (2026-10-15: foydalanuvchi qarori): M13 endi faqat rol/huquq emas — Egasi uchun to'liq foydalanuvchi boshqaruvi (xodim qo'shish, bloklash, parol/PIN tiklash, faol sessiya/qurilmalarni ko'rish va bekor qilish — US-M13-04…07) ham shu modulga kiradi; platforma admini (ADM-01) faqat tenant Egasi (owner) hisobi darajasida shu funksiyalarga ega (US-M13-08). Autentifikatsiya — o'z OAuth 2.0 implementatsiyasi, mock yo'q (`spec/02-arxitektura/12-autentifikatsiya-oauth2.md`).*
@@ -229,7 +231,7 @@ Belgilar: **K** = ko'rish, **Y** = yaratish, **T** = tasdiqlash. "–" = huquq y
 ## Ochiq savollar
 
 1. Huquqlar matritsasidagi aniq taqsimot (6-bo'lim) tadqiqot fayllarida tayyor jadval sifatida topilmadi — bu hujjatda loyihalashtirilgan taxmin; MVP ishlab chiqishdan oldin foydalanuvchi bilan tasdiqlanishi kerak.
-2. Chegirma/qaytarish/nasiya uchun aniq summa limitlari (masalan, Kassir qancha so'mgacha tasdiqsiz chegirma berishi mumkin) — ochiq manbada yo'q, biznes-qoida sifatida sozlash kerak (`taxmin`).
+2. *(2026-10-15: hal qilindi — foydalanuvchi qarori)* ~~Chegirma/qaytarish/nasiya uchun aniq summa limitlari~~ — endi standart qiymatlar bor (6-bo'lim yangi izoh: chegirma 5%, qaytarish 100 000, pul olish 50 000), Egasi tomonidan o'zgartiriladi.
 3. *(2026-10-15: hal qilindi — foydalanuvchi qarori)* Markirovkalangan tovar offline sotilganda kassir nima qilishi kerak — endi aniq: narx qurilmada ma'lum bo'lsa sotuvga ruxsat (CRPT tekshiruvi internet qaytganda), narx noma'lum bo'lsa taqiq (`02-modullar-talablari.md`, US-M01-03). Qaytarish/ko'chirish uchun siyosat hali ochiq.
 4. Kichik do'konda bir necha rol birlashuvi uchun aniq segment chegaralari (1-3 xodim, 4+ xodim) — bu hujjatdagi 0-bo'limdagi guruhlash taxminiy, tadqiqotda raqam bilan tasdiqlanmagan.
 5. Buxgalterning **5 kalendar kunlik** davlat hisobotini solishtirish jarayonida aniq ish oqimi (kim birinchi ko'radi, qanday eskalatsiya) — `02-arxitektura` jamoasi bilan birga ishlab chiqilishi kerak *(2026-10-14: "5 ish kuni" → "5 kalendar kun" tuzatildi, muddatning o'zi va huquqiy asosi endi aniq)*.
@@ -247,3 +249,4 @@ Belgilar: **K** = ko'rish, **Y** = yaratish, **T** = tasdiqlash. "–" = huquq y
 - `research_notes/AI ERP startap Ozbekistonda/04_sohalar.md`
 - `research_notes/texnik/tekshiruv-2026-10-14/` — 2026-10-14 fakt-tekshiruv natijalari
 - `spec/02-arxitektura/12-autentifikatsiya-oauth2.md` — autentifikatsiya arxitekturasi — Foydalanuvchi qarori, 2026-10-15
+- `spec/tekshiruv/savollar-yakuniy-tavsiyalar.md` — 2026-10-15, tavsiya #1 (standart rol limitlari)

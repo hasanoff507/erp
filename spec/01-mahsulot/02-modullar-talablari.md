@@ -22,6 +22,7 @@
 **US-M01-01**: Kassir sifatida tovarni skanerlab/tanlab chek yaratmoqchiman, mijozga tez xizmat ko'rsatish uchun.
 - Given kassir smena ochgan, When tovar shtrix-kodi skanerlanadi yoki qo'lda tanlanadi, Then tovar chekka narx va MXIK kodi bilan qo'shiladi.
 - Given chekda bir yoki bir nechta tovar bor, When kassir to'lovni tanlaydi (naqd/karta/yagona QR (UzQR, bank)/Payme/Click/Uzum yoki aralash) *(2026-10-14: tekshiruv)*, Then chek yakunlanadi va fiskal belgi+QR-kod bilan chop etiladi/ko'rsatiladi (`research_notes/texnik/02-kassa-ofd-markirovka.md`, "Chek formati va majburiy rekvizitlar").
+- *(2026-10-15: foydalanuvchi qarori)* Given do'konda mustaqil (bankka to'g'ridan-to'g'ri ulangan) karta terminali bor, lekin u veb-kassaga integratsiyalanmagan, When kassir "Karta" to'lov turini qo'lda belgilaydi (online va offline'da ham ruxsat), Then ixtiyoriy "terminal operatsiya raqami" maydoni kiritiladi (ixtiyoriy, terminal kvitansiyasi bilan solishtirish uchun) va chek "karta" to'lov turi bilan yakunlanadi; smena yopilganda Z-hisobotda "karta" jami alohida chiqadi (M16, US-M16-02/03), Egasi kun oxirida bank ko'chirmasi bilan solishtiradi.
 
 **US-M01-02**: Kassir sifatida internet bo'lmaganda ham savdo qilishni, keyin avtomatik sinxronlanishini istayman.
 - Given internet aloqasi yo'q, When kassir chek yaratadi, Then chek mahalliy append-only jurnalga yoziladi va "offline" belgisi bilan ko'rsatiladi.
@@ -52,6 +53,10 @@
 ### Davlat tizimlari bog'liqligi
 OFD (fiskal operator — "Yangi texnologiyalar" DUK), Asl belgisi (CRPT Turon), MXIK (chekning majburiy rekviziti), 2026-07-01'dan yuridik shaxslar uchun bank tomonidan generatsiya qilingan yagona QR kod (UzQR) orqali to'lov qabul qilish majburiy (PF-246-son, 10.12.2025, 3-band "b", [lex.uz/uz/docs/-7897630](https://lex.uz/uz/docs/-7897630)); Click/Payme/Uzum — ixtiyoriy kanallar. *(2026-10-14: tekshiruv)*
 
+*(2026-10-15: foydalanuvchi qarori)* **Fiskal yo'l**: birinchi kundanoq o'z virtual kassamizni Davlat reyestriga kiritish arizasi boshlanadi (VMQ-943, 4-ilova; ~50 ish kuni); ariza tasdiqlanguncha pilot (10–20 do'kon) bitta reyestr hamkori (Multikassa yoki E-POS Communicator) orqali o'tkaziladi, hamkor haqini biz to'laymiz — mijozga ko'rinmaydi (`06-mvp-chegarasi.md`, §3.3 va §5; `spec/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #2).
+
+*(2026-10-15: foydalanuvchi qarori)* **CRPT Turon (Asl belgisi) integratsiyasi MVP'da**: har bir do'kon o'zining bepul "ishtirokchi" (Participant) kabinetidan "API Key Manager" roli bilan API kalit yaratadi va tizimimizga kiritadi (CRPT Turon yordam markazi — ishonch darajasi o'rta, sahifa 403 bo'lgani uchun faqat qidiruv parchalaridan ma'lum, Xat 2 javobi kutilmoqda). Agar bu yo'l rasman rad etilsa — **zahira: reyestr hamkori orqali proksi integratsiya**. Ikkalasi ham ishga tushmasa — markirovkalangan tovar sotuvi tizimda **bloklanadi** (CRPT'siz bu tovar sotilmaydi), US-M01-03 xatti-harakati shunga mos.
+
 ### Offline xatti-harakati
 Majburiy: append-only event-log (outbox naqshi), 48 soat OFD chegarasi. Markirovka tekshiruvi (CRPT Turon'da real-vaqt tasdiqlash) offline ishlay olmaydi (markaziy tizimga bog'liq) — lekin *(2026-10-15: foydalanuvchi qarori — avvalgi "ochiq savol" hal qilindi)* **markirovkalangan tovarni offline sotish RUXSAT ETILADI**, agar tovar narxi qurilmada ma'lum bo'lsa (POS'ga oldindan sinxronlangan/keshlangan katalog narxi, M09): DataMatrix kod skanerlanadi, qurilmada **faqat mahalliy** (kod formati/nazorat raqami) tekshiriladi va kod mahalliy jurnalga yoziladi, CRPT Turon'da haqiqiylik tekshiruvi va "chiqarish" (spisaniye)/"sotildi" belgisi internet qaytganda amalga oshiriladi (asinxron, outbox). Agar tovar narxi qurilmada ma'lum **bo'lmasa** (hali sinxronlanmagan yangi tovar) — bu tovar bilan sotuv offline rejimda **ruxsat etilmaydi**. Qaytarish/ko'chirish uchun offline siyosati hali **ochiq savol** (pastda) — faqat sotuv (bu modul) uchun qaror qabul qilindi. *Eslatma: bu mahsulot qarori; yuridik tasdiq (huquqshunos bilan) tavsiya etiladi, lekin spec darajasidagi qaror allaqachon qabul qilingan.*
 
@@ -79,8 +84,9 @@ Majburiy: append-only event-log (outbox naqshi), 48 soat OFD chegarasi. Markirov
 - Given asl chek topilmaydi, When kassir shunga qaramay qaytarishga harakat qiladi, Then operatsiya Menejer tasdig'isiz yakunlanmaydi.
 
 **US-M02-02**: Menejer sifatida belgilangan limitdan yuqori qaytarishni tasdiqlashni istayman.
-- Given qaytarish summasi limitdan yuqori (limit — taxmin, biznes-qoida sifatida sozlanadi), When kassir qaytarishni yuboradi, Then operatsiya "kutilmoqda" holatiga o'tadi va Menejerga bildirishnoma boradi.
+- Given qaytarish summasi limitdan yuqori, When kassir qaytarishni yuboradi, Then operatsiya "kutilmoqda" holatiga o'tadi va Menejerga bildirishnoma boradi.
 - Given Menejer tasdiqlaydi, When u "tasdiqlash" tugmasini bosadi, Then qaytarish yakunlanadi; rad etilsa, operatsiya bekor qilinadi va sabab yoziladi.
+- *(2026-10-15: foydalanuvchi qarori)* **Standart limit**: asl chek bilan qaytarish — Kassir PIN'siz **100 000 so'mgacha** mustaqil amalga oshiradi; chek topilmasa (asl chek yo'q) — summadan qat'i nazar **har doim Menejer PIN** talab qilinadi (US-M02-01'dagi "topilmagan chek" holati bilan birga). Egasi istalgan paytda bu limitni (M13 orqali) o'zgartirishi mumkin (`01-rollar-va-ssenariylar.md`, 6-bo'lim izohi; `spec/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #1).
 
 **US-M02-03**: Buxgalter sifatida qaytarilgan tovar bo'yicha QQS tuzatishini avtomatik ko'rishni istayman.
 - Given qaytarish yakunlangan, When tizim buxgalteriya yozuvini yaratadi, Then sotuv summasi va unga mos QQS summasi manfiy yozuv bilan tuzatiladi (M10, M11).
@@ -89,11 +95,11 @@ Majburiy: append-only event-log (outbox naqshi), 48 soat OFD chegarasi. Markirov
 Markirovkalangan tovar qaytarilganda Asl belgisi tizimida mos "qaytarish" operatsiyasi qayd etilishi talab qilinishi mumkin — rasmiy tasdiq topilmadi, **ochiq savol**.
 
 ### Offline xatti-harakati
-Offline rejimda qaytarish mahalliy jurnalga yoziladi (M01 bilan bir xil append-only naqsh), internet qaytganda sinxronlanadi.
+Oddiy (markirovkalanmagan) tovar uchun qaytarish offline rejimda mahalliy jurnalga yoziladi (M01 bilan bir xil append-only naqsh), internet qaytganda sinxronlanadi. *(2026-10-15: foydalanuvchi qarori)* **Markirovkalangan (Asl belgisi) tovarni qaytarish faqat internet bor paytda mumkin** — offline rejimda bunday tovar uchun "Qaytarish" tugmasi bloklanadi (POS-05'da aniq xabar bilan): sabab — qaytarish uchun kod yozilgan rasmiy qaytarish cheki kerak (buxgalter.uz, tasdiqlangan fakt) va CRPT Turon markaziy tizimga bog'liq bo'lgani uchun offline tekshirib bo'lmaydi, firibgarlik xavfi yuqori (`spec/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #5).
 
 ### Chekka holatlar
 - Qisman qaytarish (chekdagi bir nechta tovardan faqat bittasi).
-- Muddati o'tgan/markirovkalangan tovarni qaytarish siyosati aniq emas.
+- *(2026-10-15: hal qilindi — foydalanuvchi qarori)* Markirovkalangan tovarni qaytarish siyosati endi aniq: **faqat online** (yuqoridagi Offline xatti-harakati). Muddati o'tgan tovarni qaytarish siyosati hali ochiq.
 - Nasiya bilan sotilgan tovarni qaytarish — balans tuzatish ikki tomonlama (ombor + qarz) bo'ladi.
 
 ---
@@ -105,8 +111,9 @@ Offline rejimda qaytarish mahalliy jurnalga yoziladi (M01 bilan bir xil append-o
 ### Foydalanuvchi hikoyalari
 
 **US-M03-01**: Kassir sifatida ruxsat etilgan limit ichida chekka chegirma berishni istayman.
-- Given chegirma foizi/summasi limitdan past (limit — taxmin), When kassir chegirmani kiritadi, Then chek summasi avtomatik qayta hisoblanadi.
+- Given chegirma foizi limitdan past, When kassir chegirmani kiritadi, Then chek summasi avtomatik qayta hisoblanadi.
 - Given chegirma limitdan yuqori, When kassir kiritishga harakat qiladi, Then tizim Menejer PIN-kodini so'raydi.
+- *(2026-10-15: foydalanuvchi qarori)* **Standart limit**: Kassir PIN'siz chekka **5% gacha** chegirma beradi; chekni bekor qilish (`sales.void`) Kassirga limitsiz ruxsat etiladi, lekin har doim audit yoziladi. Egasi istalgan raqamni (M13 orqali) o'zgartirishi mumkin — sabab: raqobatchilarning (Loyverse, Square, BILLZ, REGOS) birortasida ham tayyor standart raqam yo'q, kichik standart qiymat kundalik mayda amallarni to'xtatmaydi (`spec/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #1).
 
 **US-M03-02**: Menejer sifatida avtomatik chegirma qoidalarini (kategoriya, muddat, mijoz toifasi bo'yicha) sozlashni istayman.
 - Given yangi aksiya boshlanishi kerak, When Menejer qoida yaratadi (tovar/kategoriya, foiz, boshlanish-tugash sanasi), Then qoida saqlanadi va kassada avtomatik qo'llaniladi, muddat tugagach avtomatik to'xtaydi.
@@ -121,10 +128,11 @@ Chegirmali (yakuniy) narx QQS bazasiga asos bo'ladi — QQS chegirmadan keyingi 
 Chegirma qoidalari oldindan POS'ga sinxronlanadi; offline rejimda oxirgi yuklangan qoidalar bo'yicha ishlaydi, markaz bilan real-time aloqa shart emas.
 
 ### Chekka holatlar
-- Bir nechta chegirma bir chekda birlashishi (stacking) — siyosat kerak.
+- *(2026-10-15: hal qilindi — foydalanuvchi qarori)* ~~Bir nechta chegirma bir chekda birlashishi (stacking) — siyosat kerak~~ — endi aniq: chegirmalar **yig'ilmaydi**. Agar bir chekda bir nechta chegirma manbai to'qnashsa (masalan mijozning doimiy chegirma %'i — M09/US-M09-07, M08 — va kassir/aksiya chegirmasi), **faqat bittasi — mijozga eng katta foyda beradigani** qo'llaniladi (Odoo'ning "bitta eng mos qoida" modeliga mos, `spec/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #8).
 - Chegirma tovar narxini manfiy qilib yubormasligi tekshirilishi kerak.
 - Aksiya muddati offline paytda tugashi — POS eski qoidani ishlatib qolishi mumkin.
 - *(2026-10-14: tekshiruv)* "2+1" turidagi aksiya — US-M03-02 qoidasi sifatida (uchinchi donaga 100% chegirma), alohida "bepul tovar" hujjati emas; QQS chegirmadan keyingi summadan (taxmin, buxgalter tasdig'i).
+- *(2026-10-15: foydalanuvchi qarori)* **Optom narx jadvali yo'q**: MVP'da alohida "optom narx" turi yo'q (M09'ga qarang) — mijozning doimiy chegirmasi shu yerdagi "faqat bitta eng foydali chegirma" qoidasi bilan bir xil mantiqda ishlaydi.
 
 ---
 
@@ -222,10 +230,10 @@ Mobil skanerlash (Android POS) offline ishlashi kerak (ombor sharoitida internet
 - Given tanlangan davr, When Menejer ro'yxatni ochadi, Then barcha ko'chirishlar holati (yo'lda/yetib kelgan/kechikkan) ko'rsatiladi.
 
 ### Davlat tizimlari bog'liqligi
-Asl belgisi: markirovkalangan tovarni bir joydan ikkinchisiga ko'chirish muddati **72 soatdan oshmasligi** kerak (23-son qaror, 2026-01-23 — `research_notes/texnik/02-kassa-ofd-markirovka.md`, 106-qator); tizim bu muddatni kuzatib, yaqinlashganda ogohlantirishi kerak.
+Asl belgisi: markirovkalangan tovarni bir joydan ikkinchisiga ko'chirish muddati **72 soatdan oshmasligi** kerak (23-son qaror, 2026-01-23 — `research_notes/texnik/02-kassa-ofd-markirovka.md`, 106-qator); tizim bu muddatni kuzatib, yaqinlashganda ogohlantirishi kerak. *Eslatma: offline ko'chirishga ruxsat — mahsulot qarori (2026-10-15), yuridik tasdiq (huquqshunos bilan) tavsiya etiladi, lekin spec darajasidagi qaror allaqachon qabul qilingan.*
 
 ### Offline xatti-harakati
-Qabul qiluvchi tomonda internet yo'q bo'lsa, qabul mahalliy qayd etilib keyin sinxronlanadi.
+Qabul qiluvchi tomonda internet yo'q bo'lsa, qabul mahalliy qayd etilib keyin sinxronlanadi. *(2026-10-15: foydalanuvchi qarori)* **Markirovkalangan tovarni o'z filiallar/omborlar orasida ko'chirish offline rejimda ruxsat etiladi** (jo'natish ham, qabul ham) — hujjat mahalliy append-only jurnalga yoziladi, internet qaytganda Asl belgisi tizimiga sinxronlanadi, barcha amal audit bilan qayd etiladi; sabab — ichki ko'chirishda tovar egasi (yuridik shaxs) o'zgarmaydi, 72 soatlik qoida asosan subyektlar o'rtasidagi (tashqi) ko'chirishga tegishli ko'rinadi (`spec/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #5). 72 soatlik muddat hisoblagichi offline davrni ham hisobga oladi.
 
 ### Chekka holatlar
 - Yo'lda tovar yo'qolishi/buzilishi — qisman qabul qilish imkoniyati kerak.
@@ -246,7 +254,8 @@ Qabul qiluvchi tomonda internet yo'q bo'lsa, qabul mahalliy qayd etilib keyin si
 - Given tovar yetib keldi, When Omborchi haqiqiy miqdorni kiritib tasdiqlaydi, Then farq (kam/ko'p) belgilanadi va ombor balansi (M04) yangilanadi.
 
 **US-M07-03**: Buxgalter sifatida yetkazib beruvchining e-fakturasini tizimga kiritib, QQS kreditini hisoblashni istayman.
-- Given e-faktura Didox/Faktura.uz orqali keldi yoki qo'lda kiritildi, When Buxgalter uni E-IMZO bilan tasdiqlaydi, Then faktura summasi va QQS buxgalteriya yozuviga (M11) va QQS hisobiga (M10) qo'shiladi.
+- *(2026-10-15: foydalanuvchi qarori)* **E-faktura operatori — MVP'da faqat Faktura.uz**; Didox — MVP'dan keyingi birinchi integratsiya (sabab: Faktura.uz API hujjati ochiq va tekshirilgan, REGOS ham uni ishlatadi; Didox hujjati login ortida, faqat norasmiy SDK bor — `spec/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #4). Faktura.uz token `grant_type=password` bilan olinadi — tenant Faktura.uz login/parolini xavfsiz saqlash (`tenant_secrets`) kerak.
+- Given e-faktura Faktura.uz orqali keldi yoki qo'lda kiritildi, When Buxgalter uni E-IMZO bilan tasdiqlaydi, Then faktura summasi va QQS buxgalteriya yozuviga (M11) va QQS hisobiga (M10) qo'shiladi.
 - Given faktura AI xavf-baholash tizimida "yuqori xavfli" (qizil) deb belgilangan, When Buxgalter buni ko'radi, Then tizim QQS krediti to'lovdan keyin kreditlanishi haqida ogohlantiradi (`research_notes/texnik/03-efaktura-va-tolov.md`, 1.2-bo'lim).
 
 **US-M07-04**: Buxgalter sifatida yetkazib beruvchiga bo'lgan kreditorlik qarzini to'lashni va buni tizimda qayd etishni istayman.
@@ -259,7 +268,7 @@ Qabul qiluvchi tomonda internet yo'q bo'lsa, qabul mahalliy qayd etilib keyin si
 - Given tovar markirovkalangan, When qaytariladi, Then Asl belgisi tizimidagi mos operatsiya — **ochiq savol** (M02 bilan bir xil).
 
 ### Davlat tizimlari bog'liqligi
-E-faktura (Didox — login talab qiladigan API, Faktura.uz — ochiq API), e-TTN (agar tashish bo'lsa), MXIK kod tekshiruvi, E-IMZO (imzolash), AI xavf-baholash (VM Qarori №830, 2025-12-26, 2026-01-01 dan to'liq — `research_notes/texnik/03-efaktura-va-tolov.md`, 32-qator). Yetkazib beruvchi vakili ishonchnoma bilan tovar topshirsa, 2026-01-01'dan Vakolat.uz orqali e-ishonchnomani tekshirish zarurligi **ochiq savol** (`research_notes/texnik/09-soliq-integratsiyasi.md`, 14-qator).
+E-faktura (*(2026-10-15: foydalanuvchi qarori)* **Faktura.uz — MVP'da yagona operator**, ochiq API; Didox — MVP'dan keyin, login talab qiladigan API), e-TTN (agar tashish bo'lsa), MXIK kod tekshiruvi, E-IMZO (imzolash), AI xavf-baholash (VM Qarori №830, 2025-12-26, 2026-01-01 dan to'liq — `research_notes/texnik/03-efaktura-va-tolov.md`, 32-qator). Yetkazib beruvchi vakili ishonchnoma bilan tovar topshirsa, 2026-01-01'dan Vakolat.uz orqali e-ishonchnomani tekshirish zarurligi **ochiq savol** (`research_notes/texnik/09-soliq-integratsiyasi.md`, 14-qator).
 
 ### Offline xatti-harakati
 Majburiy emas — xarid odatda ofis/ombor sharoitida internet mavjud joyda amalga oshiriladi; agar offline bo'lsa, qabul hujjati mahalliy saqlanib keyin sinxronlanadi.
@@ -281,7 +290,7 @@ Majburiy emas — xarid odatda ofis/ombor sharoitida internet mavjud joyda amalg
 **US-M08-01**: Kassir sifatida mijozga belgilangan limit ichida nasiyaga sotishni istayman.
 - Given mijoz tanlangan, When kassir "nasiya" to'lov turini tanlaydi, Then tizim mijozning joriy qarzi + yangi summa kredit limitidan oshmasligini tekshiradi.
 - Given limit yetarli, When kassir yakunlaydi, Then mijoz qarz balansi (M08) oshadi va chek shunga mos belgi bilan chiqadi.
-- Given limit yetarli emas, When kassir yakunlashga harakat qiladi, Then operatsiya rad etiladi yoki Menejer tasdig'i so'raladi.
+- Given limit yetarli emas, When kassir yakunlashga harakat qiladi, Then operatsiya rad etiladi yoki Menejer tasdig'i so'raladi (online rejim). *(2026-10-15: foydalanuvchi qarori)* Given offline rejim va oxirgi ma'lum qoldiq bo'yicha limitdan oshib ketish aniqlansa, When kassir shunga qaramay sotishni tanlaydi, Then sotuv **bloklanmaydi** — qarz yoziladi, bayroq qo'yiladi, internet qaytganda Egasiga xabar boradi (M08 Offline xatti-harakati bo'limiga qarang).
 
 **US-M08-02**: Menejer sifatida mijoz kredit limitini belgilash/o'zgartirishni istayman.
 - Given mijoz tanlangan, When Menejer limitni kiritadi/o'zgartiradi, Then yangi limit darhol kuchga kiradi va barcha kassalarga sinxronlanadi.
@@ -318,7 +327,8 @@ Majburiy emas — xarid odatda ofis/ombor sharoitida internet mavjud joyda amalg
 
 **US-M08-10**: Egasi sifatida qarzlar holatini bir qarashda ko'rishni istayman.
 - Given qarzdorlar bor, When hisobot ochiladi, Then: jami qarz, qarzdorlar soni, muddat bo'yicha guruhlar (0–30 / 31–60 / 60+ kun), eng katta qarzdorlar, bu oy berilgan va qaytgan qarz.
-- Qarzni kechib yuborish yoki "undirib bo'lmaydigan" deb yopish — faqat Egasi, sabab bilan, audit jurnaliga yoziladi.
+- *(2026-10-15: foydalanuvchi qarori)* **60 kunlik "eski qarzlar" eslatmasi**: qarz yaratilgan/oxirgi to'lovdan **60 kundan ortiq** o'tgan va hali yopilmagan qarzlar alohida ro'yxat sifatida Egasiga eslatma (M18) bilan ko'rsatiladi — bu faqat **eslatma**, tizim o'zi "shubhali qarz" deb avtomatik belgilamaydi.
+- Qarzni kechib yuborish yoki "undirib bo'lmaydigan" (shubhali) deb yopish — **faqat Egasi, sabab bilan**, audit jurnaliga yoziladi; 60 kunlik ro'yxat (yuqorida) faqat shuni ko'rib chiqishni eslatadi, o'zi avtomatik harakat qilmaydi (`spec/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #9).
 
 **US-M08-11**: Egasi sifatida **o'zim yetkazib beruvchilarga** qarzimni ham daftar kabi yuritishni istayman (mol qarzga olinadi).
 - Given xarid nasiyaga qabul qilingan (M07), When yetkazib beruvchi tanlanadi, Then "Men qarzdorman" daftari: kimga, qancha, qachon to'lash kerak; to'lov BP-12 orqali yopiladi; to'lov sanasi yaqinlashganda eslatma.
@@ -332,7 +342,7 @@ Majburiy emas — xarid odatda ofis/ombor sharoitida internet mavjud joyda amalg
 To'g'ridan-to'g'ri davlat talabi aniqlanmadi; QQS'ni hisobga olish vaqti (sotuv vaqti yoki to'lov vaqti) aniq emas — **ochiq savol**.
 
 ### Offline xatti-harakati
-Offline rejimda nasiya yaratish mumkin, lekin limit tekshiruvi faqat oxirgi sinxronlashgan ma'lumot asosida bo'ladi — bir mijozga bir nechta kassada parallel nasiya berilsa, limitdan oshib ketish xavfi bor (**ochiq savol**, pastda).
+Offline rejimda nasiya yaratish mumkin, lekin limit tekshiruvi faqat oxirgi sinxronlashgan ma'lumot asosida bo'ladi — bir mijozga bir nechta kassada parallel nasiya berilsa, limitdan oshib ketish xavfi bor (**ochiq savol**, pastda). *(2026-10-15: foydalanuvchi qarori)* **Offline'da limitdan oshgan nasiya**: qurilma oxirgi ma'lum qoldiq bo'yicha ogohlantiradi, lekin kassir baribir sotishni tanlasa — sotuv **bekor qilinmaydi**, qarz limitdan oshgan holicha yoziladi, operatsiyaga **bayroq** qo'yiladi va internet qaytganda Egasiga xabar (M18) boradi; sabab — sotuv va fiskal chek allaqachon amalga oshgan, uni orqaga qaytarish buxgalteriyani buzadi, nazorat xabar/audit orqali amalga oshadi (`spec/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #7).
 
 ### Chekka holatlar
 - Bir nechta kassa bir vaqtda bitta mijozga nasiya berishi (offline sinxronlash konflikti).
@@ -343,7 +353,7 @@ Offline rejimda nasiya yaratish mumkin, lekin limit tekshiruvi faqat oxirgi sinx
 
 ## M09 — Narxlar
 
-**Maqsad**: chakana/optom narxlarni, kategoriyalarni va narx tarixini boshqarish.
+**Maqsad**: chakana narxlarni, kategoriyalarni va narx tarixini boshqarish. *(2026-10-15: foydalanuvchi qarori)* **Alohida optom narx jadvali MVP'da yo'q** — ulgurji/doimiy mijozlar uchun o'rniga mijoz kartasida (M08/counterparty) "doimiy chegirma %" maydoni ishlatiladi (pastga qarang va M03 chekka holatlar).
 
 ### Foydalanuvchi hikoyalari
 
@@ -367,6 +377,10 @@ Offline rejimda nasiya yaratish mumkin, lekin limit tekshiruvi faqat oxirgi sinx
 - Given yorliq chiqaradigan tarozi og'irlik kiritilgan shtrix-kod chop etgan, When kassir uni skanerlaydi, Then POS koddan tovar va og'irlikni ajratib chekka qo'shadi. Kod formati — keng tarqalgan EAN-13 "2x" prefiksli og'irlik kodi: **taxmin**, real tarozi modellarida tekshiriladi.
 - Given yorliqli tarozi yo'q, When tovar tanlanadi, Then og'irlik qo'lda kiritiladi (mavjud zahira yo'l, `04-ekranlar-va-ux.md`, 1.6).
 
+**US-M09-07** *(2026-10-15: foydalanuvchi qarori — qo'shildi)*: Menejer sifatida doimiy/ulgurji mijozga standart chegirma foizini mijoz kartasida belgilashni istayman.
+- Given mijoz kartasi (M08/counterparty) ochilgan, When Menejer "doimiy chegirma %" maydoniga qiymat kiritadi, Then shu mijoz bilan qilingan har bir sotuvda bu chegirma avtomatik qo'llanadi.
+- Given bir chekda doimiy chegirma va boshqa chegirma (kassir/aksiya) manbai to'qnashsa, Then **faqat bittasi — mijozga eng katta foyda beradigani** qo'llaniladi, ikkisi yig'ilmaydi (M03 chekka holatlar bilan bir xil qoida, `spec/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #8).
+
 ### Davlat tizimlari bog'liqligi
 Narx QQS stavkasi (12%, 0%, ixtiyoriy 6%) bilan bog'liq — har bir tovar MXIK kodiga mos QQS toifasiga ega bo'lishi kerak (`research_notes/texnik/01-erp-modullar-va-malumot-modeli.md`, "QQS" bandi).
 
@@ -374,7 +388,7 @@ Narx QQS stavkasi (12%, 0%, ixtiyoriy 6%) bilan bog'liq — har bir tovar MXIK k
 Narxlar POS'ga oldindan sinxronlanadi (lokal keshda saqlanadi); offline paytida oxirgi sinxronlangan narx ishlatiladi — markazda narx o'zgargan bo'lsa, internet qaytguncha POS eski narxda sotishi mumkin (**chekka holat**).
 
 ### Chekka holatlar
-- Optom va chakana narx bir vaqtda qo'llanilishi (mijoz turi/miqdorga bog'liq).
+- *(2026-10-15: hal qilindi — foydalanuvchi qarori)* ~~Optom va chakana narx bir vaqtda qo'llanilishi (mijoz turi/miqdorga bog'liq)~~ — endi aniq: alohida optom narx yo'q, faqat mijoz kartasidagi doimiy chegirma % (US-M09-07), eng foydali chegirma qoidasi bilan.
 - Vaqtinchalik aksiya narxi muddati tugagandan keyin asl narxga avtomatik qaytishi.
 - Offline POS'dagi eskirgan narx bilan sotilgan cheklarni keyin tuzatish kerak bo'lmasligi (narx chek yaratilish vaqtida "qotiriladi").
 - *(2026-10-14: tekshiruv)* Onlayn ochiq chek davomida narx o'zgarsa — chekka allaqachon qo'shilgan qator narxi qo'shilgan paytdagidek qoladi, keyin qo'shilgan qator yangi narxni oladi (offline'dagi "qotirish" qoidasi bilan bir xil).
@@ -413,7 +427,7 @@ Narxlar POS'ga oldindan sinxronlanadi (lokal keshda saqlanadi); offline paytida 
 *Qamrov chegarasi: MVP faqat **QQS va aylanma solig'i** hisobotlarini solishtiradi. Mol-mulk, yer, JShDS va ijtimoiy soliq hisobotlari ham 2026-01-01'dan davlat tomonidan avtomatik tuziladi, lekin bular MVP'dan **tashqarida** qoladi — sabab: JShDS/ijtimoiy soliq xodim/ish haqi hisobini, mol-mulk solig'i esa asosiy vositalar hisobini talab qiladi, ikkisi ham MVP 18 moduliga kiritilmagan (`spec/README.md`).*
 
 ### Davlat tizimlari bog'liqligi
-my.soliq.uz (davlat hisoboti), e-faktura/EDO (QQS bazasi manbai), VM Qarori №830 (2025-12-26, AI xavf-baholash), Soliq kodeksi 81-moddasi/O'RQ-1108 (davlat hisobot shakllantirish va 5 kalendar kunlik tuzatish huquqi — lex.uz/docs/-7944527). Rasmiy dasturiy o'qish API'si **topilmadi** — bu modul MVP'da qo'lda/yarim-avtomatik ishlaydi (taxmin/ochiq savol). *(2026-10-14: tekshiruv)* Aylanma solig'i stavkalari — Soliq kodeksi 467-moddasi (O'RQ-1108 tahririda, 2026-01-01'dan), to'lovchilar va 1 mlrd so'm chegarasi — 461-modda ([lex.uz/docs/4674902](https://lex.uz/docs/4674902)).
+my.soliq.uz (davlat hisoboti), e-faktura/EDO (QQS bazasi manbai — *(2026-10-15: foydalanuvchi qarori)* MVP'da Faktura.uz, Didox keyinroq), VM Qarori №830 (2025-12-26, AI xavf-baholash), Soliq kodeksi 81-moddasi/O'RQ-1108 (davlat hisobot shakllantirish va 5 kalendar kunlik tuzatish huquqi — lex.uz/docs/-7944527). Rasmiy dasturiy o'qish API'si **topilmadi** — bu modul MVP'da qo'lda/yarim-avtomatik ishlaydi (taxmin/ochiq savol). *(2026-10-14: tekshiruv)* Aylanma solig'i stavkalari — Soliq kodeksi 467-moddasi (O'RQ-1108 tahririda, 2026-01-01'dan), to'lovchilar va 1 mlrd so'm chegarasi — 461-modda ([lex.uz/docs/4674902](https://lex.uz/docs/4674902)).
 
 ### Offline xatti-harakati
 Deklaratsiya/solishtirish jarayoni online tizim (my.soliq.uz) talab qiladi, shuning uchun offline ishlamaydi; faqat ichki QQS hisob-kitobi (sotuvlardan) offline tayyorlanib, online bo'lganda solishtiriladi.
@@ -436,6 +450,7 @@ Deklaratsiya/solishtirish jarayoni online tizim (my.soliq.uz) talab qiladi, shun
 
 **US-M11-02**: Buxgalter sifatida oy yakunida balans va daromad-xarajat hisobotini olishni istayman.
 - Given oy yakunlangan, When Buxgalter "oy yopish"ni boshlaydi, Then barcha provodkalar yig'ilib balans va foyda-zarar hisoboti shakllanadi.
+- *(2026-10-15: foydalanuvchi qarori)* **Yopilgan oy qayta ochilmaydi**: MVP'da yopilgan davr (oy) hech qanday rolga (shu jumladan Buxgalter/Egasiga) qayta ochilmaydi; shu davrga tegishli xato aniqlansa, tuzatish **joriy ochiq oyda tuzatuvchi hujjat** (storno/qo'shimcha yozuv) bilan kiritiladi, asl yopilgan davr o'zgarmaydi (append-only). Sabab: hozircha O'zbekistonda oldingi davr xatolarini tuzatish bo'yicha alohida standart yo'q (NSFO №2 faqat 2027-01-01'dan kuchga kiradi), shuning uchun eng xavfsiz yondashuv — xalqaro tizimlardagi "lock date" tamoyili. Keyinroq (buxgalter roziligi bilan) Odoo uslubidagi "faqat Buxgalter, sabab va muddat bilan, audit yozuvli" istisno qo'shilishi mumkin — MVP'da yo'q (`spec/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #15).
 
 **US-M11-03**: Egasi sifatida asosiy moliyaviy ko'rsatkichlarni (foyda, aylanma) sodda ko'rinishda ko'rishni istayman.
 - Given tanlangan davr, When Egasi dashboard'ni ochadi, Then aylanma, xarajat, sof foyda asosiy raqamlar sifatida ko'rsatiladi (texnik tafsilotsiz).
@@ -447,7 +462,7 @@ NSBU №21 (2024/2025, 191-son buyruq) hisob rejasi — eski 2002-yilgi reja **e
 Markazlashtirilgan serverda ishlaydi, offline kiritilmaydi; faqat sotuv/xarid ma'lumotlari kelib tushgandan keyin provodka yaratiladi.
 
 ### Chekka holatlar
-- Avtomatik provodkada xato aniqlansa, qo'lda tuzatish imkoniyati (audit-trail bilan) kerak.
+- Avtomatik provodkada xato aniqlansa, qo'lda tuzatish imkoniyati (audit-trail bilan) kerak — yopilgan oyda esa faqat joriy ochiq oyda tuzatuvchi yozuv orqali (yuqoridagi US-M11-02).
 - Ko'p filialli (M14) konsolidatsiyalangan balans.
 - To'liq NSBU hisob rejasi (asosiy vositalar, ish haqi) MVP'dan tashqarida — faqat savdo/ombordan kelib chiqadigan asosiy hisoblar avtomatlashtiriladi (`spec/README.md`).
 
@@ -599,11 +614,12 @@ Kassadan to'langan xarajat POS'da offline yoziladi (M16 bilan birga), sinxronlas
 
 **US-M16-01**: Kassir sifatida kassaga pul qo'yish va kassadan pul olishni sabab bilan yozishni istayman.
 - Given smena ochiq, When kassir "Pul qo'yish" (maydalash uchun) yoki "Pul olish" ni tanlaydi, Then summa, sabab (Egasi oldi / Inkasso / Xarajat to'lovi → M15 / Boshqa) va kim bajargani yoziladi.
-- Belgilangan summadan katta "Pul olish" — Egasi/Menejer PIN tasdig'i bilan (limit sozlanadi, taxmin).
+- *(2026-10-15: foydalanuvchi qarori)* **Standart limit**: Kassir PIN'siz kassadan pul olishni **50 000 so'mgacha** mustaqil amalga oshiradi; shundan katta "Pul olish" — Egasi/Menejer PIN tasdig'i bilan. Egasi istalgan raqamni (M13 orqali) o'zgartirishi mumkin (`spec/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #1).
 
 **US-M16-02**: Kassir sifatida smena yopilganda kassadagi pulni sanab kiritishni istayman.
 - Given smena yopilmoqda, When kassir sanalgan naqd summani kiritadi, Then tizim **kutilgan naqd** (boshlang'ich naqd + naqd sotuvlar − naqd qaytarishlar + naqd qarz to'lovlari + qo'yilgan − olingan) bilan solishtiradi va farqni (kamomad/ortiqcha) ko'rsatadi.
 - Farq bo'lsa, kassir izoh yozadi va Egasiga xabar ketadi (M18).
+- *(2026-10-15: foydalanuvchi qarori)* Smena yopilganda naqd bilan bir qatorda **"karta" jami** (qo'lda belgilangan "Karta" to'lovlari yig'indisi, terminal operatsiya raqamlari bilan) ham alohida ko'rsatiladi (POS-07 Z-hisobot, POS-15), Egasi kun oxirida bank ko'chirmasi bilan solishtirishi uchun (`02-modullar-talablari.md`, M01, US-M01-01).
 
 **US-M16-03**: Egasi sifatida har bir smena va kassa bo'yicha naqd pul tarixini ko'rishni istayman.
 - Given davr tanlangan, When "Kassa harakati" hisoboti ochiladi, Then har bir smena bo'yicha: boshlanish, sotuvlar, qo'yilgan/olingan (kim, nega), kutilgan va sanalgan naqd, farq.
@@ -622,17 +638,18 @@ To'liq offline ishlaydi (M01 bilan bir xil append-only jurnal).
 
 ## M17 — Obuna va ro'yxatdan o'tish (platforma) *(2026-10-14: qo'shildi)*
 
-**Maqsad**: do'kon tizimga o'zi ro'yxatdan o'tsin, sinab ko'rsin, tarif tanlab to'lasin — bu bizning daromad oqimimiz.
+**Maqsad**: do'kon tizimga o'zi ro'yxatdan o'tsin, sinab ko'rsin, obuna uchun to'lasin — bu bizning daromad oqimimiz. *(2026-10-15: foydalanuvchi qarori)* Tarif **yagona** (99 000 so'm/oy, hammasi narxga kiradi); Egasi faqat qo'shimcha kassa sonini va oylik/yillik to'lov davrini tanlaydi (`06-mvp-chegarasi.md`, 3.3).
 
 ### Foydalanuvchi hikoyalari
 
 **US-M17-01**: Do'kon egasi sifatida 2 daqiqada ro'yxatdan o'tishni istayman.
 - Given sayt ochildi, When telefon raqami kiritiladi va SMS kod tasdiqlanadi, Then do'kon nomi va faoliyat turi so'raladi; STIR, OFD, e-faktura ulash keyinroq (sozlamalarda, bosqichma-bosqich yo'riqnoma bilan).
-- Ro'yxatdan o'tgach **30 kunlik bepul sinov** boshlanadi (Biznes tarifi imkoniyatlari bilan — taxmin).
+- Ro'yxatdan o'tgach **30 kunlik bepul sinov** boshlanadi *(2026-10-15: foydalanuvchi qarori — endi yagona tarifning to'liq imkoniyatlari bilan, Biznes/Pro farqlanishi yo'q)*.
 
-**US-M17-02**: Egasi sifatida tarifni tanlash va to'lashni istayman.
-- Given sinov tugayapti yoki Egasi "Tarif" ni ochadi, When Start / Biznes / Pro (`06-mvp-chegarasi.md`, 3.3) va oylik/yillik (−20%) tanlanadi, Then to'lov Click yoki Payme orqali amalga oshiriladi va obuna muddati uzayadi; to'lov uchun hujjat beriladi.
-- Tarif limitlari tizimda qo'llanadi: kassa soni, filiallar, AI oylik limiti.
+**US-M17-02**: Egasi sifatida tarifni tanlash va to'lashni istayman *(2026-10-15: foydalanuvchi qarori — qayta yozildi: uch pog'onali tanlov o'rniga yagona tarif + qo'shimcha kassa)*.
+- Given sinov tugayapti yoki Egasi "Tarif" ni ochadi, Then **tarif tanlovi yo'q** — faqat bitta yagona tarif (99 000 so'm/oy, barcha modul+1 virtual kassa+AI+Telegram) va oylik/yillik (−20%) tanlanadi (`06-mvp-chegarasi.md`, 3.3); to'lov Click yoki Payme orqali amalga oshiriladi va obuna muddati uzayadi, to'lov uchun hujjat beriladi.
+- Given Egasi qo'shimcha savdo nuqtasi (kassa) ochmoqchi, When "Qo'shimcha kassa qo'shish" tugmasini bosadi, Then har bir qo'shimcha kassa uchun **+39 000 so'm/oy** (taxmin) obuna summasiga qo'shiladi, keyingi to'lovdan qo'llanadi.
+- Tarif limitlari tizimda qo'llanadi: faol kassalar soni (asosiy 1 + sotib olingan qo'shimchalar), AI oylik limiti; filiallar soni cheklanmaydi (filial — M14, kassa — M17 obunasi, ikkisi alohida tushuncha).
 
 **US-M17-03**: Egasi sifatida to'lov muddatini unutmasligim va muddat o'tsa ham darhol to'xtab qolmasligimni istayman *(2026-10-14: foydalanuvchi qarori — 24 soatlik imtiyoz; 2026-10-15: foydalanuvchi qarori — imtiyozdan keyingi holat qayta belgilandi, quyida)*.
 - **Eslatmalar (muddatdan oldin):** to'lov sanasidan **3 kun**, **1 kun** oldin va **to'lov kuni ertalab** — Egasiga Telegram (M18), ilova ichida banner va SMS (Telegram ulanmagan bo'lsa). Xabarda: summa, tarif, "To'lash" havolasi (Click/Payme).
@@ -661,7 +678,7 @@ Ro'yxatdan o'tish va to'lov — faqat online. *(2026-10-15: foydalanuvchi qarori
 
 ### Chekka holatlar
 - To'lov o'tdi, lekin tizimga xabar kelmadi — Click/Payme holatini qayta tekshirish.
-- Tarifni pasaytirish: kassalar soni yangi limitdan ko'p — ortiqchalarini o'chirish so'raladi, ma'lumot o'chirilmaydi.
+- *(2026-10-15: foydalanuvchi qarori bilan yangilandi)* **Qo'shimcha kassa sonini kamaytirish**: Egasi qo'shimcha kassalardan voz kechsa, faol kassalar soni yangi (kamroq) sonidan ko'p bo'lsa, ortiqcha kassa(lar)ni o'chirish/arxivlash so'raladi — ma'lumot (tarix, hujjatlar) o'chirilmaydi, faqat shu kassa yangi sotuv uchun yopiladi.
 
 ---
 
@@ -697,8 +714,8 @@ Server tomonida ishlaydi; kassa offline bo'lsa, ma'lumotlar sinxronlangach xabar
 
 ## Ochiq savollar
 
-1. Chegirma/qaytarish/narx o'zgarishi/nasiya limit summalari — ochiq manbada yo'q, biznes-qoida sifatida MVP oldidan sozlanishi kerak (`taxmin`, barcha modullarda takrorlanadi: M02, M03, M08, M09).
-2. *(2026-10-15: qisman hal qilindi — foydalanuvchi qarori)* Markirovkalangan tovarni offline **sotish** siyosati M01 uchun endi aniq: narx qurilmada ma'lum bo'lsa ruxsat etiladi, bo'lmasa taqiqlanadi (yuqoridagi US-M01-03 va Offline xatti-harakati). Hali ochiq qolgan qism: offline **qaytarish** (M02) va **ko'chirish** (M06) siyosati — CRPT Turon rasmiy API hujjatlari yopiq (`research_notes/texnik/02-kassa-ofd-markirovka.md`, ochiq savol 4).
+1. *(2026-10-15: hal qilindi — foydalanuvchi qarori)* ~~Chegirma/qaytarish/nasiya limit summalari — ochiq manbada yo'q~~ — endi standart qiymatlar bor: chegirma PIN'siz 5% (M03), chek bilan qaytarish PIN'siz 100 000 so'm (M02), kassadan pul olish PIN'siz 50 000 so'm (M16); Egasi istalgan raqamni o'zgartirishi mumkin (`spec/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #1). Narx o'zgarishi tasdiqlash limiti (M09) hali ochiq (`taxmin`).
+2. *(2026-10-15: hal qilindi — foydalanuvchi qarori)* ~~Markirovkalangan tovarni offline **sotish**/**qaytarish**/**ko'chirish** siyosati~~ — endi barcha uchi aniq: **sotish** — narx qurilmada ma'lum bo'lsa ruxsat, bo'lmasa taqiq (US-M01-03); **ko'chirish** (M06) — o'z filiallar/omborlari orasida offline ruxsat etiladi; **qaytarish** (M02) — faqat internet bor paytda (offline'da bloklanadi). CRPT Turon rasmiy API hujjatlari hamon yopiq, lekin bu mahsulot qarorlariga xalaqit bermaydi (`spec/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #5).
 3. M10'dagi davlat hisobotini solishtirish uchun aniq tolerance (ruxsat etilgan farq) va eskalatsiya jarayoni — tadqiqotda yo'q, arxitektura jamoasi bilan birga ishlab chiqilishi kerak.
 4. M11'dagi to'liq NSBU №21 hisob rejasi jadvali (barcha bo'lim/kichik hisob raqamlari) — tadqiqotda faqat qisman (I, II, V bo'lim) topildi, to'liq ro'yxat ochiq savol (`research_notes/texnik/01-erp-modullar-va-malumot-modeli.md`).
 5. M14'da ko'p filialli mijoz (nasiya) balansini konsolidatsiya qilish yoki filial bo'yicha ajratish — biznes qarori kerak.
@@ -723,3 +740,4 @@ Server tomonida ishlaydi; kassa offline bo'lsa, ma'lumotlar sinxronlangach xabar
 - `research_notes/texnik/11-raqobatchilar-kamchiliklari.md`
 - `spec/01-mahsulot/01-rollar-va-ssenariylar.md` (huquqlar matritsasi uchun o'zaro havola)
 - `spec/02-arxitektura/12-autentifikatsiya-oauth2.md` — autentifikatsiya arxitekturasi (o'z OAuth 2.0 implementatsiyasi, mock yo'q) — Foydalanuvchi qarori, 2026-10-15
+- `spec/tekshiruv/savollar-yakuniy-tavsiyalar.md` — 2026-10-15, 15 ta foydalanuvchi qarori (rol limitlari, fiskal yo'l, CRPT, e-faktura operatori, offline markirovka, karta, nasiya, narx/chegirma, yopilgan oy va h.k.)

@@ -186,7 +186,16 @@ Quyidagi jadval `01-rollar-va-ssenariylar.md` (6-bo'lim) dagi K/Y/T matritsasi b
 4. Offline holatda: limit tekshiruvi oxirgi sinxronlangan ma'lumot asosida, Menejer PIN'i **lokal** tasdiqlaydi, server qayta tekshiradi (konflikt — **ochiq savol**, 04-ekranlar-va-ux.md, Ochiq savol 3 bilan bog'liq emas, lekin shunga yaqin xavf sinfi).
 5. Har bir tasdiqlash/rad etish `audit_log`ga yoziladi (kim, qachon, limit, natija).
 
-Aniq limit raqamlari (masalan chegirma foizi, qaytarish/nasiya/pul olish summasi) **tadqiqotda yo'q — taxmin**, `role_permissions.limit_value` orqali tenant darajasida sozlanadigan qilib loyihalanadi (`01-rollar-va-ssenariylar.md`, Ochiq savol 2; `02-modullar-talablari.md`, Ochiq savol 1).
+**Standart limitlar (Kassir uchun)** *(2026-10-15: foydalanuvchi qarori — `tekshiruv/savollar-yakuniy-tavsiyalar.md` #1)*:
+
+| Ruxsat | Standart limit (PIN'siz) | Limitdan oshganda |
+|---|---|---|
+| `discount.give` (chekka chegirma) | **5%**gacha | Menejer/Egasi PIN |
+| `returns.approve` (chek bilan qaytarish) | **100 000 so'm**gacha | Menejer/Egasi PIN; **chek yo'q bo'lsa — har doim PIN** (sale_line_id=NULL, `01-malumotlar-modeli.md` §6) |
+| `cash.withdraw` (kassadan pul olish) | **50 000 so'm**gacha | Menejer/Egasi PIN |
+| `sales.void` (chekni bekor qilish) | **Limitsiz** | — (lekin har doim audit_log'ga yoziladi) |
+
+Bu raqamlar — **boshlang'ich standart** (hech bir raqobatchi — Loyverse, Square, BILLZ, REGOS — tayyor raqam bermaydi, hammasi "yoqish/o'chirish + PIN" modelida; bu kichik standart raqamlar kundalik mayda amallarni to'xtatmaydi, katta summani nazoratda saqlaydi). Egasi istalgan raqamni `role_permissions.limit_value` orqali tenant darajasida o'zgartira oladi (`01-rollar-va-ssenariylar.md`, Ochiq savol 2; `02-modullar-talablari.md`, Ochiq savol 1). **Keyin tekshiriladi**: pilotda PIN so'rovlari soni va Egalar bu raqamlarni qanchaga o'zgartirgani.
 
 ### 2.4 Filialga bog'lash (branch scoping)
 
@@ -345,7 +354,7 @@ Manbada aniq "OWASP ASVS L2" talabi tilga olinmagan — quyidagilar sanoat stand
 | CSP (Content Security Policy) | Veb frontendda standart sarlavhalar | **Taxmin** — frontend hujjatida alohida tilga olinmagan, bazaviy amaliyot sifatida qo'shiladi |
 | Kirish nazorati (input validation) | Pydantic v2 (backend), zod (frontend) | `00-umumiy-arxitektura.md`, `08-frontend-arxitekturasi.md` — ikkalasi ham allaqachon tanlangan |
 | Dependency scanning | CI'da avtomatik (masalan `pip-audit`/`npm audit` darajasidagi tekshiruv) | **Taxmin** — manbada yo'q, CI jarayoniga qo'shiladigan tavsiya |
-| Penetratsion test | Ishga tushirishdan oldin kamida bir marta mustaqil pentest | **Taxmin** — manbada yo'q, lekin davlat tizimlariga (OFD, soliq) ulanuvchi mahsulot uchun oqilona ehtiyot chorasi |
+| Penetratsion test | **Ikki bosqich** *(2026-10-15: foydalanuvchi qarori — `tekshiruv/savollar-yakuniy-tavsiyalar.md` #14)*: (1) **pilotdan oldin** — bepul avtomatik DAST skaner (masalan OWASP ZAP) + ichki OAuth/to'lov/fiskal tekshiruv ro'yxati; (2) **ommaviy sotuvdan oldin** — Celion yoki ONESEC'dan (ikkalasidan narx so'rab) OWASP ASVS L2 bo'yicha to'liq pentest (veb, API, OAuth, Android). Byudjet rezervi: **~60 mln so'm (~$5 000)** | Standart/qamrov — yuqori ishonch; narx — xalqaro ma'lumotdan taxmin ($1 500–7 000), mahalliy firmalar (Celion, ONESEC, Toshkent) narxni ochiq bermaydi — rasmiy taklif so'ralishi kerak |
 | Shifrlash (tinch holatda) | DBaaS/S3 darajasidagi shifrlash (UzCloud taqdim etadigan darajada) | **Taxmin** — UzCloud'ning aniq "encryption at rest" xususiyati rasmiy sahifada alohida tasdiqlanmagan |
 
 ---

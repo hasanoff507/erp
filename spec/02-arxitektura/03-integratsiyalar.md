@@ -8,7 +8,7 @@
 2. **Faqat 3 tizimda** to'liq ochiq, mustaqil tekshirilgan API hujjati va/yoki sandbox bor: **Faktura.uz** (`api.faktura.uz/help/`), **Payme** (`test.paycom.uz`), **E-IMZO** (`testvpn.e-imzo.uz`, jamoatchilik hujjati). Qolgan 9 tasida hujjat yopiq, login talab qiladi yoki umuman topilmadi — bu MVP jadvaliga to'g'ridan-to'g'ri xavf (`research_notes/texnik/14-tekshiruv-xulosasi.md`, 4-bo'lim).
 3. Uchta qattiq **SLA/muddat** butun arxitekturani belgilaydi: OFD offline chegarasi **48 soat** (VMQ-943, 1-ilova, 31-band), markirovkalangan tovar ko'chirish **72 soat** (23-son qaror, 2026-01-23), davlat hisobotini tuzatish **5 kalendar kun** (Soliq kodeksi 81-moddasi, O'RQ-1108). Uchtasi ham worker darajasida taymer va eskalatsiya bildirishnoma sifatida amalga oshiriladi.
 4. **my.soliq.uz uchun rasmiy API yo'q** — davlat hisobotini solishtirish (markaziy qiymat taklifi, M10/BP-08) MVP'da **qo'lda fayl yuklash** bilan boshlanadi; bu `08-mahsulot-modullari.md`/`00-xulosa-va-ochiq-savollar.md`dagi 1-raqamli texnik xavf.
-5. **CRPT Turon (Asl belgisi) integrator hujjatlari yopiq** (help.crpt-turon.uz, 403 xato) — markirovka moduli (M01/M02/M06) texnik xavf ostida; *(2026-10-15: foydalanuvchi qarori)* offline **sotish** siyosati endi aniq: narx qurilmada ma'lum bo'lsa ruxsat (CRPT tasdig'i internet qaytganda), bo'lmasa taqiq (4-bo'lim); online holatda kod yaroqsiz/takroriy bo'lsa hamon MVP standart taxmin — "sotuv rad etiladi". Offline **qaytarish/ko'chirish** siyosati hali ochiq savol.
+5. **CRPT Turon (Asl belgisi) integrator hujjatlari yopiq** (help.crpt-turon.uz, 403 xato) — markirovka moduli (M01/M02/M06) texnik xavf ostida; *(2026-10-15: foydalanuvchi qarori)* integratsiya yo'li: har do'kon o'z bepul "ishtirokchi" API kalitini oladi, rad etilsa hamkor proksi, ikkisi ham ishlamasa sotuv bloklanadi (4-bo'lim). Offline siyosat endi **to'liq aniq**: **sotish** — narx ma'lum bo'lsa ruxsat, bo'lmasa taqiq; **ko'chirish** — ruxsat (audit bilan); **qaytarish** — faqat online (4-bo'lim, `04-offline-sync.md` §7).
 6. **Click, Payme, Uzum ikki alohida vazifada** ishlatiladi: (a) do'kon QR to'lovlari (mijoz do'konga to'laydi, do'konning o'z merchant hisobi) va (b) bizning obuna billing'imiz (M17, `billing_payments` — bizning merchant hisobimiz). Ikkisi texnik jihatdan bir xil adapter interfeysidan foydalanadi, lekin **kredensial va tenant kontekst butunlay ajratilgan**.
 7. Har bir integratsiya kredensiali (API kalit, sertifikat, merchant ID) **tenant darajasida shifrlangan** saqlanadi (`tenants.settings` JSONB emas — alohida `tenant_secrets` jadvali, shifrlangan ustun; tafsilot `05-xavfsizlik-va-audit.md`).
 8. **BO-14 "Integratsiyalar holati"** ekrani — har bir tashqi tizim uchun: ulanganmi, oxirgi muvaffaqiyatli chaqiruv vaqti, navbatdagi/muvaffaqiyatsiz ishlar soni, qo'lda qayta urinish tugmasi. Bu ekran bo'lmasa, OFD/e-faktura muvaffaqiyatsizligi Egasi/Buxgalterga ko'rinmay qoladi.
@@ -96,7 +96,7 @@ class FiscalAdapter(Protocol):
 
 **Monitoring**: BO-14 + har kassa uchun "oxirgi muvaffaqiyatli fiskalizatsiya" ko'rsatkichi; 24/36/44-soat bosqichlarida kuchaygan ogohlantirish (Telegram, M18).
 
-**MVP bosqichi**: MVP — majburiy (markaziy funksiya). **Zaxira yo'l**: agar mustaqil sertifikatlash narx/muddat jihatdan mos kelmasa — reyestrda allaqachon bor vendor (E-POS, UZKASSA, Rahmat POS) bilan OEM/oq-etiket hamkorlik orqali tezroq ishga tushirish (`12-taxminlar-va-murojaatlar.md`, savol 1).
+**MVP bosqichi va fiskal yo'l qarori** *(2026-10-15: foydalanuvchi qarori — `tekshiruv/savollar-yakuniy-tavsiyalar.md` (b)-bo'lim va #2)*: MVP — majburiy (markaziy funksiya). Qaror: (1) **0-bosqichda, birinchi kundan** o'z virtual kassamizni Davlat reyestriga kiritish arizasi boshlanadi (VMQ-943, 4-ilova, ~50 ish kuni ≈ 2,5–3 oy; `11-backlog.md` 0-bosqich); (2) reyestr tasdiqlanguncha **pilot (10–20 do'kon)** bitta reyestr hamkori (Multikassa yoki E-POS Communicator, qaysi biri ko'p-tenant SaaS'ga ulgurji narx bersin) orqali, `FiscalAdapter` porti ortida — adapter almashtirilishi kod o'zgarishi talab qilmaydi; (3) pilot davridagi hamkor haqini (taxminan ≤100 000 so'm/kassa) **biz to'laymiz**, jami byudjet **≤ ~13 mln so'm** (20 kassa × ~100 000 so'm/oy × 3 oy + ulanish xarajati); (4) ommaviy sotuv faqat o'z reyestrimiz tasdiqlangandan keyin boshlanadi — agar reyestr 6 oydan ortiq cho'zilsa/rad etilsa, hamkor orqali davom etiladi, qo'shimcha narxi mijozga ochiq "o'tkaziladigan to'lov" sifatida ko'rsatiladi (hamkor narxi + ~10%). **Narxga ta'siri**: virtual kassa yagona 99 000 so'm/oy tarifga **kirmaydi** — alohida **+39 000 so'm/oy/kassa** qo'shimcha (`addons.code='extra_register'`, `01-malumotlar-modeli.md` §2) — fiskal modul to'lovi (o'z reyestrimizda ham ~35 000 so'm/kassa qoladi, 1 BHM/yil) tarif marjasini yo'q qilmasligi uchun. **Zaxira yo'l** (agar pilot hamkori ham mos kelmasa): reyestrda allaqachon bor vendor (E-POS, UZKASSA, Rahmat POS) bilan OEM/oq-etiket hamkorlik (`12-taxminlar-va-murojaatlar.md`, savol 1).
 
 ### 1.1 Mermaid: sotuv → OFD fiskalizatsiya (onlayn + offline)
 
@@ -172,7 +172,7 @@ class EInvoiceAdapter(Protocol):
 
 **Monitoring**: BO-14 + BO-15; "qizil" faktura ulushi 10%ga yaqinlashganda Buxgalterga ogohlantirish (M10 bilan bog'liq).
 
-**MVP bosqichi**: MVP — majburiy. **Zaxira yo'l**: Didox API ochilmasa, faqat Faktura.uz bilan boshlash (API ochiq), Didox integratsiyasini ikkinchi bosqichga qoldirish; yoki ikkisi ham qo'lda hujjat yuklash (PDF/skan) bilan vaqtincha almashtiriladi.
+**MVP bosqichi** *(2026-10-15: foydalanuvchi qarori — `tekshiruv/savollar-yakuniy-tavsiyalar.md` #4)*: MVP — **faqat Faktura.uz** majburiy (ochiq API hujjati tasdiqlangan, REGOS allaqachon ishlatadi); **Didox — MVP'dan keyingi birinchi integratsiya** (Didox API hujjati login ortida, faqat norasmiy SDK bor). **Zaxira yo'l**: Faktura.uz ham kutilganidan sekin bo'lsa — qo'lda hujjat yuklash (PDF/skan) bilan vaqtincha almashtiriladi.
 
 ### 2.1 Mermaid: kiruvchi e-faktura qabul qilish va imzolash
 
@@ -272,11 +272,11 @@ class MarkingAdapter(Protocol):
 
 **SLA**: ko'chirish **72 soat** — faqat tajriba loyihasi ishtirokchilari uchun (VMQ 23-son, 23.01.2026, 1-ilova Nizom; hozircha o'simlik yog'i pilot loyihasi), umumiy majburiy muddat sifatida tasdiqlanmagan; 2026-07-01'dan elektron hisob-fakturada kod avtomatik tekshirish va kassada avtomatik kiritish majburiy. *(2026-10-14: tekshiruv)*
 
-**Xavfsizlik**: CRPT integratsiya shartnomasi/kaliti (agar bo'lsa) tenant emas, **platforma darajasida** shifrlangan saqlanadi (bizning yagona integratsiya shartnomamiz — barcha tenantlar shu orqali ishlaydi).
+**Xavfsizlik** *(2026-10-15: foydalanuvchi qarori bilan yangilandi)*: CRPT API kaliti endi **tenant darajasida** (har do'konning o'z "ishtirokchi" kalitida) shifrlangan saqlanadi (`tenant_secrets`) — avvalgi "bitta platforma kaliti" taxmini (1)-yo'l tanlanganda bekor bo'ladi; agar (2) proksi-hamkor yo'li ishlatilsa, u holda hamkor shartnomasi/kaliti **platforma darajasida** saqlanadi (bizning yagona integratsiya shartnomamiz orqali).
 
 **Monitoring**: BO-14 + har do'kon uchun "offline markirovka savdosi kutilmoqda" ogohlantirishi (internet qaytganda avtomatik tekshirish navbati).
 
-**MVP bosqichi**: MVP — majburiy, lekin **eng yuqori texnik xavf**. **Zaxira yo'l**: API ochilmasa/sekin bo'lsa — mavjud integrator (MoySklad, E-POS, Smartup) orqali proxy sifatida ulash, yoki markirovka modulini keyingi relizga ko'chirish (`12-taxminlar-va-murojaatlar.md`, savol 2). **Eslatma**: `11-backlog.md` hamon CRPT Turon integratsiyasining o'zini "MVP'dan keyin" deb belgilagan, ammo markirovkalangan tovar sotuvi (shu band, US-M01-03) MVP talabi — bu ziddiyat `11-backlog.md`da **ochiq savol** sifatida qayd etilgan, foydalanuvchi qarori kerak (2026-10-15).
+**MVP bosqichi va integratsiya yo'li** *(2026-10-15: foydalanuvchi qarori — `tekshiruv/savollar-yakuniy-tavsiyalar.md` #3, `11-backlog.md`dagi CRPT-MVP ziddiyati hal qilindi)*: MVP — majburiy, lekin **eng yuqori texnik xavf**. Qaror: (1) **har bir do'kon o'zining bepul "ishtirokchi" (Participant) kabinetidan** CRPT Turon'da "API Key Manager" roli bilan API kalit yaratadi va tizimimizga kiritadi (tenant darajasidagi kalit, `tenant_secrets`da shifrlangan — bu band platforma darajasidagi kalit haqidagi pastdagi "Xavfsizlik" bandini **tenant darajasiga** o'zgartiradi, F9 tasdiqlanmagan fakt bo'lgani uchun zaxira bilan); (2) agar bu yo'l Xat 2 javobi bilan rasman rad etilsa — reyestr hamkori (masalan hamkor allaqachon integrator maqomida bo'lgan MoySklad/E-POS/Smartup) orqali **proksi**; (3) ikkalasi ham ishga tushmasa — markirovkalangan tovar sotuvi tizimda **bloklanadi** (CRPT'siz sotilmaydi, qonunga zid bo'lmasligi uchun). **Xat 2 (CRPT Turon) javobi hali kutilmoqda** — uchinchi tomon SaaS'ning ishtirokchi kalitidan foydalanishi rasman ruxsat etilganmi, aniqlanmagan; shu sabab (1) — asosiy, (2)/(3) — zaxira zanjiri. Integratsiya vazifasi `11-backlog.md`da endi **MVP sprintiga** ko'chirildi (ilgari "MVP'dan keyin" edi).
 
 ### 4.1 Mermaid: markirovkalangan tovar sotuvi
 
@@ -540,6 +540,16 @@ class UzqrAdapter(Protocol):
 
 **MVP bosqichi**: MVP — yuridik shaxslar uchun majburiy. **Zaxira yo'l**: texnik protokol aniqlanmaguncha — statik QR (bosma) bilan boshlash, dinamik (summaga mos) QR keyinroq.
 
+### 9.2 Mustaqil bank terminali bilan "karta"ni qo'lda belgilash *(2026-10-15: foydalanuvchi qarori — `tekshiruv/savollar-yakuniy-tavsiyalar.md` #6)*
+
+**Maqsad**: ko'p kichik do'konda kassa tizimiga integratsiyalanmagan, alohida bank POS-terminali bor — kassir to'lovni terminalda qabul qiladi va kassada shunchaki "karta" to'lov turini **qo'lda** belgilaydi (API integratsiya yo'q, chunki bu **mustaqil** uskuna).
+
+**Qaror**: ruxsat etiladi, **online va offline'da ikkisida ham**. `sale_payments.method='card'` tanlanganda ixtiyoriy **`terminal_ref`** maydoni (terminal operatsiya raqami, `01-malumotlar-modeli.md` §6) to'ldiriladi. Z-hisobotda (M16) "karta" jami alohida qatorda chiqadi; Egasi kun oxirida bu summani bank ko'chirmasi bilan qo'lda solishtiradi (kelishtirish tizimda avtomatlashtirilmagan, MVP'da qo'lda jarayon).
+
+**Nega**: bozorda standart amaliyot (terminal kvitansiyasi va fiskal chek — ikki alohida hujjat, masalan uzum.uz); integratsiyalangan terminal veb-kassaga texnik jihatdan mos emas (WebUSB/Web Serial orqali bank terminali protokoli ochiq emas) va qimmat.
+
+**Ochiq savol**: O'zbekistonda to'lov turini qo'lda belgilashga yuridik cheklov/jarima bor-yo'qligi — yurist maslahati tavsiya etiladi (`tekshiruv/savollar-yakuniy-tavsiyalar.md` #6, "Keyin tekshiriladi").
+
 ---
 
 ## 10. SMS provayder
@@ -696,7 +706,7 @@ Tanlov mezoni: (a) ochiq/tasdiqlangan API/sandbox birinchi, (b) qonuniy SLA bosi
 ## Ochiq savollar
 
 1. CRPT Turon (Asl belgisi) integrator sifatida ro'yxatdan o'tish shartlari va API texnik spetsifikatsiyasi — `help.crpt-turon.uz` 403 bilan yopiq (Xat 2 javobini kutish).
-2. *(2026-10-15: qisman hal qilindi — foydalanuvchi qarori)* Offline rejimda markirovkalangan tovar **sotish** siyosati endi aniq (4-bo'lim: narx ma'lum bo'lsa ruxsat, bo'lmasa taqiq); huquqiy tasdiq hamon tavsiya etiladi. Offline **qaytarish/ko'chirish** siyosati hali ishlab chiqarilmagan.
+2. *(2026-10-15: foydalanuvchi qarori — to'liq hal qilindi, `tekshiruv/savollar-yakuniy-tavsiyalar.md` #5)* Offline rejimda markirovkalangan tovar siyosati endi to'liq aniq: **sotish** — narx qurilmada ma'lum bo'lsa ruxsat, bo'lmasa taqiq (4-bo'lim); **ko'chirish** (o'z filiallar/omborlar orasida) — offline **ruxsat etiladi**, keyin sinxronlanadi, audit bilan (egasi o'zgarmaydi, 72 soatlik qoida subyektlar o'rtasidagi ko'chirishga tegishli ko'rinadi); **qaytarish** — **faqat internet bor paytda** (offline'da qaytarish tugmasi bloklanadi — rasmiy qaytarish cheki kodi kerak, firibgarlik xavfi yuqori). To'liq siyosat `04-offline-sync.md` §7. Huquqiy tasdiq hamon tavsiya etiladi (qaytarish — qonun talabi tasdiqlangan, ko'chirish — ehtiyotkor tanlov).
 3. my.soliq.uz'dan hisobotni dasturiy (yoki yarim-rasmiy, E-IMZO orqali autentifikatsiyalangan) o'qish yo'li bormi — Xat 1 javobini kutish.
 4. Virtual kassa dasturini Davlat reyestriga kiritishning aniq narxi (sertifikatlash/ekspertiza xizmat haqi) — hamon topilmadi.
 5. Onlayn/QR to'lovda fiskal chekni kim chiqarishi (to'lov tizimi "komissioner" sifatida, yoki merchant o'zi) — ikki huquqiy talqin ziddiyatli, OFD operatori/Soliq qo'mitasi bilan aniqlashtirish kerak.

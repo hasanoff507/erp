@@ -7,7 +7,7 @@
 1. **Tartib: avval do'konning kundalik ishi, keyin davlat integratsiyalari.** Kassa + ombor + qarz daftari + xarajat + hisobot davlat API'larisiz ham to'liq ishlaydi va pilotda qiymat beradi; OFD, e-faktura va boshqalar parallel ravishda (rasmiy javoblar kelguncha) quriladi.
 2. **6 ta ikki haftalik sprint + 0-bosqich ≈ 13–14 hafta MVP** — bu **taxmin** (jamoa: 2 backend, 2 frontend, 1 QA/PM faraz qilindi; jamoa tarkibi hali aniqlanmagan).
 3. Kod yozish bilan **bir vaqtda** tashqi ishlar boshlanadi: rasmiy xatlar, buxgalter bilan provodka tasdig'i, SMS provayder tanlash, 15–20 do'kon egasi bilan suhbat va 5–10 pilot do'kon.
-4. Fiskal yo'l (o'z virtual kassamiz reyestrga kiritilishi ≈ 50 ish kuni vs mavjud hamkor orqali) **0-bosqichda hal qilinishi kerak** — 5-sprint shunga bog'liq.
+4. Fiskal yo'l *(2026-10-15: foydalanuvchi qarori — hal qilindi)*: ikkisi **parallel** — o'z reyestr arizasi 0-bosqichda boshlanadi (≈50 ish kuni), 5-sprintda pilot reyestr hamkori adapteri (`FiscalAdapter` porti) ishga tushadi, keyin o'z modulimizga almashtiriladi.
 5. Android POS (Kotlin) — MVP'dan keyin, `10-android-pos.md` bosqichlari bilan.
 
 ---
@@ -22,7 +22,9 @@
 | Seed: rollar, ruxsatlar, o'lchov birliklari, xarajat toifalari, tariflar | `05-xavfsizlik-va-audit.md` matritsasi bazada |
 | **Tashqi:** rasmiy xatlarni yuborish (`research_notes/texnik/12-taxminlar-va-murojaatlar.md` + Didox, Faktura.uz, Click, Payme, Uzum uchun yangi xatlar) | Yuborilgan xatlar ro'yxati |
 | **Tashqi:** buxgalter bilan `02-provodka-qoidalari.md` ni tekshirish | Tasdiqlangan hisoblar rejasi + `02-provodka-qoidalari.md` ogohlantirish blokidagi 12 band bo'yicha yozma javoblar jadvali *(2026-10-14: tekshiruv)* |
-| **Tashqi:** fiskal yo'l qarori (o'z reyestr yo'li va/yoki hamkor), SMS provayder tanlash | Qaror hujjati |
+| **Tashqi:** o'z virtual kassamizni **Davlat reyestriga kiritish arizasi — 0-bosqichda, birinchi kundan boshlanadi** (VMQ-943, 4-ilova, ~50 ish kuni ≈ 2,5–3 oy); parallel — pilot uchun reyestr hamkori (Multikassa/E-POS Communicator) bilan muzokara, SMS provayder tanlash *(2026-10-15: foydalanuvchi qarori — `tekshiruv/savollar-yakuniy-tavsiyalar.md` (b)/#2)* | Yuborilgan ariza + hamkor bilan muzokara holati |
+| **Tashqi:** pentest — avtomatik DAST (OWASP ZAP) sozlash va ichki OAuth/to'lov/fiskal tekshiruv ro'yxatini tayyorlash; Celion/ONESEC'dan rasmiy taklif so'rash (~60 mln so'm rezerv, `05-xavfsizlik-va-audit.md` §8) *(2026-10-15: foydalanuvchi qarori — `tekshiruv/savollar-yakuniy-tavsiyalar.md` #14)* | DAST CI'ga ulangan, ikki pentest firmadan taklif so'rovi yuborilgan |
+| **Tashqi:** qo'llab-quvvatlash kanali sozlash — Telegram "/yordam" + bitta telefon raqami, ish vaqti va dam olish kuni navbatchilik jadvali (`06-nofunksional-talablar.md` §12) *(2026-10-15: foydalanuvchi qarori — `tekshiruv/savollar-yakuniy-tavsiyalar.md` #12)* | Support kanal ishga tushgan |
 | **Tashqi:** 15–20 do'kon egasi bilan suhbat, 5–10 pilot do'kon | Suhbat xulosasi, pilot ro'yxati |
 | **Tashqi:** huquqiy maslahat — ~~(a) obuna kechikkanda kassani to'xtatmaslik~~ **bekor qilindi: endi mahsulot qarori sifatida kassa to'liq to'xtaydi, 24 soat imtiyozdan keyin (`12-autentifikatsiya-oauth2.md` §16) — bu qator uchun huquqiy maslahat shart emas, fiskal oqibat Foydalanish shartlarida qayd etiladi**; (b) 48 soatdan keyin yangi sotuvni bloklamaslik (`04-offline-sync.md` §6); (c) markirovkalangan tovarni offline sotish (§7) — **mahsulot qarori qabul qilingan (2026-10-15), huquqiy maslahat endi faqat tasdiq uchun**; (d) chekdan keyin e-faktura berish — **mahsulot qarori qabul qilingan (2026-10-15), huquqiy maslahat endi faqat tasdiq uchun** | Yozma huquqiy xulosa (5-sprintdan oldin) *(2026-10-15: foydalanuvchi qarori — (a) bandi bekor qilindi; (c)/(d) qabul-5 KICHIK 2 bo'yicha aniqlashtirildi)* |
 
@@ -61,12 +63,13 @@
 
 ## 5-sprint: fiskal va e-faktura
 
-- OFD/virtual kassa (0-bosqich qaroriga ko'ra: o'z modulimiz yoki hamkor adapteri), 48 soat nazorati, fiskal chek holatlari.
-- E-faktura (Faktura.uz va/yoki Didox) + E-IMZO brauzerda imzolash; kiruvchi faktura → kirim; VM 830 xavf belgisi.
-- M10 ichki QQS registri, qizil faktura bo'yicha QQS krediti faqat to'lovdan keyin (US-M07-04 ikkinchi mezoni, US-M10-03); M11 buxgalteriya hisobotlari (tasdiqlangan hisoblar rejasi bilan).
+- **OFD/virtual kassa — `FiscalAdapter` porti + pilot hamkor adapteri** *(2026-10-15: foydalanuvchi qarori — `tekshiruv/savollar-yakuniy-tavsiyalar.md` (b)/#2, `03-integratsiyalar.md` §1)*: 0-bosqichda boshlangan o'z reyestr arizasi hali tasdiqlanmagani sababli, bu sprintda **reyestr hamkori adapteri** (Multikassa yoki E-POS Communicator) ishga tushiriladi — `FiscalAdapter` porti orqali, keyinroq o'z modulimiz tayyor bo'lganda adapter almashtiriladi (kod o'zgarmaydi). Hamkor haqini pilot davrida **biz to'laymiz** (≤~13 mln so'm byudjet). 48 soat nazorati, fiskal chek holatlari.
+- **CRPT Turon (markirovka) — ishtirokchi (participant) API kalit integratsiyasi** *(2026-10-15: foydalanuvchi qarori — `tekshiruv/savollar-yakuniy-tavsiyalar.md` #3, `03-integratsiyalar.md` §4; ilgari "MVP'dan keyin" edi, endi MVP sprintiga ko'chirildi)*: har do'kon o'z bepul ishtirokchi kabinetidan API kalit oladi va tenant sozlamalariga kiritadi (`tenant_secrets`); `verify_code`/`sell`/`return_codes`/`transfer` adapter chaqiruvlari; agar Xat 2 javobi bu yo'lni rad etsa — reyestr hamkori orqali proksi (zaxira), ikkisi ham ishlamasa markirovkalangan tovar sotuvi bloklanadi.
+- **E-faktura — faqat Faktura.uz** *(2026-10-15: foydalanuvchi qarori — `tekshiruv/savollar-yakuniy-tavsiyalar.md` #4)* + E-IMZO brauzerda imzolash; kiruvchi faktura → kirim; VM 830 xavf belgisi. Didox — MVP'dan keyingi birinchi integratsiya (`11-backlog.md` "MVP'dan keyin" ro'yxati).
+- M10 ichki QQS registri, qizil faktura bo'yicha QQS krediti faqat to'lovdan keyin (US-M07-04 ikkinchi mezoni, US-M10-03); M11 buxgalteriya hisobotlari (tasdiqlangan hisoblar rejasi bilan, 4910-hisob shubhali qarz zahirasi bilan).
 - US-M10-03 kutilayotgan QQS krediti (BO-07/BO-10). *(2026-10-14: tekshiruv)*
 - Chek asosida chiquvchi e-faktura (US-M01-06, BP-13, BO-15 "Chek asosida e-faktura chiqarish" tugmasi) — `einvoices.related_doc`, provodka yozilmaydi (`02-provodka-qoidalari.md` 2.22). *(2026-10-15: qabul-5 KICHIK 2)*
-- **Mezon:** test muhitida chek fiskallashadi; kiruvchi e-faktura qabul qilinib imzolanadi.
+- **Mezon:** test muhitida chek fiskallashadi (hamkor adapteri orqali); kiruvchi e-faktura (Faktura.uz) qabul qilinib imzolanadi; markirovkalangan tovar ishtirokchi kalit bilan tekshiriladi.
 
 ## 6-sprint: to'lov, AI, pilot
 
@@ -81,7 +84,7 @@
 
 ## MVP'dan keyin (tartib taxminiy)
 
-1. Asl belgisi (CRPT Turon) **integratsiyasining o'zi** (rasmiy API/integrator maqomi ochilgach) — e-TTN; e-ishonchnoma (Vakolat.uz). **OCHIQ SAVOL (CRPT-MVP ziddiyati, foydalanuvchi qarori kerak, 2026-10-15)**: markirovkalangan tovar **sotuvi** (US-M01-03, offline — narx ma'lum bo'lsa ruxsat) MVP talabi bo'lib qoladi, ammo CRPT Turon bilan rasmiy integratsiya (bu band) hamon "MVP'dan keyin" — chunki `help.crpt-turon.uz` 403 bilan yopiq (`03-integratsiyalar.md` §4, Ochiq savol 1). **Taklif (hal qilinmagan, faqat variant)**: (a) MVP'da kodlar faqat mahalliy yoziladi (`marking_codes.status='pending_verification'`) va CRPT API'ga kirish ochilgan zahoti fon rejimida avtomatik yuboriladi — agar bu kirish MVP davrida ochilmasa, (b) markirovkalangan tovar sotuvi vaqtincha cheklanadi (faqat markirovkasiz/markirovka talab qilinmaydigan tovarlar). Bu band — spec darajasida **qaror qilinmagan**, foydalanuvchidan kutilmoqda.
+1. ~~Asl belgisi (CRPT Turon) integratsiyasining o'zi~~ — **MVP'ga ko'chirildi** (2026-10-15: foydalanuvchi qarori, 5-sprint — har do'konning o'z ishtirokchi API kaliti orqali). MVP'dan keyin qoladigan qism: **e-TTN**; **e-ishonchnoma (Vakolat.uz)**.
 2. ~~AI-03 (US-M04-04 (3)-yo'l) — qog'oz hujjat OCR~~ — **bekor qilindi**: AI-03 MVP'da, 6-sprintda (foydalanuvchi qarori, 2026-10-15). Mijozlarga SMS/Telegram qarz xabarlari (US-M08-08) — MVP'dan keyin, o'zgarishsiz.
 3. Android POS (Kotlin) — `10-android-pos.md` 1–4 bosqichlari.
 4. Uzum to'lovi, ko'p ombor, talab bashorati (AI-09) — 2–3 oylik savdo tarixidan keyin. *(2026-10-14: tekshiruv — "filiallar konsolidatsiyasi" olib tashlandi, 4-sprintga ko'chirildi)*
@@ -98,10 +101,10 @@
 ## Ochiq savollar
 
 1. Jamoa tarkibi va muddat — sprint hajmlari shunga qarab qayta baholanadi.
-2. Fiskal yo'l (o'z reyestr yo'li vs hamkor) — 5-sprint shunga bog'liq.
+2. ~~Fiskal yo'l (o'z reyestr yo'li vs hamkor)~~ — **Yopildi** (2026-10-15: foydalanuvchi qarori): ikkisi parallel, 4-band va 5-sprint. Ochiq qolgan qism: reyestr/sertifikatlash narxi va 1 BHM to'lovi o'z yo'limizga tegishliligi (Xat 1 javobi kutilmoqda).
 3. Rasmiy xatlarga javob muddati noma'lum — integratsiya sprintlari surilishi mumkin.
 4. ~~Kechikkan obuna to'lovida kassani to'xtatmaslik siyosatining huquqiy tasdig'i~~ **Yopildi**: foydalanuvchi qarori bilan — kassa 24 soatlik imtiyozdan keyin to'liq to'xtaydi, huquqiy tasdiq endi shart emas (`12-autentifikatsiya-oauth2.md` §16.3). *(2026-10-15: foydalanuvchi qarori)*
-5. **CRPT Turon — MVP ziddiyati (yangi, 2026-10-15, foydalanuvchi qarori kerak)**: markirovkalangan tovar sotuvi MVP talabi (US-M01-03, offline — narx ma'lum bo'lsa ruxsat, `04-offline-sync.md` §7), ammo CRPT Turon bilan rasmiy integratsiyaning o'zi "MVP'dan keyin" ro'yxatida (yuqorida, 1-band) — API hamon yopiq (403). Taklif: (a) MVP kodlarni mahalliy saqlasin va CRPT API'ga kirish ochilganda yuborsin; (b) kirish ochilmasa — markirovkalangan tovar sotuvi vaqtincha cheklansin. **Bu spec darajasida qaror qilinmagan — foydalanuvchidan kutilmoqda.**
+5. ~~CRPT Turon — MVP ziddiyati~~ — **Yopildi** (2026-10-15, foydalanuvchi qarori): markirovkalangan tovar sotuvi **va** CRPT Turon integratsiyasining o'zi (ishtirokchi API kaliti orqali) ikkisi ham MVP'ga (5-sprint) kiradi; API hamon rasmiy ravishda yopiq (403) bo'lgani uchun zaxira zanjiri: rad etilsa — hamkor proksi, ikkisi ham ishlamasa — sotuv bloklanadi (`03-integratsiyalar.md` §4).
 
 ## Manbalar
 

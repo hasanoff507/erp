@@ -11,7 +11,7 @@
 5. **Uskunalar narxi va protokollari manbali**: shtrix-kod skaner (USB HID/keyboard-wedge), chek printeri (ESC/POS), Android POS terminal (UZKASSA N5/P100, A-Pay P10) — barchasi narx bilan `06-raqobatchilar-texnik-va-uskunalar.md`dan; **tarozi protokoli va yorliq printeri protokoli tadqiqotda topilmadi — ochiq savol**.
 6. **Lokalizatsiya**: o'zbek (lotin) — asosiy, rus — ikkinchi til (allaqachon qaror, `08-frontend-arxitekturasi.md`); kirill qidiruv `pg_trgm` indeks orqali (`01-malumotlar-modeli.md`, 1-bo'lim) — bu allaqachon qabul qilingan texnik yechim.
 7. **Ma'lumot saqlash muddati**: buxgalteriya hujjatlari hisobot yilidan keyin kamida **5 yil** (Buxgalteriya hisobi to'g'risidagi qonun, O'RQ-404, 29-modda), soliq hujjatlari **3 yil** (2024-01-01'dan) — bu ikkinchisi qonuniy, manbali (`07-fayl`, 3.3-bo'lim); audit log va backup muddatlari buxgalteriya muddatiga tenglashtirilgan ichki siyosat (`05-xavfsizlik-va-audit.md`, 6.3 va 7.1-bo'lim). *(2026-10-14: tekshiruv)*
-8. **Tenant-boshiga xarajat jadvali — hisoblanadi, lekin to'liq taxmin zanjiri**: hosting (UzCloud narxlaridan hisoblangan, manbali kirish narxlari + taxmin sig'im), AI (`05-ai-funksiyalar.md`, 5-bo'lim: ~2-5 ming so'm/oy/do'kon, Haiku 5.5 asosida), SMS (manbada narx yo'q — **to'liq taxmin**); bu jadval `06-mvp-chegarasi.md` (3.3-bo'lim)dagi "unit-iqtisod hisobi hali yo'q" bo'shlig'ini to'ldiradi.
+8. **Narx modeli — yagona tarif, 99 000 so'm/oy** *(2026-10-15: foydalanuvchi qarori)*: eski Start/Biznes/Pro uch-tariflilik bekor qilindi; hammasi kiradi (modul, AI, Telegram) + 1 virtual kassa bazada, qo'shimcha kassa +39 000 so'm/oy, yillik −20%, 30 kunlik sinov. **Tenant-boshiga xarajat jadvali — hisoblanadi, lekin to'liq taxmin zanjiri**: hosting (UzCloud narxlaridan hisoblangan), AI (`07-ai-qatlami.md` §13), SMS (Eskiz.uz, F11 tasdiqlangan), fiskal modul (~35–39 ming/kassa) — 1 kassa bilan jami ≈60 000–68 000 so'm, marja ≈31 000–39 000 so'm (11-bo'lim).
 9. **Observability (log, metrika, tracing, alerting) va qo'llab-quvvatlanadigan brauzerlar ro'yxati manbada yo'q** — ikkala band ham sanoat amaliyoti/ichki arxitektura qarori sifatida **taxmin** taklif qilinadi.
 10. **Accessibility** uchun faqat UX darajasidagi umumiy tamoyillar bor (katta shrift, yuqori kontrast, 56×56dp teginish maydoni — hammasi taxmin, `04-ekranlar-va-ux.md`, 1.4-1.5-bo'lim); rasmiy WCAG audit **tadqiqotda yo'q — ochiq savol**.
 
@@ -52,7 +52,7 @@ Barcha quyidagi raqamlar — **taxmin**, manbada son ko'rsatkich topilmagani sab
 | Birinchi 3 oy (pilot) | 20–50 tenant | `06-mvp-chegarasi.md`, 3.2-bo'lim: "Pilot mijozlar soni — taxmin, manbada yo'q" |
 | 6-12 oy | ~100 tenant | Maqsad, manbasiz |
 | 18-24 oy | ~1000 tenant | Maqsad, manbasiz |
-| O'rtacha kassa/tenant | 1–2 (Start/Biznes), 3+ (Pro) | `06-mvp-chegarasi.md`, 3.3-bo'lim tarif tafsilotlariga mos (Biznes — 3 kassagacha) |
+| O'rtacha kassa/tenant | 1 (bazaga kiritilgan) + ixtiyoriy qo'shimcha (`addons.extra_register`) | Yagona tarif endi kassa soniga qarab bosqichlanmaydi — `01-malumotlar-modeli.md` §2 *(2026-10-15: foydalanuvchi qarori)* |
 | O'rtacha kunlik chek/kassa | 50–150 | Kichik chakana do'kon uchun odatiy taxmin, manbasiz |
 | O'rtacha AI so'rov/tenant/oy | ~300 | `05-ai-funksiyalar.md`, 5-bo'lim hisob-kitobida ishlatilgan taxmin |
 
@@ -204,20 +204,39 @@ Rasmiy WCAG audit tadqiqotda yo'q — faqat UX darajasidagi umumiy tamoyillar (`
 
 ---
 
-## 11. Tenant-boshiga xarajat taxmini va unit-iqtisod
+## 11. Tenant-boshiga xarajat taxmini va unit-iqtisod — yagona 99 000 so'm/oy tarif *(2026-10-15: foydalanuvchi qarori — narx modeli, `tekshiruv/savollar-yakuniy-tavsiyalar.md` #2/#13)*
 
-`06-mvp-chegarasi.md` (3.3-bo'lim) shart qo'yadi: "bir mijozga oylik xarajat (hosting, AI tokenlar, OFD/EDO operator haqlari, qo'llab-quvvatlash) Start narxidan (49 000 so'm) past bo'lishi shart" — bu hisob hali yo'q edi, quyida birinchi taxminiy versiyasi:
+**Narx modeli**: eskirgan uch-tarifli tizim (Start 49 000 / Biznes 129 000 / Pro 249 000) **bekor qilindi**. Endi **bitta tarif — 99 000 so'm/oy**, hammasi kiradi (barcha modul, AI oylik limiti, Telegram bot) + **1 virtual kassa bazaga kiritilgan**; qo'shimcha virtual kassa — **+39 000 so'm/oy/kassa** (`addons.extra_register`, `01-malumotlar-modeli.md` §2); yillik to'lovda **−20%** chegirma (950 400 so'm/yil); **30 kunlik sinov muddati**. Quyidagi jadval — bitta kassali tenant uchun xarajat/marja hisobi:
 
 | Xarajat komponenti | Taxminiy summa/tenant/oy | Manba/izoh |
 |---|---|---|
 | Hosting (UzCloud, 100 tenant sig'imida) | **~20 500 so'm** | 3.2-bo'lim hisobi, UzCloud birlik narxlaridan (`07-fayl`) — sig'im/o'lcham taxmin |
-| AI (Claude Haiku 5.5, ~300 so'rov/oy) | **~2 000–5 000 so'm** | `05-ai-funksiyalar.md`, 5-bo'lim: "1 do'kon oyiga 300 so'rov × (3000 kirish+500 chiqish token) ≈ $0,2 (~2-3 ming so'm), OCR bilan ~5 ming so'm/oy" |
-| SMS (nasiya eslatma, OTP) | **~5 000–10 000 so'm** (**to'liq taxmin**) | Manbada SMS provayder narxi yo'q — `02-modullar-talablari.md` (M08, Ochiq savol: "SMS narxi va provayder aniqlanishi kerak"); taxminiy 20–50 SMS/oy × taxminiy 150–300 so'm/SMS (provayder va aniq narx tasdiqlanmagan) |
-| **Jami taxminiy xarajat/tenant/oy** | **~28 000–36 000 so'm** | Hammasi yuqoridagi taxminlarning yig'indisi |
-| Start tarifi narxi (`06-mvp-chegarasi.md`, 3.3-bo'lim) | **49 000 so'm/oy** | Foydalanuvchi qarori, raqobatchilardan arzon bo'lishi talabi bilan |
-| Taxminiy marja (Start) | **~13 000–21 000 so'm/oy** | **Ijobiy, lekin tor** — qo'llab-quvvatlash xodimi xarajati, EDO/CRPT integrator haqlari (agar bo'lsa) hali kiritilmagan |
+| AI (Claude Haiku 5.5, ~300 so'rov/oy) | **~2 000–5 000 so'm** | `07-ai-qatlami.md` §13 — yagona tarif uchun birlashtirilgan budjet |
+| SMS (Eskiz.uz, **95 so'm/SMS**, F11 tasdiqlangan) | **~1 900–4 750 so'm** | `tekshiruv/savollar-yakuniy-tavsiyalar.md` F11; taxminiy 20–50 SMS/oy × 95 so'm |
+| Click/Payme (bizning billing komissiyasi) | **~1 000 so'm** | 1–2% komissiya, 99 000 so'mdan |
+| **Fiskal modul (1 bazaga kiritilgan virtual kassa)** | **~35 000 so'm** (+ ~4 000 zahira ≈ **39 000**) | Pilot davrida reyestr hamkori haqi (biz to'laymiz) yoki o'z reyestrimizdagi 1 BHM/yil ÷ 12 ≈ 34 000–37 000 so'm (`03-integratsiyalar.md` §1, foydalanuvchi qarori) |
+| **Jami taxminiy xarajat/tenant/oy (1 kassa bilan)** | **≈ 60 000–68 000 so'm** | Komponentlarning real (hammasi bir vaqtda eng yuqori bo'lmaydigan) yig'indisi |
+| Yagona tarif narxi | **99 000 so'm/oy** | Foydalanuvchi qarori, 2026-10-15 |
+| **Taxminiy marja (1 kassa bilan)** | **≈ 31 000–39 000 so'm/oy** | Qo'llab-quvvatlash xodimi xarajati (12-bo'lim) bu marjadan alohida, dastlabki bosqichda zarar sifatida qabul qilinadi |
+| Qo'shimcha kassa (`extra_register` addon) | +39 000 so'm/oy narx, ~35–39 000 so'm xarajat | Qo'shimcha kassa narxi o'z xarajatini deyarli to'liq qoplaydi — marja asosiy tarifdan keladi |
 
-**Muhim ogohlantirish**: bu jadvaldagi deyarli barcha raqam (sig'im, SMS narxi, so'rov soni) **taxmin zanjiri** — faqat UzCloud birlik narxlari va AI narx formulasi manbali. Marja tor va qo'llab-quvvatlash/integrator xarajatlari hali kiritilmagani uchun **Start tarifi narxini real pilot ma'lumoti bilan qayta tasdiqlash shart** (`06-mvp-chegarasi.md`, 3.3-bo'lim: "raqamlar unit-iqtisod hisobi bilan tasdiqlanishi kerak" — shu talab bu jadval bilan **qisman** yopildi, to'liq emas).
+**Muhim ogohlantirish**: bu jadvaldagi deyarli barcha raqam (sig'im, so'rov soni, fiskal modul narxi) **taxmin zanjiri** — faqat UzCloud birlik narxlari, Eskiz.uz SMS narxi (F11) va AI narx formulasi manbali. Marja (≈31 000–39 000 so'm) qo'llab-quvvatlash xodimi va integrator xarajatlarini hali o'z ichiga olmaydi — bular 12-bo'limda alohida ko'rib chiqiladi; **real pilot ma'lumoti bilan qayta tasdiqlash shart**.
+
+---
+
+## 12. Qo'llab-quvvatlash modeli (support) *(2026-10-15: foydalanuvchi qarori — `tekshiruv/savollar-yakuniy-tavsiyalar.md` #12)*
+
+| Band | Qaror |
+|---|---|
+| Kanallar | Telegram (mavjud bot ichida "/yordam") + bitta telefon raqami — BILLZ/mDokon ham aynan shu modelda |
+| Ish vaqti | Ish kunlari **09:00–19:00** (Toshkent) |
+| Javob muddati — kritik (fiskal/OFD, markirovka, bloklanish) | Ish vaqtida **1 soat ichida** birinchi javob |
+| Javob muddati — oddiy savol | **24 soat** |
+| **Dam olish kuni navbatchilik** | Kritik muammolar uchun Telegram orqali **navbatchi (asoschi), 4 soat ichida** javob — shart, chunki juma 19:00'dan dushanba 09:00'gacha 62 soat, bu 48 soatlik OFD muddatidan uzun |
+| Xodim xarajati | ~6,7–7 mln so'm/oy (1 operator, taxmin) — dastlabki bosqichda **zarar** sifatida qabul qilinadi, 11-bo'limdagi marjadan alohida |
+| Qayta ko'rib chiqish | Tenant soni **300**ga yetganda narx/xodim nisbati qayta hisoblanadi |
+
+**Ishonch**: kanallar — yuqori (bozor amaliyoti bilan mos); SLA raqamlari va xodim soni — taxmin, pilotda tasdiqlanadi (murojaatlar soni, javob vaqti).
 
 ---
 
@@ -229,10 +248,10 @@ Rasmiy WCAG audit tadqiqotda yo'q — faqat UX darajasidagi umumiy tamoyillar (`
 4. 1000 tenant uchun aniq infratuzilma o'lchami/narxi — bu hujjatda hisoblanmadi, keyingi moliyaviy rejalashtirish bosqichida.
 5. Tarozi va yorliq printeri protokoli — ochiq manbada topilmadi, pilot uskunalarida aniqlanadi (`04-ekranlar-va-ux.md`, Ochiq savol 5; `02-modullar-talablari.md`, US-M09-04).
 6. ~~Qo'llab-quvvatlanadigan brauzerlar/Android versiyasi ro'yxati~~ — **hal qilindi** (2026-10-15, D3, 6-bo'lim): Chrome/Edge/Android Chrome to'liq, iOS/iPadOS o'rnatilgan PWA + bulut printer. Ochiq qolgan qism: bulut printerning O'zbekistondagi narxi/mavjudligi va faqat-elektron chekning qonuniyligi (7.2-bo'lim, `08-frontend-arxitekturasi.md` §6).
-7. SMS provayder va aniq narx — tanlanmagan, bu 11-bo'limdagi xarajat jadvalining eng zaif qismi.
+7. ~~SMS provayder va aniq narx~~ — **qisman hal qilindi**: Eskiz.uz narxi (95 so'm/SMS) F11 bilan tasdiqlangan (11-bo'lim), lekin rasmiy provayder tanlovi hali biznes qarori sifatida yakunlanmagan.
 8. Rasmiy accessibility (WCAG) audit — MVP'da qilinmagan, keyingi bosqich sifatida qoldirilgan.
 9. Observability vositasi (Prometheus/Grafana yoki boshqa) — `09-backend-arxitekturasi.md`da tanlanadi.
-10. Tenant-boshiga xarajat jadvalidagi (11-bo'lim) marja qo'llab-quvvatlash/integrator xarajatlarini hisobga olmagani — bu raqamlar pilot va real operatsion xarajat bilan qayta tasdiqlanishi shart, aks holda tarif narxi (`06-mvp-chegarasi.md`) qayta ko'rib chiqilishi kerak bo'lishi mumkin.
+10. Tenant-boshiga xarajat jadvalidagi (11-bo'lim) marja (≈31 000–39 000 so'm) qo'llab-quvvatlash (12-bo'lim, ~6,7–7 mln so'm/oy) va integrator xarajatlarini hisobga olmagani — bu raqamlar pilot va real operatsion xarajat bilan qayta tasdiqlanishi shart; 300 to'lovchi tenantga yetganda narx/xodim nisbati qayta ko'riladi (12-bo'lim).
 
 ## Manbalar
 

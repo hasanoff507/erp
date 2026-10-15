@@ -136,7 +136,7 @@ flowchart TD
 | 5 | Omborchi | M04 | Ichki kirim hujjati | — | Ombor qoldig'i ortadi |
 | 6 | Buxgalter | M10, M11 | Avtomatik provodka | — | QQS majburiyati mos ravishda qayta hisoblanadi |
 
-Manba: `02-kassa-ofd-markirovka.md` (korrektsiya cheki tushunchasi fiskal chek talablaridan kelib chiqadi). *Eslatma: markirovkalangan tovarni Asl belgisi tizimida qanday "qaytarish" qilish kerakligi texnik API hujjatlari yopiq bo'lgani sababli ochiq manbada tasdiqlanmagan — "taxmin" (qadam 2a).*
+Manba: `02-kassa-ofd-markirovka.md` (korrektsiya cheki tushunchasi fiskal chek talablaridan kelib chiqadi). *Eslatma: markirovkalangan tovarni Asl belgisi tizimida qanday "qaytarish" qilish kerakligi texnik API hujjatlari yopiq bo'lgani sababli ochiq manbada tasdiqlanmagan — "taxmin" (qadam 2a).* *(2026-10-15: foydalanuvchi qarori)* **Markirovkalangan tovarni qaytarish faqat internet bor paytda (online) amalga oshiriladi** — offline rejimda bu jarayon butunlay bloklanadi (`02-modullar-talablari.md`, M02 Offline xatti-harakati; `spec/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #5).
 
 ---
 
@@ -157,6 +157,7 @@ flowchart TD
 |---|---|---|---|---|---|
 | Naqd | Kassir | M01 | Fiskal chek | Virtual kassa/OFD | Kassadagi naqd pul ortadi |
 | Karta | Kassir | M01 | Terminal cheki + fiskal chek | Virtual kassa/OFD (acquiring bank orqali) | Bank hisobidagi mablag' ortadi (kechikish muddati manbada ko'rsatilmagan — taxmin qilinmaydi) |
+| *(2026-10-15: foydalanuvchi qarori)* Karta — mustaqil terminal (qo'lda belgilangan) | Kassir | M01, M16 | Fiskal chek + ixtiyoriy terminal operatsiya raqami | Virtual kassa/OFD (kassa terminal bilan integratsiyalanmagan) | Online va offline'da ruxsat; Z-hisobotda "karta" jami alohida chiqadi, Egasi kun oxirida bank ko'chirmasi bilan solishtiradi |
 | QR/Click/Payme | Kassir/mijoz | M01 | To'lov tasdiqlash + fiskal chek | Virtual kassa/OFD, (Click/Payme/Uzum API) | Mablag' vositachi orqali tushadi, komissiya ushlab qolinadi |
 | *(2026-10-14: tekshiruv)* Yagona QR (UzQR, bank) | Kassir/mijoz | M01 | To'lov tasdiqlash + fiskal chek | Virtual kassa/OFD, bank (yagona QR) | Mablag' bank orqali tushadi; yuridik shaxslar uchun 2026-07-01'dan majburiy (PF-246-son, 3-band "b"), YTT uchun ixtiyoriy, Click/Payme/Uzum'ning o'rnini bosmaydi |
 
@@ -266,7 +267,7 @@ flowchart TD
 | 4 | Omborchi | M06, M04 | Kirim hujjati | — | — |
 | 5 | Tizim | M04, M14 | Avtomatik provodka | — | Qabul qiluvchi filial ombori ortadi, jo'natuvchi filial kamayadi (moddiy javobgarlik o'zgaradi) |
 
-Manba: `02-kassa-ofd-markirovka.md` (23-son qaror, 72 soat chegarasi). *Ochiq savol: filiallararo (bir yuridik shaxs ichidagi) ichki ko'chirish uchun E-TTN talab qilinishi aniq tasdiqlanmagan — tashqi tashish uchun majburiylik aniq, ichki ko'chirish uchun "taxmin" sifatida belgilanadi.*
+Manba: `02-kassa-ofd-markirovka.md` (23-son qaror, 72 soat chegarasi). *Ochiq savol: filiallararo (bir yuridik shaxs ichidagi) ichki ko'chirish uchun E-TTN talab qilinishi aniq tasdiqlanmagan — tashqi tashish uchun majburiylik aniq, ichki ko'chirish uchun "taxmin" sifatida belgilanadi.* *(2026-10-15: foydalanuvchi qarori)* **Markirovkalangan tovarni o'z filiallar/omborlar orasida ko'chirish offline rejimda ruxsat etiladi** (jo'natish va qabul ikkisi ham) — keyin sinxronlanadi, audit bilan; sabab — ichki ko'chirishda tovar egasi o'zgarmaydi (`02-modullar-talablari.md`, M06 Offline xatti-harakati; `spec/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #5).
 
 ---
 
@@ -349,7 +350,7 @@ flowchart TD
     B --> C["3. Buxgalter BO-15'da asl\nchekni tanlaydi"]
     C --> D["4. Yangi chiquvchi e-faktura\nyaratiladi, chekka bog'lanadi\n(einvoices.related_doc)"]
     D --> E["5. Buxgalter E-IMZO bilan\nimzolaydi"]
-    E --> F["6. EDO operatoriga (Didox/\nFaktura.uz) yuboriladi"]
+    E --> F["6. EDO operatoriga (Faktura.uz,\nMVP'da yagona — Didox keyinroq)\nyuboriladi"]
     F --> G["7. QQS qayta hisoblanmaydi —\nfaqat hujjat rasmiylashtiriladi,\nchekdagi QQS yozuviga havola qo'shiladi"]
 ```
 
@@ -360,10 +361,10 @@ flowchart TD
 | 3 | Buxgalter | M01, M07 | Asl chek tanlovi | — | — |
 | 4 | Tizim | M01, M10 | Chiquvchi e-faktura (`einvoices.related_doc`) | — | Effekt yo'q — `ledger_entries`/`vat_moves`ga yangi yozuv qo'shilmaydi (append-only); bog'lanish faqat `einvoices.related_doc` orqali (`02-provodka-qoidalari.md` §2.22) *(2026-10-15: qabul-5 O13 bo'yicha aniqlashtirildi)* |
 | 5 | Buxgalter | M01 | PKCS#7 imzo | E-IMZO | — |
-| 6 | Tizim | M01 | Yuborilgan e-faktura | E-faktura (Didox/Faktura.uz) | — |
+| 6 | Tizim | M01 | Yuborilgan e-faktura | E-faktura (Faktura.uz — MVP'da yagona operator) | — |
 | 7 | Tizim | M10, M11 | — | — | QQS **ikkinchi marta hisoblanmaydi** — registr yozuvlari o'zgarmaydi (append-only), bog'lanish faqat hujjat darajasida (`einvoices.related_doc`, `02-provodka-qoidalari.md` §2.22) *(2026-10-15: qabul-5 O13 bo'yicha aniqlashtirildi)* |
 
-Manba: `spec/01-mahsulot/02-modullar-talablari.md` (US-M01-06, M01 chekka holatlar). *Eslatma: bu jarayon B2C sotuvdan keyin mijoz maqomi B2B'ga aniqlanganda (yoki boshidanoq B2B bo'lib, e-faktura keyin so'ralganda) ishlaydi; qaysi EDO operatori (Didox/Faktura.uz) orqali yuborilishi tenant sozlamasiga bog'liq (BP-01/BP-03 bilan bir xil kanal).*
+Manba: `spec/01-mahsulot/02-modullar-talablari.md` (US-M01-06, M01 chekka holatlar). *Eslatma: bu jarayon B2C sotuvdan keyin mijoz maqomi B2B'ga aniqlanganda (yoki boshidanoq B2B bo'lib, e-faktura keyin so'ralganda) ishlaydi.* *(2026-10-15: foydalanuvchi qarori)* **E-faktura operatori — MVP'da faqat Faktura.uz** (ochiq API hujjati tekshirilgan, REGOS ham ishlatadi); Didox — MVP'dan keyingi birinchi integratsiya (`spec/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #4).
 
 ---
 
@@ -393,7 +394,7 @@ Matritsa talab qilingan 6 majburiy davlat tizimining barchasini kamida bitta jar
 
 1. Onlayn/QR to'lovda (Click/Payme/Uzum) fiskal chekni kim chiqarishi — to'lov tizimi "komissioner" sifatida (ГНК amaliy pozitsiyasi) yoki merchant o'zi (buxgalter.uz huquqiy tahlili) — ikki talqin ziddiyatli, aniqlashtirish kerak (`03-efaktura-va-tolov.md`, 2.5-band).
 2. Davlat tuzgan hisobotni (my.soliq.uz) dasturiy (API) o'qish uchun rasmiy yo'l yo'q — BP-08'ning 2-qadami MVP'da qo'lda/yarim-avtomatik bo'lishi mumkin, bu avtomatlashtirish va'dasini kechiktiradi (`00-xulosa-va-ochiq-savollar.md`).
-3. *(2026-10-15: sotish qismi hal qilindi — US-M01-03, foydalanuvchi qarori)* Offline rejimda Asl belgisi kodini real-vaqtda tekshirish mumkin emas (CRPT Turon markaziy tizimga bog'liq) — internetsiz do'konda markirovkalangan tovar **sotish** siyosati endi aniq: narx qurilmada ma'lum bo'lsa ruxsat, bo'lmasa taqiq (US-M01-03). Offline **qaytarish/ko'chirish** siyosati hali ochiq, huquqiy xavf bor (jarima aylanmaning 2–20%i) (`00-xulosa-va-ochiq-savollar.md`, bonus-xavf).
+3. *(2026-10-15: to'liq hal qilindi — foydalanuvchi qarori)* Offline rejimda Asl belgisi kodini real-vaqtda tekshirish mumkin emas (CRPT Turon markaziy tizimga bog'liq), lekin endi barcha uchta harakat uchun siyosat aniq: **sotish** — narx qurilmada ma'lum bo'lsa ruxsat, bo'lmasa taqiq (US-M01-03); **ko'chirish** — o'z filiallar/omborlari orasida offline ruxsat (BP-09); **qaytarish** — faqat internet bor paytda, offline'da bloklanadi (BP-04). Huquqiy tasdiq (huquqshunos bilan) hamon tavsiya etiladi, lekin mahsulot qarori allaqachon qabul qilingan (`spec/tekshiruv/savollar-yakuniy-tavsiyalar.md`, tavsiya #5).
 4. Markirovkalangan tovarni Asl belgisida "qaytarish" (BP-04) va inventarizatsiya kamchiligini "yopish" (BP-10) operatsiyalarining texnik tartibi ochiq manbada topilmadi — CRPT Turon integrator API hujjatlari 403 bilan yopiq (`02-kassa-ofd-markirovka.md`).
 5. Bir yuridik shaxs ichidagi filiallararo (ichki) ko'chirish uchun E-TTN talab qilinishi aniq tasdiqlanmagan — faqat tashqi tashish uchun majburiylik aniq (taxmin, BP-09).
 6. B2C (jismoniy shaxsga) nasiya savdosida e-faktura talab qilinishi/qilinmasligi aniq ko'rsatilmagan — faqat B2B (yuridik shaxslar orasida) uchun e-faktura shart ekani tasdiqlangan (taxmin, BP-03).
@@ -420,3 +421,4 @@ Matritsa talab qilingan 6 majburiy davlat tizimining barchasini kamida bitta jar
 - [uz.kursiv.media, 2025-12-30](https://uz.kursiv.media/uz/2025-12-30/1-yanvardan-ayrim-soliq-hisobotlari-avtomatik-shakllantiriladi/) — 5 kunlik va avtomatik qabul qoidasi (ikkinchi darajali manba, endi birlamchi qonun bilan tasdiqlangan)
 - `research_notes/texnik/tekshiruv-2026-10-14/` — 2026-10-14 fakt-tekshiruv natijalari
 - Foydalanuvchi qarori, 2026-10-15 — BP-13 (chek asosida keyinchalik e-faktura) qo'shildi (US-M01-06, `02-modullar-talablari.md`)
+- `spec/tekshiruv/savollar-yakuniy-tavsiyalar.md` — 2026-10-15, tavsiya #5 (offline qaytarish/ko'chirish) va #6 (mustaqil terminal bilan karta)

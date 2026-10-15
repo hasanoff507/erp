@@ -10,7 +10,7 @@
 > 2. QQS uchun **4410** (kiritiladigan/kompensatsiya) va **6410** (byudjetga to'lovlar, turi bo'yicha analitika) hisoblaridan foydalanish to'g'riligi — yoki QQS uchun alohida maxsus hisob kerakligi.
 > 3. Ijara/komunal/transport xarajatlari **9410 (Sotish xarajatlari)** yoki **9420 (Ma'muriy xarajatlar)**ga tushishi — do'kon savdo maydoni ijarasi odatda qaysi hisobga yozilishi.
 > 4. Kamomad/ortiqcha hisoblari: **5910** (javobgar shaxs aniqlanmagan kamomad), **4730** (javobgar shaxsdan undiriladigan), ortiqcha uchun aniq daromad hisobi (bu hujjatda kod **tasdiqlanmagan**, faqat "9300 oilasi — asosiy faoliyatdan boshqa daromadlar" deb taxmin qilingan).
-> 5. Shubhali/umidsiz qarzni **9430 (Boshqa operatsion xarajatlar)** orqali yopish — yoki NSBU №19 bo'yicha alohida zahira (rezerv) tartibi kerakligi.
+> 5. Shubhali/umidsiz qarzni **9430 (Boshqa operatsion xarajatlar)** orqali yopish — yoki NSBU №19 bo'yicha alohida zahira (rezerv, 4910-hisob) tartibi kerakligi. *(2026-10-15: foydalanuvchi qarori — qisman hal qilindi, 2.15-bo'lim: Buxgalter qo'lda 9430 yoki 4910'ni tanlaydi, F14 baholash tartibi tasdiqlanmaguncha avtomatik qoida yo'q.)*
 > 6. Karta/Click/Payme/Uzum to'lovlari uchun **klirinig (vositachi) hisobi** — bu hujjatda to'g'ridan-to'g'ri **5110 (bank)**ga yozilgan, lekin komissiya va kechikish tufayli alohida oraliq sub-hisob kerak bo'lishi mumkin.
 > 7. Boshlang'ich qarz balansini kiritishda qarshi hisob (**8720**) to'g'riligi.
 > 8. QQS yaxlitlash qoidasi (qator bo'yicha tiyingacha, so'ng yig'indi) — OFD/soliq.uz rasmiy talablari bilan.
@@ -49,6 +49,7 @@ Quyidagi jadval faqat savdo/ombor/kassa/qarz/xarajat operatsiyalari uchun kerak 
 | 6010 | Yetkazib beruvchi va pudratchilarga to'lovlar (kreditorlik) | Passiv | kontragent, filial | nrm.uz orqali o'rtacha ishonchli |
 | 6410 | Byudjetga to'lovlar bo'yicha qarz (turi bo'yicha) | Passiv | soliq turi (QQS / aylanma solig'i) | nrm.uz + buxgalter.uz, **tasdiqlanmagan** |
 | 6710 | Xodimlar bilan ish haqi bo'yicha hisob-kitoblar | Passiv | xodim | **tasdiqlanmagan**, MVP'da shartli |
+| 4910 | Shubhali qarzlar bo'yicha zaxira (rezerv) | Aktiv (kontr) | kontragent, hujjat | Hisob nomi F14 bilan **tasdiqlangan** (`tekshiruv/savollar-yakuniy-tavsiyalar.md` F14); baholash tartibi (har qarz alohida, yil oxiri inventarizatsiyasi) **tasdiqlanmagan** — paywall ortida, buxgalter tasdig'i shart |
 | 8710 | Hisobot davri taqsimlanmagan foydasi (zarari) | Kapital | — | buxgalter.uz, o'rtacha ishonchli |
 | 8720 | To'plangan foyda (yopilmagan zarar) | Kapital | — | buxgalter.uz, o'rtacha ishonchli |
 | 9020 | Tovarlarni sotishdan daromad | Daromad | mahsulot, filial, kontragent | nrm.uz (Ilova 2, Bob 4) — **yaxshi ishonchli** |
@@ -171,13 +172,13 @@ Sabab `gift` (bepul berish): QQS oqibati — ogohlantirish 11-band. *(2026-10-14
 |---|---|---|---|
 | 1 | 5010/5110 (to'lov usuliga qarab) | 4010 | To'langan summa (eng eski qarzdan boshlab, `allocations`) |
 
-### 2.15 Qarzni kechish (debt_writeoff, shubhali qarz)
+### 2.15 Qarzni kechish (debt_writeoff, shubhali qarz) *(2026-10-15: foydalanuvchi qarori — `tekshiruv/savollar-yakuniy-tavsiyalar.md` #9)*
 
 | # | Dt | Kt | Summa |
 |---|---|---|---|
-| 1 | 9430 | 4010 | Kechirilgan summa |
+| 1 | 9430 (standart, to'g'ridan-to'g'ri xarajat) **yoki** 4910 (agar Buxgalter zaxira orqali yopishga qaror qilsa) | 4010 | Kechirilgan summa |
 
-Faqat Egasi tasdig'i bilan (US-M08-10), audit jurnaliga yoziladi.
+Faqat Egasi tasdig'i bilan (US-M08-10), audit jurnaliga yoziladi. **Bosqichlar farqi**: (1) `debt_doubtful_flags` (`01-malumotlar-modeli.md` §5) — faqat Egasi, sabab bilan, qarzni "shubhali" deb **belgilaydi**; bu bosqich provodka yaratmaydi, faqat ko'rinish/ogohlantirish (BO-07, 60+ kunlik qarzlar ro'yxati — tizim avtomatik belgilamaydi, faqat eslatadi). (2) `debt_writeoffs` — qarzni haqiqatan **hisobdan chiqarish**, yuqoridagi provodka bilan; 4910 orqali o'tkazish yoki to'g'ridan-to'g'ri 9430'ga yozish — **Buxgalter qo'lda tanlaydi** (avtomatik qoida yo'q, F14 baholash tartibi tasdiqlanmaguncha). MVP'da bitta va'da sanasi yetarli — bo'lib to'lash grafigi yo'q.
 
 ### 2.16 Yetkazib beruvchiga to'lov (supplier_payment)
 
@@ -331,7 +332,7 @@ flowchart TD
 - **Oylik yopish** (MVP, US-M11-02): faqat `period_closings` orqali **bloklash** + balans/foyda-zarar hisoboti generatsiyasi; hisoblar jismoniy nolga tushirilmaydi (bu rasmiy amaliyotda odatda yillik).
 - **Yillik yopish**: daromad/xarajat hisoblari (9020, 9040, 9050, 9120, 9410, 9420, 9430) yakuniy natija hisobiga (9910) yopiladi, so'ng 9910 → 8710 (joriy davr taqsimlanmagan foydasi) → (taqsimlangandan keyin) 8720 (to'plangan foyda).
 - Yopilgan davrga tegishli har qanday tuzatish — faqat yangi, joriy ochiq davrdagi storno + tuzatuvchi yozuv bilan, hech qachon eski yozuvni o'zgartirmasdan.
-- **Qayta ochish siyosati** *(2026-10-15: kamchiliklar-yakuniy #16)*: MVP'da yopilgan davr **qayta ochilmaydi** — tuzatish faqat joriy ochiq davrda, tuzatuvchi hujjat orqali (yangi `correction_of_period` maydoni — yopilgan qaysi davrga tegishli ekanini belgilaydi) + audit yozuvi bilan kiritiladi. Davrni qayta ochish (agar kerak bo'lsa) — faqat Buxgalter tasdig'idan keyin alohida ko'rib chiqiladigan, MVP'dan tashqari jarayon.
+- **Qayta ochish siyosati** *(2026-10-15: kamchiliklar-yakuniy #16; 2026-10-15: foydalanuvchi qarori — tasdiqlandi, `tekshiruv/savollar-yakuniy-tavsiyalar.md` #15)*: MVP'da yopilgan davr **hech qachon qayta ochilmaydi** — tuzatish faqat joriy ochiq davrda, tuzatuvchi hujjat orqali (yangi `correction_of_period` maydoni — yopilgan qaysi davrga tegishli ekanini belgilaydi) + audit yozuvi bilan kiritiladi. Davrni qayta ochish (agar kerak bo'lsa) — faqat Buxgalter tasdig'idan keyin alohida ko'rib chiqiladigan, MVP'dan tashqari jarayon (append-only tamoyili eng xavfsiz yondashuv sifatida tasdiqlandi).
 
 ### 5.2 Teskari (storno) qoidasi
 

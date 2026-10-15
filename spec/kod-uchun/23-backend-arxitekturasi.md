@@ -2,22 +2,26 @@
 
 **Maqsad:** Backend repozitoriy tuzilishi, posting naqshi, API konventsiyalari, navbat kutubxonasi, kutubxona tanlovlari, test strategiyasi va deploy modelini belgilash.
 **Kim uchun:** Backend ishlab chiquvchi, arxitektor.
-**Bog'liq fayllar:** `10-umumiy-arxitektura.md`, `11-malumotlar-modeli.md`, `24-frontend-arxitekturasi.md`, `03-modullar-talablari.md`, `14-autentifikatsiya-oauth2.md`.
-**Holat:** joriy, 2026-10-15.
+**Bog'liq fayllar:** `10-umumiy-arxitektura.md`, `11-malumotlar-modeli.md`, `24-frontend-arxitekturasi.md`, `03-modullar-talablari.md`, `14-autentifikatsiya-oauth2.md`, `13-provodka-qoidalari.md` (§2.18a), `15-xavfsizlik-va-audit.md` (§4, §7), `21-integratsiyalar.md` (§1 fiskal, §16 Do'kon agenti), `33-1c-integratsiya.md`, `34-1c-agent.md`, `01-qarorlar.md` #51, #57, #60, #65.
+**Holat:** joriy, 2026-10-16.
 
 ## Asosiy xulosalar
 
-1. **Modulli monolit**: `backend/app/modules/<modul>/` — 19 modul papkasi (18 mahsulot moduliga + kesishuvchi `integrations`/`sync`/`ai` ga mos), har biri bir xil ichki qatlam: `domain/` → `application/` → `infrastructure/` → `api/`. Umumiy infratuzilma — `app/core` (DB sessiya + tenant kontekst, auth, huquq dependency, idempotentlik, xatolar, sozlamalar, logging) va `app/workers` (navbat ishlari, cron).
+1. **Modulli monolit**: `backend/app/modules/<modul>/` — 20 modul papkasi (18 mahsulot moduliga + kesishuvchi `integrations`/`sync`/`ai` + Bosqich 7 dagi M19 `onec_integration` ga mos), har biri bir xil ichki qatlam: `domain/` → `application/` → `infrastructure/` → `api/`. Umumiy infratuzilma — `app/core` (DB sessiya + tenant kontekst, auth, huquq dependency, idempotentlik, xatolar, sozlamalar, logging) va `app/workers` (navbat ishlari, cron).
 2. **"Posting service" naqshi** — har bir hujjat turi uchun bitta xizmat, bitta DB tranzaksiyada hujjat holatini **va** barcha registrlarni (`stock_moves`/`stock_lots`, `debt_moves`, `cash_moves`, `ledger_entries`, `vat_moves`) birga yozadi; bekor qilish — faqat teskari yozuv, `UPDATE`/`DELETE` yo'q.
 3. **Navbat kutubxonasi — `SAQ`** (4-bo'lim): asyncio, Redis broker (stack'da bor), ichki `CronJob`, o'rnatilgan monitoring UI. `arq` 2025-10 dan beri faqat texnik xizmat rejimida (python-arq/arq#510) — yangi loyiha uchun tanlanmaydi.
 4. **Tenant izolyatsiyasi kod darajasida ikki marta**: (a) ilova qatlami — `TenantMixin` modellariga SQLAlchemy `with_loader_criteria` orqali global `tenant_id` filtri; (b) PostgreSQL RLS (`set_config('app.tenant_id', …, true)` + siyosat, `15-xavfsizlik-va-audit.md`) — (b) (a) buzilsa ham himoya qiladi va aksincha (09 §6 RLS-o'chirilgan testi shu (a)ni tekshiradi).
-5. **Kutubxona birinchi, qo'lda kod oxirgi**: pagination — `fastapi-pagination`, filtrlash — `fastapi-filter`, retry — `tenacity`, UUIDv7 — `uuid-utils`, muddat arifmetikasi (5 kalendar kun, 48/72 soat, qarz eskirish guruhlari) — `pendulum`, Excel — `openpyxl`, shtrix-kod/yorliq — `python-barcode` + `zxing-cpp` (Ghostscript/AGPL'siz). To'liq jadval 5-bo'limda.
+5. **Kutubxona birinchi, qo'lda kod oxirgi**: pagination — `fastapi-pagination`, filtrlash — `fastapi-filter`, retry — `tenacity`, UUIDv7 — `uuid-utils`, muddat arifmetikasi (5 ish kuni, 48 soat, markirovka qabul muddati, qarz eskirish guruhlari) — `pendulum` + bayramlar ro'yxati, Excel — `openpyxl`, shtrix-kod/yorliq — `python-barcode` + `zxing-cpp` (Ghostscript/AGPL'siz). To'liq jadval 5-bo'limda.
 6. **AI — port naqshi** (`AiProvider`, README qarori): `fake` (test) | `cli` (lokal dev, Claude Code CLI) | `api` (staging/prod, `anthropic` SDK) — bitta portga qarab rejim almashtiriladi, faqat `cli` o'rniga prodda `api`.
 7. **Standart naqshlar**: qatlamli papka tuzilmasi, `pydantic-settings` + `lru_cache get_settings()` + prod-da xavfsizlik guard (`model_validator` — auth yoqilmagan/standart sir/sqlite bo'lsa ishga tushmaydi), composition-root'dagi `_build_*` factory funksiyalar, Alembic'ning asinxron `env.py`'si, `ReadinessProbe`'ning "gating vs reported" bo'linishi, ko'p bosqichli Dockerfile (non-root user, `HEALTHCHECK`).
 8. **Deploy modeli**: bitta umumiy stack, ko'p tenant, RLS bilan: `api`/`worker` gorizontal ko'payadi, `scheduler` yagona nusxa bo'lishi kerak (Postgres advisory lock bilan) (adapterlar: OFD/e-faktura/Asl belgisi/Click-Payme adapterlari).
 9. API — `/api/v1`, URL yo'li kebab-case ko'plik, JSON/query/enum/`operation_id` — snake_case (3-bo'lim, `01-qarorlar.md` #24); xato formati `{"error": {code, message_key, params, details[], request_id}}` (frontenddagi zod/i18next bilan bir xil shakl, `details` har doim massiv), `Idempotency-Key` Redis tezkor qulf + Postgres doimiy jurnal bilan, optimistik qulflash `version` maydoni orqali (faqat ma'lumotnomalarda — hujjatlarda yo'q).
 10. Test strategiyasi — bitlik testlar provodka qoidalari uchun sonli misollar bilan, `testcontainers` orqali haqiqiy Postgres'da integratsiya va RLS izolyatsiya testlari, `schemathesis` OpenAPI'dan kontrakt testlari.
 11. **Autentifikatsiya — o'z OAuth 2.0 AS+RS implementatsiyasi** (`app/modules/auth/`): protokol skeleti **Authlib** (RFC 6749/7636/7009/7662/8414/9068), JWT/JWKS — **joserfc**, parol/PIN — **argon2-cffi (argon2id)**; barcha storage/rotatsiya/obuna-tekshiruv mantiqi bizning kod. To'liq dizayn — `14-autentifikatsiya-oauth2.md`.
+12. **1C integratsiyasi — alohida modul `onec_integration`** (M19, Bosqich 7, qaror #36–#42): boshqa modullar uni faqat `OneCChangeTracker` porti orqali chaqiradi (tenantda faol 1C bazasi bo'lmasa no-op), u esa boshqa modullarning faqat o'qish portlarini (`SalesExportPort`, `CashExportPort`, …) chaqiradi. Agentga ish `outbox_jobs` orqali emas — imzolangan `onec_agent_tasks` navbati, agent uni `/api/v1/onec-agent/*` dan long-poll bilan tortadi (pull). To'liq dizayn — `33-1c-integratsiya.md` §3–§4.
+13. **Do'kon agenti — backend tomoni (qaror #60, 4.2-bo'lim)**: fiskal ko'prik, xom TCP 9100 printer va tarozi uchun alohida agent API yo'q — `33-1c-integratsiya.md` §9 dagi **bir xil** agent identifikatsiyasi va autentifikatsiyasi (OAuth mijozi `onec-agent`, device grant + `private_key_jwt`, 10 daqiqalik token) va bir xil yo'llar `/api/v1/onec-agent/*` ishlatiladi; vazifalar oq ro'yxatiga **Bosqich 5 kengaytmasi** sifatida `fiscal.*`, `print.*`, `scale.*` turlari qo'shiladi (`base_id = null`). Agent ro'yxati va vazifa navbati `onec_integration` modulida qoladi, boshqa modullar unga `AgentTaskPort` orqali vazifa qo'yadi.
+14. **Fiskal kod alohida paket** (`app/modules/integrations/fiscal/`): fiskal qism o'zgarsa operator va Kiberxavfsizlik markazidan qayta xulosa kerak (VMQ-943 2-ilova 6-band) — paket kam o'zgaradi, o'z versiyasi va o'z testlari bilan; boshqa modullar unga faqat `FiscalPort` orqali murojaat qiladi.
+15. **Sirlar va zaxira (qaror #51, #65)**: UzCloud'da KMS/sir ombori yo'q — deploy sirlari SOPS/age bilan shifrlangan fayldan muhit o'zgaruvchisiga; tenant sirlari ilova darajasida envelope shifrlash (KEK — deploy siri); PostgreSQL PITR — o'z WAL arxivi (pgBackRest/WAL-G → UzCloud S3), RPO ≤ 5 daqiqa, RTO ≤ 4 soat; nusxa boshqa provayderda ham (7.3, 9-bo'lim).
 
 ---
 
@@ -53,16 +57,18 @@ backend/
 │   │   ├── access/                   # M13 rol/ruxsat katalogi, role_permissions (foydalanuvchi CRUD'i endi `auth/`da)
 │   │   ├── branches/                 # M14 filial, ombor, kassa apparati, qurilma ro'yxati
 │   │   ├── expenses/                 # M15 xarajat, toifa, takrorlanuvchi xarajat
-│   │   ├── cash/                     # M16 kassa naqd pul harakati, smena sanash
+│   │   ├── cash/                     # M16 kassa naqd pul harakati, smena sanash; bank tushumi tasdig'i `bank_settlements` (5710 → 5110, BankSettlementPostingService, `/bank-settlements`, BO-24 — `13-provodka-qoidalari.md` §2.18a, qaror #42)
 │   │   ├── billing/                  # M17 tarif, obuna, to'lov (Click/Payme), platforma admin
 │   │   ├── notifications/            # M18 bildirishnoma, Telegram bot (aiogram), SMS
-│   │   ├── integrations/             # OFD, e-faktura, e-TTN, Asl belgisi, E-IMZO — har biri adapter
+│   │   ├── integrations/             # e-faktura/e-TTN/e-ishonchnoma (EInvoicePort), Asl belgisi (MarkingPort), E-IMZO, to'lovlar (PaymentPort, UzqrPort), OtpPort — har biri adapter
+│   │   │   └── fiscal/               # FiscalPort adapterlari (fake, partner_cloud; lokal ko'prik natijasini qabul qilish) — alohida, kam o'zgaradigan paket (qayta xulosa talabi, `21` §1)
 │   │   ├── ai/                       # AiProvider porti, AI-xx funksiyalar, ai_requests/feedback
+│   │   ├── onec_integration/         # M19: Do'kon agentlari ro'yxati, imzolangan vazifalar navbati (AgentTaskPort — fiscal.*/print.*/scale.*, Bosqich 5) va 1C qismi (bazalar, moslashtirish, kunlik partiyalar, Bosqich 7); router_web (/onec-*) + router_agent (/onec-agent/*) — ichki tuzilma `33-1c-integratsiya.md` §4.1
 │   │   └── sync/                     # offline outbox qabul qilish, client_event_id dedupe, qurilma holati
 │   └── workers/
 │       ├── jobs/                      # SAQ task funksiyalari (bitta modulga tegishli bo'lsa ham shu yerda
 │       │                               # ro'yxatga olinadi — modul papkasidagi `tasks.py` dan import qilib)
-│       ├── cron.py                    # SAQ CronJob ro'yxati (davlat hisoboti eslatmasi, qarz eslatmasi, recost, kam qoldiq, yaroqlilik muddati, obuna eslatmasi, kunlik Telegram hisobot)
+│       ├── cron.py                    # SAQ CronJob ro'yxati (davlat hisoboti eslatmasi, qarz eslatmasi, recost, kam qoldiq, yaroqlilik muddati, obuna eslatmasi, kunlik Telegram hisobot, fiskal 24/40/46/48 soat monitoringi, CBU kursi; Bosqich 7 — 5 ta `onec_*` cron, §4.1)
 │       └── worker_settings.py         # SAQ worker sozlamalari (navbatlar, concurrency, Sentry/OTel init)
 ├── alembic/
 │   ├── env.py                         # asinxron
@@ -122,7 +128,7 @@ Tranzaksiya faqat `tenant_transaction()` orqali ochiladi. `autobegin=False` saba
 
 ## 2. "Posting service" naqshi
 
-Har bir hujjat turi (`sales`, `returns`, `goods_receipts`, `transfers`, `stock_counts`, `write_offs`, `debt_payments`, `expenses`, `cash_movements`, …) uchun **bitta** `*PostingService`, umumiy protokolga mos:
+Har bir hujjat turi (`sales`, `returns`, `goods_receipts`, `transfers`, `stock_counts`, `write_offs`, `debt_payments`, `expenses`, `cash_movements`, `bank_settlements`, …) uchun **bitta** `*PostingService`, umumiy protokolga mos:
 
 ```python
 class DocumentPostingService(Protocol):
@@ -138,7 +144,8 @@ class DocumentPostingService(Protocol):
 2. **Qulflash** — serializatsiya nuqtasi `stock_balances (warehouse_id, product_id)` qatori: avval `INSERT … ON CONFLICT DO NOTHING`, so'ng `SELECT … FOR UPDATE`. Shu qulf ostida `stock_lots` qulfsiz o'qiladi va o'zgartiriladi; partiyaga tegadigan **barcha** yo'llar (sotuv, qaytarish, kirim, ko'chirish, inventarizatsiya, hisobdan chiqarish, recost) aynan shu qulfni oladi. Kerak bo'lsa `debt_balances (counterparty_id, direction)` ham `FOR UPDATE`. Deadlock'ga qarshi tartib: avval `stock_balances` — `(warehouse_id, product_id)` o'sish tartibida, so'ng `debt_balances` — `counterparty_id` bo'yicha. `cash_moves` qulflanmaydi (tekshiriladigan invariant yo'q).
 3. Barcha registrlarga append-only yozadi: `stock_moves` (+ FIFO/AVECO bo'yicha `stock_lots.qty_left`ni kamaytirish), `debt_moves`, `cash_moves`, `ledger_entries`, `vat_moves` — qaysi biri hujjat turiga tegishli bo'lsa.
 4. Hujjat holatini `posted`ga o'tkazadi, `posted_at`ni yozadi (fiskal holat — alohida `fiscal_receipts.status=pending`, `11-malumotlar-modeli.md` 8-bo'lim).
-5. Tranzaksiya commit bo'lgach (`after_commit` hook), tashqi integratsiya ishlarini **navbatga** qo'yadi (`outbox_jobs` qatori + `JobQueue.enqueue(...)`, SAQ ortida, 4-bo'lim) — OFD'ga yuborish, e-faktura, Telegram xabar. **Hech qachon tashqi tizim tranzaksiya ichida chaqirilmaydi** (`10-umumiy-arxitektura.md`, 7-xulosa: API tashqi tizimni kutib turmaydi).
+4a. Tenantda faol 1C bazasi bo'lsa — **shu tranzaksiyada** `OneCChangeTracker.touch(tenant_id, branch_id, doc_type, doc_id, doc_date)` (bitta indeksli `UPDATE`; post va cancel'da ham) — allaqachon 1C'ga yuborilgan kun uchun kech ma'lumot belgisi (`33-1c-integratsiya.md` §8.6). Baza bo'lmasa no-op.
+5. Tranzaksiya commit bo'lgach (`after_commit` hook), tashqi integratsiya ishlarini **navbatga** qo'yadi (`outbox_jobs` qatori + `JobQueue.enqueue(...)`, SAQ ortida, 4-bo'lim) — OFD'ga yuborish (faqat hamkor bulut rejimida; lokal ko'prik rejimida chek POS'da FM orqali allaqachon fiskallashtirilgan, `21` §1), e-faktura, Telegram xabar. **Hech qachon tashqi tizim tranzaksiya ichida chaqirilmaydi** (`10-umumiy-arxitektura.md`, 7-xulosa: API tashqi tizimni kutib turmaydi).
 
 Bitta tranzaksiyada yozilishi kerakligi sababi — `11-malumotlar-modeli.md` 4-xulosasi: hujjat holati va registrlar birga yoziladi yoki birga bekor bo'ladi (DB darajasidagi atomiklik, ilova darajasida "deyarli atomik" emas).
 
@@ -194,7 +201,7 @@ sequenceDiagram
     PS->>DB: BEGIN tenant_transaction; FOR UPDATE qatorlar
     PS->>DB: stock_moves + stock_lots + debt/cash_moves + ledger_entries + vat_moves + status=posted
     PS->>DB: COMMIT
-    PS->>Q: enqueue "ofd_send", "einvoice_send" (agar kerak bo'lsa)
+    PS->>Q: enqueue "ofd_send" (faqat hamkor bulut rejimi), "einvoice_send" (agar kerak bo'lsa)
     API-->>C: results:[{status: accepted, server:{id, number}}] (fiscal_receipts.status=pending)
     Q->>W: job navbatdan olinadi
     W->>W: OFD'ga yuborish (httpx + tenacity retry)
@@ -220,6 +227,7 @@ POS uchun alohida `POST /sales` yo'q — yagona yo'l `/sync/push`.
 | OpenAPI teglari | Har modul — bitta tag (`sales`, `returns`, `debts`, …), router `tags=[...]` orqali; `operation_id` qo'lda beriladi (`sales_create`, `sales_list`) — orval generatsiya qilgan funksiya nomi shundan keladi (`24-frontend-arxitekturasi.md`, 3-bo'lim) |
 | Davr yopilgan | `409 {code: PERIOD_CLOSED}` — yopilgan davrga yozishga urinish |
 | Auth | **OAuth 2.0 (AS+RS, `app/modules/auth/`)** — to'liq dizayn `14-autentifikatsiya-oauth2.md`da. Veb: BFF, HttpOnly/Secure/SameSite=Lax sessiya cookie (OAuth token brauzerga chiqmaydi); Android: to'g'ridan-to'g'ri `Authorization: Bearer <access_token>`. CSRF — o'zgarmagan: sessiya ID'ga bog'langan, `itsdangerous` bilan imzolangan token (`GET /api/v1/auth/csrf` → `X-CSRF-Token`), CSRF cookie yo'q. Noto'g'ri/eskirgan token → `403 {code: CSRF_INVALID}`. Bearer access token (Android) CSRF tekshiruvidan ozod. Har so'rovda qo'shimcha `require_subscription_ok` dependency (Redis-kesh) — `403 {code: SUBSCRIPTION_RESTRICTED}`. |
+| 1C agent API | `/api/v1/onec-agent/*` — foydalanuvchi sessiyasi emas: `Authorization: Bearer` (OAuth mijozi `onec-agent`, `client_credentials` + `private_key_jwt`, `aud=urn:erp:onec-agent`, scope `onec.agent`; `14-autentifikatsiya-oauth2.md`), CSRF'dan ozod. Dependency `onec_integration/api/deps.py`: `current_agent()` (token → `tenant_id`, `agent_id`; agent `status` Redis keshi 60 s, revoke darhol), `require_agent_base(base_id)` (baza shu agentga tegishli), `require_onec_enabled()`. Bu yo'llarda `require_permission` yo'q (agent foydalanuvchi emas); so'rov tanasidagi tenant e'tiborga olinmaydi. Obuna lokautida yangi vazifa berilmaydi. Batafsil — `33-1c-integratsiya.md` §9. Do'kon agentining `fiscal.*`/`print.*`/`scale.*` vazifalari (4.2-bo'lim) xuddi shu yo'llar va token bilan; `require_onec_enabled()` faqat 1C turlariga (`base_id` bor) qo'llanadi, qolganlariga — `require_agent_capability(kind)` (agent sozlamasida imkoniyat yoqilgan) |
 | Rate limit | `slowapi` — login, OTP, refresh va AI endpoint'larda qattiqroq limit (brute-force/AI xarajat nazorati, `14-autentifikatsiya-oauth2.md` §12) |
 
 **Middleware/dependency tartibi** (har himoyalangan so'rovda, tashqaridan ichkariga): (1) CORS → (2) CSRF tekshiruvi (faqat cookie-autentifikatsiyali so'rovlarda, Bearer'da yo'q) → (3) auth — cookie'dan `sid`/Bearer'dan JWT orqali claims chiqarish, imzoni/`sid`-revoke keshini tekshirish (`14-autentifikatsiya-oauth2.md` §5) → (4) `require_subscription_ok` — Redis `sub_status` keshi (Redis ishlamasa `subscriptions.status` to'g'ridan-to'g'ri DB'dan, fail-to-DB — `14-autentifikatsiya-oauth2.md` §16.1.1, KICHIK 9), `restricted`/`closed` bo'lsa darhol `403` (istisnolar: `/auth/*`, `/billing/pay` (BFF sahifa), **`GET /billing/plan`, `GET /billing/subscription`, `GET /billing/addons`, `POST /billing/checkout`** (restricted holatda oddiy sessiya o'rniga `pay_token` bilan, `14-autentifikatsiya-oauth2.md` §16.1.1a) **, `GET /billing/payments`, `/billing/webhooks/*`** (o'z imzo tekshiruvi bilan, sessiyadan mustaqil), `/billing/export-my-data` (SMS OTP bilan, D2), `/sync/push` **faqat `scope=sync.drain`** bilan va faqat lokautdan oldingi voqealar uchun — `14-autentifikatsiya-oauth2.md` §16.1, §16.4; oddiy `reports.export`/eksport bu ro'yxatda **yo'q** — lokautda yopiq, D2 bo'yicha alohida `/billing/export-my-data` yo'li bor) → (5) `current_branch_scope`/`X-Branch-Id` tekshiruvi → (6) `require_permission("<code>")` — `role_permissions`+`limit_value` → (7) `Idempotency-Key` tekshiruvi (yozuvchi so'rovlarda) → (8) `tenant_transaction` ochiladi, biznes kod ishga tushadi.
@@ -241,7 +249,43 @@ Navbat kutubxonasi tanlovi (`01-qarorlar.md` #2). `arq` 2025-10 dan beri faqat t
 
 **Qaror: `SAQ`.** Butun backend stack asinxron (`FastAPI` + `SQLAlchemy 2 async` + `asyncpg`); `SAQ` worker'ning o'zi ham asinxron funksiya sifatida ishlaydi — bir xil DB pool, bir xil HTTP klient (`httpx.AsyncClient`) qayta ishlatiladi, ikkinchi concurrency modelini (threads/gevent) o'rganish shart emas. Navbat `app/core/queue.py`dagi `JobQueue` porti ortida; `outbox_jobs` holat manbai bo'lgani uchun kutubxona almashtirish arzon. arq'dagi "monitoring paneli yo'q" kamchiligi SAQ UI bilan yopiladi — bundan tashqari `outbox_jobs` jadvali + oddiy ichki admin ro'yxati orqali ham kuzatiladi (allaqachon ma'lumotlar modelida bor).
 
-Cron (`workers/cron.py`) ro'yxati: davlat hisobotini kunlik tekshirish, qarz eslatmasi, takrorlanuvchi xarajat eslatmasi, 48/72 soat chegarasi monitoringi, **kam qoldiq tekshiruvi** (US-M04-02: `stock_balances.qty <= products.min_stock`, kuniga 1 marta; bir tovar uchun kuniga bitta xabar), **yaroqlilik muddati** (US-M04-06), **obuna eslatmalari va `grace` → `restricted` o'tishi** (US-M17-03), **kunlik Telegram hisobot** (US-M18-02) — `SAQ`ning o'z `CronJob`i bilan, alohida `scheduler` konteyneri sifatida ishga tushadi (`10-umumiy-arxitektura.md`dagi "Rejalashtiruvchi" komponenti).
+Cron (`workers/cron.py`) ro'yxati: davlat hisobotini kunlik tekshirish, qarz eslatmasi, takrorlanuvchi xarajat eslatmasi, **`fiscal_unacked_monitor`** (har 15 daqiqa: `ofd_acked_at IS NULL` bo'lgan eng eski fiskal chek yoshi bo'yicha 24/40/46/48 soat bosqichlari, qaror #43 — 40 soatda Egasiga M18 va `fiscal.resend_unsent` vazifasi), markirovka qabul muddati (`marking_product_groups.acceptance_deadline`), **`fetch_fx_rates`** (har kuni 09:30 Toshkent, CBU kursi → `platform.fx_rates`, qaror #55), **kam qoldiq tekshiruvi** (US-M04-02: `stock_balances.qty <= products.min_stock`, kuniga 1 marta; bir tovar uchun kuniga bitta xabar), **yaroqlilik muddati** (US-M04-06), **obuna eslatmalari va `grace` → `restricted` o'tishi** (US-M17-03), **kunlik Telegram hisobot** (US-M18-02) — `SAQ`ning o'z `CronJob`i bilan, alohida `scheduler` konteyneri sifatida ishga tushadi (`10-umumiy-arxitektura.md`dagi "Rejalashtiruvchi" komponenti).
+
+### 4.1. 1C integratsiyasi job'lari va cron (Bosqich 7)
+
+`onec_integration/infrastructure/tasks.py` dagi 13 ta SAQ job (har birida birinchi argument `tenant_id`, tana `tenant_transaction` ichida; trigger, argumentlar va idempotentlik — `33-1c-integratsiya.md` §4.4):
+
+| Job | Trigger |
+|---|---|
+| `onec_on_shift_closed` | `shift.closed` posting'idan keyin |
+| `onec_prepare_batch` | qo'lda (W-36), jadval, `on_shift_close`, kech ma'lumot |
+| `onec_schedule_tick` | cron `*/5` |
+| `onec_lease_sweeper` | cron `*/1` |
+| `onec_finalize_batch` | partiyaning barcha itemlari yakunlanganda |
+| `onec_verify_batch` | `read_totals` natijasi kelganda |
+| `onec_auto_revision` | yakunlangan partiyada `needs_resync=true` |
+| `onec_drift_check` | cron `30 6 * * *` (Toshkent) |
+| `onec_agent_offline_check` | cron `*/15` |
+| `onec_cleanup` | cron `0 3 * * *` |
+| `onec_auto_match` | W-25 (> 20 000 ERP obyekti) |
+| `onec_apply_catalog_page` | `read_refs` natijasi kelganda |
+| `onec_notify` | xizmatlardan (Telegram, `outbox_jobs(kind='telegram')`) |
+
+`workers/cron.py` ga 5 cron qo'shiladi: `onec_schedule_tick` (`*/5`), `onec_lease_sweeper` (`*/1`), `onec_drift_check` (`30 6 * * *`), `onec_agent_offline_check` (`*/15`), `onec_cleanup` (`0 3 * * *`). Fan-out — `list_active_tenant_ids()` emas, `app.onec_tenants_due(p_kind)` SECURITY DEFINER funksiyasi (faqat faol 1C bazasi bor tenantlar). Agentga beriladigan vazifalar (`onec_agent_tasks`) SAQ job emas — agent ularni long-poll bilan tortadi; uyg'otish — Redis pub/sub `onec:wake:{agent_id}`.
+
+### 4.2. Do'kon agenti vazifalari (Bosqich 5 kengaytmasi, qaror #60)
+
+Agent ro'yxati, ulash, token va vazifa navbati — `onec_integration` modulidagi mavjud mexanizm (`33-1c-integratsiya.md` §9: `onec_agent_tasks`, lease, heartbeat, Ed25519 imzosi, Redis pub/sub uyg'otish). Boshqa modullar vazifa qo'yish uchun `onec_integration.application.ports.AgentTaskPort.enqueue(tenant_id, agent_id, kind, payload)` ni chaqiradi; 1C partiya mantig'iga tegmaydi.
+
+| `kind` | Kim qo'yadi | Trigger | Natija qayerga |
+|---|---|---|---|
+| `fiscal.status` | `integrations/fiscal` | har 5 daqiqa (agent onlayn bo'lsa) | `cash_registers.fm_state`, `fm_receipts_pending`, `last_unacked_receipt_at` |
+| `fiscal.resend_unsent` | `integrations/fiscal` | `fiscal_unacked_monitor` 40 soat bosqichi; BO-14 "Qayta yuborish" | `ResendResult` → BO-14 |
+| `fiscal.zreport` | `sales` (smena yopish) | smena POS'siz yopilganda | `fiscal_receipts(kind='z_report')` |
+| `print.raw` | `notifications`/`reports` | back-office'dan LAN printerga chop etish | holat (yuborildi / printer xatosi) |
+| `scale.plu_upload` | `catalog` | narx/tovar o'zgargach yoki qo'lda | yuklangan qatorlar soni / xato |
+
+Sotuv paytidagi fiskallashtirish va chek chop etish bulut vazifasi **emas** — POS ularni agentning lokal API'si orqali bajaradi (`21` §16). Agent imkoniyatlari (`fiscal_bridge`, `raw_printers`, `scales`, `onec`) agent sozlamasida yoqiladi; yoqilmagan imkoniyat turiga vazifa berilmaydi.
 
 **Worker/scheduler'da tenant konteksti**: har job'ning birinchi argumenti — majburiy `tenant_id` (`outbox_jobs.tenant_id`dan); job tanasi `async with tenant_transaction(session, tenant_id):` ichida bajariladi, `tenant_id`'siz job darhol xato bilan tugaydi. Scheduler (cron) biznes so'rovi bajarmaydi: `SECURITY DEFINER` funksiyasi `list_active_tenant_ids()` orqali tenantlarni olib, **har tenant uchun alohida job** navbatga qo'yadi. Platformaviy job'lar (obuna holati, billing) ham shu fan-out orqali tenant kontekstida ishlaydi; RLS'ni chetlab o'tadigan worker roli yo'q.
 
@@ -278,13 +322,14 @@ Cron (`workers/cron.py`) ro'yxati: davlat hisobotini kunlik tekshirish, qarz esl
 | Shtrix-kod/yorliq | **python-barcode** (MIT; EAN-13, Code128) + **zxing-cpp** (Apache-2.0; DataMatrix/QR server PDF uchun) | Yorliqlar asosan brauzerda `bwip-js` (MIT, GS1 DataMatrix ham) bilan chiziladi. `treepoem` **taqiqlangan**: Ghostscript AGPL/tijoriy — SaaS'da manba kodini ochish yoki Artifex litsenziyasini talab qiladi |
 | Telegram bot | **aiogram** | Asinxron, FastAPI bilan bir xil stack; `10-umumiy-arxitektura.md`da allaqachon tanlangan |
 | AI | **anthropic** (rasmiy SDK), `api` rejimida | README qarori: Claude API (Haiku 5.5), `AiProvider` porti — `fake`/`cli` (dev) / `api` (prod) |
-| Vaqt/muddat | **pendulum** | 5 kalendar kun (M10), 48/72 soat (M01/M06), qarz eskirish guruhlari (0-30/31-60/60+, M08) — qo'lda `timedelta` arifmetikasi o'rniga o'qiladigan davr hisob-kitobi; saqlash — `TIMESTAMPTZ`/stdlib `zoneinfo` (Asia/Tashkent) |
+| Vaqt/muddat | **pendulum** | 5 ish kuni (M10; dam olish va bayram kunlari — `app/core/business_days.py` dagi yillik ro'yxat), 48 soat (M01), markirovka qabul muddati (3 ish kuni / 72 soat, M07), qarz eskirish guruhlari (0-30/31-60/60+, M08) — qo'lda `timedelta` arifmetikasi o'rniga; saqlash — `TIMESTAMPTZ`/stdlib `zoneinfo` (Asia/Tashkent) |
 | Son/pul formatlash, i18n | **babel** | Eksport qilinadigan hisobot/PDF'da son formatlash (uz_Latn); UI formatlash frontendda (`Intl.NumberFormat`) |
 | CLI (seed, ops skript) | **typer** | `scripts/seed.py` va h.k. — `argparse` o'rniga deklarativ CLI |
 | Testlar | **pytest, pytest-asyncio, factory-boy, testcontainers, schemathesis** | 6-bo'lim |
-| Kod sifati | **ruff, mypy, pre-commit** | Standart Python sifat vositalari, CI gate sifatida ishlatiladi |
+| Kod sifati | **ruff, mypy `--strict`, pre-commit** | Yangi kodda `mypy --strict` majburiy (qaror #57); CI gate |
+| Xavfsizlik skaneri | **pip-audit**, **gitleaks** | Bog'liqlik zaifliklari va repodagi sirlar — CI'da majburiy (qaror #57) |
 
-**Ataylab kiritilmagan**: `dependency-injector` paketi — composition-root oddiy factory funksiyalar + FastAPI `Depends` bilan yetarli, ortiqcha abstraksiya qo'shilmaydi. Agar jamoa deklarativ konteyner xohlasa, bu — tasdiqlanishi kerak bo'lgan qaror (Ochiq savollar).
+**Ataylab kiritilmagan**: `dependency-injector` paketi — composition-root oddiy factory funksiyalar + FastAPI `Depends` bilan yetarli (26 #59).
 
 ---
 
@@ -305,7 +350,7 @@ Cron (`workers/cron.py`) ro'yxati: davlat hisobotini kunlik tekshirish, qarz esl
 
 ### 7.1. CI quvuri (platforma — GitHub Actions, standart qaror: `26-ochiq-savollar-reestri.md` #60)
 
-1. `ruff check` + `ruff format --check`, `mypy app`.
+1. `ruff check` + `ruff format --check`, `mypy --strict app` (qaror #57); `pip-audit`, `gitleaks detect`; `.env.example` mavjudligi va `Settings` maydonlari bilan mosligi.
 2. `pytest` (bitlik, `testcontainers` servis sifatida CI runner'ida).
 3. Alembic: `alembic upgrade head` bo'sh bazada — migratsiya ishlayotganini tekshirish.
 4. `schemathesis run` — ishga tushirilgan API'ga qarshi.
@@ -345,7 +390,7 @@ def _enforce_production_security(self) -> "Settings":
     return self
 ```
 
-Sirlar (DB parol, Redis parol, Click/Payme kalitlari, Claude API kaliti, SMS/Telegram token) — kod/`.env`da emas, UzCloud sir-ombori yoki muhit o'zgaruvchisi orqali (`10-umumiy-arxitektura.md`, 3-bo'lim muhitlar jadvali: local — `fake/cli`, staging/prod — `api`, alohida kalitlar).
+Sirlar (DB parol, Redis parol, platforma Click/Payme kaliti, Claude API kaliti, Eskiz/Telegram token, `tenant_secrets` uchun KEK, imzolash kalitlari) — kod/`.env`da emas. UzCloud'da KMS ham, sir ombori ham yo'q, shuning uchun (qaror #65): sirlar repoda **SOPS + age** bilan shifrlangan fayllarda (`deploy/secrets/<env>.enc.yaml`), age maxfiy kaliti faqat deploy mashinasida/CI maxfiy o'zgaruvchisida; deploy vaqtida ochilib konteynerga **muhit o'zgaruvchisi** sifatida beriladi. Tenant integratsiya sirlari (`tenant_secrets`) — ilova darajasida envelope shifrlash (har yozuvga DEK, DEK — KEK bilan; `15-xavfsizlik-va-audit.md` §4). Keyingi bosqich — o'z-hosted Vault/OpenBao (K8s ichida); UzCloud KMS paydo bo'lsa KEK joyi ko'chiriladi. `.env.example` majburiy (qaror #57). Muhitlar: local — `fake/cli`, staging/prod — `api`, alohida kalitlar (`10-umumiy-arxitektura.md`, 3-bo'lim).
 
 ---
 
@@ -354,14 +399,16 @@ Sirlar (DB parol, Redis parol, Click/Payme kalitlari, Claude API kaliti, SMS/Tel
 - **Logging**: `structlog`, JSON format, har yozuvda `tenant_id`, `request_id`, `user_id`; shaxsiy ma'lumot (telefon, STIR) log'ga tushmasligi uchun redaction filtri.
 - **Readiness/liveness**: `/health/live` (jarayon ishlayaptimi) va `/health/ready` — **gating vs reported** bo'linishi: *gating* (API 200 bermasa stack buziladi) = Postgres round-trip + Alembic sxema versiyasi (`db_create_all=false` muhitlarda) + Redis; *reported* (faqat ma'lumot, bloklamaydi) = OFD/e-faktura/Claude API/S3 reachability — mijoz tomondagi tashqi tizim uzilishi deploy/health'ni bloklamasligi kerak.
 - **Metrika**: `prometheus-client` — HTTP latensiya, posting tranzaksiya davomiyligi, `outbox_jobs` navbat chuqurligi/urinish soni, AI so'rov narxi (`ai_requests.cost_usd` yig'indisi).
-- **Trace**: OpenTelemetry, FastAPI+SQLAlchemy+httpx avtomatik instrumentatsiya; eksport nuqtasi (Grafana Tempo/Jaeger, UzCloud'da qaysi xizmat) — ochiq savol.
+- **1C integratsiyasi metrikalari** (Bosqich 7): `onec_agents_online`, `onec_poll_connections`, `onec_batch_duration_seconds`, `onec_items_total{kind,status}`, `onec_items_failed_total{code}`, `onec_task_lease_expired_total{kind}`, `onec_task_duration_seconds{kind}`, `onec_unknown_outcomes_total`, `onec_verify_mismatch_total`; log kontekstida qo'shimcha `agent_id`, `base_id`, `batch_id`, `task_id` (`33-1c-integratsiya.md` §4.6, §15.4).
+- **Trace**: OpenTelemetry, FastAPI+SQLAlchemy+httpx avtomatik instrumentatsiya; eksport — **o'z-hosted Grafana Tempo** (UzCloud'da tayyor trace xizmati yo'q). Monitoring stack — Prometheus + Grafana + Loki + Tempo, o'zimiz o'rnatamiz (26 #53).
+- **Ops ogohlantirishlari**: UzCloud billing — hisob-faktura 5-sanada, to'lov muddati +10 kun; to'lanmasa server o'chiriladi va "Suspended" holatidan 20 kun o'tib ma'lumot qaytarib bo'lmaydigan tarzda o'chiriladi (UzCloud ofertasi 4.4) → avto-to'lov/oldindan to'lov + billing alerti majburiy (qaror #65); UzCloud status sahifasi (`uzcloud.uz/status`) monitoring manbai.
 - **Xato kuzatish**: `sentry-sdk`, tenant/branch context tag sifatida (lekin mijoz PII'siz).
 
 ---
 
 ## 9. Deploy
 
-Konteynerlar (`10-umumiy-arxitektura.md`, 3-bo'lim bilan mos): **api**, **worker**, **scheduler**, **bot**, (frontend alohida `web` — statik, `24-frontend-arxitekturasi.md`).
+Konteynerlar (`10-umumiy-arxitektura.md`, 3-bo'lim bilan mos): **api**, **worker**, **scheduler**, **bot**, (frontend alohida `web` — statik, `24-frontend-arxitekturasi.md`). 1C agent API (`/api/v1/onec-agent/*`, long-poll) — alohida konteyner emas, `api` ichida (uvicorn async; 1 000 parallel long-poll ulanishi — `25-nofunksional-talablar.md`); Windows 1C agenti serverda deploy qilinmaydi (`34-1c-agent.md`).
 
 Standart deploy naqshlari: ko'p bosqichli `Dockerfile` (uv bilan bog'liqliklarni qulflangan holda o'rnatish, non-root `app` user, `HEALTHCHECK`), Alembic'ning bir martalik `migrate` konteyneri (api/worker undan keyin boshlanadi, `db_create_all=false` har joyda konteyner stack'da).
 
@@ -370,9 +417,10 @@ Deploy qarorlari (chunki bu loyiha — ko'p tenant/bitta umumiy stack):
 - **Stack soni**: bitta umumiy stack, tenant — RLS bilan ma'lumotlar darajasida (har mijoz uchun alohida stack emas).
 - **`api`/`worker`**: **gorizontal ko'payadi** (holat yo'q — sessiya Redis'da, tranzaksiya DB'da).
 - **`scheduler`**: **yagona nusxa bo'lishi shart** (cron ikki marta ishlamasligi uchun) — Postgres advisory lock (`pg_try_advisory_lock`) bilan yetakchi tanlanadi, bir nechta `scheduler` konteyneri ishga tushsa ham faqat biri faol bo'ladi.
-- **Baza**: **UzCloud boshqariladigan DBaaS** (managed Postgres) — konteyner emas.
-- **Fayl ombori**: S3-mos ombor (UzCloud'da mavjudligi — `10-umumiy-arxitektura.md` ochiq savol 2).
-- **Ulanish pool'i**: MVP: tashqi pooler yo'q — SQLAlchemy `AsyncAdaptedQueuePool` (asyncpg), `pool_size`/`max_overflow` × api+worker nusxalari soni DBaaS `max_connections` dan kichik. Pooler qo'shilsa (PgBouncer, **transaction** rejimi): PgBouncer ≥1.21 `max_prepared_statements` yoqiladi, yoki asyncpg `prepared_statement_cache_size=0` + `prepared_statement_name_func` (uuid nomlar). Session darajasidagi `SET` taqiqlanadi — tenant faqat `set_config(..., true)` bilan tranzaksiya ichida (1-bo'lim). UzCloud DBaaS'da o'rnatilgan pooler bor-yo'qligi — ochiq savol.
+- **Baza**: **UzCloud DBaaS** (managed Postgres) — konteyner emas. DBaaS'da backup "optional add-on", PITR rasmiy tasdiqlanmagan — shuning uchun **o'z WAL arxivi** (pgBackRest yoki WAL-G → UzCloud S3 Cold, pgBackRest shifrlash bilan): RPO ≤ 5 daqiqa, RTO ≤ 4 soat, har chorakda staging'da to'liq restore sinovi (natija `docs/ops/restore-log.md`), arxiv ≥ 5 yil (qaror #51). Kamida bitta oflayn nusxa **boshqa provayderda** (boshqa DC yoki sovuq arxiv) — qaror #65.
+- **Fayl ombori**: UzCloud S3 (AWS S3 API mos, uch karra replikatsiya; Standard 450 so'm/GB/oy + 300 so'm/GB chiquvchi trafik) — `StoragePort` ortida (`aioboto3`); S3 tinch holatda shifrlash bayonoti yo'q → hujjat va fotolar ilova darajasida shifrlanadi (SSE-C yoki mijoz tomonida AES-GCM, kalit — envelope KEK). Lokal/dev — MinIO.
+- **E-IMZO-SERVER**: O'zbekiston IP'sidan ishlashi shart (`vpn.e-imzo.uz:3443` faqat UZ ichidan) — UzCloud'da alohida konteyner (Java 8), yt.uz shartnomasi bilan (`21` §5).
+- **Ulanish pool'i**: MVP: tashqi pooler yo'q — SQLAlchemy `AsyncAdaptedQueuePool` (asyncpg), `pool_size`/`max_overflow` × api+worker nusxalari soni DBaaS `max_connections` dan kichik. Pooler qo'shilsa (PgBouncer, **transaction** rejimi): PgBouncer ≥1.21 `max_prepared_statements` yoqiladi, yoki asyncpg `prepared_statement_cache_size=0` + `prepared_statement_name_func` (uuid nomlar). Session darajasidagi `SET` taqiqlanadi — tenant faqat `set_config(..., true)` bilan tranzaksiya ichida (1-bo'lim). UzCloud DBaaS'da o'rnatilgan pooler haqida ma'lumot yo'q — MVP'da ilova pool'i, kerak bo'lsa o'z PgBouncer'imiz.
 
 ---
 
@@ -405,18 +453,18 @@ Seed — Alembic "data migration" emas (bazani versiyalash bilan aralashtirmasli
 
 ## Ochiq savollar
 
-1. **DI yondashuvi**: oddiy factory-funksiya + `Depends` (5-bo'limdagi tanlov) yetarlimi, yoki `dependency-injector` paketi (deklarativ `Container`) qo'shilsinmi — standart qaror: oddiy factory + `Depends` (`26-ochiq-savollar-reestri.md` #59); deklarativ konteyner kerak bo'lsa keyin qayta ko'riladi.
-2. **CI vositasi**: quvur bosqichlari (7.1-band) tasdiqlangan, lekin platforma — standart qaror: GitHub Actions (`26-ochiq-savollar-reestri.md` #60).
-3. **OpenTelemetry eksport nuqtasi**: UzCloud'da Grafana Tempo/Jaeger kabi xizmat bormi — tekshirish kerak (`10-umumiy-arxitektura.md` ochiq savol 2 bilan bog'liq, S3-mos ombor savoli ham hali ochiq; reestr #53 B, #27 B — interim: o'z-hosted Grafana Tempo, `StoragePort` + zaxira o'z-MinIO).
-4. **`scheduler`ning yagona nusxa kafolati**: Postgres advisory lock taklif qilindi (9-bo'lim) — Redis-based lock (`redis-py` + `SET NX` TTL bilan) muqobil variant, standart qaror: Postgres advisory lock (`26-ochiq-savollar-reestri.md` #61).
-5. **Aniq ruxsat kodlari ro'yxati** (`permissions`) va **NSBU №21 hisob raqamlari** (`ledger_entries.account_dt/kt`) — bu hujjatda ataylab keltirilmadi, `15-xavfsizlik-va-audit.md` va `13-provodka-qoidalari.md`da (buxgalter tasdig'i shart) aniqlanadi.
-6. **`recost_jobs` va davr yopish orasidagi aniq biznes qoida** — yopilgan oy **qayta ochilmaydi** (qaror #23, tavsiya #15), kech kelgan o'zgarish joriy ochiq davrda tuzatish yozuvi bilan (`ledger_adjustments`); batafsil `13-provodka-qoidalari.md` §5.
-7. **`zxing-cpp`ning GS1 DataMatrix (FNC1) chiqishi** Asl belgisi talabiga mosligi 0-bosqichda sinab ko'riladi; mos kelmasa server yorlig'i ham `bwip-js` (Node) orqali (`26-ochiq-savollar-reestri.md` #62).
+Faqat tashqi javob kerak bo'lgan bandlar:
+
+1. **UzCloud shartnomasi** — yuridik shaxs shartnomasida SLA foizi va kompensatsiya, DBaaS PostgreSQL HA/PITR/versiya/`max_connections`/pooler, disk va S3 tinch holatda shifrlash, K8s Control Plane narxi — 26 #51 (OQ-043). Interim: o'z WAL PITR, ilova darajasida shifrlash, ilova pool'i, o'z-hosted Tempo.
+2. **Fiskal hamkor** — lokal ko'prik yoki bulut rejimi, autentifikatsiya, test stend (`integrations/fiscal` real adapteri va `fiscal.*` vazifalari shunga bog'liq) — 26 #109 (OQ-012). Interim: `FISCAL_PROVIDER=fake`; blok — Bosqich 5.
 
 ## Manbalar
 
 - `spec/kod-uchun/14-autentifikatsiya-oauth2.md` — OAuth 2.0 AS/RS, Authlib/joserfc tanlovi, token jadvallari, obuna lokauti.
-- `spec/kod-uchun/10-umumiy-arxitektura.md` — komponentlar, muhitlar, navbat ochiq savoli.
+- `spec/kod-uchun/10-umumiy-arxitektura.md` — komponentlar, muhitlar.
 - `spec/kod-uchun/11-malumotlar-modeli.md` — jadvallar, registrlar, holat mashinalari, raqamlash.
 - `spec/kod-uchun/24-frontend-arxitekturasi.md` — API konventsiyalari (cookie/CSRF, Idempotency-Key, X-Branch-Id, xato formati, orval).
-- `spec/kod-uchun/03-modullar-talablari.md` — M01–M18 foydalanuvchi hikoyalari va chekka holatlar.
+- `spec/kod-uchun/03-modullar-talablari.md` — M01–M19 foydalanuvchi hikoyalari va chekka holatlar.
+- `spec/kod-uchun/33-1c-integratsiya.md` — `onec_integration` moduli, SAQ job'lari va cron, agent API va autentifikatsiyasi.
+- `spec/kod-uchun/21-integratsiyalar.md` §1, §16 — `FiscalPort`, Do'kon agenti.
+- `research_notes/ochiq-savollar/P4-huquq-hosting.md` §4 (UzCloud: S3, KMS yo'q, Tempo yo'q, DBaaS PITR, oferta 4.4), `P1-soliq-fiskal.md` (OQ-011 — fiskal qism o'zgarsa qayta xulosa), `D-qarorlar-va-E-standartlar.md` (qaror #51, #55, #57).

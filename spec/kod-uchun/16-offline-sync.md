@@ -2,8 +2,8 @@
 
 **Maqsad:** Qurilma (veb-kassa/Android POS) offline rejimda ishlashi, outbox-asosida sinxronizatsiya protokoli, to'qnashuv (konflikt) qoidalari, fiskal 48 soatlik muddat va obuna/litsenziya bilan bog'liq offline cheklovlarni belgilash.
 **Kim uchun:** Frontend (PWA/veb-kassa), Android ishlab chiquvchilar, backend (`modules/sync`).
-**Bog'liq fayllar:** `research_notes/texnik/04-arxitektura-va-stack.md` (2-, 6-bo'lim), `research_notes/texnik/02-kassa-ofd-markirovka.md` (48 soat, 1-ilova 31-band), `research_notes/texnik/12-taxminlar-va-murojaatlar.md` (6-band), `11-malumotlar-modeli.md` (`client_event_id`, `sync_receipts`, `devices`, `stock_lots`, `recost_jobs`), `14-autentifikatsiya-oauth2.md`, `24-frontend-arxitekturasi.md` (Dexie, vite-plugin-pwa, Idempotency-Key), `03-modullar-talablari.md` (M01, M02, M04, M08, M16), `06-ekranlar-umumiy.md` (POS-02…POS-15).
-**Holat:** joriy, 2026-10-15.
+**Bog'liq fayllar:** `research_notes/texnik/04-arxitektura-va-stack.md` (2-, 6-bo'lim), `research_notes/texnik/02-kassa-ofd-markirovka.md` (1-ilova 31-band), `research_notes/ochiq-savollar/P1-soliq-fiskal.md` (OQ-004 — 48 soatlik blok), `research_notes/ochiq-savollar/P2-efaktura-markirovka.md` (OQ-021, OQ-026, OQ-027), `research_notes/ochiq-savollar/P3-tolovlar-bank.md` (OQ-032 — UzQR), `11-malumotlar-modeli.md` (`client_event_id`, `sync_receipts`, `devices`, `stock_lots`, `recost_jobs`), `14-autentifikatsiya-oauth2.md`, `24-frontend-arxitekturasi.md` (Dexie, vite-plugin-pwa, Idempotency-Key), `03-modullar-talablari.md` (M01, M02, M04, M08, M16), `06-ekranlar-umumiy.md` (POS-02…POS-15), `33-1c-integratsiya.md` §5.22, §7.3 (1C eksporti tayyorligi, `outbox_state`).
+**Holat:** joriy, 2026-10-16.
 
 ## Asosiy xulosalar
 
@@ -12,8 +12,8 @@
 3. Har bir lokal amal **outbox voqeasi** (JSON: `client_event_id`, `device_id`, `type`, `created_at`, `payload`, `seq`) sifatida yoziladi; yuklash — `POST /sync/push` (partiyali, idempotent, har voqea uchun alohida natija), yuklab olish — `GET /sync/pull?cursor=` (2-, 3-bo'lim).
 4. Rad etilgan voqea **o'chirilmaydi** — lokal outbox'da xato belgisi bilan qoladi, foydalanuvchi uni ko'radi (POS-12) va amal qiladi (qayta urinish, qo'lda tuzatish yoki Menejerga eskalatsiya); boshqa (bog'liq bo'lmagan) voqealar bu orada davom etadi.
 5. To'qnashuvlar **delta (harakat) qo'shish** tamoyili bilan hal qilinadi, qiymatni to'g'ridan-to'g'ri almashtirish bilan emas: ombor qoldig'i manfiy bo'lsa ham sotuv **ruxsat etiladi**, qarz limiti oshsa ham sotuv **ruxsat etiladi** — ikkisi ham bayroq (flag) bilan belgilanadi va Egasi/Menejerga bildirishnoma boradi; faqat ma'lumotnoma (reference) maydonlari — ism, telefon, izoh kabilar — `version` ustuni bilan **last-writer-wins** (5-bo'lim).
-6. 48 soatlik fiskal muddat (`02-kassa-ofd-markirovka.md`, 1-ilova 31-band) — taymer birinchi offline voqea yaratilgan paytdan boshlanadi; 24/40 soatda ogohlantirish (**taxmin**, aniq soat manbada yo'q) qo'yilgan, lekin 48 soatda **yangi sotuvni bloklash qonunda topilmadi** — shu sabab bloklash emas, majburiy eskalatsiya + audit belgisi taklif qilinadi (6-bo'lim, ochiq savol).
-7. Markirovkalangan tovar offline siyosati **to'liq**: **sotish** — narx qurilmada **ma'lum** bo'lsa ruxsat (kod mahalliy yoziladi, internet qaytganda CRPT Turon'ga tekshirish/yuborish yuboriladi), noma'lum bo'lsa **taqiq** (US-M01-03, `03-modullar-talablari.md`; `21-integratsiyalar.md` §4); **ko'chirish** (o'z filiallar/omborlar orasida) — **ruxsat**, keyin sinxronlanadi, audit bilan; **qaytarish** — **faqat internet bor paytda** (offline'da bloklanadi). To'liq tafsilot 7-bo'limda. Mustaqil bank terminali bilan "karta"ni qo'lda belgilash (`terminal_ref`) — online va offline'da ikkisida ham ruxsat (`21-integratsiyalar.md` §9.2).
+6. **48 soatlik fiskal blok — majburiy** (VMQ-943 2-ilova 6-band 6-xatboshi, VMQ-23 23.01.2026 tahriri; qaror #43): taymer — shu `cash_register`da `fiscal_receipts.ofd_acked_at IS NULL` bo'lgan **eng eski** fiskal chekning `created_at`i (har kassa uchun alohida). Bosqichlar: 24 soat — 🟡 sariq, 40 soat — 🔴 qizil + Egasiga Telegram (M18), 46 soat — har chek oldidan modal (sotuv to'xtamaydi), **48 soat — blok**: shu kassada yangi fiskal chek chiqarilmaydi (`FISCAL_OFFLINE_48H_BLOCKED`), faqat sinxronizatsiya/qayta yuborish ishlaydi, audit yoziladi; to'plangan cheklar OFD tasdig'ini olgach blok avtomatik yechiladi. Fiskal modulning o'z bloki (`fm_state`, `FISCAL_DEVICE_LOCKED`) bundan mustaqil (6-bo'lim).
+7. Markirovkalangan tovar offline siyosati (qaror #17, #62): **sotish** — narx qurilmada **ma'lum** bo'lsa ruxsat; kod **fiskal chek ichida** fiskal modulda imzolanib OFD orqali Asl belgisiga boradi (CRPT'ga alohida "sotdim" chaqiruvi yo'q), lokal dublikat-kod tekshiruvi majburiy; narx noma'lum bo'lsa **taqiq** (US-M01-03, `03-modullar-talablari.md`; `21-integratsiyalar.md` §4); **ko'chirish** (o'z filiallar/omborlar orasida) — **ruxsat**, sinxronlanadi, audit bilan, lekin avtotransportda tashishdan oldin **e-TTN majburiy** (qaror #63); **qaytarish** — **faqat internet bor paytda** (ichki tanlov, qonundan qat'iyroq). To'liq tafsilot 7-bo'limda. To'lov: mustaqil bank terminali bilan "karta"ni qo'lda belgilash (`terminal_ref`, karta rekvizitlari — qaror #64) — online va offline'da ruxsat (`21-integratsiyalar.md` §9.2); UzQR — faqat online (2-bo'lim).
 8. Veb-kassada bir nechta tab ochilishi xavfli (ikki tab bitta lokal `seq` raqamini ikki marta bersa) — **Web Locks API** bilan yagona yozuvchi tab saylanadi, **BroadcastChannel** bilan holat (online/offline, yangi ma'lumot) boshqa tablarga tarqatiladi (10-bo'lim).
 9. Lokal ma'lumot shifrlanishi brauzerda OS darajasida (disk shifrlash tavsiyasi) + chiqishda (logout) Dexie bazasi to'liq tozalanadi; Android'da (keyingi bosqich) SQLCipher bilan butun Room bazasini shifrlash tavsiya etiladi (`28-android-pos.md`) (11-bo'lim).
 10. Test strategiyasi — tarmoq xatosi, soat farqi, ikki qurilmaning bir vaqtda to'qnashuvi, qayta yuborilgan voqea (duplicate), qurilma bekor qilinishi kabi stsenariylar uchun **chaos/tarmoq testlari** (Playwright network emulation, MSW) (12-bo'lim).
@@ -33,11 +33,13 @@
 | Huquqlar (`role_permissions`, `memberships`) | `permissions` | Login paytida to'liq | Delta; o'zgarsa darhol pull (login session yangilanishi) |
 | Joriy smena (`shifts`) | `shift` | Smena ochilganda yaratiladi (lokal) | Push orqali serverga, server tasdiqlagandan keyin doimiy holatga o'tadi |
 | Outbox (chek, qaytarish, qarz to'lovi, kassa harakati) | `outbox` | — | Faqat push (2-bo'lim) |
+| Markirovka kodlari keshi (`marking_codes`, holati `sold`/`pending_verification`, shu filial bo'yicha) | `marking_codes` | Katalog bilan birga | Delta — lokal dublikat-kod tekshiruvi uchun (7-bo'lim) |
+| Fiskal holat (`cash_registers.fm_state`, `last_unacked_receipt_at`, `fm_receipts_pending`; chekning `fiscal_receipts.ofd_acked_at`) | `fiscal` | Smena ochilganda | Push javobi va delta pull; 48 soat taymeri uchun (6-bo'lim) |
 | Do'kon sozlamalari va qoidalar (`tenants.settings`: tarozi shtrix-kod formati va uning versiyasi; faol `discount_rules`; obuna holati `subscriptions.status`) | `settings` | Login/snapshot bilan | Delta; tarozi formati versiyasi o'zgarsa majburiy pull |
 
-**Dastlabki to'liq nusxa (snapshot)**: qurilma birinchi marta ro'yxatdan o'tganda (`devices` yozuvi yaratilganda) yoki lokal baza tozalanganda (`GET /sync/pull?scope=all&cursor=` bo'sh kursor bilan) — sahifalab (`page_size`, **taxmin: 500 qator/sahifa**) yuklanadi, `has_more=true` bo'lsa davom etiladi.
+**Dastlabki to'liq nusxa (snapshot)**: qurilma birinchi marta ro'yxatdan o'tganda (`devices` yozuvi yaratilganda) yoki lokal baza tozalanganda (`GET /sync/pull?scope=all&cursor=` bo'sh kursor bilan) — sahifalab (`page_size=500` qator/sahifa — standart, sozlanadi, qaror #54) yuklanadi, `has_more=true` bo'lsa davom etiladi.
 
-**Delta yangilanish**: har bir jadvalda `updated_at` (yoki ma'lumotnomalarda `version`) bo'yicha kursor; qurilma oxirgi ko'rgan `(updated_at, id)` juftligini saqlaydi va keyingi so'rovda yuboradi (sahifalashda barqaror tartib uchun ikkilik kursor — faqat `updated_at` bilan bir xil millisekundda bir nechta yozuv bo'lsa tartib buzilmasligi uchun). Chastota — veb-kassa fon rejimida har **5 daqiqada** (taxmin) + internet qaytganda darhol + `pageMounted`/smena ochilganda majburiy.
+**Delta yangilanish**: har bir jadvalda `updated_at` (yoki ma'lumotnomalarda `version`) bo'yicha kursor; qurilma oxirgi ko'rgan `(updated_at, id)` juftligini saqlaydi va keyingi so'rovda yuboradi (sahifalashda barqaror tartib uchun ikkilik kursor — faqat `updated_at` bilan bir xil millisekundda bir nechta yozuv bo'lsa tartib buzilmasligi uchun). Chastota — veb-kassa fon rejimida har **60 soniyada** + `online` hodisasida (internet qaytganda) darhol (standart, sozlanadi — qaror #54) + `pageMounted`/smena ochilganda majburiy.
 
 ---
 
@@ -67,6 +69,15 @@
 
 Qarzga sotish alohida voqea turi emas — `sale.created` ichida `sale_payments.method = "debt"` sifatida yuboriladi (US-M08-01, US-M08-05); qarz daftaridagi tezkor yozuv (POS-13) ham shu yo'l bilan amalga oshadi.
 
+Hisobdan chiqarish (write-off) — **faqat online** back-office, outbox voqea turi yo'q (qaror #54).
+
+**To'lov usullari offline** (`sale_payments`, `debt_payments`):
+
+- `cash` — online va offline.
+- `card` (mustaqil bank terminali, qo'lda belgilash) — online va offline; `card_type` (`personal`/`corporate`/`social`/`unknown`) majburiy, `card_mask` va `rrn` — `card_type='social'` bo'lsa majburiy, `terminal_ref` ixtiyoriy (qaror #64; `21-integratsiyalar.md` §9.2). Chekda to'lov shakli (`fiscal_receipts.payment_form`: `cash`/`card`/`qr`/`mixed`) va karta turi 2026-10-22 dan majburiy rekvizit (VMQ-943 1-ilova 7-band, VMQ-393 tahriri).
+- `uzqr` **dinamik** (`qr_type='dynamic'`) va `click`/`payme`/`uzum` — **faqat online** (provayder tranzaksiyasi `provider_tx_id` majburiy).
+- `uzqr` **statik** (`qr_type='static'`, kassir qo'lda tasdiqlaydi) — online'da ruxsat (qaror #64); offline'da ruxsat etilmaydi — statik UzQR'ni offline qabul qilish asoschi qarorini kutmoqda (`21-integratsiyalar.md` §9.1).
+
 ---
 
 ## 3. Yuklash protokoli
@@ -80,9 +91,12 @@ Qarzga sotish alohida voqea turi emas — `sale.created` ichida `sale_payments.m
   "events": [
     { "client_event_id": "...", "seq": 141, "type": "sale.created", "created_at": "...", "payload": {...} },
     { "client_event_id": "...", "seq": 142, "type": "return.created", "created_at": "...", "payload": {...} }
-  ]
+  ],
+  "outbox_state": { "pending_count": 0, "oldest_pending_created_at": null }
 }
 ```
+
+`outbox_state` — **majburiy** (yo'q bo'lsa `422 VALIDATION_ERROR`): qurilma outbox'ining shu so'rovga **kiritilmagan** qismi holati — `pending_count` (integer ≥ 0) — server natijasi hali `accepted`/`duplicate` bo'lmagan voqealar soni (yuborilishini kutayotgan, partiyaga sig'magan va avval `rejected` bo'lib qayta yuborilishi kutilayotganlar), `oldest_pending_created_at` (timestamptz yoki `null`, `pending_count = 0` da majburiy `null`) — ulardan eng eskisining `created_at`i (qurilma soati, §8). Server so'rovni qayta ishlagach **bitta tranzaksiyada** `devices` ni yangilaydi: `last_sync_at = now()`, `outbox_reported_at = now()`, `outbox_pending_count = outbox_state.pending_count + shu so'rovda rad etilgan voqealar soni`, `outbox_oldest_pending_at = min(oldest_pending_created_at, rad etilgan voqealarning created_at)` (`12-db-sxema.md` `devices.outbox_*`). Bu qiymatlar faqat 1C eksporti tayyorligi uchun ishlatiladi (§9, `33-1c-integratsiya.md` §7.3). Shu sababli onlayn qurilma outbox'i bo'sh bo'lsa ham davriy (har 5 daqiqada, *taxmin*) `"events": []` bilan push yuboradi — javob `{"results": []}`.
 
 ```json
 // Javob
@@ -96,10 +110,11 @@ Qarzga sotish alohida voqea turi emas — `sale.created` ichida `sale_payments.m
 
 `warnings` — har bir natija (entry) darajasida, string massivi (katalog kodlari, masalan `STOCK_NEGATIVE`, `DEBT_LIMIT_EXCEEDED`) — hujjat qabul qilingan, lekin diqqatga loyiq holat bor ekanini bildiradi (xato emas).
 
-- **Partiya hajmi**: taxmin — 50 voqea/so'rov (katta hujjat ro'yxatlari uchun kam, tarmoq kechikishi uchun ko'p emas); aniq raqam yuklama sinovida tasdiqlanadi.
-- **Backpressure**: server — qurilma boshiga **5 so'rov/soniya**, tenant boshiga bir vaqtda **4 ta** parallel `/sync/push` (taxmin); bu chegaralardan oshsa `429 Too Many Requests` + `Retry-After` qaytariladi. Qurilma — eksponensial backoff + jitter bilan qayta uriniladi (ofline sinxronlashda to'lib-toshgan outbox'ni birdan yuborishning oldini olish uchun).
+- **Partiya hajmi**: **≤ 100 voqea/so'rov** (standart, sozlanadi — qaror #54; `sync_config`).
+- **Backpressure**: server — qurilma boshiga **5 so'rov/soniya**, tenant boshiga bir vaqtda **4 ta** parallel `/sync/push` (standart, sozlanadi — qaror #54); bu chegaralardan oshsa `429 Too Many Requests` + `Retry-After` qaytariladi. Qurilma — eksponensial backoff + jitter bilan qayta uriniladi (ofline sinxronlashda to'lib-toshgan outbox'ni birdan yuborishning oldini olish uchun).
 - **Idempotentlik**: server har bir `client_event_id`ni `sync_receipts`da tekshiradi (`11-malumotlar-modeli.md` §10). Oldin qabul qilingan voqea qayta yuborilsa — `status: "duplicate"`, bir xil natija (server raqami) qaytariladi, ikkinchi marta yozilmaydi.
-- **Fiskal raqam**: `receipt_seq` qurilmadan keladi; server uni o'zgartirmaydi, faqat `UNIQUE (tenant_id, cash_register_id, shift_id, receipt_seq)` bilan tekshiradi. Takror — `rejected`, `error_code: RECEIPT_SEQ_CONFLICT`, `retryable: false` (eskalatsiya).
+- **Fiskal raqam**: `receipt_seq` qurilmadan keladi; server uni o'zgartirmaydi, faqat `UNIQUE (tenant_id, cash_register_id, shift_id, receipt_seq)` bilan tekshiradi. Takror — `rejected`, `error_code: RECEIPT_SEQ_CONFLICT`, `retryable: false` (eskalatsiya). Fiskal modul bergan raqam alohida — `fiscal_receipts.fm_receipt_seq` (`fm_terminal_id`, `fiscal_at` bilan; 6-bo'lim).
+- **48 soatlik blok**: shu kassa 48 soatlik blokda bo'lgan paytda (`created_at` blok boshlanganidan keyin) yaratilgan yangi fiskal hujjat voqeasi — `rejected`, `error_code: FISCAL_OFFLINE_48H_BLOCKED`, `retryable: false` (POS buni lokal bloklagani uchun amalda faqat buzilgan/eski klientdan keladi; audit). Blokdan oldin yaratilgan voqealar odatdagidek qabul qilinadi (6-bo'lim).
 - **Partiya "hammasi yoki hech narsa" emas** — har voqea alohida tranzaksiyada qayta ishlanadi; bittasi rad etilsa, qolganlari (bog'liq bo'lmasa) baribir qabul qilinadi (`results` massivi buni ko'rsatadi).
 
 ### 3.2 `GET /sync/pull?cursor=<token>&scope=catalog,prices,customers,permissions&page_size=500`
@@ -164,11 +179,13 @@ sequenceDiagram
     DB-->>API: OK (id, number)
     API-->>L: results: [{status: accepted, server:{id, number}}]
     API->>WK: outbox_jobs: ofd_send navbatga qo'yiladi
-    WK->>OFD: Fiskal chekni yuborish
+    WK->>OFD: Fiskal chekni yuborish (FiscalPort, hamkor bulut API)
     OFD-->>WK: Fiskal belgi + QR
-    WK->>DB: fiscal_receipts.status = "fiscalized"
+    WK->>DB: fiscal_receipts.status = "fiscalized", ofd_acked_at
     L->>K: Chek fiskal belgi/QR bilan chop etiladi (keyingi pull'da yoki push javobida)
 ```
+
+Diagramma `FiscalPort`ning hamkor bulut API adapterini ko'rsatadi. **Do'kon agenti** (lokal ko'prik, qaror #60) adapterida chek yakunlanganda POS uni agent orqali fiskal modulda (FM) imzolatadi, FM chekni OFD'ga o'zi yuboradi (tarmoq bo'lmasa — keyin `resend`), server esa natijani (`fm_receipt_seq`, `fiscal_at`, `ofd_acked_at`) push/agent orqali oladi (6-bo'lim).
 
 ### 4.2 Offline sotuv + keyinroq sinxron
 
@@ -181,14 +198,14 @@ sequenceDiagram
 
     Note over K,L: Internet yo'q — status 🔴/🟡
     K->>L: Chek 1 (seq=141) — offline belgisi bilan
-    Note over L: 48 soatlik taymer shu voqeadan boshlanadi
+    Note over L: 48 soatlik taymer — OFD tasdig'isiz eng eski chekdan (6-bo'lim)
     K->>L: Chek 2…7 (seq=142..147)
     Note over K,L: Internet qaytdi
     L->>API: POST /sync/push {events: seq 141..147, xronologik tartibda}
     API->>DB: Har voqea: sync_receipts tekshiruvi → tranzaksiya
     DB-->>API: natijalar
     API-->>L: results[7] — hammasi "accepted", server id/number
-    L->>L: "accepted" voqealar outbox'da 7 kun saqlanadi (taxmin), keyin tozalanadi
+    L->>L: "accepted" voqealar outbox'da 7 kun saqlanadi (standart, qaror #54), keyin tozalanadi
     API->>API: outbox_jobs: ofd_send (48 soatlik deadline bilan)
 ```
 
@@ -219,36 +236,61 @@ sequenceDiagram
 | Ombor qoldig'ida overselling (ikki qurilma oxirgi donani oflaynda sotgan) | Sotuv **ruxsat etiladi**; qoldiq manfiy bo'lishi mumkin, `stock_balances`ga manfiy qiymat yoziladi, BO-03'da "⚠ manfiy qoldiq" belgisi; tannarx `pending_cost` sifatida oxirgi ma'lum narxda, keyingi kirimda qayta hisoblanadi | `11-malumotlar-modeli.md` §7; `04-arxitektura-va-stack.md` §2.3 |
 | Qarz limiti offline oshib ketgan | Sotuv **ruxsat etiladi** (allaqachon bo'lib o'tgan — sotuv va fiskal chek bekor qilinmaydi); qurilma oxirgi ma'lum qoldiq bo'yicha ogohlantiradi, kassir baribir sotsa qarz shundayligicha qoladi; server qayta tekshiradi, `limit_exceeded=true` bayrog'i qo'yiladi, internet qaytganda Egasi/Menejerga M18 orqali bildirishnoma (qaror #23 — tavsiya #7) | US-M08-01; `04-arxitektura-va-stack.md` §2.3 |
 | Narx offline o'zgargan (server narxi yangilangan, qurilma eski narxda sotgan) | Chekdagi narx **"qotiriladi"** — avtomatik tuzatilmaydi; farq Buxgalter ko'rib chiqadigan **istisno** sifatida belgilanadi | M09 chekka holatlar (`03-modullar-talablari.md`); `04-arxitektura-va-stack.md` §2.3 |
-| Mahsulot offline sotuv vaqtida arxivlangan (serverda keyin arxivlangan, qurilma bilmagan) | Hujjat **qabul qilinadi** (tovar sotuv vaqtida faol edi); "arxivlangan tovar bilan yozilgan" bayrog'i, Menejerga ko'rinadi, bloklanmaydi | Qat'iy siyosat **ochiq savol** (pastda) |
+| Mahsulot offline sotuv vaqtida arxivlangan (serverda keyin arxivlangan, qurilma bilmagan) | Hujjat **qabul qilinadi** (tovar sotuv vaqtida faol edi); "arxivlangan tovar bilan yozilgan" bayrog'i, Menejerga ko'rinadi, bloklanmaydi; sinxron istisnosi sifatida Buxgalter ko'rib chiqadi (pastda) | qaror #56 |
 | Bir xil mijoz ikki joyda tahrirlangan (ism/telefon/izoh) | **Last-writer-wins**, `counterparties.version` bilan optimistik qulflash; kech kelgan `client_event_id` server qabul vaqti bo'yicha g'olib, eski qiymat `audit_log`ga | `11-malumotlar-modeli.md` §1 (`version INT`) |
 | Mijoz qarz balansi/kredit limiti | **Hech qachon LWW emas** — balans faqat `debt_moves` delta sifatida qo'shiladi (konflikt yo'q, hisoblanadigan registr); limit maydoni (reference) — LWW + version | `11-malumotlar-modeli.md` §7 |
 | Smena bir vaqtda ikki joyda yopilmoqchi (nazariy) | Server tomonida `shifts.status` optimistik tekshiruv bilan himoyalanadi — ikkinchisi "smena allaqachon yopilgan" xatosi oladi | Amaliyotda kam uchraydi (bitta smena — bitta qurilma) |
 | Qaytarish yoki chegirma limiti offline oshgan | Sotuvdan farqli — **lokal Menejer/Egasi PIN'isiz yakunlanmaydi** (BO-16 offline ishlamaydi); PIN bilan tasdiqlangan bo'lsa server qabul qiladi va qayta tekshiradi, `limit_exceeded=true` bayrog'i + M18 xabar | `15-xavfsizlik-va-audit.md` §2.3 |
 
+**Sinxron istisnolarini ko'rib chiqish** (qaror #56 b): server qabul qilgan, lekin bayroq qo'yilgan holatlar (chekdagi narx farqi, arxivlangan tovar bilan yozilgan hujjat) `sync_exceptions` jadvaliga yoziladi va BO-14 **"Sinxron istisnolari"** ro'yxatida ko'rinadi. Buxgalter har qatorni "Ko'rib chiqildi" deb belgilaydi — izoh majburiy, `sync_exceptions.reviewed_at`/`reviewed_by`/`review_note` to'ldiriladi, audit yoziladi; endpoint `POST /sync-exceptions/{id}/review` (`20-api-moliya-admin.md`). Ko'rib chiqish provodkaga ta'sir qilmaydi (hujjat allaqachon qabul qilingan).
+
 ---
 
 ## 6. Fiskal 48 soat qoidasi
 
-- **Huquqiy asos**: VM 943-son qarori, 1-ilova, 31-band — offline rejimda shakllangan birinchi chek **48 soat ichida** OFD'ga yetib borishi shart (`research_notes/texnik/02-kassa-ofd-markirovka.md`, §1).
-- **Taymer**: birinchi offline voqea (`created_at`, qurilma soati) yaratilgan paytdan boshlanadi — "chek yaratilgan payt, OFD'ga yetib borish payti emas" (`04-arxitektura-va-stack.md`, §2.2, 3-band). Har bir uzluksiz offline davr uchun alohida taymer; internet qaytib hammasi sinxronlanganda taymer to'xtaydi.
-- **Ogohlantirishlar**: 24 soatda birinchi signal, 40 soatda ikkinchi (kuchli) signal (**taxmin** — aniq soat manbada yo'q, `06-ekranlar-umumiy.md` §1.3 ham shu holatni "taxmin" deb belgilagan; maqsad — muddat tugashidan oldin kamida ikki marta ogohlantirish, M18 orqali Egasiga ham).
-- **48 soatda yangi sotuvni bloklash — ochiq savol**: qonun matnida (1-ilova 31-band) faqat "chek 48 soat ichida yetib borishi zarur" deyilgan, yangi sotuvni to'xtatish talabi **topilmadi**. **Taklif**: yangi sotuvni **bloklamaslik** (do'kon ishini to'xtatish mijozga xizmat ko'rsatish va boshqa huquqiy/biznes xavflarni kuchaytiradi), lekin 48 soat chegarasi buzilganda: (1) audit_log'ga qat'iy huquqiy-xavf yozuvi, (2) Egasiga Telegram orqali zudlik bilan xabar (M18), (3) back-office'da doimiy ko'rinadigan "huquqiy xavf" bayrog'i. Bu band — `research_notes/texnik/12-taxminlar-va-murojaatlar.md` (6-band) kabi — yakuniy huquqiy maslahat bilan tasdiqlanishi kerak.
-- **Hisob-kitob asosi**: taymer qiymati `created_at` (qurilma soati) asosida hisoblanadi, lekin 8-bo'limdagi soat farqi qoidalari bilan himoyalanadi (soatni "orqaga surish" orqali muddatni cho'zishga urinishning oldini olish uchun).
+- **Huquqiy asos**:
+  - VMQ-943 1-ilova 31-band — offline rejimda shakllangan birinchi chek **48 soat ichida** operatorga (OFD) uzatilishi shart.
+  - VMQ-943 **2-ilova 6-band 6-xatboshi** (virtual kassa; onlayn-NKM uchun 3-band 19-xatboshi), VMQ-23 (23.01.2026) tahriri: «48 соат оффлайн режимида ишлагандан сўнг автоматик блоклаш тизимига ўтиш». Bu kassa dasturining texnik talabi (Davlat reyestriga kiritish sharti); faqat ogohlantirish bilan ishlaydigan kassa talabga mos emas (SK 221-modda 4-qism — jarima) (`research_notes/ochiq-savollar/P1-soliq-fiskal.md`, OQ-004).
+- **Fiskal arxitektura** (qaror #60): chek `FiscalPort` orqali fiskal modulda (FM) imzolanadi; adapter — (a) fiskal hamkorning bulut API'si yoki (b) do'kon Windows kompyuteridagi **Do'kon agenti** (lokal ko'prik). FM chekni tarmoqsiz imzolaydi, yuborilmagan cheklar ro'yxatini saqlaydi va internet qaytganda OFD'ga qayta yuboradi (`resend`). Qurilma raqami `receipt_seq` (qaror #12) saqlanadi; FM bergan raqam — alohida `fiscal_receipts.fm_receipt_seq` (`fm_terminal_id`, `fiscal_at` bilan). OFD tasdig'i (ack) kelganda `fiscal_receipts.ofd_acked_at` to'ldiriladi. MVP'da `FISCAL_PROVIDER=fake` (`21-integratsiyalar.md` §1).
+- **Taymer** (har `cash_register` uchun alohida): shu kassada `fiscal_receipts.ofd_acked_at IS NULL` bo'lgan **eng eski** fiskal chekning `created_at`i — "chek yaratilgan payt, OFD'ga yetib borish payti emas". Serverda — `cash_registers.last_unacked_receipt_at` va `fm_receipts_pending`; qurilmada — lokal `fiscal` keshi va outbox'dagi hali ack olmagan fiskal cheklar (`sale.created`, `return.created`, `debt_payment.created`) bo'yicha, qurilma serversiz hisoblaydi. Eng eski chek ack olgach taymer keyingi ack'siz chekdan hisoblanadi; ack'siz chek qolmasa taymer to'xtaydi. Soat farqi himoyasi — 8-bo'lim.
+- **Bosqichlar** (qaror #43; konstantalar `OFFLINE_WARN_HOURS = (24, 40, 46)`, `OFFLINE_FISCAL_BLOCK_HOURS = 48`):
+
+| Taymer | Holat | Amal |
+|---|---|---|
+| 24 soat | 🟡 sariq | POS status panelida ma'lumot (`06-ekranlar-umumiy.md` §1.3) |
+| 40 soat | 🔴 qizil | POS'da kuchli ogohlantirish + Egasiga M18 (Telegram) xabari |
+| 46 soat | modal | Har yangi chek oldidan yopib bo'lmaydigan modal ("2 soatdan keyin kassa bloklanadi — internetga ulaning", "Tushundim" bilan yopiladi); **sotuv to'xtamaydi** |
+| 48 soat | ⛔ blok | Pastdagi band |
+
+- **48 soatda blok** (majburiy): shu `cash_register`da yangi fiskal chek (sotuv, qaytarish, avans, kredit, qarz to'lovi cheki `debt_settlement`) **shakllantirilmaydi**, toki to'plangan cheklar OFD'ga yetib bormaguncha:
+  - POS blokni lokal (serversiz) qo'llaydi — "Sotish", "Qaytarish", "Qarz to'lovi" amallari yopiladi, ekranda "⛔ Kassa bloklangan — 48 soat ichida cheklar OFD'ga yetib bormadi" va "Sinxronlash/Qayta yuborish" tugmasi (`06-ekranlar-umumiy.md` §1.3).
+  - Server ham shu kassa uchun yangi fiskal hujjatni `409 FISCAL_OFFLINE_48H_BLOCKED` bilan rad etadi (sync voqeasi uchun — §3.1).
+  - **Ruxsat etilgan**: sinxronizatsiya (`/sync/push`, `/sync/pull`), FM/OFD'ga qayta yuborish, fiskal bo'lmagan amallar (qoldiqni ko'rish, smenani yopish, naqd sanash).
+  - Egasi/admin uchun qo'lda chetlab o'tish **yo'q**.
+  - Blok boshlanishi va yechilishi `audit_log`ga yoziladi, Egasiga M18 xabari; back-office'da kassa "bloklangan" holatda ko'rinadi.
+  - Blok **avtomatik yechiladi** — shu kassadagi barcha ack'siz cheklar OFD tasdig'ini (`ofd_acked_at`) olgach.
+  - Boshqa kassalar bloklanmaydi — taymer kassa bo'yicha.
+- **FM o'zi ham bloklaydi**: FM eng eski tasdiqlanmagan chek 48 soatdan oshsa (yoki xotira to'lsa, OFD bloklasa) chek imzolamaydi. Holat `cash_registers.fm_state` (`ok`/`locked`/`ack_overdue`/`memory_full`/`unknown`) da; `fm_state != 'ok'` bo'lsa sotuv `409 FISCAL_DEVICE_LOCKED` bilan to'xtaydi (26 #89, OQ-008). Ilova bloki va FM bloki mustaqil — ikkisidan biri faol bo'lsa yangi chek chiqmaydi.
+- **Obuna lokauti** (§3.5) bu taymerdan mustaqil.
 
 ---
 
 ## 7. Markirovkalangan tovar — offline siyosati
 
-CRPT Turon'da kodni real vaqtda tekshirish offline holatda **mumkin emas** (markaziy tizimga bog'liq). Siyosat (qaror #17; `03-modullar-talablari.md` US-M01-03, `21-integratsiyalar.md` §4):
+**Huquqiy asos**: offline chek VMQ-943 1-ilova 31-band bilan ruxsat (48 soat, keyin kassa bloklanadi — 6-bo'lim). Chakana sotuvda markirovka kodi **fiskal chek ichida** (`fiscal_receipts.items[].marking_codes`) FM imzosi bilan OFD'ga, OFD esa Asl belgisiga uzatadi (VM 833 75–77-band; qaror #62) — sotuvchi CRPT'ni alohida "sotdim" deb chaqirmaydi. CRPT Turon API (`MarkingPort`) faqat kirim qabul qilish, kodni tekshirish (`verify_code`), yetkazib beruvchiga qaytarish va hisobdan chiqarish uchun ishlatiladi. Sotuvdan oldin majburiy online tekshiruv ("ruxsat beruvchi rejim") O'zbekistonda yo'q. Kassaning majburiy cheklovlari (VMQ-943 2-ilova, PQ-190 7(в)(ii)): kodsiz markirovkali qator bilan chek yo'q; bitta chekda dublikat kod yo'q; avval ishlatilgan kod bilan chek yo'q.
 
-- **Narx qurilmada ma'lum** (tovar va uning amaldagi narxi Dexie `catalog`/`prices`da bor) — sotuvga **ruxsat**. DataMatrix kod skanerlanadi, qurilmada faqat mahalliy format/nazorat raqami tekshiriladi, kod `marking_codes.status='pending_verification'` bilan (hamda outbox `sale.created` voqeasi payload'ida) yoziladi, chekka "⚠ Offlayn sotildi, CRPT tekshiruvi kutilmoqda" belgisi qo'yiladi (POS-02/08/09/10, `06-ekranlar-umumiy.md` §1.7, §1.3).
+Siyosat (qaror #17, #62; `03-modullar-talablari.md` US-M01-03, `21-integratsiyalar.md` §4):
+
+- **Sotuvdan oldingi tekshiruv** — `MARKING_PRECHECK=off|warn|block`, standart **`warn`**. Online'da `verify_code` chaqiriladi; `warn` rejimida tekshiruv muvaffaqiyatsiz yoki CRPT mavjud bo'lmasa sotuv davom etadi, javobda `MARKING_PRECHECK_WARNING` (200, `warnings[]`) + audit. `block` rejimida — `MARKING_VERIFY_FAILED`/`MARKING_VERIFY_UNAVAILABLE` bilan rad etiladi, shu sababli `block` rejimida markirovkali tovar offline sotilmaydi. Offline'da (`warn`) precheck bajarilmaydi — sotuv lokal tekshiruvlar bilan davom etadi.
+- **Lokal dublikat-kod tekshiruvi** — har rejimda majburiy: qurilma kodni (1) shu chekdagi boshqa qatorlar, (2) lokal outbox'dagi sotilgan kodlar, (3) sinxronlangan `marking_codes` keshi (holati `sold`/`pending_verification`, 1-bo'lim) bilan solishtiradi; takror bo'lsa qator qo'shilmaydi, kassir chetlab o'ta olmaydi.
+- **Narx qurilmada ma'lum** (tovar va uning amaldagi narxi Dexie `catalog`/`prices`da bor) — sotuvga **ruxsat**. DataMatrix kod skanerlanadi, qurilmada mahalliy format/nazorat raqami va dublikat tekshiriladi, kod chek qatoriga (FM imzolaydigan `items[].marking_codes`) va outbox `sale.created` payload'iga yoziladi, `marking_codes.status='pending_verification'`; chekka "⚠ Offlayn sotildi, OFD tasdig'i kutilmoqda" belgisi qo'yiladi (POS-02/08/09/10, `06-ekranlar-umumiy.md` §1.7, §1.3).
 - **Narx qurilmada noma'lum** (tovar hali sinxronlanmagan) — sotuv **ruxsat etilmaydi**, POS "Offlaynda sotib bo'lmaydi, narx noma'lum" xabarini ko'rsatadi. Kassir qarorni chetlab o'ta olmaydi.
-- Internet qaytganda worker `outbox_jobs(kind="marking_sell")` orqali CRPT Turon'ga `verify_code` + `sell` yuboradi; muvaffaqiyatli bo'lsa `marking_codes.status=sold`; `verify_failed` bo'lsa (noto'g'ri/takroriy kod yoki CRPT xatosi) Egasi/Buxgalterga ogohlantirish beriladi (tovar allaqachon sotilgan, orqaga qaytarib bo'lmaydi — faqat qayd va keyingi tuzatish uchun belgi).
-- **Audit voqealari** (`15-xavfsizlik-va-audit.md` §6.1 ro'yxatiga ham kiritiladi): `marking.offline_sold` (actor_user_id, device_id, code, sale_id, price_source=`cache`, created_at), `marking.offline_refused_no_price` (kassir taqiqqa uchragan urinish), `marking.verify_failed` (sync'dan keyingi noto'g'ri/takroriy kod yoki CRPT xatosi — M18 orqali Egasiga).
+- **Internet qaytganda**: chek FM orqali OFD'ga yetadi, OFD kodni Asl belgisiga uzatadi; chek OFD tasdig'ini (`ofd_acked_at`) olgach `marking_codes.status='sold'`. `MARKING_PRECHECK != off` bo'lsa worker offline sotilgan kodni keyin `verify_code` bilan tekshiradi; noto'g'ri/takroriy kod yoki CRPT/OFD rad etsa Egasi/Buxgalterga M18 ogohlantirish (tovar allaqachon sotilgan, orqaga qaytarib bo'lmaydi — qayd va keyingi tuzatish uchun belgi). Server sinxronda tenant bo'yicha takror kodni aniqlasa ham shunday.
+- **Audit voqealari** (`15-xavfsizlik-va-audit.md` §6.1 ro'yxatiga ham kiritiladi): `marking.offline_sold` (actor_user_id, device_id, code, sale_id, price_source=`cache`, created_at), `marking.offline_refused_no_price` (kassir taqiqqa uchragan urinish), `marking.verify_failed` (sinxrondan keyingi noto'g'ri/takroriy kod, CRPT yoki OFD rad etishi — M18 orqali Egasiga).
 - **Offline ko'chirish (M06) va qaytarish (M02)** (qaror #23 — tavsiya #5):
-  - **Ko'chirish** — o'z filiallar/omborlar orasida markirovkalangan tovarni offline ko'chirish **ruxsat etiladi** (jo'natuvchi chiqim, qabul qiluvchi kirim — ikkisi ham offline bajarilishi mumkin), internet qaytganda sinxronlanadi va audit yoziladi. Nega: egalik (owner) o'zgarmaydi (bitta tenant ichida), 72 soatlik CRPT muddati odatda **subyektlar o'rtasidagi** ko'chirishga tegishli ko'rinadi (ichki ko'chirishga emas — bu taxmin, huquqiy xat bilan tasdiqlanadi).
-  - **Qaytarish** — markirovkalangan tovarni **faqat internet bor paytda** qaytarish mumkin; offline holatda POS'da qaytarish tugmasi markirovkalangan tovar qatorlari uchun **bloklanadi** (oddiy, markirovkasiz tovar qaytarishiga bu cheklov tegmaydi). Nega: rasmiy qaytarish uchun kod yozilgan maxsus qaytarish cheki kerak (`buxgalter.uz`, F10 tasdiqlangan) va offline firibgarlik xavfi yuqori baholanadi.
-  - Bu mahsulot qarori; huquqshunos tasdig'i tavsiya etiladi (ayniqsa ko'chirish bo'yicha — CRPT'ga xabar qilish majburiyati va e-TTN zarurligi, `21-integratsiyalar.md` §3, Ochiq savol 5), lekin spec darajasidagi qaror allaqachon qabul qilingan.
+  - **Ko'chirish** — o'z filiallar/omborlar orasida markirovkalangan tovarni offline ko'chirish **ruxsat etiladi** (jo'natuvchi chiqim, qabul qiluvchi kirim — ikkisi ham offline qayd etilishi mumkin), internet qaytganda sinxronlanadi va audit yoziladi. CRPT: VM 833 Qoidalarida ichki ko'chirish uchun CRPT xabarnomasi talabi yo'q — xabarnomalar egalik o'tishiga bog'liq (66–67-band), bitta tenant ichida egalik o'zgarmaydi; ichki ko'chirish uchun CRPT muddati ham yo'q.
+  - **E-TTN** — o'z filiallari orasidagi ko'chirishda ham **majburiy** ("Ombordan omborga" rejimi; VM 249 31-ilova, VM 168 tahriri, 13-, 16-band; qaror #63): avtotransportda tashish (`transfers.transport_mode='vehicle'`) e-TTN rasmiylashtirilmaguncha boshlanmaydi; `on_foot_or_public` (qo'lda/jamoat transporti) uchun e-TTN talab qilinmaydi. E-TTN faqat online (EDO operatori) rasmiylashtiriladi: offline yaratilgan ko'chirish uchun e-TTN internet qaytgach, **tashish boshlanishidan oldin** rasmiylashtirilishi va `transfers.ettn_ref` to'ldirilishi kerak. POS/back-office ko'chirish kartasida "e-TTN kutilmoqda — tashishni boshlamang" belgisi turadi; `vehicle` ko'chirishni e-TTN'siz jo'natish urinishi `409 ETTN_REQUIRED` (`19-api-ombor.md`).
+  - **Qaytarish** — markirovkalangan tovarni **faqat internet bor paytda** qaytarish mumkin; offline holatda POS'da qaytarish tugmasi markirovkalangan tovar qatorlari uchun **bloklanadi** (oddiy, markirovkasiz tovar qaytarishiga bu cheklov tegmaydi). Bu **ichki ehtiyot tanlovi**, qonundan qat'iyroq: qonun offline qaytarish chekini taqiqlamaydi (VM 833 84-, 90-band), lekin kod holatini tekshirish va firibgarlik xavfi sababli qaytarish online-only.
 
 ---
 
@@ -257,6 +299,7 @@ CRPT Turon'da kodni real vaqtda tekshirish offline holatda **mumkin emas** (mark
 - Qurilma soati noto'g'ri bo'lishi mumkin (batareya, qo'lda o'zgartirish). Server har API javobida `Date` sarlavhasini yuboradi; qurilma internetga ulanganda o'z soatini server bilan solishtiradi.
 - Farq **taxmin: 5 daqiqadan** oshsa — qurilma UI'da ogohlantirish ko'rsatadi ("Qurilma soati noto'g'ri, sinxronlang") va `audit_log`ga yoziladi.
 - **48 soatlik hisob-kitobda firibgarlikdan himoya**: agar `created_at` (qurilma soati) server qabul qilish vaqtidan (`received_at`) ancha oldin bo'lsa va bu farq amaldagi offline sessiya davomiyligidan katta bo'lsa (ya'ni soat "orqaga surilgan" bo'lishi mumkin) — server `created_at`ni **qisqartiradi** (clamp: `max(created_at, received_at - taxminiy_offline_oyna)`) va holatni audit uchun belgilaydi, shunda qurilma soatini o'zgartirib 48 soatlik muddatni cho'zib bo'lmaydi.
+- **Qurilmadagi 48 soat taymeri** (6-bo'lim) soat orqaga surilsa ham kamaymaydi: qurilma eng katta ko'rilgan vaqtni (oxirgi server `Date` sarlavhasi va lokal soat maksimumi) saqlaydi va taymerni shundan hisoblaydi; lokal soat shu qiymatdan orqada bo'lsa — ogohlantirish va `audit_log` yozuvi (yuqoridagi kabi).
 - Ikki yo'nalishda ham (orqaga va oldinga surish) xom `created_at` va tuzatilgan qiymat alohida saqlanadi — tekshiruv/audit uchun.
 
 ---
@@ -264,9 +307,10 @@ CRPT Turon'da kodni real vaqtda tekshirish offline holatda **mumkin emas** (mark
 ## 9. Qurilmani ro'yxatdan o'tkazish va bekor qilish
 
 - Qurilma birinchi marta login qilganda `devices` yozuvi avtomatik yaratiladi (`tenant_id`, `cash_register_id`, `kind`, `app_version`) — kichik do'kon uchun qo'shimcha tasdiqlash qadam qo'shilmaydi (tezkor ishga tushirish).
-- Egasi/Menejer qurilmalar ro'yxatini ko'radi va kerak bo'lsa **bekor qiladi** (masalan o'g'irlangan/eskirgan qurilma) — aniq ekran hozircha `06-ekranlar-umumiy.md`da yo'q, **ochiq savol** (pastda).
-- **Bekor qilingan qurilma**: `devices.revoked_at` o'rnatilishi bilan shu qurilmaga bog'langan **barcha OAuth refresh/access token va litsenziya tokeni** bekor qilinadi (`14-autentifikatsiya-oauth2.md` §7, §17) — keyingi `POST /sync/push` va `GET /sync/pull` so'rovlari `403 device_revoked` bilan rad etiladi. Lokal outbox'dagi hali yuborilmagan hujjatlar **jim yo'qolmaydi** — UI "Qurilma bloklandi, ma'lumotlarni eksport qiling" xabarini ko'rsatadi va Excel eksport imkoniyatini beradi (qog'oz chekka tushgan savdoni yo'qotmaslik uchun), shundan keyingina lokal baza tozalanadi. Aniq UX oqimi **ochiq savol**.
-- Qurilma bekor qilinganda shu qurilmada oxirgi 30 kun (taxmin) ichida PIN bilan kirgan barcha xodimlarning PIN'i serverda bekor qilinadi va keyingi kirishda yangi PIN majburiy (lokal 4 raqamli PIN hashlari offline buzilishi oson). Ro'yxat va "Bekor qilish" — BO-11 "Qurilmalar" tabi.
+- Egasi/Menejer qurilmalar ro'yxatini ko'radi va kerak bo'lsa **bekor qiladi** (masalan o'g'irlangan/eskirgan qurilma). UX — BO-11 **"Qurilmalar"** tabi (qaror #56 a; `06-ekranlar-umumiy.md`, `07-ekran-tafsilotlari.md` BO-11): ro'yxat — `device_name`, `kind`, `last_sync_at`, sinxronlanmagan voqealar soni (`devices.outbox_pending_count`); "Bekor qilish" amali (`devices.revoke`) — Egasi/Menejer; qurilmada sinxronlanmagan voqea bo'lsa ogohlantirish va avval `sync.drain` orqali yuborishni kutish taklifi.
+- **Bekor qilingan qurilma**: `devices.revoked_at` o'rnatilishi bilan shu qurilmaga bog'langan **barcha OAuth refresh/access token va litsenziya tokeni** bekor qilinadi (`14-autentifikatsiya-oauth2.md` §7, §17) — keyingi `POST /sync/push` va `GET /sync/pull` so'rovlari `403 device_revoked` bilan rad etiladi. Lokal outbox'dagi hali yuborilmagan hujjatlar **jim yo'qolmaydi** — UI "Qurilma bloklandi, ma'lumotlarni eksport qiling" xabarini ko'rsatadi va Excel eksport imkoniyatini beradi (qog'oz chekka tushgan savdoni yo'qotmaslik uchun), shundan keyingina lokal baza tozalanadi.
+- Qurilma bekor qilinganda shu qurilmada oxirgi 30 kun (taxmin) ichida PIN bilan kirgan barcha xodimlarning PIN'i serverda bekor qilinadi va keyingi kirishda yangi PIN majburiy (lokal 4–6 raqamli PIN hashlari offline buzilishi oson; PIN uzunligi — qaror #54). Ro'yxat va "Bekor qilish" — BO-11 "Qurilmalar" tabi.
+- **1C eksporti tayyorligi** (qaror #36/#39; aniq qoida — `33-1c-integratsiya.md` §7.3 `devices_synced`): `day_end(D) = (D + 1) 00:00 Asia/Tashkent`. Hisobga olinadigan **faol POS qurilmasi** `d`: `d.kind IN ('web','android')` (`onec_agent` hisobga olinmaydi), `d.revoked_at IS NULL`, `d.cash_register_id` kassasi bog'langan filialda, `d.last_seen_at >= day_end(D) − 8 kun` va partiyada qo'lda istisno qilinmagan. Har shunday qurilma uchun shart: `d.last_sync_at > day_end(D)` **va** `d.outbox_reported_at >= d.last_sync_at` **va** (`d.outbox_pending_count = 0` **yoki** `d.outbox_oldest_pending_at > day_end(D)`) — ya'ni D kuni yopilgandan keyin push bo'lgan va shu push'dan keyin outbox'da D kuni oxiridan oldin yaratilgan yuborilmagan voqea qolmagan (`devices.outbox_*` — §3.1 `outbox_state`). Shart bajarilmasa partiya `ONEC_DEVICES_NOT_SYNCED` bilan bloklanadi; qurilma keyin sinxronlansa (`/sync/push` qayta ishlangach `OneCChangeTracker.device_synced`) partiya avtomatik qayta quriladi. Qo'lda istisno (`onec.export.approve`, sabab majburiy) va kech kelgan chek yo'li — `33-1c-integratsiya.md` §7.3, §8.6.
 
 ---
 
@@ -274,8 +318,8 @@ CRPT Turon'da kodni real vaqtda tekshirish offline holatda **mumkin emas** (mark
 
 - **Hajm taxmini**: bitta outbox voqeasi ≈ 2 KB (JSON); 1 000 chek/kun × 2 kun offline ≈ 4 MB — kichik do'kon uchun amalda ahamiyatsiz. `navigator.storage.estimate()` orqali kvota kuzatiladi: 80%ga yetganda UI ogohlantiradi, 95%da chek tarixi keshi (UI ko'rsatish uchun, 90 kunlik oyna, pastda) qisqartiriladi — **`pending`/yuborilmagan outbox hech qachon o'chirilmaydi** (fiskal/audit yaxlitligi ustunlik qiladi).
 - Katalog/narx/mijoz keshlari — delta-sync bilan doimiy yangilanadi, qo'lda tozalash shart emas (hajm tenant ma'lumot hajmiga bog'liq).
-- Outbox voqealari — `accepted`/`duplicate` natija olgandan keyin darhol o'chirilmaydi, **taxmin: 7 kun** xavfsizlik buferi bilan saqlanadi (foydalanuvchi ko'rib chiqishi/eksport qilishi uchun), keyin avtomatik tozalanadi.
-- Sotuv/chek tarixi (UI ko'rsatish uchun lokal kesh) — **taxmin: 90 kunlik** aylanma oyna; eskisi serverdan talab bo'yicha olinadi (online bo'lganda).
+- Outbox voqealari — `accepted`/`duplicate` natija olgandan keyin darhol o'chirilmaydi, **7 kun** xavfsizlik buferi bilan saqlanadi (standart, sozlanadi — qaror #54; foydalanuvchi ko'rib chiqishi/eksport qilishi uchun), keyin avtomatik tozalanadi. OFD tasdig'ini (`ofd_acked_at`) olmagan fiskal chek voqeasi bu muddatdan qat'i nazar saqlanadi (6-bo'lim).
+- Sotuv/chek tarixi (UI ko'rsatish uchun lokal kesh) — **90 kunlik** aylanma oyna (standart, sozlanadi — qaror #54); eskisi serverdan talab bo'yicha olinadi (online bo'lganda).
 - Veb-kassa Chrome/Edge/Android Chrome'da va **iPhone/iPad'da o'rnatilgan PWA** sifatida ishlaydi; ishga tushganda `navigator.storage.persist()` so'raladi; iOS'da faqat o'rnatilgan PWA (o'rnatilmagan sayt ma'lumoti tozalanishi mumkin) va chop etish faqat bulutli printer yoki elektron chek orqali (`24-frontend-arxitekturasi.md` §6, `25-nofunksional-talablar.md` §6).
 
 ---
@@ -293,9 +337,9 @@ CRPT Turon'da kodni real vaqtda tekshirish offline holatda **mumkin emas** (mark
 
 - **Veb (Dexie/IndexedDB)**: brauzer IndexedDB'ni o'zi shifrlamaydi — maxfiylik asosan OS/profil darajasidagi sandboxing va **OS disk shifrlashi** (BitLocker/FileVault, tashkiliy siyosat sifatida tavsiya) orqali ta'minlanadi, ilova darajasidan majburlab bo'lmaydi.
 - **Logout** — Dexie bazasi to'liq o'chiriladi (`Dexie.delete()` / `indexedDB.deleteDatabase`), shu jumladan mijoz telefon raqami, qarz balansi keshi va outbox (agar hammasi sinxronlangan bo'lsa; sinxronlanmagan bo'lsa ogohlantirish bilan eksport taklif qilinadi, 9-bo'limdagi kabi).
-- **Offline PIN login** (internet yo'qligida kassaga kirish) — faqat salt bilan heshlangan PIN lokal saqlanadi, muvaffaqiyatsiz urinishlar soni cheklanadi (**taxmin: 5 urinish**), oshsa qurilma vaqtincha bloklanadi.
+- **Offline PIN login** (internet yo'qligida kassaga kirish) — faqat salt bilan heshlangan PIN lokal saqlanadi, muvaffaqiyatsiz urinishlar soni cheklanadi (**5 urinish** — standart, sozlanadi, qaror #54), oshsa qurilma vaqtincha bloklanadi.
 - **Android (keyingi bosqich)** — `28-android-pos.md`da batafsil: butun Room bazasini **SQLCipher** bilan shifrlash tavsiya etiladi (yoki Android Keystore asosida maydon darajasida shifrlash, agar SQLCipher xarajati ortiqcha topilsa).
-- Karta/to'lov ma'lumotlari (PAN, CVV) hech qachon qurilmada saqlanmaydi — to'lov terminali/bank SDK'si orqali to'g'ridan-to'g'ri ishlanadi, bu tizim faqat tranzaksiya natijasi (muvaffaqiyat/summasi) bilan ishlaydi.
+- Karta/to'lov ma'lumotlari (to'liq PAN, CVV) hech qachon qurilmada saqlanmaydi — to'lov terminali/bank SDK'si orqali to'g'ridan-to'g'ri ishlanadi; tizim faqat tranzaksiya natijasi va chek rekvizitlari — `card_type`, maskalangan `card_mask` (birinchi va oxirgi 4 raqam), `rrn` — bilan ishlaydi (qaror #64).
 
 ---
 
@@ -306,10 +350,12 @@ CRPT Turon'da kodni real vaqtda tekshirish offline holatda **mumkin emas** (mark
 | Tarmoq emulyatsiyasi (chaos) | Online↔offline↔online tez almashinuvi, sekin 3G, uzilish o'rtada | Playwright network conditions (`24-frontend-arxitekturasi.md` testlar ro'yxati) |
 | Idempotentlik | Bir xil `client_event_id` ikki marta yuborilsa — ikkinchi marta yozilmasligi, `duplicate` natija | MSW bilan backend simulyatsiyasi + backend integratsion test |
 | Ikki qurilma to'qnashuvi | Ikki kassa bir vaqtda oxirgi donani oflaynda sotadi — ikkisi ham qabul qilinadi, qoldiq manfiy va bayroqlanadi | Backend integratsion test (parallel push) |
-| 48 soat chegarasi | Simulyatsiya qilingan 50 soatlik offline davr — 24/40 soat ogohlantirish, 48 soatda audit bayrog'i to'g'ri ishga tushishi | Vaqtni soxtalashtiruvchi (fake clock) unit/integratsion test |
+| 48 soat chegarasi | Simulyatsiya qilingan 50 soatlik offline davr: 24 soatda 🟡, 40 soatda 🔴 + M18, 46 soatda har chek oldidan modal (sotuv o'tadi); 48 soatda shu kassada yangi sotuv/qaytarish/qarz to'lovi cheki rad etiladi (`FISCAL_OFFLINE_48H_BLOCKED`), sinxronlash ishlaydi, audit + M18; boshqa kassa bloklanmaydi; barcha cheklar `ofd_acked_at` olgach keyingi sotuv o'tadi; `fm_state='locked'` bo'lsa `FISCAL_DEVICE_LOCKED` | Vaqtni soxtalashtiruvchi (fake clock) unit/integratsion test, `FakeFiscalAdapter` |
+| Markirovka offline | Bitta chekda yoki outbox/keshdagi sotilgan kod takror skanerlansa — qator qo'shilmaydi; `MARKING_PRECHECK=warn`da CRPT mavjud bo'lmasa sotuv `MARKING_PRECHECK_WARNING` bilan o'tadi, `block`da rad etiladi; markirovkali qaytarish offline bloklanadi | Unit + Playwright (offline) |
 | Soat farqi | Qurilma soati +3 kun qilib qo'yilganda, server `created_at`ni to'g'ri "clamp" qilishi | Backend unit test |
 | Ko'p-tab | Ikki tab ochilganda faqat bittasi yozuvchi bo'lishi, `seq` takrorlanmasligi | Playwright (ikki context, bitta profil) |
 | Qurilma bekor qilinishi | Push/pull sinxronida qurilma bekor qilinsa `403` va UI eksport taklifi | E2E test + backend test |
+| `outbox_state` va 1C tayyorligi | Push'dan keyin `devices.outbox_*`/`last_sync_at` bitta tranzaksiyada yangilanadi; rad etilgan voqea `outbox_pending_count`ga qo'shiladi; `outbox_state`siz so'rov `422`; bo'sh `events: []` push `last_sync_at`ni yangilaydi; `devices_synced` shartining har bandi (D kuni oxiridan oldin/keyin) | Backend integratsion test |
 | Rad etilgan voqea oqimi | `retryable`/`non-retryable` xatolar UI'da to'g'ri ko'rsatilishi, boshqa voqealarni bloklamasligi | Playwright + MSW |
 
 Backend tomonida `/sync/push` va `/sync/pull` uchun OpenAPI sxemasiga mos kontrakt testlari (`23-backend-arxitekturasi.md`da belgilanadi) va worker→OFD orasidagi kechikish/uzilishni simulyatsiya qiluvchi chaos-vosita (masalan toxiproxy) tavsiya etiladi — aniq vosita tanlovi backend hujjatida.
@@ -318,17 +364,19 @@ Backend tomonida `/sync/push` va `/sync/pull` uchun OpenAPI sxemasiga mos kontra
 
 ## Ochiq savollar
 
-1. 48 soatda yangi sotuvni bloklash yoki faqat ogohlantirish — qonunda aniq topilmadi, taklif (6-bo'lim) huquqiy maslahat bilan tasdiqlanishi kerak.
-2. Qurilmani bekor qilish UX oqimi (qaysi ekranda, kim bekor qiladi, eksport jarayoni) — mahsulot ekranlarida hali yo'q (9-bo'lim).
-3. Aniq partiya hajmi (`/sync/push` necha voqea), `page_size` (`/sync/pull`), delta-sync chastotasi, outbox saqlash muddati (7 kun), chek tarixi oynasi (90 kun), PIN urinish soni (5) — barchasi **taxmin**, yuklama sinovida/pilotda aniqlanadi.
-4. Chekdagi narx yoki arxivlangan tovar istisnolarini Buxgalter qanday "yopish" (tasdiqlash) jarayoni — UI darajasida hali loyihalashtirilmagan.
+1. **Tashqi javob kerak** — FM'ning OFD tasdig'i (ack) va yuborilmagan cheklar holatini qanday olish (webhook yoki polling), PWA'ni lokal agent (Do'kon agenti) orqali FM'ga ulashga ruxsat, bulut rejimi borligi, fiskal hamkor (Multikassa/E-POS) va "Yangi texnologiyalar" (Xat 9, Xat 1) — interim: `FiscalPort` + `FakeFiscalAdapter` (`FISCAL_PROVIDER=fake`), 48 soat taymeri `fiscal_receipts.ofd_acked_at` bo'yicha (6-bo'lim) — 26 #109 (OQ-012).
+2. **Tashqi javob kerak** — FM/kassa holat kodlari (bloklangan, ack muddati o'tgan, xotira to'lgan, ro'yxatdan chiqarilgan) va ularni API'da aniqlash, fiskal hamkor — interim: `cash_registers.fm_state` (`ok`/`locked`/`ack_overdue`/`memory_full`/`unknown`), `fm_state != 'ok'` → `FISCAL_DEVICE_LOCKED` — 26 #89 (OQ-008).
+3. **Tashqi javob kerak** — offline chekda "avval ishlatilgan kod" tekshiruvi qanday ishlaydi (kassa tomonida yoki OFD/CRPT keyin rad etadimi), offline qaytarishda VM 833 84-band ma'lumoti alohida kiritiladimi, ichki ko'chirishni CRPT'ga xabar qilish majburiyati yo'qligini tasdiqlash, CRPT Turon (Xat 2) — interim: lokal dublikat-kod tekshiruvi + `MARKING_PRECHECK=warn`, markirovkali qaytarish faqat online, ichki ko'chirish CRPT'ga xabar qilinmaydi (7-bo'lim) — 26 #40 (OQ-025).
 
 ## Manbalar
 
 - `spec/kod-uchun/14-autentifikatsiya-oauth2.md` — OAuth 2.0 token, refresh rotatsiyasi, offline litsenziya tokeni, obuna lokauti.
 - `research_notes/texnik/04-arxitektura-va-stack.md` — §2 (offline-first, event-log, konflikt), §6 (davlat hisoboti, bevosita bog'liq emas, lekin arxitektura uslubi).
-- `research_notes/texnik/02-kassa-ofd-markirovka.md` — §1 (48 soat, 1-ilova 31-band; OFD, fiskal modul).
-- `research_notes/texnik/12-taxminlar-va-murojaatlar.md` — 6-band (markirovka offline taxmini).
+- `research_notes/texnik/02-kassa-ofd-markirovka.md` — §1 (1-ilova 31-band; OFD, fiskal modul).
+- `research_notes/ochiq-savollar/P1-soliq-fiskal.md` — OQ-004 (48 soatlik blok, VMQ-943 2-ilova 6-band, VMQ-23), OQ-009 (chek rekvizitlari, to'lov shakli).
+- `research_notes/ochiq-savollar/P2-efaktura-markirovka.md` — OQ-021 (e-TTN ichki ko'chirishda), OQ-026 (markirovka offline huquqiy asosi), OQ-027 (72 soat / 3 ish kuni).
+- `research_notes/ochiq-savollar/P3-tolovlar-bank.md` — OQ-032 (UzQR statik/dinamik).
+- `research_notes/ochiq-savollar/D-qarorlar-va-E-standartlar.md` — qaror #43, #54, #56; OQ-008, OQ-012, OQ-025 interim standartlari.
 - `research_notes/texnik/06-raqobatchilar-texnik-va-uskunalar.md` — uskunalar, ESC/POS, HID skaner (Android hujjatiga ham tegishli).
 - `spec/kod-uchun/10-umumiy-arxitektura.md`, `11-malumotlar-modeli.md` (`client_event_id`, `sync_receipts`, `devices`, `stock_lots`, `recost_jobs`, `fiscal_receipts`).
 - `spec/kod-uchun/24-frontend-arxitekturasi.md` (Dexie, vite-plugin-pwa, Idempotency-Key, Web Locks/BroadcastChannel yondashuvi).

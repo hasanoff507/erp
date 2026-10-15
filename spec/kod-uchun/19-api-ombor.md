@@ -1,23 +1,25 @@
 # API katalogi — 2. Ombor, katalog va xarid
 
-**Maqsad:** Mahsulot katalogi, narxlar, yorliqlar, import, qoldiq/partiyalar, kirim, yetkazib beruvchilar, xaridnoma, to'lov, qaytarish, ko'chirish, inventarizatsiya, hisobdan chiqarish, boshlang'ich qoldiq, baholash sozlamalari, qayta hisoblash ishlari va kiruvchi e-faktura uchun API kontrakti.
+**Maqsad:** Mahsulot katalogi, narxlar, yorliqlar, import, qoldiq/partiyalar, kirim, yetkazib beruvchilar, xaridnoma, to'lov, qaytarish, ko'chirish, inventarizatsiya, hisobdan chiqarish, boshlang'ich qoldiq, baholash sozlamalari, qayta hisoblash ishlari, kiruvchi e-faktura, e-TTN va e-ishonchnoma uchun API kontrakti.
 **Kim uchun:** Backend/frontend/Android ishlab chiquvchilar, QA.
-**Bog'liq fayllar:** `17-api-umumiy.md` (konventsiyalar), `11-malumotlar-modeli.md` (§4 katalog/narx, §5 kontragentlar, §6 hujjatlar, §7 registrlar, §9), `13-provodka-qoidalari.md` (2.6–2.8, 2.12, 2.20, 2.21, §3 FIFO/AVECO), `21-integratsiyalar.md` (§4 Asl belgisi, §5 E-IMZO, §6 Vakolat.uz, §7 MXIK), `16-offline-sync.md` (§1, §7), `15-xavfsizlik-va-audit.md` (§2.1–2.2), `23-backend-arxitekturasi.md`, `03-modullar-talablari.md` (M04, M05, M06, M07, M09), `04-biznes-jarayonlar.md` (BP-01, BP-09, BP-10, BP-12), `06-ekranlar-umumiy.md` (BO-02…05, BO-18, POS-08…12), `09-ai-funksiyalar.md` (AI-03).
-**Holat:** joriy, 2026-10-15.
+**Bog'liq fayllar:** `17-api-umumiy.md` (konventsiyalar), `11-malumotlar-modeli.md` (§4 katalog/narx, §5 kontragentlar, §6 hujjatlar, §7 registrlar, §9), `13-provodka-qoidalari.md` (2.6–2.8, 2.12, 2.20, 2.21, §3 FIFO/AVECO), `21-integratsiyalar.md` (§2 e-faktura, §3 E-TTN, §4 Asl belgisi, §5 E-IMZO, §6 e-ishonchnoma, §7 MXIK), `16-offline-sync.md` (§1, §7), `15-xavfsizlik-va-audit.md` (§2.1–2.2), `23-backend-arxitekturasi.md`, `03-modullar-talablari.md` (M04, M05, M06, M07, M09), `04-biznes-jarayonlar.md` (BP-01, BP-09, BP-10, BP-12), `06-ekranlar-umumiy.md` (BO-02…05, BO-08, BO-18, POS-08…12), `09-ai-funksiyalar.md` (AI-03), `34-1c-agent.md` (Do'kon agenti, qaror #60).
+**Holat:** joriy, 2026-10-16.
 
 > Bu API — noldan quriladigan tizimning o'z interfeysi; hech qanday tashqi buxgalteriya/ERP formatiga moslashtirilmagan.
 
 ## Asosiy xulosalar
 
-1. Bu fayl **ombor/katalog/xarid** qatlamini qamrab oladi: mahsulot katalogi, narxlar, yorliqlar, import, qoldiq/partiyalar, kirim, yetkazib beruvchilar, xaridnoma, to'lov, qaytarish, ko'chirish, inventarizatsiya, hisobdan chiqarish, boshlang'ich qoldiq, baholash sozlamalari, qayta hisoblash ishlari, kiruvchi e-faktura.
+1. Bu fayl **ombor/katalog/xarid** qatlamini qamrab oladi: mahsulot katalogi, narxlar, yorliqlar, import, qoldiq/partiyalar, kirim, yetkazib beruvchilar, xaridnoma, to'lov, qaytarish, ko'chirish, inventarizatsiya, hisobdan chiqarish, boshlang'ich qoldiq, baholash sozlamalari, qayta hisoblash ishlari, kiruvchi e-faktura, e-TTN, e-ishonchnoma.
 2. Barcha hujjat turlari (`goods-receipts`, `supplier-returns`, `transfers`, `stock-counts`, `write-offs`, `stock-openings`) umumiy hayot sikliga amal qiladi: `POST /{resource}` (draft) → `POST /{id}/post` → `POST /{id}/cancel` (storno — registrlarga teskari yozuv, alohida teskari hujjat yo'q, `11-malumotlar-modeli.md` §1/§6). `price-changes` bundan mustasno — o'z holat mashinasi bor (`draft → pending_approval-ekvivalenti (202) → posted/rejected`, §4).
 3. Ma'lumotnomalar (`products`, `product-categories`, `suppliers`) — `archive`/`unarchive` bilan, hech qachon `DELETE` qilinmaydi; `PATCH` optimistik qulflash (`version`) talab qiladi → mos kelmasa `409 VERSION_CONFLICT`.
 4. **Import oqimi** (`import-jobs`) uch bosqichli: `upload` (fayl) → `validate` (qator/maydon xatolari) → `commit` (bitta tranzaksiyada `stock-openings`/`debt-openings` yaratiladi). Mahsulot (US-M04-04) va qarz (US-M08-07) importi shu bir yo'l orqali.
 5. **Partiya (lot) — tannarxning yagona manbai**: har kirim (qo'lda, e-fakturadan, AI-03 OCR'dan, boshlang'ich qoldiqdan) `stock-lots` yozuvi yaratadi; FIFO/AVECO (`valuation-settings`) shu ma'lumotdan hisoblanadi. Usul faqat **keyingi hisobot yili boshidan** o'zgartiriladi (US-M04-05).
 6. **AI-03 (OCR)** — yagona oqim `20-api-moliya-admin.md` #73–75 (`POST /ai/ocr/jobs`, `GET /ai/ocr/jobs/{job_id}`, `POST /ai/ocr/jobs/{job_id}/confirm`); bu faylda alohida OCR endpoint yo'q. `confirm` `doc_type_hint=purchase` uchun to'g'ridan-to'g'ri `goods-receipts` qoralamasini yaratadi — AI hech qachon to'g'ridan-to'g'ri hujjat yozmaydi.
-7. **Offline — faqat ikki joyda**: (a) `transfers` — o'z filiallar/omborlar orasida jo'natish **va** qabul qilish offline ruxsat etilgan (`16-offline-sync.md` §7); (b) `stock-counts` — skanerlash/sanash to'liq offline (POS-10), lekin yakuniy `review`/`post` online. Qolgan barcha hujjat (kirim, qaytarish, xaridnoma, to'lov, narx, import, e-faktura) — **faqat online**, chunki ular ofis/ombor sharoitida (internet mavjud) yoki tashqi tizim (E-IMZO, Faktura.uz) bilan sinxron ishlaydi. Offline `transfers`/`stock-counts` bu REST endpoint'lar o'rniga `POST /sync/push` outbox voqealari (`transfer.sent`/`transfer.received`, `stock_count.line_recorded`) orqali keladi — bu faylda shu voqea payload'lari hujjat sxemasiga mos qilib ko'rsatiladi, alohida `/sync/push` yo'li `16-offline-sync.md`da.
+7. **Offline — faqat ikki joyda**: (a) `transfers` — o'z filiallar/omborlar orasida jo'natish **va** qabul qilish offline ruxsat etilgan (`16-offline-sync.md` §7), lekin avtotransportda tashish uchun e-TTN majburiy — offline yaratilgan ko'chirishga e-TTN internet qaytgach, **tashish boshlanishidan oldin** rasmiylashtiriladi (qaror #63, §13); (b) `stock-counts` — skanerlash/sanash to'liq offline (POS-10), lekin yakuniy `review`/`post` online. Qolgan barcha hujjat (kirim, qaytarish, xaridnoma, to'lov, narx, import, hisobdan chiqarish, e-faktura, e-TTN, e-ishonchnoma) — **faqat online**, chunki ular ofis/ombor sharoitida (internet mavjud) yoki tashqi tizim (E-IMZO, Faktura.uz) bilan sinxron ishlaydi. Offline `transfers`/`stock-counts` bu REST endpoint'lar o'rniga `POST /sync/push` outbox voqealari (`transfer.sent`/`transfer.received`, `stock_count.line_recorded`) orqali keladi — bu faylda shu voqea payload'lari hujjat sxemasiga mos qilib ko'rsatiladi, alohida `/sync/push` yo'li `16-offline-sync.md`da.
 8. **MXIK** (`tasnif.soliq.uz`) — sinxron, keshlangan qidiruv; chekning/fakturaning majburiy rekviziti, tovar yaratishda bloklovchi emas (saqlanadi, lekin sotishdan oldin to'ldirilishi shart — bu tekshiruv sotuv API'sida, `18-api-kassa.md`).
 9. Barcha pul maydonlari `"12000.00"` (decimal string, tiyingacha), miqdor `"10.000"` (3 kasr), narx/tannarx 4 kasr (`"8333.3333"`) — `11-malumotlar-modeli.md` §3 bilan bir xil.
+10. **E-TTN va e-ishonchnoma — e-faktura operatori orqali** (MVP'da Faktura.uz, `EInvoicePort`; qaror #63): ichki ko'chirish ("Ombordan omborga") e-TTN'i `transfers` `post`ida yaratiladi, e-TTN ro'yxatdan o'tmaguncha jo'natish taqiqlanadi (`409 ETTN_REQUIRED`); kiruvchi e-TTN'ni yetkazib beruvchi chiqaradi, do'kon elektron tasdiqlaydi/rad etadi; e-ishonchnomani do'kon o'z xodimiga operator orqali beradi (§8, §20).
+11. **MVP UI'da filialda bitta ombor** (avtomatik yaratiladi, `warehouse_id` UI'da tanlanmaydi); API va model bir nechta omborni cheklamaydi (qaror #54).
 
 ---
 
@@ -45,13 +47,14 @@ Bu faylda har bir endpoint uchun: Maqsad, Ruxsat, So'rov, Javob, Xatolar, Idempo
 | 10 | `purchase-orders` | xaridnoma hayot sikli |
 | 11 | `supplier-payments` | to'lov, "qizil" faktura QQS krediti |
 | 12 | `supplier-returns` | yetkazib beruvchiga qaytarish |
-| 13 | `transfers` | jo'natish/qabul/farq (offline) |
+| 13 | `transfers` | e-TTN bilan jo'natish/qabul/farq (offline) |
 | 14 | `stock-counts` | sanash varag'i, skaner, review, post |
 | 15 | `write-offs` | hisobdan chiqarish (sabab bilan) |
 | 16 | `stock-openings` | boshlang'ich qoldiq |
 | 17 | `valuation-settings`, `stock-settings` | FIFO/AVECO, tarozi kod formati, kam qoldiq chegarasi |
 | 18 | `recost-jobs` | qayta hisoblash holati |
 | 19 | `einvoices` (direction=in) | kiruvchi e-faktura ro'yxati, qabul/rad, E-IMZO imzolash |
+| 20 | `ettn-documents` | e-TTN: ichki ko'chirish (chiquvchi) imzolash/yuborish, kiruvchi e-TTN tasdiqlash/rad etish |
 
 ---
 
@@ -235,11 +238,11 @@ Kodni tasdiqlash + QQS toifasi.
 
 **Ruxsat**: `labels.print`.
 **So'rov**: page pagination.
-**Javob**: `{items:[{id, name, width_mm, height_mm, fields:[...]}], total, page, size}` — `platform.label_templates` global jadvalidan (tenant'siz, RLS istisnosi), standart shablonlar (58×40mm va h.k., US-M09-04), tenant o'zgartira olmaydi (MVP, global ro'yxat).
+**Javob**: `{items:[{id, name, width_mm, height_mm, fields:[...]}], total, page, size}` — `platform.label_templates` global jadvalidan (tenant'siz, RLS istisnosi), tenant o'zgartira olmaydi (MVP, global ro'yxat). Standart shablonlar (US-M09-04): **58×40** (asosiy narx yorlig'i), 58×30, 43×25, 40×30, 30×20 mm va **A4** (3×8 yoki 4×10 to'r, oddiy printer uchun); 203 dpi uchun shtrix moduli butun nuqtaga (1 nuqta ≈ 0,125 mm) yaxlitlanadi. Chop etish — tizim drayveri orqali (brauzer HTML/SVG yoki PDF); xom TSPL/ZPL buyruqlari MVP'da yo'q.
 
 ### `POST /label-print-jobs`
 
-**Maqsad**: tanlangan tovarlar uchun yorliq chop etish ishini yaratish va serverda PDF generatsiya qilish (zahira yo'l — asosiy chop etish brauzerda `bwip-js`; server `python-barcode`+`zxing-cpp` orqali ham PDF beradi, `23-backend-arxitekturasi.md` §5).
+**Maqsad**: tanlangan tovarlar uchun yorliq chop etish ishini yaratish va serverda PDF generatsiya qilish. Asosiy chop etish — brauzerda (`bwip-js` + tizim drayveri); server PDF (`python-barcode`+`zxing-cpp`, `23-backend-arxitekturasi.md` §5) **faqat** ommaviy chop etish (>200 yorliq, `product_ids × copies_per_product`, standart, sozlanadi) yoki iOS/Safari klienti uchun ishlatiladi (qaror #54; Bosqich 2 oxiri). Klient shu shartdan tashqarida server yo'lini chaqirmaydi.
 **Ruxsat**: `labels.print`.
 **So'rov**:
 
@@ -252,7 +255,7 @@ Kodni tasdiqlash + QQS toifasi.
 **Javob**: `202 {job_id, status:"queued"}` → poll `GET /label-print-jobs/{id}` → `{status:"done", file_url}` (PDF, `attachments`) — `job_id` = `outbox_jobs.id` (`kind="label_pdf"`; alohida job jadvali shart emas). Muvaffaqiyatli chop etilgandan keyin klient `POST /label-print-queue/mark-printed {product_ids}` chaqiradi — navbatdan olib tashlaydi (`printed_at` o'rnatiladi).
 **Xatolar**: `404 NOT_FOUND` (`params.resource="label_template"`).
 **Idempotentlik**: `Idempotency-Key` majburiy (job yaratishda).
-**Offline**: "Offline — lokal printer bilan ishlaydi" (BO-18 ekran holati) — bu brauzerdagi `bwip-js` yo'li, server endpoint'i shart emas agar printer to'g'ridan-to'g'ri lokal ulangan bo'lsa; server yo'li faqat online.
+**Offline**: "Offline — lokal printer bilan ishlaydi" (BO-18 ekran holati) — bu brauzerdagi `bwip-js` yo'li, server endpoint'i shart emas agar printer to'g'ridan-to'g'ri lokal ulangan bo'lsa; server yo'li faqat online. LAN (raw TCP 9100) yorliq printerlari brauzerdan to'g'ridan-to'g'ri ishlamaydi — ular **Do'kon agenti** orqali ulanadi (qaror #60).
 **Bog'liq**: US-M09-04, BO-18.
 
 ---
@@ -272,7 +275,7 @@ Uchta `kind`: `products` (US-M04-04), `opening_stock` (US-M04-04), `opening_debt
 
 **Maqsad**: fayl yuklash, job yaratish (`status="uploaded"`).
 **Ruxsat**: `catalog.manage` (`kind=products`) / `stock.opening.manage` (`kind=opening_stock`, `kind=opening_debts`).
-**So'rov**: `multipart/form-data`: `kind` (enum), `file` (CSV/XLSX, max 10 MB, max 20 000 qator — taxmin).
+**So'rov**: `multipart/form-data`: `kind` (enum), `file` (CSV/XLSX, max 10 MB, max 20 000 qator — standart, sozlanadi, qaror #54).
 **Javob**: `201 {id, kind, status:"uploaded", total_rows:null}`.
 **Xatolar**: `422 IMPORT_FILE_INVALID` (format/kodlash xato), `413 FILE_TOO_LARGE`.
 **Idempotentlik**: `Idempotency-Key` majburiy.
@@ -331,7 +334,7 @@ Uchta `kind`: `products` (US-M04-04), `opening_stock` (US-M04-04), `opening_debt
 
 ## 8. Omborga kirim (`goods-receipts`) va AI-03 OCR
 
-> **AI-03 (OCR) — bu yerda emas.** OCR to'liq oqimi — `20-api-moliya-admin.md` #73–75: fayl `POST /attachments`ga yuklanadi (≤10 MB, `17-api-umumiy.md` §12) → `POST /ai/ocr/jobs` (`doc_type_hint=purchase`) → poll `GET /ai/ocr/jobs/{job_id}` → `POST /ai/ocr/jobs/{job_id}/confirm` shu yerdagi `POST /goods-receipts` shakli bilan **to'g'ridan-to'g'ri** `goods-receipts` qoralamasini yaratadi (ruxsat `ai.ocr.use` + `purchases.receive`). Sariq belgi chegaralari (summa <95%, sana <90%, miqdor/nom <80%) saqlanadi.
+> **AI-03 (OCR) — bu yerda emas.** OCR to'liq oqimi — `20-api-moliya-admin.md` #73–75: fayl `POST /attachments`ga yuklanadi (≤10 MB, `17-api-umumiy.md` §12) → `POST /ai/ocr/jobs` (`doc_type_hint=purchase`) → poll `GET /ai/ocr/jobs/{job_id}` → `POST /ai/ocr/jobs/{job_id}/confirm` shu yerdagi `POST /goods-receipts` shakli bilan **to'g'ridan-to'g'ri** `goods-receipts` qoralamasini yaratadi (ruxsat `ai.ocr.use` + `purchases.receive`). Sariq belgi chegaralari (summa <95%, sana <90%, miqdor/nom <80%) saqlanadi. AI-03 rasmlari tenant chegaradan tashqari uzatishga rozilik bermaguncha (`ai.cross_border_enabled=false`) yuborilmaydi — `403 AI_CONSENT_REQUIRED` (qaror #61).
 
 ### `POST /goods-receipts`
 
@@ -352,15 +355,18 @@ Uchta `kind`: `products` (US-M04-04), `opening_stock` (US-M04-04), `opening_debt
 | `lines[].vat_exemption_code` | string\|null | yo'q | imtiyoz kodi, `vat_rate="0.00"` bo'lsa ishlatiladi |
 | `lines[].expiry_date` | date | yo'q | — |
 | `paid_immediately` | bool | yo'q | standart `false` — `true` bo'lsa `13-provodka-qoidalari.md` §2.6 yo'li (naqd/darhol to'lov), aks holda §2.8 (kreditorlik) |
-| `ettn_ref` | string | yo'q | qo'lda belgilash (e-TTN API yo'q, MVP, `21-integratsiyalar.md` §3) |
-| `poa_number` | string | yo'q | vakil ishonchnomasi raqami, qo'lda (`21-integratsiyalar.md` §6) |
+| `kind` | enum | yo'q | `purchase` (standart) / `gratuitous` (bepul olingan tovar — provodka `13-provodka-qoidalari.md` bo'yicha) |
+| `ettn_ref` | string | yo'q | kiruvchi e-TTN raqami (operator hujjati); birlashtirilgan EHF+TTN bo'lsa `from-einvoice` yo'lida avtomatik to'ldiriladi, aks holda qo'lda (masalan e-TTN rouming orqali kechikkan) |
+| `poa_number` | string | yo'q | do'kon o'z xodimiga (qabul qiluvchi Omborchiga) e-faktura operatori orqali bergan e-ishonchnoma raqami (qaror #63) |
 
 **Javob**: `201 {id, status:"draft", number:null, lines}` (`version` yo'q — hujjat `draft`ligi `PATCH` bilan butunicha almashtiriladi).
 **Xatolar**: `422 VALIDATION_ERROR`, `404 {code:"NOT_FOUND", params:{resource:"counterparties"}}`, `409 {code:"PURCHASE_ORDER_CLOSED"}` (agar `po_id` berilgan va PO yopiq/bekor bo'lsa).
 
+**E-ishonchnoma** (qaror #63): do'kon o'z xodimiga e-ishonchnomani e-faktura operatori orqali (Faktura.uz `PowerOfAttorney`, `EInvoicePort.send_power_of_attorney`, `21-integratsiyalar.md` §6; alohida Vakolat.uz integratsiyasi yo'q) **e-fakturadan oldin** beradi; kirimda uning raqami `poa_number`da qayd etiladi; yetkazib beruvchi uni tekshirib, e-fakturani shu ishonchnoma asosida shakllantiradi, e-fakturani ishonchli shaxs E-IMZO bilan imzolaydi. Ishonchnomasiz kirim bloklanmaydi — e-fakturani Buxgalter (direktor ERI) imzolaydi.
+
 ### `POST /goods-receipts/from-einvoice/{einvoice_id}`
 
-**Maqsad**: qabul qilingan kiruvchi e-faktura (§19) asosida draft kirim hujjatini oldindan to'ldirish (qatorlar, summalar, QQS — e-faktura `payload`dan); `source="einvoice"`, `einvoice_id` saqlanadi — "qizil" faktura QQS kechiktirish yo'li shu bog'lanish orqali aniqlanadi.
+**Maqsad**: qabul qilingan kiruvchi e-faktura (§19) asosida draft kirim hujjatini oldindan to'ldirish (qatorlar, summalar, QQS, markirovka kodlari — e-faktura `payload`dan); `source="einvoice"`, `einvoice_id` saqlanadi — "qizil" faktura QQS kechiktirish yo'li shu bog'lanish orqali aniqlanadi. E-faktura birlashtirilgan EHF+TTN shaklida bo'lsa, `ettn_ref` shu fakturaga bog'langan kiruvchi `ettn_documents` yozuvidan (`direction="in"`, operator poll'ida yaratiladi, §20) to'ldiriladi (alohida e-TTN emas, EHF'ning bir qismi).
 **Ruxsat**: `purchases.receive`.
 **So'rov**: `{warehouse_id}` (qolgan maydonlar e-fakturadan olinadi, foydalanuvchi keyin `PATCH` bilan tahrirlaydi — masalan `expiry_date` qo'shadi).
 **Xatolar**: `404 NOT_FOUND` (`params.resource="einvoice"`), `409 {code:"EINVOICE_NOT_ACCEPTED"}` (faqat `status=accepted` fakturadan kirim yaratiladi).
@@ -369,11 +375,12 @@ Uchta `kind`: `products` (US-M04-04), `opening_stock` (US-M04-04), `opening_debt
 
 **Ruxsat**: `stock.view` (GET), `purchases.receive` (PATCH, faqat `draft` holatda).
 **So'rov** (GET ro'yxat): `supplier_id?`, `status?`, `from?`, `to?`, `cursor`, `limit`.
+**Javob** (qo'shimcha hosila maydonlar): `ettn_status` (`none`/`received`/`accepted`/`rejected`, §20), `marking_acceptance: {status: "not_required"|"pending"|"accepted"|"overdue", due_at, deadline_kind: "3_business_days"|"72_hours"}|null` — pastdagi "Markirovkalangan tovar qabuli" bandiga qarang.
 
 ### `POST /goods-receipts/{id}/post`
 
 **Maqsad**: hujjatni o'tkazish — yangi `stock_lots` yaratiladi, `stock_balances`/`stock_moves` +, yetkazib beruvchiga qarz + (nasiya bo'lsa), kiritiladigan QQS (`13-provodka-qoidalari.md` 2.6–2.8; "qizil" faktura bo'lsa QQS yozuvi to'lovgacha kechiktiriladi, §2.8).
-**Ruxsat**: `purchases.post` (Buxgalter).
+**Ruxsat**: `purchases.post` — Buxgalter/Egasi; Egasi BO-11'da Omborchi roliga `purchases.post`ni qo'shishi mumkin (≤3 FTE do'konlar, qaror #49).
 **So'rov**: `{}`.
 **Javob**: `200 {id, status:"posted", number:"M-01-2026-000154", posted_at, lots_created:[{lot_id, product_id, qty_in, unit_cost}]}` (`M` = `goods_receipts`, `12-db-sxema.md` §2.9).
 **Xatolar**: `404 NOT_FOUND` (`params.resource="goods_receipt"`), `409 DOC_NOT_DRAFT` (allaqachon `posted`), `409 PERIOD_CLOSED` (agar `doc_date` yopilgan davrda bo'lsa).
@@ -383,7 +390,11 @@ Uchta `kind`: `products` (US-M04-04), `opening_stock` (US-M04-04), `opening_debt
 
 **Ruxsat**: `purchases.post`.
 **So'rov**: `{reason: string}` (majburiy). Storno: `stock_moves`/`stock_lots.qty_left` teskari, kreditorlik qarzi teskari, QQS teskari (`13-provodka-qoidalari.md` §5.2). Agar partiyadan allaqachon chiqim bo'lgan bo'lsa (masalan sotilgan) — `409 {code:"LOT_ALREADY_CONSUMED"}` (bekor qilish taqiqlanadi, avval sotuvni ko'rib chiqish kerak).
-**Offline**: **yo'q** — markirovkalangan tovar qabulida egalik o'zgaradi, shuning uchun kirim (offline o'z filiallari orasidagi `transfers`dan farqli) faqat online ruxsat etiladi (Asosiy xulosa 7, qaror #23 — tavsiya #5). Mobil skaner (POS-08) ham **shu REST endpoint'lardan online rejimda** foydalanadi — alohida offline outbox voqeasi yo'q. Omborchi `draft` yaratadi (`purchases.receive`), `post`ni Buxgalter bajaradi (`purchases.post`) — qoldiq shu paytda oshadi; Omborchi qabul paytida qoldiq oshishi kerak bo'lsa, `post`ga `purchases.receive`ni ham qo'shish keyingi bosqich qarori (ochiq savol, BP-01 bilan solishtirilib).
+**Offline**: **yo'q** — markirovkalangan tovar qabulida egalik o'zgaradi, shuning uchun kirim (offline o'z filiallari orasidagi `transfers`dan farqli) faqat online ruxsat etiladi (Asosiy xulosa 7, qaror #23 — tavsiya #5). Mobil skaner (POS-08) ham **shu REST endpoint'lardan online rejimda** foydalanadi — alohida offline outbox voqeasi yo'q. Omborchi `draft` yaratadi (`purchases.receive`), `post`ni Buxgalter/Egasi bajaradi (`purchases.post`) — qoldiq shu paytda oshadi; Egasi `purchases.post`ni Omborchiga bergan bo'lsa, Omborchi o'zi o'tkazadi (qaror #49).
+
+**Kiruvchi e-TTN** (qaror #63): e-TTN'ni **yuk jo'natuvchi (yetkazib beruvchi)** chiqaradi — odatda e-faktura bilan birlashtirilgan; do'kon (yuk oluvchi) tashish yakunida uni **elektron tasdiqlaydi yoki rad etadi** — birlashtirilgan shaklda §19 `accept`/`reject` bilan birga, alohida e-TTN bo'lsa §20 `accept`/`reject`. E-TTN'siz kirim bloklanmaydi, lekin `ettn_status="none"` BO-04/BO-15'da "E-TTN yo'q" belgisi bilan ko'rsatiladi.
+
+**Markirovkalangan tovar qabuli** (`is_marked=true` qatorlar): markirovka kodlari (e-faktura `payload`idan yoki POS-08 skaneridan) `marking_codes`ga yoziladi va `post`da Asl belgisi'da **CRPT API orqali** qabul qilinadi (`MarkingPort`, `outbox_jobs(kind="marking_accept")`; CRPT API ishlatiladigan joylardan biri — chakana sotuvdan farqli, qaror #62). Qabul muddati — tovar guruhi bo'yicha sozlanadi (`marking_product_groups.acceptance_deadline`): umumiy standart **3 ish kuni** (VM 833 66–67-band), o'simlik yog'i, suv/ichimlik va dori vositalari guruhlarida — **72 soat**; hisoblagich jo'natish (e-faktura/e-TTN) sanasidan boshlanadi. Tizim muddatni kuzatadi (`marking_acceptance.due_at`) va BO-04/BO-14'da ogohlantiradi, `post`ni bloklamaydi. Real CRPT adapteri — Bosqich 5, unggacha stub (26 #40 (OQ-025)).
 **Bog'liq**: US-M04-01, US-M07-01…03, BP-01, BO-04, POS-08.
 
 ---
@@ -484,7 +495,7 @@ Uchta `kind`: `products` (US-M04-04), `opening_stock` (US-M04-04), `opening_debt
 | Maydon | Tur | Majburiy | Validatsiya |
 |---|---|---|---|
 | `supplier_id` | UUID | ha | — |
-| `amount` | decimal(2dp) | ha | > 0, ≤ joriy kreditorlik qoldig'i (oshsa ogohlantirish, bloklanmaydi — avans sifatida qabul qilinadi, `4310`) |
+| `amount` | decimal(2dp) | ha | > 0; joriy kreditorlik qoldig'idan oshishi mumkin — `tenants.settings.supplier_overpay_policy` bo'yicha (pastga qarang, qaror #47) |
 | `method` | enum | ha | `cash`/`bank` |
 | `cash_register_id` | UUID | `method=cash` bo'lsa shart | — |
 | `shift_id` | UUID | `method=cash` bo'lsa shart | faol smena |
@@ -493,8 +504,9 @@ Uchta `kind`: `products` (US-M04-04), `opening_stock` (US-M04-04), `opening_debt
 | `allocations[].amount` | decimal(2dp) | ha | — |
 | `doc_date` | date | ha | — |
 
-**Javob**: `201 {id, status:"posted", number, vat_credit_unlocked: [{einvoice_id, vat_amount}]}` — agar `allocations` ichida "qizil" fakturaga tegishli kirim bo'lsa, shu qismga mos `4410/6010` QQS yozuvi ham qo'shiladi va `vat_credit_unlocked`da ko'rsatiladi (qisman to'lovda proporsional, `13-provodka-qoidalari.md` 2.16 — taxmin).
-**Xatolar**: `422 VALIDATION_ERROR`, `409 {code:"SUPPLIER_PAYMENT_EXCEEDS_DEBT"}` (standart siyosat — ogohlantirish bilan ruxsat, qattiq bloklash **emas**; bu kod faqat tenant sozlamasida "qattiq nazorat" yoqilgan bo'lsa qaytadi — ochiq savol, Ochiq savollar #1), `409 PERIOD_CLOSED`.
+**Qarzdan ortiq to'lov** (qaror #47): `tenants.settings.supplier_overpay_policy` — `'warn'` (standart) yoki `'block'`. `warn`da summa joriy kreditorlik qoldig'idan oshsa to'lov o'tkaziladi, ortiqcha qism yetkazib beruvchiga berilgan avans sifatida `4310`ga yoziladi (`13-provodka-qoidalari.md` 2.16) va javobda `warnings:[{code:"SUPPLIER_OVERPAY_ADVANCE", params:{debt, amount, advance}}]` qaytadi; `block`da — `422 SUPPLIER_OVERPAY_BLOCKED` (`params:{debt, amount}`), hujjat yaratilmaydi.
+**Javob**: `201 {id, status:"posted", number, vat_credit_unlocked: [{einvoice_id, vat_amount}], advance_amount, warnings:[]}` — agar `allocations` ichida "qizil" (yoki `risk_flag="unknown"`) fakturaga tegishli kirim bo'lsa, shu qismga mos `4410/6010` QQS yozuvi ham qo'shiladi va `vat_credit_unlocked`da ko'rsatiladi (qisman to'lovda proporsional, `13-provodka-qoidalari.md` 2.16 — taxmin, buxgalter tasdig'i kerak); `advance_amount` — `4310`ga tushgan ortiqcha qism (`"0.00"` bo'lishi mumkin).
+**Xatolar**: `422 VALIDATION_ERROR`, `422 SUPPLIER_OVERPAY_BLOCKED` (faqat `supplier_overpay_policy='block'`), `409 PERIOD_CLOSED`.
 
 ### `POST /supplier-payments/{id}/cancel`
 
@@ -537,32 +549,52 @@ Ombor qoldig'i − (asl partiyadan), yetkazib beruvchiga qarz − (yoki debitorl
 **Idempotentlik**: `Idempotency-Key` majburiy.
 **Offline**: yo'q (ofis/ombor, internet mavjud joy).
 **Bog'liq**: US-M07-05, BO-04.
-**Ochiq savol**: markirovkalangan tovarni yetkazib beruvchiga qaytarishda Asl belgisi operatsiyasi — manbada topilmadi (`03-modullar-talablari.md` M07 chekka holatlar; Ochiq savollar #2).
+**Markirovka**: markirovkalangan tovarni yetkazib beruvchiga qaytarish — subyektlar o'rtasida egalik o'tishi, shuning uchun Asl belgisi'ga xabarnoma **3 ish kuni** ichida (VM 833 85-band) **CRPT API orqali** (`MarkingPort`, `outbox_jobs(kind="marking_return")`) yuboriladi; chakana chek yo'li (OFD) bu yerda ishlatilmaydi (qaror #62). Aniq CRPT metodi/hujjat turi — tashqi javob kutilmoqda (Ochiq savollar #1); unggacha stub, qaytarish faqat online.
 
 ---
 
 ## 13. Ko'chirish (`transfers`)
 
+> **E-TTN majburiy** (qaror #63): o'z filiallari/omborlari orasidagi ko'chirish ham e-TTN bilan rasmiylashtiriladi — tashish turi **"Ombordan omborga"** (`ettn_documents.transport_type="warehouse_to_warehouse"`): jo'natuvchi bir vaqtda yuk oluvchi, e-faktura chiqarilmaydi (VM 249 31-ilova, VM 168 tahriri, 13-band). E-TTN e-faktura operatori orqali (MVP'da Faktura.uz, `EInvoicePort`, `21-integratsiyalar.md` §3) shakllantiriladi; e-TTN'siz yuk tashishga topshirish taqiqlanadi (16-band). Istisno — qo'lda yoki jamoat transportida tashish (24-band): `transport_mode="on_foot_or_public"`, e-TTN talab qilinmaydi.
+>
+> **Markirovka**: ichki ko'chirish Asl belgisi'ga xabar qilinmaydi — VM 833 66–67-band xabarnomalari faqat subyektlar o'rtasida egalik o'tishiga tegishli; ko'chirishda markirovka muddati hisoblagichi yo'q (qabul muddati — §8, §12).
+
+**Holatlar**: `draft` → `posted` (e-TTN yaratildi) → `sent` (jo'natildi, "yo'lda") → `received` / `discrepancy`; `cancelled`.
+
 ### `POST /transfers`
 
-**Maqsad**: jo'natish (draft → sent, jo'natuvchi ombordan chiqim).
+**Maqsad**: ko'chirish hujjatini `draft` sifatida yaratish.
 **Ruxsat**: `transfer.create`.
 **So'rov**:
 
-| Maydon | Tur | Majburiy |
-|---|---|---|
-| `from_warehouse_id` | UUID | ha |
-| `to_warehouse_id` | UUID | ha (boshqa filial/ombor) |
-| `doc_date` | date | ha |
-| `lines[].product_id` | UUID | ha |
-| `lines[].qty` | decimal(3dp) | ha |
+| Maydon | Tur | Majburiy | Validatsiya |
+|---|---|---|---|
+| `from_warehouse_id` | UUID | ha | — |
+| `to_warehouse_id` | UUID | ha | boshqa filial/ombor, shu tenant |
+| `doc_date` | date | ha | — |
+| `transport_mode` | enum | yo'q | `vehicle` (standart) / `on_foot_or_public` (e-TTN talab qilinmaydi) |
+| `vehicle_plate` | string | `transport_mode=vehicle` bo'lsa `post`da shart | e-TTN rekviziti |
+| `driver_name` | string | yo'q | e-TTN rekviziti |
+| `lines[].product_id` | UUID | ha | — |
+| `lines[].qty` | decimal(3dp) | ha | > 0 |
 
-`client_event_id` bu REST tanasida **yo'q** — faqat offline `transfer.sent`/`transfer.received` sync voqealarida ishlatiladi (pastga qarang). `POST`ning o'zi hujjatni `draft` qiladi.
+`client_event_id` bu REST tanasida **yo'q** — faqat offline `transfer.sent`/`transfer.received` sync voqealarida ishlatiladi (pastga qarang).
+**Javob**: `201 {id, status:"draft", number:null, transport_mode, ettn:null, lines}`.
+
+### `POST /transfers/{id}/post`
+
+**Maqsad**: `draft→posted` — hujjat o'tkaziladi va `ettn_documents` yozuvi yaratiladi (`transfer_id`, `direction="out"`, `transport_type="warehouse_to_warehouse"`, `status="pending_signature"`; yozuvchi — shu `post`, `TransferPostingService`). Keyin e-TTN §20 bo'yicha E-IMZO bilan imzolanadi va operatorga yuboriladi (`outbox_jobs(kind="ettn_send")`) → operator ro'yxatga olgach `status="registered"`, `operator_doc_id` → `transfers.ettn_ref`. `transport_mode="on_foot_or_public"` bo'lsa e-TTN yaratilmaydi. Qoldiq bu bosqichda o'zgarmaydi.
+**Ruxsat**: `transfer.create`.
+**So'rov**: `{}`.
+**Javob**: `200 {id, status:"posted", number, ettn:{id, status:"pending_signature"}|null}`.
+**Xatolar**: `404 NOT_FOUND` (`params.resource="transfer"`), `409 DOC_NOT_DRAFT`, `422 VALIDATION_ERROR` (`params.field="vehicle_plate"`), `409 PERIOD_CLOSED`.
 
 ### `POST /transfers/{id}/send`
 
-**Maqsad**: `draft→sent`: `stock_moves` (jo'natuvchi −, "yo'lda"), partiya ma'lumoti saqlanadi.
+**Maqsad**: `posted→sent` (yuk tashishga topshirildi): `stock_moves` (jo'natuvchi −, "yo'lda"), partiya ma'lumoti saqlanadi.
 **Ruxsat**: `transfer.create`.
+**Shart**: `transport_mode="vehicle"` bo'lsa e-TTN `status="registered"` bo'lishi shart, aks holda `409 ETTN_REQUIRED` (`params:{ettn_status}`) — jo'natish rad etiladi.
+**Xatolar**: `404 NOT_FOUND`, `409 DOC_INVALID_STATE` (`posted`dan tashqari holat), `409 ETTN_REQUIRED`.
 
 ### `POST /transfers/{id}/receive`
 
@@ -575,25 +607,25 @@ Ombor qoldig'i − (asl partiyadan), yetkazib beruvchiga qarz − (yoki debitorl
 | `lines[].transfer_line_id` | UUID | ha |
 | `lines[].qty_received` | decimal(3dp) | ha |
 
-Agar barcha qatorlar `qty_received = qty` → `status="received"`; farq bo'lsa → `status="discrepancy"` (`stock_moves` qabul qiluvchida +, farq — kamomad/ortiqcha provodkasi, `13-provodka-qoidalari.md` 2.10).
-**Xatolar**: `404 NOT_FOUND` (`params.resource="transfer"`), `409 DOC_INVALID_STATE` (allaqachon `received`).
+Agar barcha qatorlar `qty_received = qty` → `status="received"`; farq bo'lsa → `status="discrepancy"` (`stock_moves` qabul qiluvchida +, farq — kamomad/ortiqcha provodkasi, `13-provodka-qoidalari.md` 2.10). Qabul qiluvchi e-TTN'ni tashish yakunida elektron tasdiqlaydi (§20 `accept`, online) — qabulning o'zi buni kutmaydi.
+**Xatolar**: `404 NOT_FOUND` (`params.resource="transfer"`), `409 DOC_INVALID_STATE` (`sent`dan tashqari holat, masalan allaqachon `received`).
 
 ### `GET /transfers` · `GET /transfers/{id}`
 
-**Ruxsat**: `stock.view`. **So'rov**: `status?` (`sent`/`received`/`discrepancy`); markirovkalangan tovar bo'lsa javobda `marking_hours_remaining` (72 soat hisoblagich, US-M06-03/BO-03 "Ko'chirishlar" tabi).
+**Ruxsat**: `stock.view`. **So'rov**: `status?` (`draft`/`posted`/`sent`/`received`/`discrepancy`/`cancelled`), `ettn_status?`. **Javob**: hujjat + `transport_mode`, `ettn_ref`, `ettn:{id, status, operator_doc_id}|null` (BO-03 "Ko'chirishlar" tabi — "E-TTN kutilmoqda" belgisi).
 
 ### `POST /transfers/{id}/cancel`
 
-**Ruxsat**: `transfer.create`. Faqat `draft`/`sent` (hali qabul qilinmagan) holatda; `received` bo'lgandan keyin bekor qilish taqiqlanadi (`409 DOC_INVALID_STATE`) — tuzatish uchun yangi teskari ko'chirish yaratiladi.
+**Ruxsat**: `transfer.create`. Faqat `draft`/`posted`/`sent` (hali qabul qilinmagan) holatda; `received` bo'lgandan keyin bekor qilish taqiqlanadi (`409 DOC_INVALID_STATE`) — tuzatish uchun yangi teskari ko'chirish yaratiladi. E-TTN allaqachon `registered` bo'lsa, javobda `warnings:["ETTN_CANCEL_IN_OPERATOR"]` — e-TTN operator kabinetida bekor qilinadi/tuzatiladi (yuk oluvchi tasdiqlaguncha tuzatuvchi e-TTN, 27-band).
 
 **Idempotentlik**: `Idempotency-Key` majburiy (yoki offline'da `client_event_id`, pastga qarang).
-**Offline**: **ruxsat etilgan** — jo'natish ham, qabul ham, faqat **o'z filiallar/omborlar orasida** (`16-offline-sync.md` §7, markirovkalangan tovar uchun ham, egalik o'zgarmagani uchun; qaror #23 — tavsiya #5). Offline yaratilgan `transfers` bu REST endpoint'lar o'rniga `POST /sync/push` outbox voqealari orqali keladi — server tomoni bir xil `TransferPostingService`, idempotentlik `client_event_id` orqali (`Idempotency-Key` o'rniga). 72 soatlik hisoblagich offline davrni ham qamrab oladi.
+**Offline**: **ruxsat etilgan** — jo'natish ham, qabul ham, faqat **o'z filiallar/omborlar orasida** (`16-offline-sync.md` §7, markirovkalangan tovar uchun ham, egalik o'zgarmagani uchun; qaror #23 — tavsiya #5). Offline yaratilgan `transfers` bu REST endpoint'lar o'rniga `POST /sync/push` outbox voqealari orqali keladi — server tomoni bir xil `TransferPostingService`, idempotentlik `client_event_id` orqali (`Idempotency-Key` o'rniga). **E-TTN offline rasmiylashtirilmaydi**: offline yaratilgan avtotransport ko'chirishi uchun e-TTN internet qaytgach, **tashish boshlanishidan oldin** imzolanadi va ro'yxatdan o'tkaziladi (qaror #63); POS/ombor ilovasi offline'da `transport_mode="vehicle"` ko'chirishni "E-TTN kutilmoqda — tashishni boshlamang" holatida ko'rsatadi. Oldindan online `post` qilingan va e-TTN'i `registered` ko'chirishni jo'natish offline ham mumkin.
 
 **Sync voqea payload'lari** (hujjat sxemasiga moslab qayta ko'rsatiladi):
-- **`transfer.sent`** — huquq `transfer.create`; payload: `{id (UUIDv7), temp_number, doc_date, from_warehouse_id, to_warehouse_id, lines: [{line_id, product_id, qty_sent}]}`; server darhol `draft→sent` qiladi (bitta voqea — qoralama mazmunsiz); javob `{id, number}`. Markirovkali qator — faqat o'z tenant omborlari orasida, aks holda `VALIDATION_ERROR`.
-- **`transfer.received`** — huquq `transfer.receive`; payload: `{transfer_id, lines: [{transfer_line_id, qty_received}]}`; javob `{status:"received"|"discrepancy"}`; javobda `lines[].lot_allocations`, `unit_cost` (bitta qator bir nechta partiyadan FIFO bo'yicha chiqishi mumkin). Boshqa qurilmadagi jo'natma hali kelmagan bo'lsa (`transfer_id` topilmasa) — `422 {code:"DEPENDENCY_NOT_SYNCED", params:{entity:"transfers"}}` (retryable), `DOC_INVALID_STATE` — takror qabul.
+- **`transfer.sent`** — huquq `transfer.create`; payload: `{id (UUIDv7), temp_number, doc_date, from_warehouse_id, to_warehouse_id, transport_mode, vehicle_plate?, lines: [{line_id, product_id, qty_sent}]}` yoki mavjud hujjat uchun `{transfer_id}`; javob `{id, number, status}`. Server: `transport_mode="on_foot_or_public"` yoki e-TTN allaqachon `registered` bo'lsa — darhol `sent` (`stock_moves`); aks holda hujjat `posted` qiladi, `ettn_documents` yaratadi va `status="posted"` + `warnings:["ETTN_REQUIRED"]` qaytaradi — jo'natish online `send` bilan e-TTN ro'yxatdan o'tgach bajariladi. Markirovkali qator — faqat o'z tenant omborlari orasida, aks holda `VALIDATION_ERROR`.
+- **`transfer.received`** — huquq `transfer.receive`; payload: `{transfer_id, lines: [{transfer_line_id, qty_received}]}`; javob `{status:"received"|"discrepancy"}`; javobda `lines[].lot_allocations`, `unit_cost` (bitta qator bir nechta partiyadan FIFO bo'yicha chiqishi mumkin). Boshqa qurilmadagi jo'natma hali kelmagan bo'lsa (`transfer_id` topilmasa) — `422 {code:"DEPENDENCY_NOT_SYNCED", params:{entity:"transfers"}}` (retryable), `DOC_INVALID_STATE` — takror qabul yoki hali `sent` bo'lmagan ko'chirish.
 
-**Bog'liq**: US-M06-01…03, BP-09, BO-03.
+**Bog'liq**: US-M06-01…03, BP-09, BO-03, §20.
 
 ---
 
@@ -601,21 +633,21 @@ Agar barcha qatorlar `qty_received = qty` → `status="received"`; farq bo'lsa �
 
 ### `POST /stock-counts`
 
-**Maqsad**: sanashni boshlash — `counting` holatida, `count_lines` tizimdagi joriy qoldiq (`expected`) bilan oldindan to'ldiriladi.
+**Maqsad**: sanashni boshlash — `counting` holatida; server `stock_counts.started_at` (server vaqti) ni yozadi va `count_lines` ni shu paytdagi qoldiq bilan oldindan to'ldiradi (`count_lines.snapshot_qty`).
 **Ruxsat**: `stock.count.create`.
-**So'rov**: `{warehouse_id, doc_date, product_ids?: UUID[]}` (bo'sh — butun ombor).
-**Javob**: `201 {id, status:"counting", lines:[{product_id, expected, counted:null}]}`.
+**So'rov**: `{warehouse_id, doc_date, product_ids?: UUID[], responsible_user_id?: UUID}` (`product_ids` bo'sh — butun ombor; `responsible_user_id` — moddiy javobgar shaxs, kamomad `4730`ga yoziladi, berilmasa `5910`, `13-provodka-qoidalari.md` 2.11).
+**Javob**: `201 {id, status:"counting", started_at, lines:[{id, product_id, snapshot_qty, counted:null, counted_at:null}]}`.
 
 ### `POST /stock-counts/{id}/lines` (skaner kiritish)
 
 **Maqsad**: skaner/qo'lda sonlarni kiritish (POS-10, bir yoki ko'p qator birdan).
 **Ruxsat**: `stock.count.create`.
-**So'rov**: `{lines: [{product_id, counted, barcode?}]}` — mavjud qatorni yangilaydi yoki (agar `product_id` ro'yxatda yo'q, masalan kutilmagan tovar topildi) yangi qator qo'shadi (`expected=0`).
+**So'rov**: `{lines: [{product_id, counted, barcode?}]}` — mavjud qatorni yangilaydi yoki (agar `product_id` ro'yxatda yo'q, masalan kutilmagan tovar topildi) yangi qator qo'shadi (`snapshot_qty` — `started_at` dagi qoldiq, odatda `0`). Har yozuvda `count_lines.counted_at` = qator kiritilgan server vaqti (qaror #53).
 **Xatolar**: `409 {code:"BARCODE_NOT_IN_CATALOG"}` (POS-10 ekran xato holati).
 
 ### `PATCH /stock-counts/{id}/lines/{line_id}`
 
-Bitta qatorni tuzatish (`counted` qiymatini qayta kiritish).
+Bitta qatorni tuzatish (`counted` qiymatini qayta kiritish; `counted_at` yangilanadi).
 
 ### `POST /stock-counts/{id}/submit-for-review`
 
@@ -623,9 +655,10 @@ Bitta qatorni tuzatish (`counted` qiymatini qayta kiritish).
 
 ### `POST /stock-counts/{id}/post`
 
-**Maqsad**: farq bo'yicha balansni moslashtirish (US-M05-02/03) — kamomad `4730`/`5910`, ortiqcha `9300`-oilasi (`13-provodka-qoidalari.md` 2.11).
+**Maqsad**: farq bo'yicha balansni moslashtirish (US-M05-02/03). Har qator uchun (qaror #53):
+`expected = snapshot_qty(started_at) + Σ stock_moves.qty(product, warehouse, started_at < moved_at ≤ count_lines.counted_at)` — ya'ni har qator o'z sanash vaqtigacha bo'lgan harakatlar (sanash davomidagi sotuv/kirim) bilan solishtiriladi; farq `counted − expected`. Provodka (`13-provodka-qoidalari.md` 2.11): kamomad — `4730` (`responsible_user_id` berilgan) yoki `5910`; ortiqcha — `9390`, joriy qiymatda; tovar hisobi — ombor sozlamasi `warehouses.inventory_account` (`2910` ombor / `2920` savdo zali).
 **Ruxsat**: `stock.count.post` (Egasi/Menejer).
-**Javob**: `200 {status:"posted", shortage_lines:[...], surplus_lines:[...]}`.
+**Javob**: `200 {status:"posted", shortage_lines:[{product_id, expected, counted, diff, amount}], surplus_lines:[...]}`.
 **Xatolar**: `409 DOC_INVALID_STATE` (`post` faqat `review` holatidan), `409 PERIOD_CLOSED`.
 
 ### `POST /stock-counts/{id}/cancel`
@@ -639,7 +672,7 @@ Bitta qatorni tuzatish (`counted` qiymatini qayta kiritish).
 **Idempotentlik**: `Idempotency-Key` (`post`/`submit-for-review`/`cancel`da majburiy; `lines` skaner kiritishda offline bo'lsa `client_event_id` bilan, pastga qarang).
 **Offline**: sanash/skaner (POS-10, `type:"stock_count.line_recorded"` outbox voqeasi) **to'liq offline** ishlaydi — internet talab qilinmaydi; `submit-for-review`/`post` esa online back-office/Menejer amali (yakuniy tasdiqlash).
 
-**`stock_count.line_recorded` payload**: huquq `stock.count.create`; `{count_id, product_id, counted (shu qurilmadagi **mutlaq** son, 3dp), barcode?, recorded_at}`; bir qator bir necha marta kelsa — oxirgi `recorded_at` g'olib (idempotent upsert); katalogda yo'q shtrix-kod — `status="accepted"`, `warnings:["BARCODE_NOT_IN_CATALOG"]` ichida (xato emas). **MVP: bitta inventarizatsiya — bitta qurilma** (`stock_counts.device_id`); boshqa qurilmadan voqea kelsa — `409 {code:"DOC_INVALID_STATE", params:{reason:"count_device_mismatch"}}`. `post`da `expected` sanash davomidagi sotuvlar uchun qayta hisoblanishi kerakmi — Ochiq savollar #6.
+**`stock_count.line_recorded` payload**: huquq `stock.count.create`; `{count_id, product_id, counted (shu qurilmadagi **mutlaq** son, 3dp), barcode?, recorded_at}`; bir qator bir necha marta kelsa — oxirgi `recorded_at` g'olib (idempotent upsert); katalogda yo'q shtrix-kod — `status="accepted"`, `warnings:["BARCODE_NOT_IN_CATALOG"]` ichida (xato emas). **MVP: bitta inventarizatsiya — bitta qurilma** (`stock_counts.device_id`); boshqa qurilmadan voqea kelsa — `409 {code:"DOC_INVALID_STATE", params:{reason:"count_device_mismatch"}}`. Server voqeani yozganda `count_lines.counted_at` ni o'rnatadi; `post`dagi `expected` formulasi yuqorida (qaror #53).
 
 **Bog'liq**: US-M05-01…03, BP-10, POS-10, BO-03.
 
@@ -659,14 +692,17 @@ Bitta qatorni tuzatish (`counted` qiymatini qayta kiritish).
 | `lines[].product_id` | UUID | ha | — |
 | `lines[].lot_id` | UUID | **yo'q** | ixtiyoriy — berilmasa server FIFO/AVECO bo'yicha o'zi taqsimlaydi |
 | `lines[].qty` | decimal(3dp) | ha | ≤ `stock_lots.qty_left` |
-| `lines[].reason` | enum | ha | `expired`/`damaged`/`gift`/`other` — qator darajasida |
+| `lines[].reason` | enum | ha | `expired`/`damaged`/`gift`/`expired_return`/`other` — qator darajasida |
+| `lines[].gift_kind` | enum | `reason=gift` bo'lsa shart | `promo_justified` (iqtisodiy asoslangan reklama/aksiya, buyruq bilan — QQS obyekti emas) / `other` (asoslanmagan — QQS bozor qiymatidan, `13-provodka-qoidalari.md` 2.12) |
+| `promo_order_ref` | string | `gift_kind=promo_justified` qatori bo'lsa shart | aksiya buyrug'i raqami/sanasi |
 | `responsible_user_id` | UUID | yo'q | belgilansa `4730`, aks holda `5910`→`9430` (`13-provodka-qoidalari.md` 2.12) |
 
-**Javob**: `201 {id, status:"draft", ...}`.
+`reason="expired_return"` — muddati o'tgan tovarni xaridordan qaytarishda (`restock=false`) server **avtomatik** yaratadigan qoralama; `write_offs.source_return_id` qaytarish hujjatiga bog'lanadi, qo'lda bu sabab tanlanmaydi (qaror #48, `18-api-kassa.md` qaytarish bo'limi).
+**Javob**: `201 {id, status:"draft", source_return_id:null, ...}`.
 
 ### `POST /write-offs/{id}/post`
 
-**Maqsad**: qoldiq −, xarajat (`13-provodka-qoidalari.md` 2.12). Limitdan katta summa — `stock.writeoff` `limit_value`sidan katta bo'lsa `202 {status:"draft", approval_request_id}` (`kind=write_off_over_limit`), tasdiqlanganda server o'zi `post`ni bajaradi — BO-16 umumiy navbati orqali, alohida PIN-only oqim emas.
+**Maqsad**: qoldiq −, xarajat (`13-provodka-qoidalari.md` 2.12; kredit — ombor tovar hisobi `warehouses.inventory_account`, `2910` ombor / `2920` savdo zali). Limitdan katta summa — `stock.writeoff` `limit_value`sidan katta bo'lsa `202 {status:"draft", approval_request_id}` (`kind=write_off_over_limit`), tasdiqlanganda server o'zi `post`ni bajaradi — BO-16 umumiy navbati orqali, alohida PIN-only oqim emas.
 **Ruxsat**: `stock.writeoff`.
 **Xatolar**: `422 {code:"INSUFFICIENT_STOCK", params:{lot_id, available}}`, `409 PERIOD_CLOSED`, `403 {code:"WRITE_OFF_LIMIT_EXCEEDED"}` (limit cheksiz emas, lekin tasdiq so'ralmagan holatda — odatda yuqoridagi `202` yo'li ishlaydi).
 
@@ -674,7 +710,7 @@ Bitta qatorni tuzatish (`counted` qiymatini qayta kiritish).
 
 **Ruxsat**: `stock.writeoff`. **So'rov**: `{reason}`.
 **Idempotentlik**: `Idempotency-Key` majburiy.
-**Offline**: yo'q (hozircha faqat online back-office/ombor ilovasi — mobil offline write-off uchun maxsus outbox turi aniqlanmagan, Ochiq savollar #3).
+**Offline**: yo'q — hisobdan chiqarish faqat online back-office amali, outbox voqea turi yo'q (qaror #54); Android POS bosqichida qayta ko'riladi.
 **Bog'liq**: US-M04-06, BO-03.
 
 ---
@@ -698,7 +734,7 @@ Bitta qatorni tuzatish (`counted` qiymatini qayta kiritish).
 
 ### `POST /stock-openings/{id}/post`
 
-Yangi partiya yaratadi, qoldiq +, `Dt 2910 / Kt 8720` (`13-provodka-qoidalari.md` 2.21). Chek/faktura **yo'q**.
+Yangi partiya yaratadi, qoldiq +, `Dt 2910/2920 (warehouses.inventory_account) / Kt 0000` — texnik yordamchi hisob (`13-provodka-qoidalari.md` 2.21). Chek/faktura **yo'q**.
 **Ruxsat**: `stock.opening.manage`. Bir mahsulotga bir nechta marta boshlang'ich kiritish mumkin (masalan qo'shimcha partiya) — bu cheklanmaydi, faqat umumiy validatsiya xatolari qaytadi.
 
 ### `POST /stock-openings/{id}/cancel`
@@ -731,8 +767,29 @@ Server joriy sanani tekshiradi: agar joriy hisobot yili ichida bo'lsa — darhol
 
 **Maqsad**: tarozi shtrix-kod formati/versiyasi (US-M09-06), kam qoldiq ogohlantirish standart kuni (US-M04-02/06 — "7 kun qolganda", sozlanadi).
 **Ruxsat**: `stock.view` (GET), `catalog.manage` (PATCH).
-**So'rov/Javob maydonlari**: `{scale_barcode_prefix: string, scale_barcode_version: int, low_stock_check_enabled: bool, expiry_warning_days: int}` — saqlash joyi: `tenants.settings` JSONB kalitlari, alohida jadval emas; `PATCH` tanasidagi `version` = `tenants.version`.
-**Offline**: `/sync/pull?scope=settings` orqali POS'ga keshlanadi; format versiyasi o'zgarsa majburiy pull (`16-offline-sync.md` §1).
+**So'rov/Javob maydonlari**: `{weight_barcode_templates: [...], low_stock_check_enabled: bool, expiry_warning_days: int}` — saqlash joyi: `tenants.settings` JSONB kalitlari, alohida jadval emas; `PATCH` tanasidagi `version` = `tenants.version`.
+
+`weight_barcode_templates[]` — tarozi EAN-13 og'irlik kodi `PP CCCCC VVVVV K` shablonlari:
+
+| Maydon | Tur | Validatsiya |
+|---|---|---|
+| `prefixes` | string[] | har biri `20`–`29` oralig'ida 2 raqam, shablonlar orasida takrorlanmaydi |
+| `item_code_len` | int | 4..6, standart `5` (PLU kodi) |
+| `value_len` | int | `5` |
+| `value_kind` | enum | `WEIGHT` (og'irlik) / `AMOUNT` (summa, so'm) |
+| `decimals` | int | 0..3; `WEIGHT` uchun `3` (grammdan kg) |
+| `enabled` | bool | — |
+
+Standart ikki shablon: `{prefixes:["22"], value_kind:"WEIGHT", decimals:3}` (og'irlik grammda) va `{prefixes:["21"], value_kind:"AMOUNT", decimals:0}` (summa so'mda, miqdor = summa ÷ joriy narx); prefiks — do'kon sozlamasi. Nazorat raqami mos kelmagan kod rad etiladi (`03-modullar-talablari.md` US-M09-06).
+**Offline**: `/sync/pull?scope=settings` orqali POS'ga keshlanadi; shablonlar o'zgarsa majburiy pull (`16-offline-sync.md` §1).
+
+### `GET /stock-settings/plu-export`
+
+**Maqsad**: yorliqli tarozilarga PLU ro'yxatini yuklash uchun CSV eksport — MVP'da yagona yo'l: fayl vendor dasturi (CL-Works, Shtrih Loader, Rongta tool) bilan tarozi(lar)ga import qilinadi. Tarozi(lar)ga to'g'ridan-to'g'ri yuklash (CAS TCP 20304, Shtrih UDP 1111) brauzerdan mumkin emas — MVP'da yo'q (keyin Do'kon agenti orqali, qaror #60).
+**Ruxsat**: `catalog.manage`.
+**So'rov**: `?category_id=` (ixtiyoriy).
+**Javob**: CSV (`Content-Disposition: attachment`, UTF-8, `;` ajratgich) — `is_weighed=true` faol tovarlar: `plu_code;name;price;shelf_life_days`.
+**Bog'liq**: US-M09-06, BO-18.
 
 ---
 
@@ -755,7 +812,7 @@ Bitta ish tafsiloti (tuzatilgan `ledger_entries`/`stock_moves` yozuvlari ro'yxat
 **Xatolar**: `404 NOT_FOUND` (`params.resource="recost_job"`), `409 DOC_INVALID_STATE` (`failed`dan tashqari holat).
 **Idempotentlik**: `Idempotency-Key` majburiy.
 **Offline**: yo'q.
-**Bog'liq**: hozircha mustaqil ekran yo'q, BO-03/BO-08 ichida ko'rinishi mumkin (Ochiq savollar #4).
+**Bog'liq**: BO-08 ichidagi **"Qayta hisoblash navbati"** bloki (ustunlar: mahsulot, ombor, holat, navbatga qo'yilgan, tugagan, xato) + BO-14 holat qatori (qaror #56c).
 
 ---
 
@@ -763,9 +820,11 @@ Bitta ish tafsiloti (tuzatilgan `ledger_entries`/`stock_moves` yozuvlari ro'yxat
 
 ### `GET /einvoices?direction=in&status=&risk_flag=&cursor=&limit=`
 
-**Maqsad**: BO-15 ro'yxati.
+**Maqsad**: BO-15 ro'yxati. Operator — MVP'da Faktura.uz (`EInvoicePort`, qaror #23 tavsiya #4); kiruvchi hujjatlar operatordan poll bilan olinadi (`UpdatedFrom` bo'yicha inkremental, webhook yo'q, `21-integratsiyalar.md` §2).
 **Ruxsat**: `purchases.post` (Buxgalter).
-**Javob**: `{items:[{id, operator, operator_doc_id, counterparty_id, status, risk_flag, signed_at, total_amount, vat_amount}], next_cursor}`. Kiruvchi faktura dastlabki holati — `status="received"`.
+**Javob**: `{items:[{id, operator, operator_doc_id, counterparty_id, status, risk_flag, factura_type, related_einvoice_id, signed_at, total_amount, vat_amount}], next_cursor}`. Kiruvchi faktura dastlabki holati — `status="received"`.
+- `risk_flag` — `green`/`red`/`unknown` (standart `unknown`). VM 830 xavf darajasi EHF rasmiylashtirilayotganda avtomatik shakllanadi va EDO oqimida hamda my.soliq.uz kabinetida ko'rinadi; operator API'si uni qaytarsa — avtomatik, qaytarmasa (Faktura.uz — tasdiqlanmagan) `unknown` qoladi. `unknown` **qizil kabi** hisoblanadi (QQS krediti to'lovgacha kechiktiriladi, §11); Buxgalter kabinetdan ko'rib `PATCH /einvoices/{id}/risk-flag` (`{risk_flag:"green"|"red", note}`, `purchases.post`, audit) bilan qo'lda belgilaydi.
+- `factura_type` — `standard`/`additional`/`corrected`/… (operator turi); `related_einvoice_id` — `additional`/`corrected` faktura qaysi asl fakturaga tegishli (masalan yetkazib beruvchiga qaytarishdagi salbiy qo'shimcha EHF, §12).
 
 ### `GET /einvoices/{id}`
 
@@ -773,14 +832,14 @@ To'liq `payload` (tovar qatorlari, MXIK, QQS) bilan.
 
 ### `POST /einvoices/{id}/accept`
 
-**Maqsad**: imzolangan kiruvchi fakturani qabul qilish (operatorga tasdiq yuborish, `21-integratsiyalar.md` §2).
+**Maqsad**: imzolangan kiruvchi fakturani qabul qilish (operatorga tasdiq yuborish, `21-integratsiyalar.md` §2). Birlashtirilgan EHF+TTN bo'lsa, shu tasdiq e-TTN'ni ham tasdiqlaydi (bog'langan `ettn_documents.status="accepted"`).
 **Ruxsat**: `purchases.post`.
 Avval imzolash shart — `sign-challenge`/`submit-signed` (pastda) o'tmagan hujjat uchun `409 {code:"EINVOICE_NOT_SIGNED"}`.
-**Javob**: `202 {status:"queued"}` → `outbox_jobs(kind=einvoice_accept)` → worker orqali operatorga yuboriladi → `status="accepted"` (yashil bo'lsa `vat_moves(kind=input)` darhol; qizil bo'lsa to'lovgacha kutiladi, §11).
+**Javob**: `202 {status:"queued"}` → `outbox_jobs(kind=einvoice_accept)` → worker orqali operatorga yuboriladi → `status="accepted"` (yashil bo'lsa `vat_moves(kind=input)` darhol; qizil yoki `unknown` bo'lsa to'lovgacha kutiladi, §11).
 
 ### `POST /einvoices/{id}/reject`
 
-**Ruxsat**: `purchases.post`. **So'rov**: `{reason: string}` (majburiy).
+**Ruxsat**: `purchases.post`. **So'rov**: `{reason: string}` (majburiy). Birlashtirilgan EHF+TTN bo'lsa e-TTN ham rad etiladi (`ettn_documents.status="rejected"`).
 
 ### `POST /einvoices/{id}/sign-challenge`
 
@@ -803,6 +862,42 @@ Avval imzolash shart — `sign-challenge`/`submit-signed` (pastda) o'tmagan hujj
 
 ---
 
+## 20. E-TTN (`ettn-documents`)
+
+> E-TTN faqat e-faktura operatori orqali (MVP'da Faktura.uz, `EInvoicePort`; TTN hujjat turi operator API'sida aniqlanmaguncha — qo'lda ro'yxatga olish yo'li, pastda) shakllantiriladi (qaror #63, `21-integratsiyalar.md` §3). Yozuvchilar: chiquvchi (`direction="out"`, `transport_type="warehouse_to_warehouse"`) — **faqat `transfers` `post`** (§13); kiruvchi (`direction="in"`) — operatordan poll (birlashtirilgan EHF+TTN bo'lsa `einvoice_id` bilan, §19). `ettn_documents.status`: `pending_signature` → `sending` → `registered` → `accepted`/`rejected` (chiquvchi); `received` → `accepted`/`rejected` (kiruvchi); `failed` — operator xatosi (qayta urinish).
+
+### `GET /ettn-documents?direction=&status=&transfer_id=&cursor=&limit=` · `GET /ettn-documents/{id}`
+
+**Ruxsat**: `stock.view`.
+**Javob**: `{items:[{id, direction, transport_type, status, operator_doc_id, transfer_id, einvoice_id, counterparty_id, doc_date, created_at}], next_cursor}`; `GET /{id}` — operator `payload` bilan.
+
+### `POST /ettn-documents/{id}/sign-challenge` · `POST /ettn-documents/{id}/submit-signed`
+
+**Maqsad**: chiquvchi e-TTN'ni (§13 `post` yaratgan) E-IMZO bilan imzolash va operatorga yuborish — oqim §19 `sign-challenge`/`submit-signed` bilan bir xil (`{document_hash, challenge_id}` → `{challenge_id, signature_pkcs7}`). `submit-signed` muvaffaqiyatli bo'lsa `status="sending"`, `outbox_jobs(kind="ettn_send")` → operator ro'yxatga olgach `status="registered"`, `operator_doc_id` va `transfers.ettn_ref` to'ldiriladi. `received`/`registered` holatdagi hujjat uchun `sign-challenge` tasdiq/rad payload'ini qaytaradi (`?action=accept|reject`) — imzo `accept`/`reject` tanasida yuboriladi.
+**Ruxsat**: `einvoice.sign`.
+**Xatolar**: `404 NOT_FOUND` (`params.resource="ettn_document"`), `409 DOC_INVALID_STATE` (`submit-signed` — `pending_signature`/`failed`dan tashqari holat), `422 EIMZO_SIGN_FAILED`, `503 EINVOICE_PROVIDER_UNAVAILABLE`.
+
+### `POST /ettn-documents/{id}/register-manual`
+
+**Maqsad**: e-TTN operator kabinetida qo'lda rasmiylashtirilgan bo'lsa (operator API'sida TTN turi mavjud bo'lmaganda yoki operator ishlamay qolganda), uning raqamini tizimga bog'lash — `status="registered"`, `transfers.ettn_ref` to'ldiriladi, `audit_log` yoziladi.
+**Ruxsat**: `transfer.create`.
+**So'rov**: `{operator_doc_id: string, ettn_date: date}`.
+**Xatolar**: `404 NOT_FOUND`, `409 DOC_INVALID_STATE` (allaqachon `registered`/`accepted`), `422 VALIDATION_ERROR`.
+
+### `POST /ettn-documents/{id}/accept` · `POST /ettn-documents/{id}/reject`
+
+**Maqsad**: tashish yakunida yuk oluvchi e-TTN'ni **elektron tasdiqlaydi yoki rad etadi** — kiruvchi (yetkazib beruvchi chiqargan, alohida e-TTN) va ichki ko'chirish (qabul qiluvchi filial, §13 `receive`dan keyin). Birlashtirilgan EHF+TTN §19 `accept`/`reject` bilan birga tasdiqlanadi — bu yerda emas. Imzo — `sign-challenge?action=accept|reject` dan olingan payload E-IMZO bilan imzolanib shu so'rov tanasida yuboriladi, so'ng `outbox_jobs(kind="ettn_accept")`.
+**Ruxsat**: `purchases.receive` (kiruvchi) / `transfer.receive` (ichki); imzo — `einvoice.sign`.
+**So'rov**: `accept` — `{challenge_id, signature_pkcs7}`; `reject` — `{reason: string, challenge_id, signature_pkcs7}`.
+**Javob**: `202 {status:"queued"}` → `status="accepted"`/`"rejected"`.
+**Xatolar**: `404 NOT_FOUND`, `409 DOC_INVALID_STATE` (`received`/`registered`dan tashqari holat yoki birlashtirilgan EHF+TTN), `422 EIMZO_SIGN_FAILED`.
+
+**Idempotentlik**: `Idempotency-Key` majburiy (barcha yozuvchi amallar).
+**Offline**: yo'q — operator va E-IMZO online talab qiladi; offline ko'chirish uchun e-TTN internet qaytgach, tashishdan oldin (§13).
+**Bog'liq**: US-M06-01…02, US-M07-01, BP-01, BP-09, BO-03, BO-04, BO-15.
+
+---
+
 ## Ishlatilgan xato kodlari
 
 > Umumiy/konventsiyaga oid kodlar (`VERSION_CONFLICT`, `PERIOD_CLOSED`, `IDEMPOTENCY_IN_PROGRESS`, `IDEMPOTENCY_KEY_REUSED`, `CSRF_INVALID`, `SUBSCRIPTION_RESTRICTED`, `VALIDATION_ERROR`, `NOT_FOUND`, `PERMISSION_DENIED`, `RATE_LIMITED`) — `17-api-umumiy.md`da ta'riflangan, bu yerda faqat qayerda ishlatilgani qayd etiladi. Quyida — shu faylga **xos** kodlar.
@@ -813,7 +908,7 @@ Avval imzolash shart — `sign-challenge`/`submit-signed` (pastda) o'tmagan hujj
 | `BARCODE_DUPLICATE` | §1 | Shtrix-kod tenant ichida takror |
 | `MXIK_CODE_INVALID` | §1 | MXIK format noto'g'ri (17 raqam emas) |
 | `CATEGORY_HAS_PRODUCTS` | §2 | Arxivlanmagan tovarlar bog'langan kategoriyani arxivlash |
-| `DOC_NOT_DRAFT` | §4, §8 | Qayta `post` chaqirilishi (allaqachon `posted`) |
+| `DOC_NOT_DRAFT` | §4, §8, §13 | Qayta `post` chaqirilishi (allaqachon `posted`) |
 | `IMPORT_FILE_INVALID` | §6 | Fayl formati/kodlash xato |
 | `FILE_TOO_LARGE` | §6 | Hajm/qator chegarasidan oshdi |
 | `IMPORT_JOB_NOT_VALIDATED` | §6 | `commit` dan oldin `validate` o'tmagan |
@@ -823,13 +918,16 @@ Avval imzolash shart — `sign-challenge`/`submit-signed` (pastda) o'tmagan hujj
 | `EINVOICE_NOT_ACCEPTED` | §8 | Faqat qabul qilingan fakturadan kirim yaratiladi |
 | `EINVOICE_NOT_SIGNED` | §19 | `accept`dan oldin imzolanmagan |
 | `EINVOICE_ALREADY_SIGNED` | §19 | — |
-| `EIMZO_SIGN_FAILED` | §19 | E-IMZO imzo tekshiruvi muvaffaqiyatsiz |
-| `EINVOICE_PROVIDER_UNAVAILABLE` | §9 | Faktura.uz STIR qidiruvi ishlamadi |
-| `SUPPLIER_PAYMENT_EXCEEDS_DEBT` | §11 | Qattiq nazorat yoqilgan tenant'da (ochiq savol) |
+| `EIMZO_SIGN_FAILED` | §19, §20 | E-IMZO imzo tekshiruvi muvaffaqiyatsiz |
+| `EINVOICE_PROVIDER_UNAVAILABLE` | §9, §20 | Faktura.uz (operator) ishlamadi — STIR qidiruvi yoki e-TTN yuborish |
+| `SUPPLIER_OVERPAY_BLOCKED` | §11 | 422 — `supplier_overpay_policy='block'` tenant'da to'lov kreditorlik qoldig'idan oshdi (qaror #47) |
+| `SUPPLIER_OVERPAY_ADVANCE` | §11 | 200, `warnings[]` — `'warn'` siyosatida ortiqcha qism avans `4310`ga yozildi (qaror #47) |
 | `INSUFFICIENT_STOCK` | §12, §15 | Qaytarish/hisobdan chiqarish miqdori qolgan partiyadan ko'p |
 | `DEPENDENCY_NOT_SYNCED` | §13 | Boshqa qurilmadagi jo'natma hali sinxronlanmagan (`transfer.received`, retryable) |
+| `ETTN_REQUIRED` | §13 | 409 — `transport_mode=vehicle` ko'chirishni e-TTN `registered` bo'lmaguncha jo'natish (`send`); offline `transfer.sent`da — `warnings[]` (hujjat `posted`da qoladi) (qaror #63) |
+| `ETTN_CANCEL_IN_OPERATOR` | §13 | 200, `warnings[]` — ro'yxatdan o'tgan e-TTN'li ko'chirish bekor qilindi, e-TTN operator kabinetida bekor qilinishi/tuzatilishi kerak |
 | `BARCODE_NOT_IN_CATALOG` | §14 | Inventarizatsiyada skanerlangan kod katalogda yo'q |
-| `DOC_INVALID_STATE` | §13, §14, §18 | Qabul qilingan ko'chirishni qayta qabul/bekor qilish (§13); `post` faqat `review` holatidan yoki `count_device_mismatch` — boshqa qurilmadan voqea (§14); `failed`dan tashqari holatdagi recost ishini qayta urinish (§18) |
+| `DOC_INVALID_STATE` | §13, §14, §18, §20 | Ko'chirish holati amalga mos emas — `posted`dan tashqari `send`, `sent`dan tashqari qabul, qabul qilinganini bekor qilish (§13); `post` faqat `review` holatidan yoki `count_device_mismatch` — boshqa qurilmadan voqea (§14); `failed`dan tashqari holatdagi recost ishini qayta urinish (§18); e-TTN holati imzolash/qo'lda ro'yxatga olish/tasdiqlashga mos emas (§20) |
 | `WRITE_OFF_LIMIT_EXCEEDED` | §15 | Limitdan katta — endi `202 APPROVAL_REQUIRED` yo'liga yo'naltiradi, bu kod faqat tasdiq so'ralmagan holatda |
 | `VALUATION_METHOD_CHANGE_NOT_ALLOWED` | §17 | Shu yil uchun qarama-qarshi so'rov takrori |
 
@@ -837,12 +935,8 @@ Avval imzolash shart — `sign-challenge`/`submit-signed` (pastda) o'tmagan hujj
 
 ## Ochiq savollar
 
-1. `supplier-payments` summasi joriy kreditorlik qoldig'idan oshganda qattiq bloklash yoki ogohlantirish bilan ruxsat (avans sifatida, `4310`) — buxgalter tasdig'i kerak (§11).
-2. Markirovkalangan tovarni yetkazib beruvchiga qaytarishda Asl belgisi operatsiyasi — API yopiq, qaror topilmadi (§12, `03-modullar-talablari.md` M07).
-3. Mobil (Android/POS) orqali `write-offs` yaratish offline bo'lishi kerakmi — hozircha faqat online back-office ko'zda tutilgan, maxsus outbox event turi yo'q (§15).
-4. `recost-jobs` uchun mustaqil mahsulot ekrani yo'q (`06-ekranlar-umumiy.md`da) — BO-03/BO-08 ichida ko'rinishi taklif qilinadi, tasdiqlanishi kerak (§18).
-5. `label-print-jobs` serverda PDF generatsiyasi qancha chastota bilan kerak bo'ladi (asosiy yo'l brauzer `bwip-js`) — zahira sifatida qoldirilgan, ustunlik past (§5).
-6. Inventarizatsiya davomida sotuv bo'lsa `expected` qayta hisoblash qoidasi — ochiq (`13-provodka-qoidalari.md` X-02, §14).
+1. **Tashqi javob kerak** — markirovkalangan tovar kirimini qabul qilish va yetkazib beruvchiga qaytarishda CRPT Turon (Asl belgisi) API metodi/hujjat turi, SaaS-integrator uchun API kaliti va test muhiti, CRPT Turon (Xat 2) — interim: `MarkingPort` stub, qaytarish faqat online, qabul muddati (3 ish kuni / 72 soat) kuzatiladi va ogohlantiriladi (§8, §12) — 26 #40 (OQ-025).
+2. **Tashqi javob kerak** — Faktura.uz API'si kiruvchi e-faktura VM 830 xavf darajasini qaytaradimi, Faktura.uz (Xat 4) — interim: `risk_flag="unknown"` qizil kabi hisoblanadi (QQS krediti to'lovgacha kechiktiriladi), Buxgalter my.soliq.uz kabinetidan ko'rib qo'lda belgilaydi (§11, §19) — 26 #47 (OQ-019).
 
 ## Manbalar
 

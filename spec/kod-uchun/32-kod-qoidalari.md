@@ -2,8 +2,8 @@
 
 **Maqsad:** Kod yozishda rioya qilinadigan aniq, tekshiriladigan qoidalar — repo tuzilmasi, nomlash, pul/sana, tranzaksiya/tenant, xato/log, test, Git ish oqimi, "tayyor" ta'rifi, spec↔kod bog'lanishi, xavfsizlik. Boshqa fayllarni (`11`–`24`) qaytarib yozmaydi — faqat ulardagi qarorlarni **bitta joyga jamlab**, PR tekshiruvida foydalanish uchun qisqartiradi.
 **Kim uchun:** hammasi (backend/frontend dasturchi — asoschi + Claude, qabul agenti, kod review).
-**Bog'liq fayllar:** `11-malumotlar-modeli.md`, `12-db-sxema.md`, `13-provodka-qoidalari.md`, `15-xavfsizlik-va-audit.md`, `17-api-umumiy.md`, `23-backend-arxitekturasi.md`, `24-frontend-arxitekturasi.md`, `27-backlog.md`, `29-atamalar-lugati.md`, `01-qarorlar.md`.
-**Holat:** joriy, 2026-10-15.
+**Bog'liq fayllar:** `11-malumotlar-modeli.md`, `12-db-sxema.md`, `13-provodka-qoidalari.md`, `15-xavfsizlik-va-audit.md`, `17-api-umumiy.md`, `23-backend-arxitekturasi.md`, `24-frontend-arxitekturasi.md`, `27-backlog.md`, `29-atamalar-lugati.md`, `33-1c-integratsiya.md`, `34-1c-agent.md`, `01-qarorlar.md`.
+**Holat:** joriy, 2026-10-16.
 
 ## Qoidalar ierarxiyasi
 
@@ -13,7 +13,7 @@ Bu fayl **ikkinchi darajali manba**: ziddiyat bo'lsa `01-qarorlar.md` → mavzu 
 
 ## 1. Repo tuzilmasi
 
-Ikkita asosiy papka: `backend/` (`23-backend-arxitekturasi.md` §1) va `web/` (`24-frontend-arxitekturasi.md` §1). Hujjatlar — `spec/kod-uchun/` (bu repo ichida, kod bilan bir joyda).
+Uchta kod papkasi: `backend/` (`23-backend-arxitekturasi.md` §1), `web/` (`24-frontend-arxitekturasi.md` §1) va Bosqich 7 dan — `agent-1c/` (Windows 1C agenti, .NET Framework 4.8; 1.3-band, `34-1c-agent.md`). Hujjatlar — `spec/kod-uchun/` (bu repo ichida, kod bilan bir joyda). Umumiy test-vektorlar — repo ildizidagi `shared/` (6.3-band).
 
 ### 1.1 Backend (`backend/`)
 
@@ -63,7 +63,9 @@ backend/
 
 **Qatlam qoidasi** (`23-backend-arxitekturasi.md` §1): `api → application → domain`; `infrastructure` faqat `domain`dagi portni amalga oshiradi. Modullar bir-birining `infrastructure`/`api` qatlamini **import qilmaydi** — faqat boshqa modulning `application`/`domain` portini (masalan `sales` → `inventory.application.ports.StockPort`, hech qachon `inventory.infrastructure`). Bu qoida FSD'dagi "faqat pastga import"ga parallel va `eslint-plugin-boundaries` singari CI import-linter bilan majburlanadi (**taklif**: `import-linter`/`grimp`, asoschi tasdiqlaydi — `23`da aniq vosita ko'rsatilmagan).
 
-Modul papkalari (`23-backend-arxitekturasi.md` §1 — 18 mahsulot moduli + kesishuvchi `integrations`/`sync`/`ai`; OpenAPI tag ↔ papka xaritasi — `17-api-umumiy.md` §11): `sales, returns, pricing, inventory, purchasing, debts, vat, accounting, reports, access, auth, branches, expenses, cash, billing, notifications, integrations, ai, sync`. `integrations` — tag emas, faqat ichki modul (adapterlar).
+Modul papkalari (`23-backend-arxitekturasi.md` §1 — 18 mahsulot moduli + kesishuvchi `integrations`/`sync`/`ai`; OpenAPI tag ↔ papka xaritasi — `17-api-umumiy.md` §11): `sales, returns, pricing, inventory, purchasing, debts, vat, accounting, reports, access, auth, branches, expenses, cash, billing, notifications, integrations, ai, sync` + Bosqich 7 da `onec_integration` (M19; ichki tuzilma — `33-1c-integratsiya.md` §4.1, ikki router: `router_web.py` — `/onec-*`, `router_agent.py` — `/onec-agent/*`). `integrations` — tag emas, faqat ichki modul (adapterlar). `bank_settlements` — `cash` moduli ichida (`23` §1).
+
+**Fiskal kod — alohida, kam o'zgaradigan paket** (qaror #60): `FiscalPort` va uning adapterlari (`FakeFiscalAdapter`, hamkor bulut adapteri, Do'kon ko'prigi adapterlari `multikassa_local`/`fiscaldrive_local`) `integrations/fiscal/` ichida, boshqa modullar faqat `FiscalPort` orqali murojaat qiladi; port chegarasida pul — butun son tiyinda (`int`), konvertatsiya bitta funksiyada (`01-qarorlar.md` #26). Sabab: virtual kassaning fiskal qismi o'zgarsa qayta xulosa talab qilinadi (VMQ-943 2-ilova 6-band) — fiskal paketga tegadigan PR alohida, kichik va CHANGELOG bilan. Tanlov — `FISCAL_PROVIDER` = `fake` / `cloud` / `multikassa_local` / `fiscaldrive_local` (MVP'da `fake`, real adapter Bosqich 5 da — `26-ochiq-savollar-reestri.md` #109).
 
 **Eslatma**: bu daraxt `{api,service,repo,models,schemas,events}` kabi yassi papka to'plami emas — har modulda **to'rt qatlam** (`domain/application/infrastructure/api`) bor; `service`/`repo`/`models`/`schemas` nomlari mos ravishda `application/services.py`, `infrastructure/repositories.py`, `infrastructure/models.py`, `api/schemas.py` ichida yashaydi. Alohida `events/` papkasi yo'q: domen voqealari (`sale.created`, `shift.opened` — 2.3-bo'lim) `sync`/`outbox_jobs` orqali, fon ishlari esa har modulning `infrastructure/tasks.py`sida.
 
@@ -74,7 +76,7 @@ web/                                  # Turborepo (npm workspaces)
 ├── apps/shell/src/{app,features,main.tsx}   # yagona Vite ilova: router, layout, auth-provider
 ├── packages/
 │   ├── pages/<sahifa-guruhi>/         # pos, catalog, warehouse, debts, finance, reports,
-│   │                                   # settings, billing, ai-assistant
+│   │                                   # settings, billing, ai-assistant, onec (Bosqich 7)
 │   │   └── src/{app, pages/<sahifa>/{model/{events,stores,effects,connections,types,lib}, ui}, features, entities, shared}
 │   └── shared/{api, models, state, ui, i18n, offline, lib, config}
 └── turbo.json
@@ -82,9 +84,48 @@ web/                                  # Turborepo (npm workspaces)
 
 Import qoidasi (FSD, `24-frontend-arxitekturasi.md` §1): `app → pages → features → entities → shared`, faqat pastga, sahifalar bir-birini import qilmaydi, paketlararo faqat `@shared/*`.
 
-### 1.3 Hujjatlar
+### 1.3 Do'kon agenti (`agent-1c/`, asos — Bosqich 5, 1C — Bosqich 7)
 
-Spec — shu repo ichida `spec/kod-uchun/00`–`32` (o'qish tartibi `00-README.md`da). Kod commit'i spec o'zgarishini talab qilsa — **bitta PR**da (7-bo'lim, spec-first qoidasi).
+Alohida .NET Framework 4.8 solution (qarorlar #38, #60). Bu **bitta Do'kon agenti** asosi: fiskal ko'prik (POS → `127.0.0.1` lokal API → FM/hamkor lokal xizmati → OFD), xom TCP 9100 printer, tarozi va 1C moduli bir xil supervisor, ulash, avto-yangilanish, imzo va DPAPI qatlamidan foydalanadi; imkoniyatlar alohida loyihalar (`src/Fiscal/`, `src/Devices/` — Bosqich 5; `src/Worker/` (COM) — Bosqich 7) sifatida qo'shiladi, `Agent/`, `Protocol/`, `Common/` umumiy. Repo papkasi nomi `agent-1c/` saqlanadi (34 `34-dokon-agenti.md` ga kengaytirilganda nom qayta ko'riladi). ichki arxitektura, protokol bajarilishi va yozish algoritmi — `34-1c-agent.md` (ustun manba; quyidagi daraxt — repo darajasidagi konventsiya, loyiha nomlari 34 bilan izchil qilinadi).
+
+```
+agent-1c/
+├── ErpOneCAgent.sln
+├── src/
+│   ├── Agent/            # supervisor: per-user tray ilova, ulash (device code), long-poll, lease/heartbeat,
+│   │                     # DPAPI (CurrentUser) sirlar, results.jsonl outbox, imzoli avto-yangilanish
+│   ├── Worker/           # COM worker: x86 va x64 build → OneCWorker.x86.exe / OneCWorker.x64.exe
+│   │                     # (V8x.COMConnector, stdin/stdout JSON, bitta bazaga bitta COM sessiya)
+│   ├── Protocol/         # 33 §9 DTO'lari: ObjectSpec/QuerySpec/Value, xato obyekti, vazifa turlari (oq ro'yxat)
+│   ├── Fiscal/           # fiskal ko'prik (qaror #60): localhost API, FM/hamkor lokal xizmati adapteri — Bosqich 5
+│   ├── Devices/          # xom TCP 9100 printer, tarozi (serial/TCP, PLU) — Bosqich 5
+│   └── Common/           # Ed25519 imzo tekshiruvi, UUIDv5 (onec_guid), JCS xesh, log maskalash
+├── tests/                # unit + protokol testlari (soxta server, soxta COM)
+├── installer/            # per-user o'rnatuvchi (admin huquqisiz; vosita — 34 da)
+└── build/                # imzolash va reliz skriptlari
+```
+
+- **Server bilan yagona kontrakt** — `33-1c-integratsiya.md` §9: `ObjectSpec`/`QuerySpec` JSON Schema backenddagi Pydantic modellaridan (`onec_integration/domain/object_spec.py`) eksport qilinadi va `agent-1c/` testlarida shu sxemaga qarshi tekshiriladi; agentda qo'lda «ikkinchi» sxema yozilmaydi (`openapi.json` → orval qoidasining agentdagi ekvivalenti).
+- **Umumiy test-vektorlar**: GUID (`33` §8.1) va kontent xeshi (§8.2) vektorlari — `shared/onec-guid-vectors.json`; backend (pytest) va agent (C#) **bitta fayldan** o'qiydi (QT-M19-12).
+- **Nomlash (C#)**: .NET standarti — `PascalCase` tiplar/metodlar, `camelCase` lokal o'zgaruvchilar, `_camelCase` maydonlar; JSON maydonlari protokolda **snake_case** (serverdagi bilan aynan bir xil, `01-qarorlar.md` #24).
+- **Pul**: `decimal` (hech qachon `double`); qiymat kodlash — `33` §9.8.
+- **Sirlar**: agent maxfiy kaliti va 1C paroli faqat DPAPI `CurrentUser` bilan PK'da; serverga, logga, crash-dump'ga hech qachon chiqmaydi (10-band).
+
+**CI va imzolash (`agent-1c/`):**
+
+| # | Bosqich | Izoh |
+|---|---|---|
+| 1 | Windows runner'da `msbuild` (Release, x86 va x64) | `ubuntu` runner'da emas — .NET Framework 4.8 |
+| 2 | Unit + protokol testlari | Soxta server va soxta COM bilan; GUID/xesh vektorlari `shared/` dan |
+| 3 | JSON Schema drift tekshiruvi | backend eksport qilgan `ObjectSpec` sxemasi ↔ agent DTO'lari |
+| 4 | **Authenticode OV** imzosi (`.exe`, `.dll`, o'rnatuvchi) + vaqt tamg'asi | Faqat reliz build'da; kalit apparat tokenda/HSM'da (qaror #38) — imzolash qo'lda yoki token ulangan alohida runner'da, sertifikat CI sirlarida saqlanmaydi |
+| 5 | Yangilanish manifesti — **Ed25519** (`signing_keys.purpose='agent_update'`) + SHA-256 + hajm | Ildiz kalit **oflayn**, CI'da hech qachon yo'q; manifest `GET /onec-agent/update-manifest?channel=stable\|pilot` orqali tarqatiladi (`33` §9.3 A-09), downgrade taqiq |
+
+Agent reliz versiyasi `min_agent_version` bilan moslanadi — server eski agentga yozish vazifasini bermaydi (`ONEC_AGENT_UPDATE_REQUIRED`).
+
+### 1.4 Hujjatlar
+
+Spec — shu repo ichida `spec/kod-uchun/00`–`34` (o'qish tartibi `00-README.md`da). Kod commit'i spec o'zgarishini talab qilsa — **bitta PR**da (7-bo'lim, spec-first qoidasi).
 
 ---
 
@@ -175,13 +216,13 @@ Ikki alohida nomlash tizimi, aralashtirilmaydi:
 
 ### 3.2 Backend hisob-kitob
 
-Python `decimal.Decimal` — pul/miqdor bilan ishlaydigan har qanday kodda majburiy; `float`/`int` orqali oraliq hisob **taqiqlanadi**. Yaxlitlash — `ROUND_HALF_UP`: chek qatori jami butun so'mgacha (`line_total = ROUND_HALF_UP(qty × unit_price − chegirma, 0)`), QQS summasi tiyingacha (`ROUND_HALF_UP(line_total × r/(100+r), 2)`) — `01-qarorlar.md` #26 formulasi (buxgalter tasdig'i kutilmoqda — `26-ochiq-savollar-reestri.md` #82). Pydantic v2 schemalarida pul/miqdor maydoni — `str` tipi (`Decimal` emas!), chunki API javobida JSON `number` taqiqlangan (quyida 3.4).
+Python `decimal.Decimal` — pul/miqdor bilan ishlaydigan har qanday kodda majburiy; `float`/`int` orqali oraliq hisob **taqiqlanadi**. Yaxlitlash — `ROUND_HALF_UP`: chek qatori jami butun so'mgacha (`line_total = ROUND_HALF_UP(qty × unit_price − chegirma, 0)`), QQS summasi tiyingacha (`ROUND_HALF_UP(line_total × r/(100+r), 2)`) — `01-qarorlar.md` #26 formulasi (qonunda yaxlitlash qoidasi yo'q — muhandislik qarori, `26-ochiq-savollar-reestri.md` #82). Pydantic v2 schemalarida pul/miqdor maydoni — `str` tipi (`Decimal` emas!), chunki API javobida JSON `number` taqiqlangan (quyida 3.4).
 
 ### 3.3 Frontend hisob-kitob
 
 Pul hisob-kitobi **standart holatda frontendda qilinmaydi** — backend tayyor summalarni qaytaradi. Istisno — **faqat ikki holat** (`08-dizayn-tizimi.md` §0.1): (a) offline POS'da chek jamini/qaytimni/kutilgan naqdni hali serverga yuborilmasdan hisoblash, (b) submit'dan oldingi forma jami (masalan yangi chek qatori qo'shilganda oraliq ko'rsatish). Bu ikki holatda ham:
 
-- `Number`/`parseFloat` bilan pul hisoblash **taqiqlanadi** (lint qoidasi bilan majburlanadi — ESLint custom rule yoki `no-restricted-syntax`, **taklif**: aniq ESLint konfiguratsiyasi asoschi bilan tasdiqlanadi).
+- `Number`/`parseFloat` bilan pul hisoblash **taqiqlanadi** (lint bilan majburlanadi, qaror #57: ESLint `no-restricted-syntax` + custom rule — `Number(`, `parseFloat(`, `parseInt(` chaqiruvlari va `Money` tipidagi qiymatlarda `+ - * /` operatorlari taqiqlangan; istisno faqat `shared/lib/money` ichida, `eslint-disable` izohi bilan).
 - `decimal.js`/`big.js` — satr-satr amal, `shared/lib/money` ichida bitta joyda.
 - Yaxlitlash formulasi backend bilan **aynan bir xil** (yuqoridagi 3.2), umumiy test-vektorlar — `shared/money-vectors.json` (ikki tomon bir xil fayldan test o'qiydi).
 - `formatMoney(value: string): string` — **faqat ko'rsatish**, natijasi hech qachon API'ga qaytarilmaydi va keyingi hisoblashda ishlatilmaydi. `Intl.NumberFormat("uz-UZ")` + qo'lda `" so'm"` suffiks.
@@ -317,6 +358,7 @@ Manba — `23-backend-arxitekturasi.md` §6, `24-frontend-arxitekturasi.md` §4,
 
 - Pul hisob-kitobi test-vektorlari (`shared/money-vectors.json`) — backend va frontend **bitta fayldan** o'qiydi (3.2–3.3-bo'lim), ikki tomonda alohida qo'lda yozilmaydi.
 - Yangi ruxsat kodi qo'shilsa — standart matritsa testi (`15-xavfsizlik-va-audit.md` §2.2) yangilanadi.
+- 1C integratsiyasi (Bosqich 7): server testlari 1C'siz — protokol darajasidagi soxta agent bilan (`31-qabul-testlari.md` M19); real 1C bazadagi tekshiruv — faqat pilot oldi testlari P-01…P-22 (`33` §16.1), CI'da emas.
 
 ---
 
@@ -349,15 +391,19 @@ Kichik, bitta mantiqiy o'zgarish bir PR'da (bitta modul/bitta hujjat turi oqimi)
 
 | # | Bosqich | Manba |
 |---|---|---|
-| 1 | `ruff check` + `ruff format --check`, `mypy app` (qattiqlik darajasi — `--strict`: **taklif**, hozir spec faqat `mypy app` deydi) | 23 §7.1 |
+| 1 | `ruff check` + `ruff format --check`, `mypy --strict app` (yangi kod uchun majburiy, qaror #57) | 23 §7.1, 01 #57 |
 | 2 | `pytest` (bitlik + `testcontainers` CI runner servisi sifatida) | 23 §7.1 |
 | 3 | Alembic: `alembic upgrade head` bo'sh bazada | 23 §7.1 |
 | 4 | `schemathesis run` — ishga tushirilgan API'ga qarshi | 23 §7.1 |
 | 5 | `openapi.json` eksport + frontend `npm run api:gen --check` — sxema drift bo'lsa build qizil | 23 §7.1, 10 §3 |
-| 6 | Frontend: `eslint`, `tsc --noEmit`, `vitest` — **taklif** (23/24 aniq CI qadam sifatida yozmagan, lekin kutubxonalar jadvalida bor) | 24 §4 |
+| 6 | Frontend: `eslint` (pul qoidasi bilan), `tsc --noEmit`, `vitest` | 24 §4, 01 #57 |
+| 6a | Xavfsizlik: `pip-audit` (backend), `npm audit --audit-level=high` (frontend), `gitleaks` (butun repo) — topilma bo'lsa build qizil | 01 #57 |
+| 6b | `.env.example` mavjudligi va `Settings` maydonlari bilan mosligi (har kerakli o'zgaruvchi nomi bor, qiymatlar bo'sh) | 01 #57 |
 | 7 | Docker image build + (`main`da) registry push | 23 §7.1 |
 
-CI platformasi — GitHub Actions (standart qaror, `26-ochiq-savollar-reestri.md` #60).
+CI platformasi — GitHub Actions (`26-ochiq-savollar-reestri.md` #60). `agent-1c/` uchun alohida Windows job — 1.3-band jadvali.
+
+**Bosqich 0 spike'lari** (qaror #57, `27-backlog.md` Bosqich 0): (a) `zxing-cpp` GS1 DataMatrix (FNC1) dekod/enkod — `tests/fixtures/datamatrix` test-vektorlari (AI 01/21/91/92, GS ajratgichi); mos kelmasa server zahirasi `bwip-js` (Node) (`26` #62); (b) shrift — tizim shrifti; U+02BB (`oʻ gʻ`) va kirill glif skrinshot-testi (Playwright, Windows/Android/iOS), yetishmasa self-hosted Noto Sans (offline kesh, `08` §2).
 
 ---
 
@@ -393,25 +439,29 @@ CI platformasi — GitHub Actions (standart qaror, `26-ochiq-savollar-reestri.md
 
 Manba — `15-xavfsizlik-va-audit.md` §4, `23-backend-arxitekturasi.md` §7.3.
 
-- **Sirlar repo'da hech qachon saqlanmaydi**: DB parol, Redis parol, Click/Payme kalitlari, Claude API kaliti, SMS/Telegram token, OAuth `signing_keys` — kod/`.env`da emas, UzCloud sir-ombori yoki muhit o'zgaruvchisi orqali. `.gitignore`da `.env` bor, `.env.example` — **taklif**: barcha kerakli o'zgaruvchi nomi bilan, qiymat **bo'sh**, repo'da saqlanadi (maqsad — yangi dasturchi/Claude sessiyasi qaysi o'zgaruvchi kerakligini ko'radi).
+- **Sirlar repo'da hech qachon saqlanmaydi**: DB parol, Redis parol, Click/Payme kalitlari, Claude API kaliti, SMS/Telegram token, OAuth `signing_keys` — kod/`.env`da emas — o'z sir yechimi (SOPS/age yoki o'z-hosted Vault; UzCloud'da KMS/secret store yo'q, qaror #65) yoki muhit o'zgaruvchisi orqali. `.gitignore`da `.env` bor; `.env.example` **majburiy** (qaror #57): barcha kerakli o'zgaruvchi nomi bilan, qiymat **bo'sh**, repo'da saqlanadi; `gitleaks` CI'da sir sizishini to'xtatadi.
 - `app/core/config.py` prod-xavfsizlik guard'i (`model_validator`) — `environment == "prod"` bo'lsa: auth yoqilmagan yoki standart (`_INSECURE_DEFAULT`) maxfiy kalit qolgan bo'lsa **ishga tushmaydi**; `ai_mode == "cli"` prodda **taqiqlangan** (faqat `api`).
 - Parol/PIN — **argon2id** (`passlib[argon2]`/`argon2-cffi`), boshqa hash algoritmi ishlatilmaydi.
 - JWT/JWKS — **joserfc** (EdDSA/ES256); OAuth 2.0 protokol skeleti — **Authlib**. Qo'lda JWT encode/decode yozilmaydi.
 - CSRF — sinxronizator-token (`itsdangerous`, `GET /api/v1/auth/csrf`), CSRF cookie yo'q; Bearer (Android) so'rovlar CSRF tekshiruvidan ozod.
-- Dependency audit — **taklif (asoschi tasdiqlaydi)**: `pip-audit`/`uv pip audit` (backend) va `npm audit`/`osv-scanner` (frontend) CI'da yoki muntazam qo'lda; `23`/`24`da aniq vosita tanlanmagan.
+- Dependency audit — CI'da majburiy (qaror #57): `pip-audit` (backend), `npm audit --audit-level=high` (frontend), `gitleaks` (7.5-band 6a).
+- **CSP** — qat'iy (qaror #57): `default-src 'self'`, `frame-ancestors 'none'`, `object-src 'none'`, inline skript yo'q; tashqi manba faqat aniq ruxsat etilgan API domenlari (`connect-src`), Do'kon agenti uchun `http://127.0.0.1:<port>` (qaror #60).
+- **AI'ga shaxsiy ma'lumot** — Claude'ga yuboriladigan har so'rov maskalash quvuridan o'tadi (o'chirib bo'lmaydi), `ai_cross_border_enabled=false` bo'lsa rasm yuborilmaydi (qaror #61); maskalashni chetlab o'tadigan to'g'ridan-to'g'ri SDK chaqiruvi taqiqlangan.
 - PII logga tushmaydi (5.2-band); `audit_log` immutable, DB roli darajasida `UPDATE`/`DELETE` huquqisiz (5.3-band).
 - Platform admin bypass (`platform_admins`) — faqat ichki admin panel yo'li, oddiy API endpoint hech qachon `tenant_id`siz ishlamaydi (4.2-band); har platform admin amali audit'ga majburiy yoziladi.
+- **1C integratsiyasi**: server 1C parolini, to'liq ulanish satrini va agent maxfiy kalitini **hech qachon** olmaydi/saqlamaydi/loglamaydi; agentga ish faqat Ed25519 imzoli vazifa (`signing_keys.purpose='onec_task'`), faqat oq ro'yxatdagi `kind`, ixtiyoriy 1C kodi va jismoniy o'chirish yo'q; `/onec-agent/*` — faqat agent tokeni (`aud=urn:erp:onec-agent`), so'rov tanasidagi tenant e'tiborga olinmaydi (`33-1c-integratsiya.md` §9, §15.2).
 - Fayl yuklash — ruxsat etilgan tur/hajm chegarasi (`17-api-umumiy.md` §12) serverda tekshiriladi, faqat frontend validatsiyasiga ishonilmaydi.
 
 ---
 
 ## Ochiq savollar
 
-1. **DI yondashuvi** — standart qaror: oddiy factory + `Depends` (`26-ochiq-savollar-reestri.md` #59); `dependency-injector` ishlatilmaydi.
-2. **CI platformasi** — standart qaror: GitHub Actions (`26-ochiq-savollar-reestri.md` #60).
-3. **mypy qattiqlik darajasi** (`--strict` yoki yo'q) va **frontend lint/test CI qadamlari** — bu faylda taklif qilindi (7.5-band), asoschi tasdig'i kerak.
-4. **ESLint custom qoida** (pul uchun `Number`/`parseFloat` taqiqi) — aniq konfiguratsiya yozilmagan, `08-dizayn-tizimi.md` §0.1 faqat qoidani belgilaydi.
-5. **`.env.example`/dependency audit vositasi** — 10-bo'limda taklif qilindi, hali tasdiqlanmagan.
+1. Hal qilingan: factory + `Depends` (`26-ochiq-savollar-reestri.md` #59).
+2. Hal qilingan: GitHub Actions (`26-ochiq-savollar-reestri.md` #60).
+3. Hal qilingan: `mypy --strict` va frontend lint/test CI qadamlari — qaror #57 (7.5-band).
+4. Hal qilingan: ESLint pul qoidasi — qaror #57 (3.3-band).
+5. Hal qilingan: `.env.example`, `pip-audit`/`npm audit`/`gitleaks`, CSP — qaror #57 (10-bo'lim).
+6. `agent-1c/` o'rnatuvchi vositasi va test freymvorki — `34-1c-agent.md` da tanlanadi; OV kod-imzolash sertifikati — `26-ochiq-savollar-reestri.md` #105 (OQ-046).
 
 ## Manbalar
 
@@ -424,3 +474,4 @@ Manba — `15-xavfsizlik-va-audit.md` §4, `23-backend-arxitekturasi.md` §7.3.
 - `spec/kod-uchun/08-dizayn-tizimi.md` §0.1 — pul hisob-kitobi frontend qoidasi.
 - `spec/kod-uchun/27-backlog.md` — "tayyor" ta'rifi, bosqich tushunchasi.
 - `spec/kod-uchun/29-atamalar-lugati.md` — atama↔kod nomi xaritasi.
+- `spec/kod-uchun/33-1c-integratsiya.md` §4, §9, §15; `34-1c-agent.md` — `onec_integration` moduli va `agent-1c/` repo konventsiyasi.

@@ -7,6 +7,7 @@ buxgalteriya va soliq hisobotigacha **bitta tizim** + o'zbek tilidagi AI yordamc
 ## Asosiy qarorlar (tadqiqotdan, o'zgarmaydi)
 
 - Mahsulot noldan qurilgan, yadro 1C'siz ishlaydi. 1C bilan bog'lanish — alohida **1C integratsiya moduli** (noldan yoziladi, Sonar AI namunasi; `kod-uchun/01-qarorlar.md` #36, `../research_notes/sonar-1c-integratsiya/`).
+- 1C integratsiyasi — **faqat COM** (do'kon PK'sidagi Windows agenti, bulutdan pull, faqat chiquvchi HTTPS; OData/publish yo'q), ERP → 1C bir tomonlama, MVP'dan keyin **Bosqich 7** (`kod-uchun/33-1c-integratsiya.md`, `kod-uchun/34-1c-agent.md`, qarorlar #36–#42).
 - MVP 18 modul: kassa, qaytarish, chegirma, ombor qoldig'i, inventarizatsiya, ko'chirish, xarid,
   nasiya/qarz daftari, narxlar, QQS, buxgalteriya, hisobotlar, huquqlar, filiallar, xarajatlar,
   kassa pul harakati, obuna/ro'yxatdan o'tish, bildirishnomalar/Telegram bot (2026-10-14)
@@ -33,7 +34,7 @@ buxgalteriya va soliq hisobotigacha **bitta tizim** + o'zbek tilidagi AI yordamc
 
 | Papka | Mazmuni |
 |---|---|
-| **`spec/kod-uchun/`** | **Kod uchun yagona spetsifikatsiya** — 00–28 o'qish tartibida (`00-README.md` dan boshlang) |
+| **`spec/kod-uchun/`** | **Kod uchun yagona spetsifikatsiya** — 00–34 o'qish tartibida (`00-README.md` dan boshlang) |
 | `spec/tarix/` | Tekshiruvlar, qabul agentlari qarorlari, kamchiliklar tahlili, tuzatishlar jurnali, rasmiy xatlar — kod uchun shart emas |
 | `research_notes/` | Bozor va texnik tadqiqot (manbalar) |
 

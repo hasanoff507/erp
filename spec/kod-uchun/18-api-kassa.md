@@ -2,19 +2,20 @@
 
 **Maqsad:** POS kassa (smena, chek, qaytarish, chegirma), tasdiqlash navbati va qarz daftari uchun to'liq API kontrakti — voqea (event) payload'lari va REST resurslari.
 **Kim uchun:** Backend/frontend/Android ishlab chiquvchilar, QA.
-**Bog'liq fayllar:** `17-api-umumiy.md` (konventsiyalar), `11-malumotlar-modeli.md`, `13-provodka-qoidalari.md`, `21-integratsiyalar.md` (§1 OFD, §4 Asl belgisi, §9 Click/Payme/Uzum/UzQR), `16-offline-sync.md`, `15-xavfsizlik-va-audit.md`, `23-backend-arxitekturasi.md`, `03-modullar-talablari.md` (M01, M02, M03, M08, M16), `04-biznes-jarayonlar.md` (BP-03, BP-11, BP-12), `06-ekranlar-umumiy.md` (POS-01…15, BO-06, BO-16).
-**Holat:** joriy, 2026-10-15.
+**Bog'liq fayllar:** `17-api-umumiy.md` (konventsiyalar), `11-malumotlar-modeli.md`, `13-provodka-qoidalari.md`, `21-integratsiyalar.md` (§1 OFD, §4 Asl belgisi, §9 Click/Payme/Uzum/UzQR), `16-offline-sync.md` (§3.1 `/sync/push`, §9), `15-xavfsizlik-va-audit.md`, `23-backend-arxitekturasi.md`, `33-1c-integratsiya.md` §7.3 (`outbox_state` — 1C eksporti tayyorligi), `34-1c-agent.md` (Do'kon agenti — fiskal modul ko'prigi, qaror #60), `03-modullar-talablari.md` (M01, M02, M03, M08, M16), `04-biznes-jarayonlar.md` (BP-03, BP-11, BP-12), `06-ekranlar-umumiy.md` (POS-01…15, BO-06, BO-16).
+**Holat:** joriy, 2026-10-16.
 
 ## Asosiy xulosalar
 
 1. **Kassada yaratiladigan hujjatlar REST orqali emas** — smena, chek, qaytarish, qarz to'lovi (POS'da), kassa pul harakati, mijozni tezkor yaratish — barchasi `POST /api/v1/sync/push` orqali **voqea (event)** sifatida yuboriladi; `16-offline-sync.md` umumiy konvertni (`client_event_id`, `seq`, `type`) beradi, bu fayl shu voqealarning **to'liq payload sxemasini** belgilaydi.
 2. **Voqea turlari**: `shift.opened`, `shift.closed`, `sale.created`, `sale.draft_voided`, `receipt.reprinted`, `return.created`, `debt_payment.created`, `cash_movement.created`, `counterparty.created` (tezkor mijoz yaratish offline uchun, US-M08-05, §11.1), `expense.created` (faqat `cash_movement.created.reason=expense` orqali — §13.1, POS-14 "Xarajat" sababi), `transfer.sent`, `transfer.received`, `stock_count.line_recorded` (M04/M05 ombor voqealari — to'liq payload sxemasi `19-api-ombor.md`da, bu fayl faqat ro'yxatda tutadi).
 3. **Tasdiqlash ikki yo'l bilan ishlaydi**: (a) Menejer/Egasi kassada **jismonan** bo'lsa — PIN mahalliy (offline ham) tekshiriladi, voqea ichida `approval` obyekti bilan yuboriladi, server postingda qayta tekshiradi; (b) Menejer yo'q bo'lsa — **faqat online**, `POST /api/v1/approval-requests` orqali BO-16 navbatiga tushadi, Menejer PWA'dan tasdiqlaydi/rad etadi, POS natijani so'rab oladi (`approval_request_id`). Ikkisi ham bir xil `ApprovalRef` sxemasiga tushadi (§2.4).
-4. **To'lovlar (UzQR/Click/Payme/Uzum) ikki bosqichli**: avval `POST /api/v1/payments/checkouts` bilan to'lov boshlanadi (hali chek yo'q — `checkout_ref` qurilma beradi), tasdiq kelgandan keyin (poll yoki webhook) `sale.created` voqeasi shu `checkout_ref`/`provider_tx_id` bilan yuboriladi. Bu to'lovlar **faqat online**.
-5. Markirovka tekshiruvi (`POST /api/v1/marking-codes/verify`) — **sinxron**, chekka yozishdan oldin, hech narsa saqlamaydi; offline'da bu chaqiruv ishlamaydi, siyosat `16-offline-sync.md` §7 bo'yicha (narx ma'lum — ruxsat, noma'lum — taqiq).
-6. **Qarz daftari** — ikki kiritish yo'li: POS'dan tezkor (`debt_payment.created` voqeasi, offline ham) va back-office'dan (`POST /api/v1/debt-payments`, online). Ikkisi ham bitta `DebtPaymentPostingService`ga tushadi. Qarzni kechish/shubhali belgisi — faqat Egasi, faqat back-office REST (offline'da yo'q).
-7. Xato kodlari — to'liq ro'yxat §18da, `17-api-umumiy.md` xato katalogi bilan moslashtirilgan.
-8. Pul — `"12000.00"` (NUMERIC(18,2) string), miqdor — `"2.000"` (NUMERIC(18,3) string), sana — ISO 8601 (`doc_date`: `"2026-10-14"`, `created_at`: `"2026-10-14T09:12:03.482Z"`, UTC, `Z` qo'shimchasi bilan). Hujjat/registr ro'yxatlari — cursor pagination `?cursor=&limit=` → `{items, next_cursor}`; ma'lumotnoma ro'yxatlari (`counterparties`, `discount-rules`) — **page** pagination `?page=&size=` → `{items, total, page, size}`.
+4. **To'lovlar (dinamik UzQR/Click/Payme/Uzum) ikki bosqichli**: avval `POST /api/v1/payments/checkouts` bilan to'lov boshlanadi (hali chek yo'q — `checkout_ref` qurilma beradi), tasdiq kelgandan keyin (poll yoki webhook) `sale.created` voqeasi shu `checkout_ref`/`provider_tx_id` bilan yuboriladi. Bu to'lovlar **faqat online**. **Statik UzQR** — checkout'siz, kassir qo'lda tasdiqlaydi (mustaqil terminaldagi `card` kabi), faqat online. Karta to'lovida `card_type` majburiy, ijtimoiy kartada `card_mask` va `rrn` ham (qaror #64). Fiskal chekni har doim bizning kassamiz chiqaradi — provayder tomonidagi avto-fiskalizatsiya o'chiq bo'lishi shart (§16).
+5. **Markirovka**: kod Asl belgisi'ga **fiskal chek ichida** OFD orqali boradi (`items[].marking_codes`), sotuv uchun CRPT API chaqirilmaydi (qaror #62). Sotuvdan oldingi tekshiruv (`POST /api/v1/marking-codes/verify`) — `MARKING_PRECHECK=off|warn|block`, standart `warn`: tekshiruv o'tmasa yoki CRPT javob bermasa sotuv davom etadi, `warnings[]`da `MARKING_PRECHECK_WARNING` (§4.2, §15). Lokal takror-kod tekshiruvi har doim ishlaydi.
+6. **Fiskal bloklar**: shu kassada OFD tasdig'ini olmagan eng eski chek ≥ 48 soat bo'lsa yangi fiskal chek (sotuv, qaytarish, qarz to'lovi) rad etiladi — `FISCAL_OFFLINE_48H_BLOCKED` (qaror #43); fiskal modul holati `fm_state ≠ ok` bo'lsa — `FISCAL_DEVICE_LOCKED` (§4.10).
+7. **Qarz daftari** — ikki kiritish yo'li: POS'dan tezkor (`debt_payment.created` voqeasi, offline ham) va back-office'dan (`POST /api/v1/debt-payments`, online). Ikkisi ham bitta `DebtPaymentPostingService`ga tushadi. Qarzni kechish/shubhali belgisi — faqat Egasi, faqat back-office REST (offline'da yo'q).
+8. Xato kodlari — to'liq ro'yxat §18da, `17-api-umumiy.md` xato katalogi bilan moslashtirilgan.
+9. Pul — `"12000.00"` (NUMERIC(18,2) string), miqdor — `"2.000"` (NUMERIC(18,3) string), sana — ISO 8601 (`doc_date`: `"2026-10-14"`, `created_at`: `"2026-10-14T09:12:03.482Z"`, UTC, `Z` qo'shimchasi bilan). Hujjat/registr ro'yxatlari — cursor pagination `?cursor=&limit=` → `{items, next_cursor}`; ma'lumotnoma ro'yxatlari (`counterparties`, `discount-rules`) — **page** pagination `?page=&size=` → `{items, total, page, size}`.
 
 ---
 
@@ -73,10 +74,10 @@
 | 30 | `POST /api/v1/fiscal-receipts/{id}/retry` | Qo'lda qayta urinish (BO-14) | 14.2 |
 | 31 | `GET /api/v1/einvoices?direction=out` / `POST /einvoices` / `POST /einvoices/from-receipt` / sign / `send` / `cancel` | Chiquvchi e-faktura (B2B) | 14a |
 | 32 | `POST /api/v1/marking-codes/verify` | Markirovka kodini tekshirish (sinxron) | 15 |
-| 33 | `POST /api/v1/payments/checkouts` | To'lov boshlash (uzqr/click/payme/uzum) | 16.2 |
+| 33 | `POST /api/v1/payments/checkouts` | To'lov boshlash (dinamik uzqr/click/payme/uzum; statik UzQR checkout'siz) | 16.2 |
 | 34 | `GET /api/v1/payments/checkouts/{checkout_ref}` | To'lov holati | 16.3 |
 | 35 | `POST /api/v1/payments/webhooks/{provider}` | Bank/to'lov tizimi tasdig'i (kiruvchi) | 16.4 |
-| 36 | `POST /api/v1/sync/push` / `GET /api/v1/sync/pull` | POS bootstrap/sinxron (to'liq — `16-offline-sync.md`) | 17 |
+| 36 | `POST /api/v1/sync/push` / `GET /api/v1/sync/pull` | POS bootstrap/sinxron (to'liq — `16-offline-sync.md`; push so'rovi — §2.6) | 17, 2.6 |
 | 37 | `GET /api/v1/sales` / `GET /api/v1/sales/{id}` | Chek qidiruvi (back-office/POS-05) | 4.8 |
 
 ---
@@ -129,6 +130,16 @@ Server validatsiyasi (ikkala holatda ham): `approved_by_user_id` (yoki `approval
 ```
 
 `details` har doim massiv, `params` — ixtiyoriy biznes kontekst obyekti (`17-api-umumiy.md` §7.1).
+
+### 2.6 `SyncPushRequest` (`POST /api/v1/sync/push` so'rov tanasi)
+
+| Maydon | Tur | Majburiy | Izoh |
+|---|---|---|---|
+| `device_id` | UUIDv7 | ha | `devices` yozuviga mos (token `device_id` bilan bir xil bo'lishi shart) |
+| `events` | `SyncEventEnvelope[]` (§2.1) | ha | `seq` tartibida, partiya ≤ 100 voqea (standart, sozlanadi — qaror #54); bo'sh massiv ruxsat — davriy holat hisoboti |
+| `outbox_state` | object | ha | Shu so'rovga kiritilmagan outbox qismi: `{pending_count: integer ≥ 0, oldest_pending_created_at: timestamptz\|null}` (`pending_count = 0` da `null`); yo'q yoki noto'g'ri bo'lsa `422 VALIDATION_ERROR` |
+
+Javob — `{results: PushResultEntry[]}` (§2.2). `outbox_state` asosida server `devices.outbox_pending_count`/`outbox_oldest_pending_at`/`outbox_reported_at` va `last_sync_at` ni bitta tranzaksiyada yangilaydi (rad etilgan voqealar ham hisobga qo'shiladi) — to'liq qoida va 1C eksporti tayyorligidagi o'rni `16-offline-sync.md` §3.1, §9; `33-1c-integratsiya.md` §7.3.
 
 ---
 
@@ -241,8 +252,8 @@ Server hisoblaydi: `expected_cash = opening_cash + Σcash_moves(shift_id)` (`sto
 | `discount_source` | enum\|null | shartli | `discount_amount`/`discount_pct` bo'lsa majburiy: `manual` / `standing_customer` / `rule` |
 | `discount_rule_id` | UUID\|null | shartli | `discount_source=rule`da majburiy |
 | `discount_approval` | `ApprovalRef`\|null | shartli | `discount_source=manual` va foiz standart limitdan (odatda 5%) oshsa majburiy (§9) |
-| `marking_code` | string\|null | shartli | Tovar `is_marked=true` bo'lsa majburiy; qty har doim `"1.000"` bo'lishi shart (har kod alohida qator) |
-| `marking_offline` | boolean | yo'q | `true` — offline sotilgan, CRPT tasdig'i kutilmoqda (`marking_codes.status=pending_verification`) |
+| `marking_code` | string\|null | shartli | Tovar `is_marked=true` bo'lsa majburiy — DataMatrix xom qiymati, GS (`\u001d`) ajratgichlari bilan **aynan** (fiskal chekka shu ko'rinishda ketadi); qty har doim `"1.000"` bo'lishi shart (har kod alohida qator) |
+| `marking_offline` | boolean | yo'q | `true` — offline sotilgan, sotuvdan oldingi tekshiruv (§15) qilinmagan; kod baribir fiskal chek bilan OFD'ga ketadi (§4.2) |
 
 `line_no` — qurilma yubormaydi, server massiv indeksi+1 sifatida belgilaydi; `line_total`, `vat_amount`, `cost_amount` — qurilma hisoblab yuboradi (offline jami ko'rsatish uchun), server qayta hisoblab tekshiradi (mos kelmasa `VALIDATION_ERROR`) — "qotirilgan" qiymat emas.
 
@@ -252,18 +263,27 @@ Server hisoblaydi: `expected_cash = opening_cash + Σcash_moves(shift_id)` (`sto
 |---|---|---|---|
 | `method` | enum | ha | `cash` / `card` / `uzqr` / `click` / `payme` / `uzum` / `debt` |
 | `amount` | Money | ha | > `"0.00"` |
-| `terminal_ref` | string\|null | yo'q | Faqat `method=card`, mustaqil terminal operatsiya raqami (online/offline ikkisida ham) |
-| `checkout_ref` | UUID\|null | shartli | `uzqr`/`click`/`payme`/`uzum`da majburiy — §16dagi `payment_checkouts.checkout_ref` |
-| `provider_tx_id` | string\|null | shartli | `uzqr`/`click`/`payme`/`uzum`da majburiy — §16dagi checkout natijasidan |
-| `qr_type` | enum\|null | yo'q | `static`/`dynamic`, faqat `method=uzqr` |
+| `terminal_ref` | string\|null | yo'q | `method=card` — mustaqil terminal operatsiya raqami (online/offline ikkisida ham); `method=uzqr` + `qr_type=static` — ixtiyoriy to'lov raqami (kassir mijoz telefonidan kiritadi) |
+| `card_type` | enum\|null | shartli | `personal` / `corporate` / `social` / `unknown`; `method=card` bo'lsa majburiy (POS standart qiymati `personal`, kassir terminal chekiga qarab o'zgartiradi), boshqa usullarda `null` — chekdagi majburiy "karta turi" rekviziti (qaror #64) |
+| `card_mask` | string\|null | shartli | Karta niqobi — birinchi va oxirgi 4 raqam, terminal chekidan; format `^[0-9]{4}\*+[0-9]{4}$` (masalan `8600****1234`); `card_type=social` bo'lsa majburiy, boshqa holatda ixtiyoriy |
+| `rrn` | string\|null | shartli | Tranzaksiyaning unikal raqami (RRN, terminal chekidan); `card_type=social` bo'lsa majburiy, boshqa holatda ixtiyoriy |
+| `qr_type` | enum\|null | shartli | `static`/`dynamic`; `method=uzqr` bo'lsa majburiy, boshqa usullarda `null` |
+| `checkout_ref` | UUID\|null | shartli | `click`/`payme`/`uzum` va `uzqr`+`qr_type=dynamic`da majburiy — §16dagi `payment_checkouts.checkout_ref`; `uzqr`+`qr_type=static`da `null` (checkout yaratilmaydi) |
+| `provider_tx_id` | string\|null | shartli | `click`/`payme`/`uzum` va `uzqr`+`qr_type=dynamic`da majburiy — §16dagi checkout natijasidan; **istisno**: `uzqr`+`qr_type=static` — ixtiyoriy (qo'lda tasdiq, ixtiyoriy to'lov raqami `terminal_ref`da) — `sale_payments` CHECK shu qoida bilan (`12-db-sxema.md`) |
 | `due_date` | ISO sana\|null | yo'q | Faqat `method=debt` — "va'da sanasi" (bitta, bo'lib to'lash grafigi yo'q); `debt_moves.due_date`/`counterparties.debt_due_date` manbasi |
 | `debt_approval` | `ApprovalRef`\|null | shartli | `method=debt` va joriy qarz+summa kredit limitidan oshsa (online rejimda majburiy; offline'da — §4.3) |
 
-### 4.2 Markirovka qatori qoidalari
+Mos kelmagan shart (masalan `method=card` va `card_type` yo'q, `card_type=social` va `card_mask`/`rrn` yo'q, `uzqr` va `qr_type` yo'q) — `VALIDATION_ERROR`.
 
-- `marking_offline=true` bilan kelgan qator — server `marking_codes(status=pending_verification)` yozadi, `outbox_jobs(kind=marking_sell)` navbatga qo'yadi (internet qaytganda CRPT Turon'ga `verify_code`+`sell`).
-- `marking_offline=false` (online sotuv) — `sale.created`dan **oldin** `POST /api/v1/marking-codes/verify` chaqirilgan bo'lishi kerak (§15); server shu holatni `marking_codes.status` bo'yicha tekshiradi, mos kelmasa `MARKING_CODE_INVALID`.
-- Bir xil `marking_code` ikkinchi marta boshqa hujjatga chiqarilsa — `MARKING_CODE_ALREADY_SOLD`.
+### 4.2 Markirovka qatori qoidalari (qaror #62)
+
+- **Kod qayerga ketadi**: chakana sotuvda markirovka kodi Asl belgisi'ga **fiskal chek ichida** OFD orqali uzatiladi — `FiscalPort` chek payload'ida `items[].marking_codes[]` (GS ajratgichlari bilan aynan, `marking_code` qiymatining o'zi). Sotuv uchun CRPT API chaqirilmaydi, `marking_sell` outbox ishi yo'q; server `marking_codes(status='pending_verification')` yozadi, chek OFD tasdig'ini (`fiscal_receipts.ofd_acked_at`) olgach `status='sold'` (`16-offline-sync.md` §7). CRPT API (`MarkingPort`) faqat qabul, tekshiruv, qaytarish va hisobdan chiqarish uchun.
+- **Sotuvdan oldingi tekshiruv** — `MARKING_PRECHECK` tenant sozlamasi (`off` / `warn` / `block`, standart `warn`):
+  - `off` — POS `POST /api/v1/marking-codes/verify`ni chaqirmaydi;
+  - `warn` — online sotuvda POS §15ni chaqiradi; kod tekshiruvdan o'tmasa yoki CRPT javob bermasa (timeout) §15 javobida `200` + `warnings=["MARKING_PRECHECK_WARNING"]`, `audit_log` yozuvi, sotuv **davom etadi** (`sale.created` bu sabab bilan rad etilmaydi);
+  - `block` — §15 tekshiruvdan o'tmagan kod `MARKING_VERIFY_FAILED`, CRPT javob bermasa `MARKING_VERIFY_UNAVAILABLE` qaytaradi; POS bunday kodli qatorni chekka qo'shmaydi (javob bermaganda offline siyosatini taklif qiladi, `16-offline-sync.md` §7). `sale.created` CRPT'ni qayta chaqirmaydi.
+- **Lokal takror-kod tekshiruvi** (rejimdan qat'i nazar, offline'da ham): bitta chekda bir xil kod ikki marta — `VALIDATION_ERROR`; tenantda allaqachon sotilgan kod (qurilmadagi lokal outbox va sinxronlangan `marking_codes` keshi, serverda `marking_codes.status IN ('sold','pending_verification')`) — `MARKING_CODE_ALREADY_SOLD`. Format xatosi (DataMatrix o'qilmadi) — `MARKING_CODE_INVALID`.
+- `marking_offline=true` — offline sotuv, oldindan tekshiruv qilinmagan; narx qurilmada noma'lum bo'lsa sotuv taqiq (`MARKING_PRICE_UNKNOWN_OFFLINE`, `16-offline-sync.md` §7).
 
 ### 4.3 Qarz (debt) va offline limit
 
@@ -276,19 +296,21 @@ Server discount'ni **qayta hisoblamaydi** (narx kabi "qotirilgan") — faqat: (1
 
 ### 4.5 Server javobi va fiskal holat
 
-`server`: `{id, number, fiscal_receipt_seq, fiscal: {status: "pending"|"deferred"}, warnings: []}` — `fiscal_receipt_seq` qurilma yuborgan `receipt_seq`ning aks-sadosi (server o'zi raqam bermaydi). Fiskal belgi/QR keyingi `GET /api/v1/sync/pull`da yoki `GET /api/v1/fiscal-receipts/{id}`da keladi (§14).
+`server`: `{id, number, fiscal_receipt_seq, fiscal: {status: "pending"|"deferred"}, warnings: []}` — `fiscal_receipt_seq` qurilma yuborgan `receipt_seq`ning aks-sadosi (server o'zi raqam bermaydi). Fiskal modul bergan raqam (`fiscal_receipts.fm_receipt_seq`), fiskal belgi/QR keyingi `GET /api/v1/sync/pull`da yoki `GET /api/v1/fiscal-receipts/{id}`da keladi (§14).
 
-**`fiscal.status` qiymati — qarzga sotuv**:
-- `payments[]`da **faqat** `method=debt` bo'lsa — `fiscal_receipts` yozuvi **yaratilmaydi**, javobdagi `fiscal.status="deferred"` (chek chiqarilmaydi, `fiscal_receipt_seq` shunga qaramay saqlanadi — keyinchalik qarz to'langanda chiqariladigan chekda ishlatiladi, §12.2). Sotuv hujjatining o'zi (qoldiq −, qarz +) oddiy tartibda yoziladi.
-- **Aralash to'lov** (masalan qisman naqd + qisman qarz, `payments[]`da bir nechta usul) — naqd/karta/UzQR/Click/Payme/Uzum qismiga **darhol** oddiy fiskal chek chiqariladi (`fiscal_receipts.kind='sale'`, faqat non-debt qatorlar/summasi bilan), `fiscal.status="pending"→"sent"`; qarz qismiga mos chek **qarz to'langanda** chiqariladi (§12.2). Javobda `fiscal.status` aralash holatda ham `"pending"` (non-debt qismi fiskallanadi) qaytadi.
-- Faqat naqd/karta/UzQR/Click/Payme/Uzum (qarz yo'q) — o'zgarishsiz, `fiscal.status="pending"`.
-- Amalga oshirish `FiscalPolicy` (tenant/global sozlama, `13-provodka-qoidalari.md` §5.x) ortida — buxgalter/yurist javobigacha standart yoqilgan holatda qoladi, kelajakda o'zgartirish migratsiyasiz.
+**Qarzga sotuv — daromad va fiskal chek** (qaror #30, #45, #59):
+- **Daromad va QQS faqat sotuv kuni** tan olinadi (BHMS 2, SK 242-modda 1-qism, 78-modda) — `SalePostingService` provodkasi `doc_date` bilan, to'lov usulidan qat'i nazar (`13-provodka-qoidalari.md` §2.14). Fiskal chek esa **to'lov kuni** chiqariladi (§12.2) — provodka sanasi ≠ fiskal chek sanasi.
+- `payments[]`da **faqat** `method=debt` bo'lsa — fiskal chek (`kind='sale'`) **chiqarilmaydi**, javobdagi `fiscal.status="deferred"` (`fiscal_receipt_seq` shunga qaramay saqlanadi). Sotuv hujjatining o'zi (qoldiq −, qarz +, daromad, QQS) oddiy tartibda yoziladi. `FiscalPolicy.credit_sale_receipt` = `none` (standart) / `credit_type` — `credit_type`da sotuv paytida `fiscal_receipts(kind='credit_sale')` (QR va fiskal belgisiz "kredit" turidagi chek) chiqariladi; bu tur kerakligi va OFD chek turi kodi tashqi javobga bog'liq (Ochiq savollar 1).
+- **Aralash to'lov** (masalan qisman naqd + qisman qarz) — naqd/karta/UzQR/Click/Payme/Uzum qismiga **darhol** oddiy fiskal chek chiqariladi (`fiscal_receipts.kind='sale'`, faqat non-debt qatorlar/summasi bilan), `fiscal.status="pending"`; qarz qismiga chek **qarz to'langanda** chiqariladi (§12.2).
+- Faqat naqd/karta/UzQR/Click/Payme/Uzum (qarz yo'q) — `fiscal.status="pending"`.
+
+**Chekdagi to'lov rekvizitlari** (2026-10-22 dan majburiy, qaror #64): `fiscal_receipts.payment_form` — `cash` (naqd), `card` (bank kartalari), `qr` (`uzqr`/`click`/`payme`/`uzum` — QR-kodli to'lov), `mixed` (bitta chekda bir nechta shakl); karta to'lovida chekka `card_type` (shaxsiy/korporativ/ijtimoiy), ijtimoiy kartada `card_mask` va `rrn` ham yoziladi. Bu maydonlar `payments[]`dan olinadi, `FiscalPort` chek payload'iga xaritalanadi (`21-integratsiyalar.md` §1).
 
 **Chek tili — ikki tilli chek**: chek matni/payload **ikki tilda** chiqadi — har bir tovar qatori `"{products.name} / {products.name_ru}"` (name_ru bo'lmasa faqat `name`); sarlavha/yakun matnlari ham ikki tilda ("Jami / Итого", "Qaytim / Сдача" va h.k., to'liq lug'at — chop etish shabloni, §4.9). Fiskal rekvizitlar (STIR, OFD QR, chek raqami) — OFD operatori talab qilgan formatda, tarjima qilinmaydi.
 
 ### 4.6 Xatolar (voqea darajasida)
 
-`SHIFT_NOT_OPEN`, `SHIFT_DEVICE_MISMATCH`, `RECEIPT_SEQ_CONFLICT` (`UNIQUE(cash_register_id, shift_id, receipt_seq)` buzilgan — `retryable:false`, eskalatsiya), `STOCK_NEGATIVE` (faqat **ogohlantirish**, offline overselling ruxsat — §4.7), `DISCOUNT_LIMIT_EXCEEDED`, `DEBT_LIMIT_EXCEEDED`, `MARKING_CODE_INVALID`, `MARKING_PRICE_UNKNOWN_OFFLINE`, `APPROVAL_INVALID` (`ApprovalRef` kutilgan, kelmagan), `SUBSCRIPTION_RESTRICTED`, `VALIDATION_ERROR`.
+`SHIFT_NOT_OPEN`, `SHIFT_DEVICE_MISMATCH`, `RECEIPT_SEQ_CONFLICT` (`UNIQUE(cash_register_id, shift_id, receipt_seq)` buzilgan — `retryable:false`, eskalatsiya), `STOCK_NEGATIVE` (faqat **ogohlantirish**, offline overselling ruxsat — §4.7), `DISCOUNT_LIMIT_EXCEEDED`, `DEBT_LIMIT_EXCEEDED`, `MARKING_CODE_INVALID`, `MARKING_CODE_ALREADY_SOLD`, `MARKING_PRICE_UNKNOWN_OFFLINE`, `FISCAL_OFFLINE_48H_BLOCKED`, `FISCAL_DEVICE_LOCKED` (§4.10), `APPROVAL_INVALID` (`ApprovalRef` kutilgan, kelmagan), `SUBSCRIPTION_RESTRICTED`, `VALIDATION_ERROR`.
 
 ### 4.7 Manfiy qoldiq (overselling)
 
@@ -311,7 +333,18 @@ Server discount'ni **qayta hisoblamaydi** (narx kabi "qotirilgan") — faqat: (1
 
 ### 4.9 Chek chop etish shabloni — ikki til
 
-Chek chop etish shabloni (`shared/lib/printer` adapteri — WebUSB/Serial/Bluetooth/tarmoq/bulut, `24-frontend-arxitekturasi.md` §6; native Android — `EscPosPrinterAdapter`/`FiscalPrinterAdapter`, `28-android-pos.md` §4) qator formatini quyidagicha quradi: `{products.name}` birinchi qatorda, agar `products.name_ru` bo'sh bo'lmasa — ikkinchi (kichikroq shrift) qatorda `"{products.name_ru}"`, yoki 80mm'da bitta qatorga sig'adigan `"{name} / {name_ru}"` shablonda. Standart lug'at (uz → ru) sarlavha/yakun matnlari uchun: `Jami`→`Итого`, `Chegirma`→`Скидка`, `Qaytim`→`Сдача`, `Naqd`→`Наличные`, `Karta`→`Карта`, `Qarz`→`Долг`, `Sana`→`Дата`, `Kassir`→`Кассир`. Fiskal rekvizitlar bloki (STIR/korxona nomi, OFD QR, fiskal belgi, chek raqami) — OFD operatori hujjatida ko'rsatilgan tayyor formatda chiqadi, tarjima qilinmaydi. Shablon joylashuvi: `receipt_templates/{80mm,58mm}.json`.
+Chek chop etish shabloni (`shared/lib/printer` adapteri — WebUSB/Serial/Bluetooth/tarmoq/bulut, `24-frontend-arxitekturasi.md` §6; native Android — `EscPosPrinterAdapter`/`FiscalPrinterAdapter`, `28-android-pos.md` §4) qator formatini quyidagicha quradi: `{products.name}` birinchi qatorda, agar `products.name_ru` bo'sh bo'lmasa — ikkinchi (kichikroq shrift) qatorda `"{products.name_ru}"`, yoki 80mm'da bitta qatorga sig'adigan `"{name} / {name_ru}"` shablonda. Standart lug'at (uz → ru) sarlavha/yakun matnlari uchun: `Jami`→`Итого`, `Chegirma`→`Скидка`, `Qaytim`→`Сдача`, `Naqd`→`Наличные`, `Karta`→`Карта`, `Qarz`→`Долг`, `Sana`→`Дата`, `Kassir`→`Кассир`. Fiskal rekvizitlar bloki (STIR/korxona nomi, OFD QR, fiskal belgi, chek raqami, to'lov shakli va karta turi — §4.5) — OFD operatori hujjatida ko'rsatilgan tayyor formatda chiqadi, tarjima qilinmaydi. Shablon joylashuvi: `receipt_templates/{80mm,58mm}.json`.
+
+### 4.10 Fiskal bloklar (sotuv, qaytarish, qarz to'lovi uchun umumiy)
+
+Fiskal chek `FiscalPort` orqali chiqariladi — hamkor bulut API'si yoki do'kon kompyuteridagi **Do'kon agenti** (fiskal modul ko'prigi, qaror #60; `34-1c-agent.md`); MVP kodi `FISCAL_PROVIDER=fake` bilan. Fiskal modul o'z raqamini beradi — `fiscal_receipts.fm_receipt_seq` (qurilma `receipt_seq`idan alohida, ikkisi ham saqlanadi), shuningdek `fm_terminal_id`, `fiscal_at`, OFD tasdig'i vaqti `ofd_acked_at`.
+
+| Shart | Natija |
+|---|---|
+| Shu `cash_register_id`da `ofd_acked_at IS NULL` bo'lgan eng eski fiskal chekning `created_at`idan **≥ 48 soat** o'tgan (`cash_registers.last_unacked_receipt_at`) | Yangi fiskal chek talab qiladigan voqea (`sale.created`, `return.created`, `debt_payment.created`) rad etiladi — `409 FISCAL_OFFLINE_48H_BLOCKED`, `retryable:false`, `audit_log` + M18 xabari (qaror #43; VMQ-943 2-ilova 6-band). Fiskal bo'lmagan amallar (`/sync/push` bilan kutilayotgan cheklarni yuborish, smenani yopish, naqd sanash, qoldiq ko'rish) ishlayveradi; barcha kutilayotgan cheklar OFD tasdig'ini olgach blok avtomatik yechiladi; qo'lda chetlab o'tish yo'q |
+| `cash_registers.fm_state ≠ 'ok'` (`locked` / `ack_overdue` / `memory_full` / `unknown`) | Yangi fiskal chek rad etiladi — `409 FISCAL_DEVICE_LOCKED`, `retryable:false`, `params.fm_state` bilan |
+
+Asosiy himoya — POS'ning o'zida: qurilma 24 soatda 🟡, 40 soatda 🔴 + Egasiga M18, 46 soatda har chek oldidan modal ko'rsatadi va 48 soatda yangi chekni lokal bloklaydi (`16-offline-sync.md` §6); server tekshiruvi — ikkinchi qatlam. Tekshiruv voqeaning `created_at`i bo'yicha: blokdan oldin yaratilib, keyin sinxronlangan voqea rad etilmaydi.
 
 ---
 
@@ -375,7 +408,7 @@ Chek chop etish shabloni (`shared/lib/printer` adapteri — WebUSB/Serial/Blueto
 | `lines[]` | array | ha, ≥1 | pastda |
 | `reason` | enum | ha | `defective`/`wrong_item`/`customer_changed_mind`/`other` |
 | `refund_method` | enum | ha | `cash`/`card`/`debt_adjustment` (asl to'lov usuliga qarab) |
-| `approval` | `ApprovalRef`\|null | shartli | `sale_id=null` YOKI summa `returns.approve.limit_value` (standart 100 000 so'm)dan oshsa majburiy |
+| `approval` | `ApprovalRef`\|null | shartli | `sale_id=null` YOKI summa `returns.approve.limit_value` (standart 100 000 so'm)dan oshsa YOKI muddati o'tgan tovar qatori bo'lsa (pastda) va `actor_user_id`da `returns.approve` yo'q bo'lsa majburiy |
 
 **`lines[]`**:
 
@@ -388,11 +421,17 @@ Chek chop etish shabloni (`shared/lib/printer` adapteri — WebUSB/Serial/Blueto
 | `vat_rate` | decimal (2 xona) | ha | `"12.00"`/`"0.00"` |
 | `vat_exemption_code` | string\|null | shartli | QQS imtiyoz kodi |
 | `marking_code` | string\|null | shartli | Markirovkalangan qatorda majburiy |
+| `restock` | boolean | yo'q | Standart `true` — tovar sotuvga yaroqli qoldiqqa qaytadi; `false` — qoldiqqa qaytmaydi (`return_lines.restock`). Muddati o'tgan tovarda server majburan `false` qiladi (pastda) |
 
-**Markirovka qoidasi**: `marking_code` bor qatorli `return.created` — **faqat `is_offline=false`** bilan qabul qilinadi; qurilma offline'da bu amal tugmasini bloklaydi (POS-05), lekin server ham qayta tekshiradi: offline voqea markirovka qatori bilan kelsa `MARKING_RETURN_REQUIRES_ONLINE`.
+**Muddati o'tgan tovarni qaytarish** (qaror #48): qator tovarining yaroqlilik muddati o'tgan bo'lsa (`expiry_date < bugun`, Toshkent kuni; asl sotuv partiyasi bo'yicha) — qaytarish ruxsat, lekin:
+- `restock` majburan `false` (qurilma `true` yuborsa ham server `false` yozadi, `warnings`siz);
+- `actor_user_id`da `returns.approve` bo'lmasa `approval` (`ApprovalRef`, `returns.approve` egasi — Menejer/Egasi) majburiy, aks holda `APPROVAL_REQUIRED` (`retryable:false`; POS PIN yoki BO-16 so'rovini taklif qiladi — `kind=return_over_limit`, `context.expired_return=true`);
+- posting shu tranzaksiyada `write_offs` **qoralamasini** yaratadi (`source_return_id` = shu qaytarish, `write_off_lines.reason='expired_return'`), Menejer keyin back-office'da o'tkazadi (`19-api-ombor.md` §15).
 
-**Javob**: `{id, number, fiscal_receipt_seq, fiscal: {status: "pending"}}` (qaytarish cheki ham OFD'ga yuboriladi).
-**Xatolar**: `SALE_NOT_FOUND` (`retryable:true` — asl chek hali sinxronlanmagan), `RETURN_QTY_EXCEEDED`, `RETURN_LIMIT_EXCEEDED`, `APPROVAL_INVALID`, `MARKING_CODE_INVALID`, `MARKING_RETURN_REQUIRES_ONLINE`.
+**Markirovka qoidasi**: `marking_code` bor qatorli `return.created` — **faqat `is_offline=false`** bilan qabul qilinadi; qurilma offline'da bu amal tugmasini bloklaydi (POS-05), lekin server ham qayta tekshiradi: offline voqea markirovka qatori bilan kelsa `MARKING_RETURN_REQUIRES_ONLINE`. Bu qonundan qat'iyroq ichki tanlov (kod holatini tekshirish, firibgarlikdan himoya). Kod Asl belgisi'ga qaytarish fiskal cheki ichida OFD orqali boradi (§4.2 bilan bir xil, `items[].marking_codes`).
+
+**Javob**: `{id, number, fiscal_receipt_seq, fiscal: {status: "pending"}, write_off_id|null, warnings: []}` (qaytarish cheki ham OFD'ga yuboriladi; `write_off_id` — muddati o'tgan qator bo'lsa yaratilgan qoralama).
+**Xatolar**: `SALE_NOT_FOUND` (`retryable:true` — asl chek hali sinxronlanmagan), `RETURN_QTY_EXCEEDED`, `RETURN_LIMIT_EXCEEDED`, `APPROVAL_REQUIRED` (muddati o'tgan tovar, `returns.approve` yo'q), `APPROVAL_INVALID`, `MARKING_CODE_INVALID`, `MARKING_RETURN_REQUIRES_ONLINE`, `FISCAL_OFFLINE_48H_BLOCKED`, `FISCAL_DEVICE_LOCKED` (§4.10).
 **Idempotentlik**: `client_event_id`.
 **Offline**: oddiy tovar — to'liq ishlaydi (append-only); markirovkalangan — bloklanadi (yuqorida).
 **Bog'liq**: US-M02-01…03, POS-05.
@@ -461,7 +500,7 @@ Umumiy mexanizm — chegirma (limitdan yuqori), qaytarish (limitdan yuqori/chek 
 | `status` | enum | `pending` / `approved` / `rejected` / `expired` / `consumed` — hujjat postingda shu so'rovni ishlatgach `consumed`ga o'tadi, qayta ishlatilmaydi |
 | `requested_by`, `requested_at` | UUID, ISO | — |
 | `resolved_by`, `resolved_at`, `reject_reason` | UUID\|null, ISO\|null, string\|null | — |
-| `expires_at` | ISO | `requested_at + 15 daqiqa` (taxmin, Ochiq savollar #1) |
+| `expires_at` | ISO | `requested_at + 15 daqiqa` (standart, sozlanadi — 26 #87) |
 
 ### 9.2 `POST /api/v1/approval-requests`
 
@@ -485,7 +524,7 @@ Umumiy mexanizm — chegirma (limitdan yuqori), qaytarish (limitdan yuqori/chek 
 
 **Maqsad**: BO-16 navbati.
 **Ruxsat**: `discount.approve`/`returns.approve`/`debts.approve`/`prices.approve`/`cash.withdraw` (limit ≥ summa)/`expenses.approve`/`stock.writeoff` (yuqori limit) — mos `kind` bo'yicha filtrlanadi (foydalanuvchi faqat o'z huquqiga mos `kind`larni ko'radi); to'liq `kind` → tasdiqlovchi ruxsati xaritasi — `15-xavfsizlik-va-audit.md` §2.3 (yagona manba).
-**So'rov**: `?status=pending&cursor=&limit=`. POS tomoni `GET /api/v1/approval-requests/{id}` orqali **poll** qiladi (taxmin: har 3 soniyada) `status` o'zgarishini kutib.
+**So'rov**: `?status=pending&cursor=&limit=`. POS tomoni `GET /api/v1/approval-requests/{id}` orqali **poll** qiladi (har 3 soniyada — standart, sozlanadi, 26 #87) `status` o'zgarishini kutib.
 **Bog'liq**: BO-16.
 
 ### 9.4 `POST /api/v1/approval-requests/{id}/approve`
@@ -584,7 +623,7 @@ Umumiy mexanizm — chegirma (limitdan yuqori), qaytarish (limitdan yuqori/chek 
 **Maqsad**: qarz to'lovini qabul qilish.
 **Ruxsat**: `debts.payment.accept`.
 
-**Fiskal chek**: har bir `debt_payment.created` (`post` bosqichida, `FiscalPolicy` yoqilgan bo'lsa — standart yoqilgan) uchun `fiscal_receipts` yozuvi yaratiladi, `kind='debt_settlement'`, summasi = `amount`. Tovar qatorlari qo'lda kiritilmaydi — server allokatsiya natijasidagi `debt_payment_allocations`dan qaysi `sales`ni qancha yopganini oladi va shu sotuv(lar)ning `sale_lines`idan **proporsional** (yopilgan summa ulushiga ko'ra) qator ro'yxatini chiqaradi (QQS ham shu nisbatda bo'linadi). `debt_openings` (eski qog'oz qarz) allokatsiyasiga mos qism — tovar qatorsiz, faqat umumiy summa bilan (asl tovar tarkibi tizimda yo'q). Chiqarilgan chek ikki tilda (§4.9). `FiscalAdapter.issue_credit_payment()` porti shu oqimni amalga oshiradi (`FiscalPolicy.debt_settlement_receipts_enabled` ortida, buxgalter/yurist tasdig'i kelganda o'chirish/o'zgartirish migratsiyasiz). Daromad/QQS tan olish vaqti (sotuvdami, to'lovdami) — ochiq savol buxgalter uchun, `13-provodka-qoidalari.md` §5.x'da belgilanadi.
+**Fiskal chek** (qaror #30, #45): qarz to'lovida pul qabul qilinganini tasdiqlovchi chek majburiy (VMQ-943 1-ilova 30-band). **Bitta to'lov = bitta chek**: har bir `debt_payment.created` (`post` bosqichida) uchun **bitta** `fiscal_receipts` yozuvi yaratiladi, `kind='debt_settlement'`, summasi = olingan pul (`amount`). Tovar qatorlari qo'lda kiritilmaydi — server allokatsiya natijasidagi `debt_payment_allocations`dan qaysi `sales`ni qancha yopganini oladi va shu sotuv(lar)ning `sale_lines`idan **proporsional** (yopilgan summa ulushiga ko'ra) qator ro'yxatini chiqaradi (QQS ham shu nisbatda bo'linadi). `debt_openings` (eski qog'oz qarz) allokatsiyasiga mos qism — tovar qatorsiz, faqat umumiy summa bilan (asl tovar tarkibi tizimda yo'q). Zaxira sozlama `FiscalPolicy.debt_receipt_split` = `single` (standart) / `per_sale` (har yopilgan sotuvga alohida chek) — migratsiyasiz almashtiriladi. Chiqarilgan chek ikki tilda (§4.9), to'lov rekvizitlari bilan (§4.5). `FiscalPort` (`21-integratsiyalar.md` §1, `issue_credit_payment()`) shu oqimni amalga oshiradi; fiskal bloklar — §4.10. Daromad va QQS bu yerda **qayta tan olinmaydi** — ular sotuv kuni yozilgan (§4.5, `13-provodka-qoidalari.md` §2.14); to'lov kuni faqat pul harakati va fiskal chek.
 
 **So'rov** (payload):
 
@@ -593,18 +632,21 @@ Umumiy mexanizm — chegirma (limitdan yuqori), qaytarish (limitdan yuqori/chek 
 | `id` | UUIDv7 | ha | — |
 | `counterparty_id` | UUID | ha | — |
 | `branch_id`, `cash_register_id`, `shift_id` | UUID | shartli | `method=cash`da `cash_register_id`/`shift_id` majburiy (`shift.status=open`); bank/karta orqali — bo'sh |
-| `amount` | Money | ha | > `"0.00"` |
+| `amount` | Money | ha | > `"0.00"` va ≤ mijozning joriy qarzi (`receivable_balance`); oshsa — `422 VALIDATION_ERROR`, `message_key=debt_payment_exceeds_balance` (`params: {balance, requested}`), ortig'i qabul qilinmaydi — kassir qaytimni naqd beradi, mijoz avansi yo'q (qaror #45) |
 | `method` | enum | ha | `cash`/`card`/`uzqr`/`click`/`payme`/`uzum`/`bank` |
-| `terminal_ref` | string\|null | yo'q | `method=card` |
-| `checkout_ref` | UUID\|null | shartli | Elektron usullarda — §16dagi `payment_checkouts.checkout_ref` |
-| `provider_tx_id` | string\|null | shartli | elektron usullarda |
+| `terminal_ref` | string\|null | yo'q | `method=card`; `uzqr`+`qr_type=static`da ixtiyoriy to'lov raqami |
+| `card_type`, `card_mask`, `rrn` | — | shartli | §4.1 `payments[]` bilan bir xil qoidalar (`method=card`da `card_type` majburiy; `social`da `card_mask`+`rrn`) |
+| `qr_type` | enum\|null | shartli | `method=uzqr`da majburiy: `static`/`dynamic` |
+| `checkout_ref` | UUID\|null | shartli | `click`/`payme`/`uzum` va dinamik `uzqr`da — §16dagi `payment_checkouts.checkout_ref`; statik `uzqr`da `null` |
+| `provider_tx_id` | string\|null | shartli | `click`/`payme`/`uzum` va dinamik `uzqr`da majburiy; statik `uzqr`da ixtiyoriy |
 | `promise_date` | ISO sana\|null | yo'q | Yangi va'da sanasi (agar qoldiq qolsa) — qoldiq qolsa mijozning **joriy** va'da sanasi yangilanadi (`counterparties.debt_due_date`); `debt_payments.promise_date` ustuni saqlanadi (`sale_payments.due_date`dan farqli nom) |
 | `comment` | string\|null | yo'q | — |
 
 **Allokatsiya**: server `amount`ni **eng eski ochiq qarzdan boshlab** (`debt_moves`, `due_date ASC`) avtomatik taqsimlaydi (`allocations` registrga yoziladi) — client allokatsiyani tanlamaydi.
 **Javob**: `{id, allocations: [{target_doc_type, target_doc_id, amount}], remaining_balance, fiscal: {status: "pending"}}` (`debt_payment_allocations` ustunlari bilan bir xil).
+**Xatolar**: `VALIDATION_ERROR` (`debt_payment_exceeds_balance` va boshqa shartlar), `SHIFT_NOT_OPEN`, `FISCAL_OFFLINE_48H_BLOCKED`, `FISCAL_DEVICE_LOCKED` (§4.10), `NOT_FOUND`.
 **Idempotentlik**: `client_event_id`.
-**Offline**: to'liq ishlaydi; qurilma oflayn bo'lsa `fiscal_receipts(kind=debt_settlement, status=pending, offline_since=...)` navbatga qo'yiladi, internet qaytganda `outbox_jobs(kind=ofd_send)` orqali OFD'ga yuboriladi (`16-offline-sync.md` §3.5/§7, `21-integratsiyalar.md` §1).
+**Offline**: to'liq ishlaydi (summa chegarasi qurilmadagi oxirgi sinxronlangan `receivable_balance` bo'yicha tekshiriladi); qurilma oflayn bo'lsa `fiscal_receipts(kind=debt_settlement, status=pending, offline_since=...)` navbatga qo'yiladi, internet qaytganda `outbox_jobs(kind=ofd_send)` orqali OFD'ga yuboriladi (`16-offline-sync.md` §3.5/§7, `21-integratsiyalar.md` §1).
 **Bog'liq**: US-M08-04/09, POS-13, BO-06 "To'lov qabul qilish".
 
 ### 12.3 `POST /api/v1/debt-payments` (back-office)
@@ -641,7 +683,7 @@ Bekor qilish. Tizim avtomatik belgilamaydi — faqat 60+ kunlik ro'yxatni (§12.
 
 **Maqsad**: mijoz Telegram orqali o'z qarz tarixini ko'rishi (US-M08-08).
 **Ruxsat**: `debts.create`/`debts.payment.accept`.
-**Javob**: `{url, token, expires_at}` — imzolangan, muddatli (taxmin: 30 kun), faqat shu `counterparty_id`ning o'z ma'lumotini ko'rsatadigan ochiq (autentifikatsiyasiz, token-asosli) havola; haqiqiy ko'rinish `/public/debt-statements/{token}` yo'lida (M18 hujjatida).
+**Javob**: `{url, token, expires_at}` — imzolangan, muddatli (30 kun — standart, sozlanadi, qaror #54), faqat shu `counterparty_id`ning o'z ma'lumotini ko'rsatadigan ochiq (autentifikatsiyasiz, token-asosli) havola; haqiqiy ko'rinish `/public/debt-statements/{token}` yo'lida (M18 hujjatida).
 
 ### 12.8 Offline over-limit bayrog'i va eskirish hisoboti
 
@@ -689,7 +731,7 @@ Qarz eskirishi hisoboti — **yagona manba `20-api-moliya-admin.md` #21, `GET /a
 
 **Ruxsat**: `reports.sales.view` (BO-14 shu yerdan oziqlanadi).
 **So'rov**: `?sale_id=&shift_id=&status=&cursor=&limit=`.
-**Javob** (bitta element): `{id, sale_id, status: "pending"|"sent"|"fiscalized"|"failed", fiscal_sign, qr_url, sent_at, offline_since, attempts}`.
+**Javob** (bitta element): `{id, sale_id, kind: "sale"|"return"|"z_report"|"debt_settlement"|"credit_sale", status: "pending"|"sent"|"fiscalized"|"failed", receipt_seq, fm_terminal_id, fm_receipt_seq, fiscal_sign, qr_url, payment_form: "cash"|"card"|"qr"|"mixed", delivery: "printed"|"electronic", fiscal_at, ofd_acked_at, sent_at, offline_since, attempts}` — `receipt_seq` qurilma raqami, `fm_receipt_seq` fiskal modul raqami (ikkisi alohida); `ofd_acked_at IS NULL` cheklar §4.10 dagi 48 soatlik blok hisobiga kiradi.
 
 ### 14.2 `POST /api/v1/fiscal-receipts/{id}/retry`
 
@@ -738,8 +780,8 @@ Provodka **yo'q** (`13-provodka-qoidalari.md` §2.22); bitta hujjatga bitta faol
 
 ### `POST /api/v1/marking-codes/verify`
 
-**Maqsad**: DataMatrix kodni skanerlashda — **hech narsa saqlamaydi**, faqat tekshiradi (`21-integratsiyalar.md` §4.1 sequence diagrammasiga mos).
-**Ruxsat**: `sales.create`. Sinxron, qisqa timeout (taxmin 3s), retry yo'q.
+**Maqsad**: DataMatrix kodni skanerlashda sotuvdan oldingi ixtiyoriy sifat tekshiruvi — **hech narsa saqlamaydi**, faqat tekshiradi (`21-integratsiyalar.md` §4.1). Sotuvning o'zi CRPT'ga bu endpoint orqali emas, fiskal chek ichida OFD orqali boradi (§4.2, qaror #62). `MARKING_PRECHECK=off`da POS bu endpoint'ni chaqirmaydi.
+**Ruxsat**: `sales.create`. Sinxron, timeout 3 s (standart, sozlanadi), retry yo'q.
 
 **So'rov**:
 
@@ -748,20 +790,37 @@ Provodka **yo'q** (`13-provodka-qoidalari.md` §2.22); bitta hujjatga bitta faol
 | `code` | string | ha — DataMatrix xom qiymati |
 | `product_id` | UUID\|null | yo'q — agar kod ichidan mahsulot aniqlanmasa, qurilma skanerlangan shtrix-kod/tanlangan tovarni beradi |
 
-**Javob (online, CRPT javob berdi)**: `{valid: true, status: "in_stock"}` yoki `{valid: false, error_code: "MARKING_CODE_INVALID", details: {reason: "already_sold"|"expired"|"invalid_format"}}`.
-**Javob (online, CRPT javob bermadi/timeout)**: `503 {error: {code: "MARKING_VERIFY_UNAVAILABLE"}}` — POS bu holatda foydalanuvchiga offline siyosatini (§4.2, narx ma'lum bo'lsa ruxsat) taklif qiladi.
-**Offline**: bu endpoint umuman chaqirilmaydi (internet yo'q) — POS mahalliy faqat format tekshiradi, `sale.created`ga `marking_offline=true` bilan yuboradi (§4.2).
+Server avval **lokal** tekshiradi (format, tenantdagi `marking_codes.status IN ('sold','pending_verification')` takrori), keyin `MarkingPort.verify_code` orqali CRPT'ga murojaat qiladi. Natija `MARKING_PRECHECK` rejimiga qarab:
+
+| Holat | `warn` (standart) | `block` |
+|---|---|---|
+| CRPT: kod yaroqli | `200 {valid: true, status: "in_stock"}` | xuddi shu |
+| Format xatosi (lokal) | `422 MARKING_CODE_INVALID` | xuddi shu |
+| Tenantda allaqachon sotilgan (lokal) | `409 MARKING_CODE_ALREADY_SOLD` | xuddi shu |
+| CRPT: kod yaroqsiz (`already_sold`/`expired`/`not_found`) | `200 {valid: false, details: {reason}, warnings: ["MARKING_PRECHECK_WARNING"]}` — POS ogohlantirish ko'rsatadi, sotuv davom etadi, `audit_log` | `409 MARKING_VERIFY_FAILED` (`params.reason`) — sotuv rad |
+| CRPT javob bermadi (timeout 3 s) | `200 {valid: null, warnings: ["MARKING_PRECHECK_WARNING"]}` — sotuv davom etadi | `503 MARKING_VERIFY_UNAVAILABLE` — POS offline siyosatini taklif qiladi (`16-offline-sync.md` §7) |
+
+**Offline**: bu endpoint umuman chaqirilmaydi (internet yo'q) — POS mahalliy format va takror-kod (sinxronlangan `marking_codes` keshi) tekshiradi, `sale.created`ga `marking_offline=true` bilan yuboradi (§4.2).
 **Bog'liq**: US-M01-03, POS-02.
 
 ---
 
 ## 16. To'lovlar — UzQR / Click / Payme / Uzum (do'kon sotuvi uchun)
 
+**Merchant modeli** (qaror #46): sotuv to'lovlari — har tenant o'z merchant hisobi va kalitlari (`tenant_secrets`da shifrlangan; dinamik UzQR API kaliti — har kassa uchun alohida, `tenant_secrets.cash_register_id`), pul to'g'ridan-to'g'ri do'konga tushadi. Platforma merchant'i faqat obuna billingi (M17) uchun.
+
+**Fiskalizatsiya qoidasi**: do'kon sotuvida har bir to'lov usulida fiskal chekni **faqat bizning kassamiz** chiqaradi (`FiscalPort`, §4.10); provayderga faqat chek havolasi yuboriladi (Click `submit_qrcode`, Payme `receipts.set_fiscal_data`, Uzum `/fiscal`). Tenant provayder kabinetida **provayder tomonidagi avto-fiskalizatsiya o'chiq** bo'lishi shart — aks holda ikki marta fiskalizatsiya bo'ladi (onboarding/BO-14 tekshiruv bandi, `21-integratsiyalar.md` §9).
+
+**Provayderlar holati** (`21-integratsiyalar.md` §9): **UzQR** — statik QR hozir (qo'lda tasdiq, checkout'siz), dinamik QR — `UzqrPort` stub (POS API spetsifikatsiyasi bank/CBU'dan kelgach real adapter); **Click** — rasmiy sandbox bor (Playground + Postman to'plami); **Payme** — sandbox (`TEST_KEY`), Basic Auth; **Uzum** — Merchant API JSON webhook'lari (`/check`, `/create`, `/confirm`, `/reverse`, `/status`) + Basic Auth.
+
 ### 16.1 Oqim
 
+**Dinamik UzQR / Click / Payme / Uzum** (faqat online):
 1. Kassir to'lov usulini tanlaydi (POS-03) → `POST /api/v1/payments/checkouts` (`provider` tanada).
 2. Mijoz QR'ni skanerlaydi/to'laydi → bank/provayder `POST /api/v1/payments/webhooks/{provider}` orqali serverga xabar beradi (yoki POS `GET /api/v1/payments/checkouts/{checkout_ref}` bilan poll qiladi).
 3. Tasdiq kelgach, POS `sale.created`ni shu `checkout_ref`/`provider_tx_id` bilan yuboradi (§4).
+
+**Statik UzQR** (do'kondagi bosma QR): checkout yaratilmaydi; mijoz to'lagach, kassir mijoz telefonidagi to'lov tasdig'ini ko'rib **qo'lda tasdiqlaydi** (mustaqil terminaldagi `card` kabi), ixtiyoriy to'lov raqamini `terminal_ref`ga kiritadi; POS `sale.created`ni `method=uzqr`, `qr_type=static`, `checkout_ref=null`, `provider_tx_id=null` bilan yuboradi. Tushum 5710 orqali `bank_settlements` bilan solishtiriladi (qaror #42). Statik UzQR faqat online'da ruxsat — offline qabul qilish yo'q (`16-offline-sync.md` §2).
 
 ### 16.2 `POST /api/v1/payments/checkouts`
 
@@ -776,29 +835,29 @@ Provodka **yo'q** (`13-provodka-qoidalari.md` §2.22); bitta hujjatga bitta faol
 | `provider` | enum | ha | `uzqr`/`click`/`payme`/`uzum` |
 | `cash_register_id` | UUID | ha | Shu kassaga tegishli checkout |
 | `amount` | Money | ha | — |
-| `qr_type` | enum\|null | shartli | Faqat `provider=uzqr`: `static`/`dynamic` |
+| `qr_type` | enum\|null | shartli | `provider=uzqr`da majburiy, faqat `dynamic` (statik UzQR checkout'siz — §16.1); `static` kelsa `VALIDATION_ERROR` |
 
 Bu endpoint faqat do'kon sotuvi uchun — bizning obuna to'lovi (`"billing"` konteksti) alohida `POST /billing/checkout` yo'lida.
-**Javob**: `{checkout_ref, provider, provider_tx_id|null, qr_payload|checkout_url, status: "pending", expires_at}`. Webhook tenantni `app.payments_checkout_by_provider_tx()`/`app.payments_checkout_by_ref()` orqali topadi.
+**Javob**: `{checkout_ref, provider, provider_tx_id|null, qr_payload|checkout_url, status: "pending", expires_at}` — `expires_at` va eskirgan (`expired`) checkout'larni tozalash muddati — 24 soat (standart, sozlanadi, qaror #54). Webhook tenantni `app.payments_checkout_by_provider_tx()`/`app.payments_checkout_by_ref()` orqali topadi.
 **Idempotentlik**: `Idempotency-Key` majburiy (takror bosilgan tugma ikkinchi checkout yaratmasligi uchun).
 **Bog'liq**: POS-03.
 
 ### 16.3 `GET /api/v1/payments/checkouts/{checkout_ref}`
 
-**Javob**: `{checkout_ref, provider, provider_tx_id, status: "pending"|"confirmed"|"failed"|"expired", amount, confirmed_at}`. POS poll qiladi (taxmin: 2s interval) chek "to'lov kutilmoqda" holatida.
+**Javob**: `{checkout_ref, provider, provider_tx_id, status: "pending"|"confirmed"|"failed"|"expired", amount, confirmed_at}`. POS poll qiladi (har 2 s — standart, sozlanadi, qaror #54) chek "to'lov kutilmoqda" holatida.
 **Bog'liq**: POS-03.
 
 ### 16.4 `POST /api/v1/payments/webhooks/{provider}` (kiruvchi)
 
 **Maqsad**: bank/to'lov tizimidan keladigan tasdiq.
-**Ruxsat**: — (bizning OAuth/CSRF emas, provayderning o'z imzosi tekshiriladi: Click MD5, Payme Basic Auth, Uzum/UzQR — protokolga qarab, `21-integratsiyalar.md` §9).
+**Ruxsat**: — (bizning OAuth/CSRF emas, provayderning o'z imzosi tekshiriladi, tenantning o'z merchant kalitlari bilan: Click — MD5 `sign_string` (SHOP API Prepare/Complete); Payme — Basic Auth (JSON-RPC Merchant API); Uzum — Basic Auth (JSON webhook'lar `/check`, `/create`, `/confirm`, `/reverse`, `/status`); dinamik UzQR — `UzqrPort` (protokol bank/CBU spetsifikatsiyasidan, hozircha stub), `21-integratsiyalar.md` §9).
 **Javob**: darhol `200` (aks holda provayder qayta-qayta yuboradi).
 **Idempotentlik**: `provider_tx_id` (`UNIQUE`, ikkinchi marta kelsa no-op muvaffaqiyat).
 
 ### 16.5 Xatolar
 
 `PAYMENT_PROVIDER_ERROR` (umumiy — tashqi tizim xatosi), `PAYMENT_NOT_CONFIRMED` (tasdiq kelmadi; muddat o'tishi checkout `status=expired` bilan ifodalanadi, chek "kutilmoqda" holatida qoladi, kassir boshqa usulga o'tishi mumkin).
-**Offline**: bu bo'lim butunlay ishlamaydi — offline paytda faqat `cash`/`debt`/`card` (qo'lda `terminal_ref`) ishlaydi.
+**Offline**: checkout oqimi (dinamik UzQR/Click/Payme/Uzum) butunlay ishlamaydi — statik UzQR ham offline'da ruxsat etilmaydi; offline paytda faqat `cash`/`debt`/`card` (qo'lda `card_type`, `terminal_ref`) ishlaydi.
 
 ---
 
@@ -808,7 +867,7 @@ To'liq protokol — `16-offline-sync.md` §1–3 (bu fayl **qaytarib yozmaydi**,
 
 - Qurilma birinchi login'da `devices` yozuvi avtomatik yaratiladi (`16-offline-sync.md` §9).
 - `GET /api/v1/sync/pull?scope=catalog,prices,customers,permissions,limits,settings&cursor=&page_size=500` — kassaga kerakli hamma narsa: katalog+narx (M09), mijoz+qarz balansi (`counterparties`+`debt_balances`), huquq/limit (`role_permissions`), do'kon sozlamalari (`discount_rules`, obuna holati).
-- `POST /api/v1/sync/push` — §1dagi barcha voqealar shu yagona endpoint orqali, partiyali (taxmin 50 voqea/so'rov), `seq` tartibida.
+- `POST /api/v1/sync/push` — §1dagi barcha voqealar shu yagona endpoint orqali, partiyali (≤ 100 voqea/so'rov, standart, sozlanadi — qaror #54), `seq` tartibida; so'rov tanasi — §2.6 `SyncPushRequest` (`outbox_state` majburiy, onlayn qurilma outbox bo'sh bo'lsa ham davriy `events: []` push yuboradi).
 - Backpressure, idempotentlik, 401/CSRF xatti-harakati, ko'p-tab xavfsizligi — to'liq `16-offline-sync.md` §3.
 
 ---
@@ -819,7 +878,7 @@ To'liq protokol — `16-offline-sync.md` §1–3 (bu fayl **qaytarib yozmaydi**,
 
 | Kod | Qayerda | Izoh |
 |---|---|---|
-| `VALIDATION_ERROR` | Deyarli hamma yerda | Sxema/biznes qoida xatosi, 422 |
+| `VALIDATION_ERROR` | Deyarli hamma yerda | Sxema/biznes qoida xatosi, 422; §12.2 qarzdan ortiq to'lov — `message_key=debt_payment_exceeds_balance` (qaror #45) |
 | `VERSION_CONFLICT` | §8.2, §11.4, §10 | Optimistik qulflash, 409 |
 | `SHIFT_NOT_OPEN` | §3.2, §4.6, §13.1 | Smena `open` emas |
 | `SHIFT_DEVICE_MISMATCH` | §3.1, §3.2, §4.6 | Boshqa qurilmadan voqea |
@@ -834,11 +893,16 @@ To'liq protokol — `16-offline-sync.md` §1–3 (bu fayl **qaytarib yozmaydi**,
 | `PRICE_CHANGE_LIMIT_EXCEEDED` | §10 | Narx o'zgarishi foizi limitdan katta |
 | `APPROVAL_INVALID` | §4, §7, §9, §10, §13 | `ApprovalRef` kutilgan, kelmagan yoki tasdiqlovchi huquqi yetarli emas |
 | `PIN_INVALID` | §9.4 | Noto'g'ri PIN bilan `approve` |
-| `MARKING_CODE_INVALID` | §4.2, §15 | Kod noto'g'ri/takroriy/muddati o'tgan |
-| `MARKING_CODE_ALREADY_SOLD` | §4.2 | Kod ikkinchi marta boshqa hujjatga chiqarilsa |
+| `APPROVAL_REQUIRED` | §7.1 | Muddati o'tgan tovar qaytarilmoqda, `actor`da `returns.approve` va `approval` yo'q (qaror #48) |
+| `FISCAL_OFFLINE_48H_BLOCKED` | §4.6, §4.10, §7.1, §12.2 | 409 — kassadagi OFD tasdig'ini olmagan eng eski chek ≥ 48 soat; yangi fiskal chek yo'q, faqat sinxron/yuborish (qaror #43) |
+| `FISCAL_DEVICE_LOCKED` | §4.6, §4.10, §7.1, §12.2 | 409 — `cash_registers.fm_state ≠ 'ok'` |
+| `MARKING_CODE_INVALID` | §4.2, §15 | Kod formati noto'g'ri / o'qilmadi |
+| `MARKING_CODE_ALREADY_SOLD` | §4.2, §15 | Kod tenantda allaqachon sotilgan (lokal takror-kod tekshiruvi) |
+| `MARKING_PRECHECK_WARNING` | §4.2, §15 | 200, `warnings[]` — `MARKING_PRECHECK=warn`da tekshiruv o'tmadi/CRPT javob bermadi, sotuv davom etadi, audit (qaror #62) |
+| `MARKING_VERIFY_FAILED` | §4.2, §15 | 409 — faqat `MARKING_PRECHECK=block`: CRPT kodni rad etdi |
 | `MARKING_RETURN_REQUIRES_ONLINE` | §7.1 | Markirovkalangan tovar qaytarishi faqat online |
 | `MARKING_PRICE_UNKNOWN_OFFLINE` | §4.2, §4.6 | Offline, narx qurilmada noma'lum — sotuv taqiq |
-| `MARKING_VERIFY_UNAVAILABLE` | §15 | CRPT Turon javob bermadi (online, lekin timeout) |
+| `MARKING_VERIFY_UNAVAILABLE` | §4.2, §15 | 503 — faqat `MARKING_PRECHECK=block`: CRPT Turon javob bermadi (timeout 3 s) |
 | `SALE_NOT_FOUND` | §7.1 | Qaytarish uchun asl chek topilmadi, `retryable:true` |
 | `APPROVAL_REQUEST_ALREADY_RESOLVED` | §9.4, §9.5 | — |
 | `APPROVAL_REQUEST_EXPIRED` | §9.4 | `expires_at` o'tgan |
@@ -846,7 +910,7 @@ To'liq protokol — `16-offline-sync.md` §1–3 (bu fayl **qaytarib yozmaydi**,
 | `CSRF_INVALID` | Barcha cookie-autentifikatsiyali yozuvchi so'rovlar | §0 |
 | `IDEMPOTENCY_IN_PROGRESS` / `IDEMPOTENCY_KEY_REUSED` | Barcha back-office REST yozuvchi so'rovlar | `23-backend-arxitekturasi.md` §3 |
 | `PERIOD_CLOSED` | §4, §7, §12 (agar `doc_date` yopilgan davrga tushsa) | `13-provodka-qoidalari.md` §5.1 |
-| `PAYMENT_PROVIDER_ERROR` | §16.2–16.4 | — |
+| `PAYMENT_PROVIDER_ERROR` | §16.2–16.4 | 502 — tashqi to'lov tizimi xatosi |
 | `PAYMENT_NOT_CONFIRMED` | §16.3 | — |
 | `DEVICE_REVOKED` | Barcha sync/REST (403) | `16-offline-sync.md` §9 |
 | `NOT_FOUND` | §11, §12 va umumiy | `params.resource` bilan |
@@ -856,10 +920,10 @@ To'liq protokol — `16-offline-sync.md` §1–3 (bu fayl **qaytarib yozmaydi**,
 
 ## Ochiq savollar
 
-1. `approval_requests.expires_at` (15 daqiqa) va POS poll chastotasi (3 soniya) — manbada raqam yo'q, taxmin, pilotda tasdiqlanadi.
-2. `counterparty_statement_links` tokenining amal qilish muddati (taxmin 30 kun) va yangilash siyosati — ochiq.
-3. `payment_checkouts` jadvalining saqlash muddati va eskirgan (`expired`) checkout'larni tozalash siklini — ochiq (taxmin: 24 soat).
-4. Qo'lda "karta" (`terminal_ref`) bo'yicha yuridik cheklov (`21-integratsiyalar.md` §9.2) — bu API dizayniga ta'sir qilmaydi, lekin yakunlanmagan.
+1. **Tashqi javob kerak** — qarzga sotuv paytida "kredit" turidagi chek (VMQ-943 1-ilova 7-band) majburiymi va qarz to'lovi cheki OFD'ga qaysi chek turi kodi bilan ketadi, fiskal hamkor / OFD operatori (Xat 1) — interim: `FiscalPolicy.credit_sale_receipt='none'` (sotuvda chek yo'q, `fiscal.status="deferred"`), qarz to'lovida `debt_settlement` cheki; `credit_type` rejimi bayroq ortida tayyor (§4.5, §12.2) — 26 #9 (OQ-002).
+2. **Tashqi javob kerak** — dinamik UzQR POS API texnik spetsifikatsiyasi (checkout yaratish, tasdiq webhook/poll, qaytarish), CBU MUNIS yoki tenantning ekvayer banki — interim: statik UzQR qo'lda tasdiq bilan, dinamik — `UzqrPort` stub (§16) — 26 #49 (OQ-032).
+3. **Tashqi javob kerak** — sotuvdan oldingi onlayn kod tekshiruvi majburiymi, chekdagi `label` formati va `verify` metodi, CRPT Turon (Xat 2) — interim: `MARKING_PRECHECK=warn` + lokal takror-kod tekshiruvi, kod fiskal chek bilan OFD'ga (§4.2, §15) — 26 #40 (OQ-025).
+4. **Tashqi javob kerak** — fiskal modul/virtual kassa holat kodlari va bloklanish (OFD bloki, 48 soat tasdiqlanmagan chek) qanday bildirilishi (webhook yoki polling), fiskal hamkor — interim: `cash_registers.fm_state` (`ok`/`locked`/`ack_overdue`/`memory_full`/`unknown`), hamkor kodlari adapterda xaritalanadi, `fm_state ≠ ok` → `FISCAL_DEVICE_LOCKED` (§4.10) — 26 #89 (OQ-008).
 
 ## Manbalar
 
@@ -867,4 +931,6 @@ To'liq protokol — `16-offline-sync.md` §1–3 (bu fayl **qaytarib yozmaydi**,
 - `spec/kod-uchun/03-modullar-talablari.md` — M01, M02, M03, M08, M16.
 - `spec/kod-uchun/04-biznes-jarayonlar.md` — BP-03, BP-11, BP-12.
 - `spec/kod-uchun/06-ekranlar-umumiy.md` — POS-01…15, BO-06, BO-16.
-- `spec/kod-uchun/01-qarorlar.md` — standart limitlar, offline siyosat qarorlari.
+- `spec/kod-uchun/01-qarorlar.md` — standart limitlar, offline siyosat qarorlari; #30, #42, #43, #45, #46, #48, #54, #59, #60, #62, #64.
+- `spec/kod-uchun/26-ochiq-savollar-reestri.md` — #87, #9, #40, #49, #89.
+- `research_notes/ochiq-savollar/` — P1 (OQ-002, OQ-004), P2 (OQ-026), P3 (OQ-032, OQ-033, §7.2), D-qarorlar.

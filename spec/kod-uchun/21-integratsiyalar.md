@@ -1,23 +1,25 @@
 # Integratsiyalar
 
-**Maqsad:** Barcha tashqi tizim integratsiyalari (OFD, e-faktura, markirovka, to'lov, autentifikatsiya kanallari, AI) uchun adapter interfeysi, ma'lumot moslashtirish, retry/SLA siyosati va MVP bosqichini belgilash.
+**Maqsad:** Barcha tashqi tizim integratsiyalari (OFD, e-faktura, markirovka, to'lov, autentifikatsiya kanallari, AI, 1C) uchun adapter interfeysi, ma'lumot moslashtirish, retry/SLA siyosati va MVP bosqichini belgilash.
 **Kim uchun:** Backend ishlab chiquvchi, arxitektor.
-**Bog'liq fayllar:** `10-umumiy-arxitektura.md`, `11-malumotlar-modeli.md`, `03-modullar-talablari.md`, `04-biznes-jarayonlar.md`, `22-ai-qatlami.md`, `23-backend-arxitekturasi.md`.
-**Holat:** joriy, 2026-10-15.
+**Bog'liq fayllar:** `10-umumiy-arxitektura.md`, `11-malumotlar-modeli.md`, `03-modullar-talablari.md`, `04-biznes-jarayonlar.md`, `16-offline-sync.md`, `22-ai-qatlami.md`, `23-backend-arxitekturasi.md`, `24-frontend-arxitekturasi.md` (§6 chop etish), `33-1c-integratsiya.md` va `34-1c-agent.md` (Do'kon agenti asosi — 16-bo'lim, 1C — 15-bo'lim), `01-qarorlar.md` #36–#65.
+**Holat:** joriy, 2026-10-16.
 
 ## Asosiy xulosalar
 
-1. **13 tashqi tizim** (12 + Google OIDC, qaror #34 — 11-band), barchasi **faqat backend worker'lar orqali** ulanadi (Google OIDC — interaktiv login redirect, worker emas, lekin bir xil "tashqi tizim" ro'yxatida) (hech qanday klient to'g'ridan-to'g'ri tashqi tizimga chiqmaydi, E-IMZO imzolashdan tashqari — u brauzerda, lokal E-IMZO.exe bilan, `10-umumiy-arxitektura.md`). Har biri bitta umumiy **outbox/navbat naqshi** (`outbox_jobs`, 2-bo'lim) orqali ishlaydi — API so'rovi tashqi tizimni hech qachon kutmaydi.
-2. **Faqat 3 tizimda** to'liq ochiq, mustaqil tekshirilgan API hujjati va/yoki sandbox bor: **Faktura.uz** (`api.faktura.uz/help/`), **Payme** (`test.paycom.uz`), **E-IMZO** (`testvpn.e-imzo.uz`, jamoatchilik hujjati). Qolgan 9 tasida hujjat yopiq, login talab qiladi yoki umuman topilmadi — bu MVP jadvaliga to'g'ridan-to'g'ri xavf (`research_notes/texnik/14-tekshiruv-xulosasi.md`, 4-bo'lim).
-3. Uchta qattiq **SLA/muddat** butun arxitekturani belgilaydi: OFD offline chegarasi **48 soat** (VMQ-943, 1-ilova, 31-band), markirovkalangan tovar ko'chirish **72 soat** (23-son qaror, 2026-01-23), davlat hisobotini tuzatish **5 kalendar kun** (Soliq kodeksi 81-moddasi, O'RQ-1108). Uchtasi ham worker darajasida taymer va eskalatsiya bildirishnoma sifatida amalga oshiriladi.
-4. **my.soliq.uz uchun rasmiy API yo'q** — davlat hisobotini solishtirish (markaziy qiymat taklifi, M10/BP-08) MVP'da **qo'lda fayl yuklash** bilan boshlanadi; bu `08-mahsulot-modullari.md`/`00-xulosa-va-ochiq-savollar.md`dagi 1-raqamli texnik xavf.
-5. **CRPT Turon (Asl belgisi) integrator hujjatlari yopiq** (help.crpt-turon.uz, 403 xato) — markirovka moduli (M01/M02/M06) texnik xavf ostida. Integratsiya yo'li: har do'kon o'z bepul "ishtirokchi" API kalitini oladi, rad etilsa hamkor proksi, ikkisi ham ishlamasa sotuv bloklanadi (4-bo'lim). Offline siyosat **to'liq aniq**: **sotish** — narx ma'lum bo'lsa ruxsat, bo'lmasa taqiq; **ko'chirish** — ruxsat (audit bilan); **qaytarish** — faqat online (4-bo'lim, `16-offline-sync.md` §7).
-6. **Click, Payme, Uzum ikki alohida vazifada** ishlatiladi: (a) do'kon QR to'lovlari (mijoz do'konga to'laydi, do'konning o'z merchant hisobi) va (b) bizning obuna billing'imiz (M17, `billing_payments` — bizning merchant hisobimiz). Ikkisi texnik jihatdan bir xil adapter interfeysidan foydalanadi, lekin **kredensial va tenant kontekst butunlay ajratilgan**.
-7. Har bir integratsiya kredensiali (API kalit, sertifikat, merchant ID) **tenant darajasida shifrlangan** saqlanadi (`tenants.settings` JSONB emas — alohida `tenant_secrets` jadvali, shifrlangan ustun; tafsilot `15-xavfsizlik-va-audit.md`).
-8. **BO-14 "Integratsiyalar holati"** ekrani — har bir tashqi tizim uchun: ulanganmi, oxirgi muvaffaqiyatli chaqiruv vaqti, navbatdagi/muvaffaqiyatsiz ishlar soni, qo'lda qayta urinish tugmasi. Bu ekran bo'lmasa, OFD/e-faktura muvaffaqiyatsizligi Egasi/Buxgalterga ko'rinmay qoladi.
-9. Qurilish tartibi (14-bo'lim): **OFD → MXIK → E-IMZO/e-faktura → Click/Payme (billing + do'kon) → Telegram/SMS → Claude API → Asl belgisi/e-TTN/e-ishonchnoma/my.soliq.uz** (eng ko'p noaniqlikka ega to'rttasi oxirida, parallel ravishda rasmiy murojaatlar bilan).
-10. Ko'p integratsiya uchun hal qiluvchi noaniqlik hali ham **ochiq savol** — bu fayl ularni "taxmin" deb aniq belgilaydi va `12-taxminlar-va-murojaatlar.md`dagi xat loyihalariga bog'laydi.
-11. **Google bilan kirish + Telegram OTP (qaror #34)**: Google OIDC — bizning OAuth AS'imizga ulangan tashqi identity provider (§9.1); OTP/parol tiklash/taklif/eksport/qarz eslatmalari — asosiy kanal **Telegram bot** (telefon "share contact" orqali ulanadi, §11.1), **SMS (Eskiz) faqat zaxira** (§10).
+1. **13 tashqi tizim** (12 + Google OIDC, qaror #34 — 11-band), barchasi **backend worker'lar orqali** ulanadi (Google OIDC — interaktiv login redirect, worker emas, lekin bir xil "tashqi tizim" ro'yxatida). Har biri bitta umumiy **outbox/navbat naqshi** (`outbox_jobs`, 0-bo'lim) orqali ishlaydi — API so'rovi tashqi tizimni hech qachon kutmaydi. Uchta istisno do'kon ichidagi lokal kanal orqali ishlaydi: (a) **E-IMZO** — brauzerda, lokal E-IMZO ilovasi bilan (5-bo'lim); (b) **fiskal modul lokal rejimda** — POS → **Do'kon agenti** (do'kon Windows PK'sidagi lokal dastur, qaror #60) → fiskal modul (FM) → OFD (1-bo'lim, 16-bo'lim); (c) **1C** (MVP'dan keyin, Bosqich 7, 15-bo'lim) — backend 1C'ga umuman ulanmaydi, Do'kon agenti vazifani bulutdan tortib oladi.
+2. **Ochiq hujjat/test muhiti** (2026-10-16 holati): **Faktura.uz** (ochiq API, sandbox ommaviy emas), **Didox** (ochiq API hujjati, partner token, test muhiti `testapi3.didox.uz`), **Payme** (`test.paycom.uz`), **Click** (rasmiy Playground + Postman to'plami), **Uzum** (Checkout test muhiti; Merchant API test kredensiali menejerdan), **E-IMZO** (TestCA, `testvpn.e-imzo.uz`), **MXIK**, **Telegram**, **Claude API**. Ommaviy API'si yo'qlari: **OFD** (bulutdan chek yuboradigan ochiq API yo'q — fiskal hamkor yoki lokal FM orqali), **UzQR POS API** (API kalit mexanizmi ma'lum, spetsifikatsiya ochiq emas), **my.soliq.uz** (yagona kanal — shaxsiy kabinet). **CRPT Turon** — xTrace Open API mavjud (kabinetdagi API kalit bilan), ommaviy Swagger va test muhiti yo'q.
+3. **Qonuniy muddatlar** worker darajasida taymer va eskalatsiya bildirishnomasi sifatida amalga oshiriladi: **OFD offline chegarasi 48 soat** — undan keyin kassa **avtomatik bloklanadi** (VMQ-943, 1-ilova 31-band; 2-ilova 6-band), ogohlantirish shkalasi 24/40/46/48 soat (qaror #43); **markirovkalangan tovar egalik o'tishi xabarnomasi** — umumiy **3 ish kuni**, ayrim tovar guruhlarida (suv/ichimlik, dori, o'simlik yog'i pilot) **72 soat** (VM 833 66–67-band; VM 631, VM 149, VM 23) — bu M07 qabulga tegishli, ichki ko'chirishga emas; **davlat hisobotini tuzatish — 5 ish kuni**, topshirish muddatidan kechiktirmay (Soliq kodeksi 5-modda 7-qism, 81-modda 6–7-qism).
+4. **my.soliq.uz uchun ommaviy API yo'q** (VM 736 3¹-ilova 10-band — yagona kanal shaxsiy kabinet) — davlat hisobotini solishtirish (M10/BP-08) foydalanuvchi yuklagan fayl (PDF/Excel) bilan ishlaydi; ichki my.soliq.uz endpoint'lari ishlatilmaydi.
+5. **Markirovka (qaror #62)**: chakana sotuv va xaridordan qaytarishda markirovka kodi Asl belgisi'ga **fiskal chek ichida OFD orqali** boradi (VM 833 75–77, 90-band) — sotuv uchun CRPT API chaqirilmaydi; CRPT API faqat kirim qabuli, kod tekshiruvi, yetkazib beruvchiga qaytarish va hisobdan chiqarish uchun. Sotuvdan oldingi tekshiruv standarti `MARKING_PRECHECK=warn` + lokal takror-kod nazorati (bitta chekda va avval sotilgan kod — qonuniy taqiq, PQ-190 7(в)(ii)). Offline: **sotuv** — ruxsat (FM chekni offline imzolaydi, 48 soat ichida OFD'ga), **ichki ko'chirish** — ruxsat (CRPT xabarnomasi talab qilinmaydi, lekin e-TTN majburiy — qaror #63), **qaytarish** — faqat online (ichki ehtiyot tanlovi).
+6. **Click, Payme, Uzum, UzQR ikki alohida vazifada**: (a) do'kon to'lovlari — har tenant **o'z merchant hisobi** va kalitlari, pul to'g'ridan-to'g'ri do'konga tushadi; (b) bizning obuna billing'imiz (M17) — platformaning o'z merchant hisobi (qaror #46). Platforma faqat texnologik vositachi — to'lov tashkiloti litsenziyasi kerak emas (O'RQ-578 14-modda). Do'kondagi har qanday to'lovda fiskal chekni **faqat bizning kassamiz** chiqaradi (VMQ-943 1-ilova 6-band; 1a-ilova 2-band), provayder tomonidagi avto-fiskallashtirish **o'chiq** bo'lishi shart (9-bo'lim).
+7. Har bir integratsiya kredensiali (API kalit, sertifikat, merchant ID, operator login/secret) **tenant darajasida shifrlangan** saqlanadi (`tenant_secrets` jadvali, shifrlangan ustun; tafsilot `15-xavfsizlik-va-audit.md`). Do'kon PK'sidagi sirlar (FM ulanish siri, 1C paroli, agent maxfiy kaliti) — faqat PK'da (DPAPI), serverga chiqmaydi.
+8. **BO-14 "Integratsiyalar holati"** ekrani — har bir tashqi tizim va Do'kon agenti uchun: ulanganmi, oxirgi muvaffaqiyatli chaqiruv vaqti, navbatdagi/muvaffaqiyatsiz ishlar soni, qo'lda qayta urinish tugmasi.
+9. Qurilish tartibi (14-bo'lim): **FiscalPort + FakeFiscalAdapter → MXIK → E-IMZO/e-faktura (+ kiruvchi e-TTN) → Payme/Click (billing + do'kon) → Telegram/SMS → Claude API → Asl belgisi (verify/qabul/hisobdan chiqarish) → ichki e-TTN → real fiskal adapter va Do'kon agenti (Bosqich 5) → 1C (Bosqich 7)**.
+10. Tashqi javobni kutayotgan har bir band port + stub/flag ortida kodlanadi (interim standart bilan) va "Ochiq savollar" bo'limida `26-ochiq-savollar-reestri.md` raqami bilan ko'rsatilgan; MVP kodini (Bosqich 0–6) to'xtatadigan band yo'q, real fiskal adapter — Bosqich 5.
+11. **Google bilan kirish + Telegram OTP (qaror #34)**: Google OIDC — bizning OAuth AS'imizga ulangan tashqi identity provider (§9.1 Google); OTP/parol tiklash/taklif/eksport/qarz eslatmalari — asosiy kanal **Telegram bot** (telefon "share contact" orqali ulanadi, §11.1), **SMS (Eskiz) faqat zaxira** (§10, `OtpPort` ortida).
+12. **1C integratsiyasi (qaror #36–#42, 15-bo'lim)**: kanal — **faqat COM**, Do'kon agentining 1C imkoniyati orqali, **pull** (faqat chiquvchi HTTPS); yo'nalish ERP → 1C bir tomonlama; kunlik sotuv (kassa × kun bitta «Отчет о розничных продажах») va boshqa birlamchi hujjatlar 1C'ga ketma-ket, takrorsiz yoziladi; provodka/QQS/tannarx yuborilmaydi. To'liq spetsifikatsiya — `33-1c-integratsiya.md`, agent — `34-1c-agent.md`.
+13. **Do'kon agenti (qaror #60, 16-bo'lim)** — bitta Windows agenti (C#/.NET Framework 4.8, `34-1c-agent.md` dagi bilan bir xil asos): fiskal modul ko'prigi, xom TCP 9100 LAN printerlar, tarozi va 1C. Brauzer xom TCP/UDP ocha olmaydi va FM'ga to'g'ridan-to'g'ri ulana olmaydi — shu uchun bu uskunalar faqat agent orqali.
 
 ---
 
@@ -44,11 +46,11 @@ stateDiagram-v2
     failed --> [*]: O'lik xat (dead-letter) — qo'lda ko'rib chiqiladi
 ```
 
-- **Jadval**: `outbox_jobs(tenant_id, kind, payload, status, attempts, next_run_at, last_error, idempotency_key)` (`11-malumotlar-modeli.md`, 10-bo'lim). `kind` ro'yxati bu hujjatda kerakli integratsiyalar bo'yicha kengaytiriladi: mavjud `ofd_send`, `einvoice_send`, `marking_sell`, `sms`, `telegram`, `ai` ustiga qo'shiladi — `einvoice_accept`, `ettn_send`, `marking_verify`, `marking_return`, `marking_transfer`, `poa_verify`, `billing_webhook_reconcile`, `state_report_reminder` (implementatsiya tafsiloti, ma'lumotlar modeli hujjati tomonidan rasmiylashtiriladi).
+- **Jadval**: `outbox_jobs(tenant_id, kind, payload, status, attempts, next_run_at, last_error, idempotency_key)` (`11-malumotlar-modeli.md`, 10-bo'lim). `kind` ro'yxati: `ofd_send` (faqat hamkor bulut rejimida, 1-bo'lim), `einvoice_send`, `einvoice_accept`, `poa_send` (e-ishonchnoma, 6-bo'lim), `ettn_send`, `marking_verify`, `marking_accept` (kirim qabul xabarnomasi), `marking_supplier_return`, `marking_writeoff`, `sms`, `telegram`, `ai`, `billing_webhook_reconcile`, `state_report_reminder`. Chakana sotuv/qaytarish uchun alohida markirovka job'i yo'q — kod fiskal chek bilan ketadi (qaror #62). Ro'yxat `11-malumotlar-modeli.md` 10-bo'limida rasmiylashtiriladi.
 - **Qayta urinish siyosati (umumiy formula)**: eksponensial backoff + jitter: `next_run_at = now() + min(cap, base * 2^attempts) + random(0, jitter)`. Har integratsiya o'z `base`/`cap`/`max_attempts`ini SLA'siga qarab belgilaydi (pastda har bo'limda).
 - **O'lik xat (dead-letter)**: `max_attempts` tugagach `status=failed`; job **o'chirilmaydi**, `last_error` va to'liq `payload` saqlanadi — qo'lda tekshirish/qayta urinish/bekor qilish uchun. Fiskal va e-faktura kabi huquqiy oqibati bor ishlarda `failed` holati **audit_log**ga ham yoziladi.
 - **Idempotentlik**: har job `idempotency_key` bilan (odatda `client_event_id` + `kind`, yoki tashqi tizim talab qilgan `merchant_trans_id`/`provider_tx_id`). Worker va tashqi tizim ikkisi ham qayta yuborilgan so'rovni xavfsiz rad etishi/bir xil natija qaytarishi kerak — bu ayniqsa offline sinxronlashda (bir xil chek ikki marta yuborilishi) va to'lov webhook'larida (bank ikki marta qayta yuborishi) muhim.
-- **Circuit-breaker**: har adapter uchun alohida, tenant'dan mustaqil (bitta tenant bitta integratsiyani "buzmasligi" uchun) — 1 daqiqa ichida 5 ketma-ket vaqtinchalik xato (`transient`, pastda) kelsa breaker **ochiladi** (shu adapterga yangi chaqiruv yo'q, job'lar `retry` holatida navbatda qoladi), 5 daqiqadan keyin **half-open** holatida bitta sinov so'rovi yuboriladi — muvaffaqiyatli bo'lsa yopiladi, yo'q bo'lsa yana 5 daqiqa. Breaker ochiq holati BO-14'da 🔴 va M18 orqali ogohlantirish bilan ko'rinadi. **OFD'ning 48 soatlik qonuniy taymeri** (6-bo'lim, `16-offline-sync.md` §6) breaker holatidan **mustaqil** — breaker ochiq bo'lsa ham 48 soat hisoblanishda davom etadi (taxmin).
+- **Circuit-breaker**: har adapter uchun alohida, tenant'dan mustaqil (bitta tenant bitta integratsiyani "buzmasligi" uchun) — 1 daqiqa ichida 5 ketma-ket vaqtinchalik xato (`transient`, pastda) kelsa breaker **ochiladi** (shu adapterga yangi chaqiruv yo'q, job'lar `retry` holatida navbatda qoladi), 5 daqiqadan keyin **half-open** holatida bitta sinov so'rovi yuboriladi — muvaffaqiyatli bo'lsa yopiladi, yo'q bo'lsa yana 5 daqiqa. Breaker ochiq holati BO-14'da 🔴 va M18 orqali ogohlantirish bilan ko'rinadi. **OFD'ning 48 soatlik qonuniy taymeri** (1-bo'lim, `16-offline-sync.md` §6) breaker holatidan **mustaqil** — breaker ochiq bo'lsa ham 48 soat birinchi yuborilmagan chekning vaqtidan hisoblanishda davom etadi.
 - **Umumiy xato tasnifi**: `transient` (timeout/5xx/429 → `retry`, backoff bilan qayta uriniladi), `auth` (401/403 → `failed`, BO-14'da "kredensial muammosi" matni bilan), `validation` (4xx, sxema/biznes qoida xatosi → `failed`, foydalanuvchiga tarjima qilingan matn), `duplicate` (tashqi tizim "allaqachon qabul qilingan" deb javob bersa → idempotent muvaffaqiyat, xato emas). Har integratsiyaning vendor-xos xato kodlari (masalan OFD 704031) ilova sifatida, hujjat kelganda qo'shiladi.
 
 ### BO-14 — "Integratsiyalar holati" ekrani (talab)
@@ -57,7 +59,7 @@ stateDiagram-v2
 
 | Ustun | Mazmun |
 |---|---|
-| Tizim | OFD, Didox/Faktura.uz, Asl belgisi, E-IMZO, Vakolat.uz, MXIK, my.soliq.uz, Click, Payme, Uzum, SMS, Telegram, Claude API |
+| Tizim | OFD/fiskal modul (har kassa: `cash_registers.fm_state`, yuborilmagan cheklar soni va eng eski yuborilmagan chek yoshi), Didox/Faktura.uz, Asl belgisi, E-IMZO, MXIK, my.soliq.uz, Click, Payme, Uzum, UzQR, SMS, Telegram, Claude API; **Do'kon agenti** (onlayn/oflayn, versiya, yoqilgan imkoniyatlar — fiskal ko'prik, printer, tarozi; 16-bo'lim); **onboarding tekshiruvi**: har ulangan to'lov provayderi kabinetida avto-fiskallashtirish o'chirilganligi tasdiqlangan (9-bo'lim); **1C** (faqat 1C bazasi bog'langan tenantda, `onec.view` — manba `outbox_jobs` emas, `GET /onec-status` (W-55): agent onlayn/oflayn, oxirgi yakunlangan kun, muammoli partiyalar; «Tafsilot» → BO-23, 15-bo'lim) |
 | Holat | 🟢 ulangan va ishlayapti / 🟡 ogohlantirish (retry ko'p) / 🔴 uzilgan (failed job bor) / ⚪ sozlanmagan |
 | Oxirgi muvaffaqiyat | vaqt (`outbox_jobs` so'nggi `done` yozuvi) |
 | Navbatda / Muvaffaqiyatsiz | `queued+running` soni / `failed` soni (so'nggi 7 kun) |
@@ -67,141 +69,172 @@ Bu ekran bo'lmasa, Egasi/Buxgalter OFD yoki e-faktura 48 soatdan ko'p muvaffaqiy
 
 ---
 
-## 1. OFD / virtual kassa ("Yangi texnologiyalar" DUK, VMQ-943)
+## 1. OFD / fiskal modul / virtual kassa ("Yangi texnologiyalar" DUK, VMQ-943)
 
-**Maqsad va modullar**: har bir sotuv/qaytarish/Z-hisobotni fiskal chek sifatida davlat OFD'siga yuborish — qonuniy majburiy, M01, M02, M16 (Z-hisobot).
+**Maqsad va modullar**: har bir sotuv/qaytarish/qarz to'lovi va smena yopilishini (Z-hisobot) fiskal chek sifatida fiskal modul orqali davlat OFD'siga yetkazish — qonuniy majburiy, M01, M02, M08 (qarz to'lovi), M16 (Z-hisobot). Kassaga pul kiritish/olish (M16) OFD'ga yuborilmaydi — fiskal modulga faqat sotuv va qaytarish boradi (VMQ-943 2-ilova 11-band).
 
-**Yo'nalish va trigger**: chiquvchi (backend → OFD). Trigger: `sales`/`returns` o'tkazilganda va smena yopilganda (`fiscal_receipts` yozuvi + `outbox_jobs(kind=ofd_send)`). **Qarz to'lovi** (`debt_payments` `post` bo'lganda) (qaror #30): `fiscal_receipts(kind='debt_settlement')` yoziladi (qarzga sotuvda sotuv vaqtida chek chiqarilmaydi, faqat to'lov vaqtida), xuddi shu `outbox_jobs(kind=ofd_send)` navbati orqali yuboriladi — alohida yo'nalish/worker kerak emas (`13-provodka-qoidalari.md` §2.14, `18-api-kassa.md` §12.2).
+**Arxitektura (qaror #60)**: bulutdan OFD'ga chek yuboradigan ochiq API **yo'q**. Chekni **fiskal modul (FM)** — JavaCard applet (USB-ridyer yoki Android SAM/NFC) — imzolaydi va do'kondagi lokal xizmat (masalan Multikassa `localhost:8080`, FiscalDriveService `127.0.0.1:3449`) OFD'ga paket bilan yuboradi; FM tarmoqsiz ham imzolaydi va yuborilmagan cheklar ro'yxatini yuritadi. Shu sababli `FiscalPort` ikki turdagi real adapterni qo'llaydi:
 
-**API holati**: Rasmiy, ochiq "OFD API spetsifikatsiyasi" hujjati **topilmadi**; integratsiya "Yangi texnologiyalar" DUK bilan to'g'ridan-to'g'ri shartnoma asosida (`research_notes/texnik/02-kassa-ofd-markirovka.md`, "Chekni yuborish protokoli/API"). Mustaqil dasturni Davlat reyestriga kiritish (sertifikatlash) muddati **aniq**: Soliq qo'mitasi 20 ish kuni + Kiberxavfsizlik markazi 15 + fiskal operator (FMO) 10 + texnik tartibga solish agentligi 5 — jami taxminan 50 ish kunigacha (bosqichlar ketma-ket/parallelligi ochiq, VMQ-943 4-ilova). Narx hamon **ochiq savol** (zaxira mablag' talabidan virtual kassa mustasno, lekin sertifikatlash xizmat haqi so'mda topilmadi). Sandbox — **ochiq savol** (reyestrga kiritilmagan dastur uchun sinov integratsiya kaliti bormi — noma'lum).
+| Rejim | `FISCAL_PROVIDER` | Oqim | Qachon |
+|---|---|---|---|
+| **Lokal ko'prik** (asosiy kutilgan yo'l) | `multikassa_local`, `fiscaldrive_local` | POS (veb-kassa) → **Do'kon agenti** lokal API (`127.0.0.1`, 16-bo'lim) → hamkorning lokal xizmati → FM → OFD | Do'konda Windows PK + FM bo'lsa |
+| **Hamkor bulut** | `partner_cloud` | POS → `/sync/push` → backend → `outbox_jobs(kind=ofd_send)` → worker → hamkor bulut API → OFD | Faqat fiskal hamkorda PK'siz bulut rejimi bo'lsa (Xat 1/Xat 9 savoli) |
+| **Fake** (dev/CI, MVP kodi) | `fake` | `FakeFiscalAdapter` (backend) va `FakeLocalBridge` (frontend) | Bosqich 0–4; real adapter — Bosqich 5, hamkor javobidan keyin |
 
-**Adapter interfeysi**:
+Ikkala real rejimda ham port, payload va natija bir xil — adapter almashtirish biznes kodini o'zgartirmaydi. **iPhone/iPad (qaror #21)**: lokal ko'prik iOS'da yo'q — iOS'da fiskal kassa faqat hamkor bulut rejimida; aks holda iOS — faqat back-office va elektron chek zaxirasi. **Android POS** (Kotlin, MVP'dan keyin) — xuddi shu `FiscalPort`ning Kotlin adapterlari (`AndroidIntentFiscalAdapter`, `ApduFiscalAdapter`, `FakeFiscalAdapter`; `28-android-pos.md`).
+
+**Fiskal kodni ajratish**: fiskal ma'lumotlar yoki ularni operatorga yuborish tartibi o'zgarsa, operator va Kiberxavfsizlik markazidan **qayta xulosa** olinadi (VMQ-943 2-ilova 6-band). Shuning uchun fiskal qism alohida, kam o'zgaradigan paket (`app/modules/integrations/fiscal/`, frontendda `@shared/lib/fiscal`, agentda alohida modul) — boshqa reliz sikllari unga tegmaydi (`23-backend-arxitekturasi.md` §1).
+
+**Yo'nalish va trigger**: sotuv/qaytarish yopilganda, qarz to'lovi `post` bo'lganda va smena ochilganda/yopilganda. **Qarz to'lovi** (qaror #30, #45): bitta `debt_payments` = bitta `fiscal_receipts(kind='debt_settlement')` chek, summasi = olingan pul, tovar qatorlari to'lov yopgan sotuvlardan proporsional; `FiscalPolicy.debt_receipt_split = 'single'` (standart) | `'per_sale'`. Qarzga sotuvda daromad va QQS **sotuv kuni** tan olinadi (BHMS 2, SK 242, 78); sotuv paytida "kredit" turidagi chek (`FiscalPolicy.credit_sale_receipt`, standart `none`) majburiymi va uning OFD chek turi kodi — hamkordan (Ochiq savollar).
+
+**API holati**: OFD protokoli ommaviy emas — integratsiya fiskal hamkor (Multikassa, E-POS va b.) yoki FiscalDriveService uslubidagi lokal xizmat orqali. Ma'lum payload (Multikassa `POST /api/v1/operations`): `module_operation_type` (1 — smena ochish, 3 — sotuv, 4 — qaytarish), `receipt_sum` (**tiyinda**), `receipt_gnk_receivedcash/card`, `receipt_gnk_time`, `items[]`: `classifier_class_code` (MXIK), `product_package` (`PackageCode`, majburiy), `product_barcode`, `product_price`, `product_vat_percent`, `product_discount`, `count`, `product_mark`, `product_label` (markirovka kodi); qaytarishda `RefundInfo{TerminalID, ReceiptSeq, DateTime, FiscalSign}`. Javob: `TerminalID`, `ReceiptSeq`, `DateTime` (`YYYYMMDDHHMMSS`), `FiscalSign` (12 raqam), `QRCodeURL` = `https://ofd.soliq.uz/check?t={TerminalID}&r={ReceiptSeq}&c={DateTime}&s={FiscalSign}`. Chek turi `Type`: 0 — xarid, 1 — avans, 2 — kredit. Test: CI'da FiscalDriveService emulyatori (`devtool fiscal-drive-emulator`, port 4387); test FM (`ZZ…`) — hamkordan. Manbalar: [github.com/qo0p/fiscal-drive-service](https://github.com/qo0p/fiscal-drive-service), [docs-virtual-kassa.multibank.uz](https://docs-virtual-kassa.multibank.uz), [docs.ovel.uz/fiskal](https://docs.ovel.uz/fiskal).
+
+**Port interfeysi** (backend — Python; frontend `@shared/lib/fiscal` — xuddi shu shakldagi TypeScript interfeys):
 ```python
-class FiscalAdapter(Protocol):
-    async def send_receipt(self, receipt: FiscalReceiptPayload) -> FiscalSendResult: ...
-    async def send_correction(self, receipt: FiscalReceiptPayload, original_fiscal_sign: str) -> FiscalSendResult: ...
-    async def send_zreport(self, shift_id: UUID, payload: ZReportPayload) -> FiscalSendResult: ...
-    async def issue_credit_payment(self, debt_payment: DebtPaymentFiscalPayload) -> FiscalSendResult: ...  # qaror #30
-    async def get_status(self, fiscal_receipt_id: UUID) -> FiscalStatus: ...
+class FiscalPort(Protocol):
+    async def open_shift(self, register: CashRegisterRef) -> FiscalShiftResult: ...
+    async def close_shift(self, register: CashRegisterRef) -> ZReport: ...
+    async def register_sale(self, receipt: FiscalReceiptPayload) -> FiscalResult: ...   # kind: sale | debt_settlement
+    async def register_refund(self, receipt: FiscalReceiptPayload, refund_ref: RefundInfo) -> FiscalResult: ...
+    async def get_device_status(self, register: CashRegisterRef) -> FiscalDeviceStatus: ...   # fm_state, pending, oldest_unacked_at
+    async def list_unsent(self, register: CashRegisterRef) -> list[UnsentReceipt]: ...
+    async def resend_unsent(self, register: CashRegisterRef) -> ResendResult: ...
+
+# FiscalResult{terminal_id, fm_receipt_seq, fiscal_at, fiscal_sign, qr_url}
+# RefundInfo{terminal_id, receipt_seq, datetime, fiscal_sign} — asl chekning FM rekvizitlari
 ```
+Port chegarasida pul — **tiyin `int64`**; ichki o'nlik satrdan (qaror #26) konvertatsiya bitta funksiyada (`money_to_tiyin`). `FakeFiscalAdapter`: `terminal_id="ZZ000000000000"`, oshib boruvchi `fm_receipt_seq`, tasodifiy 12 raqamli `fiscal_sign`, haqiqiy formatdagi `qr_url`.
 
-**Ma'lumot moslashtirish**: `fiscal_receipts(kind: sale/return/z_report/debt_settlement, sale_id/return_id/debt_payment_id, cash_register_id, shift_id, receipt_seq, payload JSONB, fiscal_sign, qr_url, sent_at, offline_since, status, attempts)` — `kind='debt_settlement'` qarz to'lovida (qaror #30). `payload` — chek rekvizitlari: tovar nomi (`products.name`, ixtiyoriy `products.name_ru` — chek qatori ikki tilda, qaror #29, `18-api-kassa.md` §4.9), miqdor, narx, **MXIK kod (17 raqam)** + o'lchov birligi, QQS stavkasi/summasi, to'lov turi, fiskal belgi, QR-kod (`research_notes/texnik/02-kassa-ofd-markirovka.md`, "Chek formati"). **OFD rekvizitlari** (STIR/korxona nomi, fiskal belgi, QR) — operator talab qilgan formatda, tarjima qilinmaydi.
+**Ma'lumot moslashtirish**: `fiscal_receipts(kind: sale/return/z_report/debt_settlement/credit_sale, sale_id/return_id/debt_payment_id, cash_register_id, shift_id, receipt_seq, fm_terminal_id, fm_receipt_seq, fiscal_at, ofd_acked_at, fiscal_sign, qr_url, payment_form, delivery, delivery_reason, payload JSONB, sent_at, offline_since, status, attempts)`; `kind='credit_sale'` — qarzga sotuv paytidagi "kredit" turidagi chek, faqat `tenants.settings.fiscal_policy.credit_sale_receipt='credit_type'` bo'lsa (standart `'none'`). `receipt_seq` — qurilma beradigan ichki raqam (qaror #12), `fm_receipt_seq` — FM bergan raqam (alohida maydon). `cash_registers` — `fm_state` (`ok`/`locked`/`ack_overdue`/`memory_full`/`unknown`), `last_unacked_receipt_at`, `fm_receipts_pending`; hamkor holat kodlari adapterda shu enumga xaritalanadi. `payload` rekvizitlari (VMQ-943 1-ilova 7-band): tovar nomi (`products.name`, ixtiyoriy `products.name_ru` — qaror #29), MXIK (17 raqam), `PackageCode`, miqdor, narx, chegirma, QQS stavkasi va summasi (tiyinda, chek QQSi = Σ qator QQS), markirovka kodlari (`items[].marking_codes[]`, GS ajratgichi bilan aynan skanerlangandek — qaror #62), to'lov shakli va karta rekvizitlari (pastda). Fiskal rekvizitlar operator formatida, tarjima qilinmaydi.
 
-**Idempotentlik kaliti**: `cash_register_id + shift_id + receipt_seq` (kassa+smena ichida ketma-ket, offline qurilmada ham generatsiya qilinadi, OFD talabi) — shu uchlik qayta yuborilsa OFD bir xil chekni ikkinchi marta qabul qilmasligi kutiladi.
+**To'lov shakli xaritasi** (`fiscal_receipts.payment_form`, 1-ilova 7-band, 2026-10-22 dan majburiy; qaror #64): `cash` → naqd (`cash`); `card` → bank kartalari (`card`) + `card_type` (`personal`/`corporate`/`social`/`unknown`), ijtimoiy kartada `card_mask` (birinchi va oxirgi 4 raqam, `^[0-9]{4}\*+[0-9]{4}$`) va `rrn` (tranzaksiya unikal raqami) majburiy; `uzqr`/`click`/`payme`/`uzum` → QR-kodli to'lov (`qr`); bir chekda bir nechta shakl → aralash (`mixed`).
 
-**Qayta urinish/backoff**: `base=30s, factor=2, cap=15 daqiqa`, lekin umumiy oyna **48 soat** (SLA) — shu oyna ichida juda ko'p marta (masalan har 15 daqiqada) urinib ko'riladi; 44-soatdan keyin urinish chastotasi oshiriladi (har 2 daqiqa) va Egasi/kassirga qizil ogohlantirish chiqadi; 48 soatda ham yuborilmasa — `failed`, huquqiy xavf sifatida audit_log + Telegram ogohlantirish (US-M01-02).
+**Chek yetkazish (`fiscal_receipts.delivery`)**: standart — **bosma** chek (`printed`). Elektron chek (ekranda `ofd.soliq.uz` QR havolasi, Telegram yoki SMS havola, `electronic`) — faqat (a) printer ishlamay qolganda yoki (b) xaridor o'zi so'raganda, kassir tasdig'i bilan; `delivery_reason` audit qilinadi (VMQ-943 1-ilova 2-band; do'kon savdosi uchun "faqat elektron" ruxsati 2026-01-23 tahririda olib tashlangan).
 
-**Xato UX**: kassir chekni normal chop etadi/ko'rsatadi ("offline" belgisi bilan) — **sotuv to'xtamaydi**. Fiskal modul texnik xatosi huquqiy javobgarlik keltirishi mumkin (`11-raqobatchilar-kamchiliklari.md`), shuning uchun xato faqat orqa fonda, foydalanuvchiga bloklovchi xato ko'rsatilmaydi.
+**Idempotentlik kaliti**: `cash_register_id + shift_id + receipt_seq` (qurilma ichida ketma-ket, offline ham beriladi); FM tomonida `fm_terminal_id + fm_receipt_seq` UNIQUE — bir xil sotuv ikki marta fiskallashtirilmaydi (agent FM'ga yuborishdan oldin `receipt_seq` bo'yicha lokal jurnalni tekshiradi).
 
-**Offline**: to'liq qo'llab-quvvatlanadi — bu integratsiyaning asosiy loyihalash sharti (`10-umumiy-arxitektura.md`, append-only event-log). Offline chek `fiscal_receipts.status=pending`, `offline_since` belgilanadi; internet qaytganda worker avtomatik yuboradi. **Lokaut (obuna to'xtagan) holatida ham** — agar chek lokautdan **oldin** yaratilgan bo'lsa, qurilma uni cheklangan `sync.drain` scope orqali serverga topshiradi (`16-offline-sync.md` §3.5, D1, 2026-10-15); bir marta `fiscal_receipts`ga qabul qilingandan keyin worker→OFD oqimi yuqoridagidek, o'zgarishsiz davom etadi — D1 faqat **qurilma→server** `/sync/push` yo'lini cheklaydi, server→OFD yo'nalishiga ta'sir qilmaydi.
+**48 soat va bloklash (qaror #43)**: hisob `ofd_acked_at IS NULL` bo'lgan eng eski fiskal chekning vaqtidan. **24 soat** — POS status panelida 🟡 sariq; **40 soat** — 🔴 qizil + Egasiga M18 (Telegram); **46 soat** — har yangi chek oldidan yopib bo'lmaydigan modal ("2 soat qoldi — internetga ulaning"); **48 soat** — **kassa bloklanadi**: yangi fiskal chek chiqarilmaydi, sotuv to'xtaydi, faqat sinxron va yuborilmagan cheklarni yuborish ruxsat (`FISCAL_OFFLINE_48H_BLOCKED`), `audit_log` + Egasiga zudlik xabari; to'plangan cheklar OFD'ga yetgach blok yechiladi (VMQ-943 2-ilova 6-band — "48 соат оффлайн режимида ишлагандан сўнг автоматик блоклаш"). Konstantalar `OFFLINE_WARN_HOURS = (24, 40, 46)`, `OFFLINE_LEGAL_LIMIT_HOURS = 48`. FM'ning o'zi bloklansa (`fm_state='locked'` — OFD bloklagan yoki tasdiqlanmagan chek muddati o'tgan) — `FISCAL_DEVICE_LOCKED`, sotuv to'xtaydi (FM imzolamaydi).
 
-**SLA**: **48 soat** (VMQ-943, 1-ilova, 31-band, [lex.uz/docs/4603329](https://lex.uz/docs/4603329)) — birlamchi manbadan tasdiqlangan.
+**Qayta urinish/backoff**: *lokal ko'prik* — yuborishni FM/hamkor xizmati o'zi bajaradi; Do'kon agenti har 5 daqiqada `get_device_status` va kerak bo'lsa `resend_unsent` chaqiradi va holatni serverga hisobot qiladi (`fiscal.status` vazifasi, 16-bo'lim). *Hamkor bulut* — `outbox_jobs(kind=ofd_send)`: `base=30s, factor=2, cap=15 daqiqa`, 40 soatdan keyin har 2 daqiqa; job 48 soatlik oyna davomida to'xtamaydi.
 
-**Xavfsizlik**: fiskal modul kaliti/sertifikati tenant darajasida shifrlangan saqlanadi; OFD bilan aloqa TLS + operator talab qilgan kripto (O'zDST 1106/1092, 3DES/AES/RSA/SHA).
+**Xato UX**: 48 soatgacha kassir chekni normal chop etadi ("offline" belgisi bilan), sotuv to'xtamaydi. Lokal ko'prik rejimida fiskal modul yoki Do'kon agenti umuman javob bermasa — POS "Fiskal modul ulanmagan" holatini ko'rsatadi va chekni yopmaydi (fiskal cheksiz savdo — SK 221-modda 1-qism, 5 mln so'm jarima); kassir agentni qayta ishga tushirish yo'riqnomasini ko'radi.
 
-**Monitoring**: BO-14 + har kassa uchun "oxirgi muvaffaqiyatli fiskalizatsiya" ko'rsatkichi; 24/36/44-soat bosqichlarida kuchaygan ogohlantirish (Telegram, M18).
+**Offline**: lokal ko'prik rejimida FM chekni **tarmoqsiz imzolaydi** — chekdagi fiskal belgi va QR darhol haqiqiy, OFD'ga yetkazish internet qaytganda; `fiscal_receipts` sinxron orqali `fiscalized` holatda keladi, yetkazilganlik `cash_registers.fm_receipts_pending`/`last_unacked_receipt_at` orqali kuzatiladi. Hamkor bulut rejimida offline chek `status=pending`, `offline_since` bilan qoladi va internet qaytganda worker yuboradi. **Lokaut (obuna to'xtagan)** holatida lokautdan oldin yaratilgan chek cheklangan `sync.drain` scope orqali serverga topshiriladi (`16-offline-sync.md` §3.5, D1); FM'dagi yuborilmagan cheklarni yuborish lokautda ham ishlaydi (fiskal majburiyat do'konda, qaror #15).
 
-**MVP bosqichi va fiskal yo'l qarori**: MVP — majburiy (markaziy funksiya). Qaror: (1) **0-bosqichda, birinchi kundan** o'z virtual kassamizni Davlat reyestriga kiritish arizasi boshlanadi (VMQ-943, 4-ilova, ~50 ish kuni ≈ 2,5–3 oy; `27-backlog.md` 0-bosqich); (2) reyestr tasdiqlanguncha **pilot (10–20 do'kon)** bitta reyestr hamkori (Multikassa yoki E-POS Communicator, qaysi biri ko'p-tenant SaaS'ga ulgurji narx bersin) orqali, `FiscalAdapter` porti ortida — adapter almashtirilishi kod o'zgarishi talab qilmaydi; (3) pilot davridagi hamkor haqini (taxminan ≤100 000 so'm/kassa) **biz to'laymiz**, jami byudjet **≤ ~13 mln so'm** (20 kassa × ~100 000 so'm/oy × 3 oy + ulanish xarajati); (4) ommaviy sotuv faqat o'z reyestrimiz tasdiqlangandan keyin boshlanadi — agar reyestr 6 oydan ortiq cho'zilsa/rad etilsa, hamkor orqali davom etiladi, qo'shimcha narxi mijozga ochiq "o'tkaziladigan to'lov" sifatida ko'rsatiladi (hamkor narxi + ~10%). **Narxga ta'siri**: **1 ta virtual kassa yagona 99 000 so'm/oy tarifga kiradi**; uning fiskal xarajati (o'z reyestrimizda ~35 000 so'm/kassa/oy, 1 BHM/yil; pilotda hamkor haqi) tarif ichida qoplanadi, marja ≈31–39 ming so'm (`25-nofunksional-talablar.md` §11). Har bir **qo'shimcha** kassa — +39 000 so'm/oy (taxmin; `addons.code='extra_register'`, `11-malumotlar-modeli.md` §2). **Zaxira yo'l** (agar pilot hamkori ham mos kelmasa): reyestrda allaqachon bor vendor (E-POS, UZKASSA, Rahmat POS) bilan OEM/oq-etiket hamkorlik (`12-taxminlar-va-murojaatlar.md`, savol 1).
+**SLA**: **48 soat**, keyin avtomatik blok (VMQ-943, 1-ilova 31-band; 2-ilova 6-band, [lex.uz/docs/4603329](https://lex.uz/docs/4603329)).
 
-### 1.1 Mermaid: sotuv → OFD fiskalizatsiya (onlayn + offline)
+**Xavfsizlik**: lokal ko'prik siri (masalan `X-POS-Auth = SHA-256(SecretKey + challenge)`) — faqat Do'kon agentida (DPAPI), serverga chiqmaydi; hamkor bulut kredensiali — `tenant_secrets`da shifrlangan. Agent lokal API'si faqat `127.0.0.1`, `Origin` oq ro'yxati va qurilma tokeni bilan (16-bo'lim).
+
+**Monitoring**: BO-14 + har kassa uchun `fm_state`, yuborilmagan cheklar soni, eng eski yuborilmagan chek yoshi; 24/40/46/48 soat bosqichlarida ogohlantirish (M18) — cron `fiscal_unacked_monitor` (`23-backend-arxitekturasi.md` §4).
+
+**MVP bosqichi va fiskal yo'l**:
+1. **Kod**: Bosqich 0–4 — `FISCAL_PROVIDER=fake`; real adapter (lokal ko'prik yoki hamkor bulut) — **Bosqich 5**, hamkor javobi (Xat 1, Xat 9) va arxitektura tanlovidan keyin. Lokal ko'prik tanlansa, Do'kon agentining fiskal moduli ham Bosqich 5 da (qaror #60).
+2. **O'z virtual kassamizni Davlat reyestriga kiritish** — Bosqich 0 da boshlanadi: fiskal ma'lumotlar operatori xulosasi (**10 ish kuni**, 4-ilova 12-band) va Kiberxavfsizlik markazi ekspertizasi (**15 ish kuni**, 11-band) arizadan **oldin**, parallel olinadi; DSQ qarori ariza kunidan **20 ish kuni** (16-band), texnik tartibga solish agentligi va "O'zeltexsanoat" xulosasi (5 ish kuni, 12¹-band) shu ichida. Reja — **35 ish kuni** (ketma-ket bo'lsa 45) + hujjat tayyorlash. Virtual kassa uchun **zaxira mablag' talab qilinmaydi** (4-ilova 11-band; 1-ilova 4-band). ЗРУ-764 bo'yicha sertifikatlash bizga majburiy emas — faqat shu reyestr ekspertizasi kerak. Reyestr talablari (2-ilova 6-band, VMQ-393): barcha bank kartalari va QR-kodlar orqali to'lovni qurilmaning o'zida qabul qilish imkoniyati, UzQR va elektron to'lov tizimlariga ulanish (9-bo'lim).
+3. **1 BHM/yil** (440 000 so'm, 2026-09-01 dan) — reyestr narxi emas: **do'kon** (kassa foydalanuvchisi) operatorga to'laydigan fiskal modul xizmati haqi (1-ilova 55-band); interim — har kassa uchun.
+4. **Pilot (10–20 do'kon)** — reyestr tasdiqlanguncha bitta fiskal hamkor orqali, `FiscalPort` ortida; pilot davridagi hamkor haqini biz to'laymiz (ommaviy chakana narx: Rahmat virtual kassa **123 600 so'm/oy**, ulgurji narx so'raladi; 20 kassa × 3 oy ≈ 7,4 mln so'm + ulanish). **Xavf (VMQ-393, 2026-10-22 dan, 3-ilova 25-band)**: reyestrdagi onlayn-NKT'larga "ikkilamchi" axborot tizimlarini QR chek chop etish uchun integratsiya qilish — TXKM'ni reyestrdan chiqarish asosi; "ERP + hamkor kassa" pilot modeliga ta'siri Xat 1 da so'raladi.
+5. **Narx**: 1 virtual kassa yagona 99 000 so'm/oy tarifga kiradi; qo'shimcha kassa narxi (`addons.extra_register`, +39 000 so'm/oy) hamkor narxi va FM haqi aniqlangach qayta ko'riladi (`25-nofunksional-talablar.md` §11).
+6. **Zaxira yo'l**: reyestr 6 oydan ortiq cho'zilsa yoki rad etilsa — hamkor orqali davom etiladi, hamkor narxi mijozga ochiq "o'tkaziladigan to'lov" sifatida ko'rsatiladi; reyestrda bor vendor (E-POS, UZKASSA, Rahmat POS) bilan OEM hamkorlik.
+
+### 1.1 Mermaid: sotuv → fiskalizatsiya (lokal ko'prik va hamkor bulut)
 
 ```mermaid
 sequenceDiagram
     participant POS as Veb-kassa (brauzer)
+    participant AG as Do'kon agenti (127.0.0.1)
+    participant FM as FM + hamkor lokal xizmati
+    participant OFD as OFD
     participant API as Backend API
-    participant DB as PostgreSQL
-    participant Q as Redis navbat
-    participant W as OFD Worker
-    participant OFD as OFD ("Yangi texnologiyalar" DUK)
+    participant W as Fiskal worker
 
-    POS->>POS: Lokal yozuv (Dexie/IndexedDB), client_event_id yaratiladi
-    POS->>API: POST /sync/push {events:[sale.created]}
-    API->>DB: Hujjat + registrlar + provodka (1 tranzaksiya) + outbox_jobs(kind=ofd_send, status=queued)
-    API-->>POS: results:[{status: accepted, server:{id, number}}] (fiscal_receipts.status=pending)
-    API->>Q: enqueue ofd_send
-
-    alt Internet bor
-        Q->>W: job claimed (status=running)
-        W->>OFD: fiskal payload yuborish
-        alt OFD tasdiqladi
-            OFD-->>W: fiscal_sign, qr_url
-            W->>DB: fiscal_receipts.status=fiscalized, outbox_jobs.status=done
-            Note over DB,POS: fiskal belgi/QR keyingi GET /sync/pull'da
-        else Xato/vaqt tugadi
-            OFD--xW: timeout/5xx
-            W->>DB: outbox_jobs.status=retry, attempts+=1, next_run_at=+backoff
-        end
-    else Internet yo'q
-        Note over POS,DB: Chek offline: fiscal_receipts.status=pending, offline_since=now()
-        Note over Q,W: Internet qaytganda worker ishga tushadi;<br/>44–48 soat oralig'ida ogohlantirish kuchayadi (M18)
+    POS->>POS: Lokal yozuv (Dexie), client_event_id, receipt_seq
+    alt Lokal ko'prik (multikassa_local / fiscaldrive_local)
+        POS->>AG: register_sale(payload, tiyinda)
+        AG->>FM: chekni imzolash (tarmoqsiz ham)
+        FM-->>AG: terminal_id, fm_receipt_seq, fiscal_sign, qr_url
+        AG-->>POS: FiscalResult → chek chop etiladi (QR bilan)
+        FM-)OFD: paket yuborish (internet bo'lganda; yuborilmaganlar ro'yxati)
+        POS->>API: POST /sync/push {sale.created + fiskal natija}
+        API-->>POS: accepted (fiscal_receipts.status=fiscalized)
+        AG->>API: fiscal.status hisobot (fm_state, pending, oldest_unacked_at)
+    else Hamkor bulut (partner_cloud)
+        POS->>API: POST /sync/push {sale.created}
+        API->>API: hujjat + registrlar + outbox_jobs(kind=ofd_send)
+        API-->>POS: accepted (fiscal_receipts.status=pending)
+        W->>OFD: hamkor bulut API orqali
+        OFD-->>W: fiscal_sign, qr_url → fiscalized (keyingi /sync/pull'da)
     end
+    Note over POS,API: Yuborilmagan chek yoshi: 24 soat sariq, 40 soat qizil + M18,<br/>46 soat modal, 48 soat — FISCAL_OFFLINE_48H_BLOCKED
 ```
 
 ---
 
-## 2. E-faktura operatorlari — Didox va Faktura.uz (+ VM 830 xavf-baholash)
+## 2. E-faktura operatorlari — Faktura.uz va Didox (+ VM 830 xavf-baholash)
 
-**Maqsad va modullar**: yetkazib beruvchidan kiruvchi faktura qabul qilish va imzolash (M07), B2B sotuvda chiquvchi faktura chiqarish (M08/BP-03), QQS kreditini hisoblash (M10).
+**Maqsad va modullar**: yetkazib beruvchidan kiruvchi faktura qabul qilish va imzolash (M07), B2B sotuvda chiquvchi faktura chiqarish (M08/BP-03), QQS kreditini hisoblash (M10), e-ishonchnoma (6-bo'lim) va e-TTN (3-bo'lim) — bir xil operator kanali.
 
-**Yo'nalish va trigger**: ikki yo'nalishli. Kiruvchi — operator → backend (poll yoki webhook, aniqlanmagan); chiquvchi — backend → operator (faktura yaratilgan/imzolanganda).
+**Yo'nalish va trigger**: ikki yo'nalishli. Kiruvchi — operator → backend, **faqat poll** (ikkala operatorda webhook yo'q, `UpdatedFrom` bo'yicha inkremental); chiquvchi — backend → operator (faktura imzolanganda).
 
-**API holati**:
-- **Faktura.uz** — rasmiy, ochiq API hujjati **topildi va o'qildi** ([api.faktura.uz/help/](https://api.faktura.uz/help/)): token autentifikatsiya (`POST account.faktura.uz/token`), asosiy endpointlar `Document/SendDocument`, `Document/SignDocument`, `Document/GetDocumentStatus`, `CheckCompanyExist/:inn` va boshqalar. Sandbox/narx **topilmadi**.
-- **Didox** — API hujjat portali (`api-docs.didox.uz`) **login talab qiladi**, ochiq o'qib bo'lmadi. Faqat norasmiy (jamoatchilik) npm SDK (`didox`) bor. Sandbox **topilmadi**.
-- Ikkisida ham QQS **AI xavf-baholash** (yashil/qizil) natijasi tizimga qaysi kanal orqali kelishi (operator orqali maydon sifatida, yoki alohida so'rov bilan) **ochiq savol** (`spec/kod-uchun/04-biznes-jarayonlar.md`, Ochiq savol 11).
-- **VM 830 xavfi**: yuqori xavfli ("qizil") fakturalar ulushi davr uchun ≤10% bilan cheklangan, bunday fakturaning QQS krediti faqat to'lovdan keyin ochiladi (VM Qarori №830-son, 2025-12-26, 6- va 8-moddalar).
+**API holati** (2026-10-16 tekshirildi):
+- **Faktura.uz** — ochiq API hujjati ([api.faktura.uz/help/](https://api.faktura.uz/help/)): OAuth2 password grant `POST account.faktura.uz/token` — **tenantning o'z** Faktura.uz login/paroli + o'z kabinetida ("Доступ к API → Настройки клиентов") yaratgan `client_id/client_secret` (integrator kredensiali va hamkor dasturi hujjatda yo'q); token 7 kun, `refresh_token` bilan. Ko'p kompaniya — faqat "мультиаккаунт" (`?companyInn=`), tarif bilan cheklangan. Imzo: `Api/Sign/GetDocumentsHashCodes` → brauzerda E-IMZO PKCS#7 → `Api/Sign/SignDocument` (`UniqueId`, `SignedContent`, `CertificateSerial`). Kiruvchi — `GET Api/Document/GetDocuments?IsInbox=true&UpdatedFrom=…` (`CompanyInn` majburiy). Hujjat turlari ichida `PowerOfAttorney` (20). Sandbox ommaviy emas (test xostlari 403), narx — sotuv bo'limidan.
+- **Didox** — ochiq API hujjati ([api-docs.didox.uz](https://api-docs.didox.uz/ru/home), login shart emas). Kirish — Didox akkaunt-menejeridan **platforma partner tokeni** (`Partner-Authorization` sarlavhasi). Test `testapi3.didox.uz`, prod `api-partners.didox.uz`. Tenant foydalanuvchisi E-IMZO (yoki parol) bilan 360 daqiqalik `user-key` oladi — tenant parolini saqlash shart emas. Imzo — hujjat JSON base64 → E-IMZO `create_pkcs7` + timestamp → `POST /v1/documents/{id}/sign` (birinchi imzodan oldin oferta imzolanadi). Kiruvchi — `GET /v2/documents?owner=0`. Xavf darajasi — `scoring` maydoni. Hujjat turlari: "ТТН (новый)", `Empowerment` (e-ishonchnoma). Partner shartnomasi/narxi — tijorat so'rovi.
+- **VM 830 xavf-baholash**: xavf darajasi EHF rasmiylashtirilayotganda avtomatik shakllanadi va EDO oqimida ko'rsatiladi; QQS to'lovi va xavf reyestri — my.soliq.uz kabinetida (3, 14, 25-band). Yuqori xavfli ("qizil") fakturalar ulushi davr uchun ≤10%, bunday fakturaning QQS krediti faqat to'lovdan keyin (6- va 8-band). Operator API'sida: Didox — `scoring` (`0` yashil, `1` qizil, `null` — ma'lumot yo'q); Faktura.uz — hujjatda maydon yo'q. Shuning uchun `risk_flag` uch qiymatli: `green` / `red` / `unknown`; `unknown` — QQS krediti **qizil kabi** (to'lovgacha kechiktiriladi), Buxgalter BO-15'da my.soliq kabinetiga qarab qo'lda `green` qila oladi (audit bilan).
 
-**Adapter interfeysi**:
+**Operator tanlovi**: MVP operatori — **Faktura.uz** (qaror #23, tavsiya #4); `EInvoicePort` ikki adapterga tayyor yoziladi. Didox'ning multi-tenant ustunliklari (platforma partner tokeni — tenant parolini saqlamaymiz, test muhiti, `scoring` maydoni) sababli asoschi operator tanlovini qayta ko'rib chiqishi tavsiya etiladi (26 #167). Faktura.uz'da tenantning login/paroli va `client_id/secret`i `tenant_secrets`da shifrlangan saqlanadi.
+
+**Port interfeysi**:
 ```python
-class EInvoiceAdapter(Protocol):
-    async def fetch_incoming(self, since: datetime) -> list[IncomingInvoice]: ...
+class EInvoicePort(Protocol):
+    async def fetch_incoming(self, updated_from: datetime) -> list[IncomingInvoice]: ...   # factura_type, related_operator_doc_id bilan
     async def sign_and_accept(self, einvoice_id: UUID, signature: Pkcs7Signature) -> EInvoiceResult: ...
     async def send_outgoing(self, einvoice_id: UUID, signature: Pkcs7Signature) -> EInvoiceResult: ...
     async def get_status(self, operator_doc_id: str) -> EInvoiceStatus: ...
-    async def get_risk_flag(self, operator_doc_id: str) -> RiskFlag: ...  # yashil/qizil — kanal ochiq savol
+    async def get_risk_flag(self, operator_doc_id: str) -> RiskFlag: ...   # green|red|unknown; Didox: scoring, Faktura.uz: unknown
+    async def send_power_of_attorney(self, poa_id: UUID, signature: Pkcs7Signature) -> PoaResult: ...   # 6-bo'lim
+    async def send_ettn(self, ettn_id: UUID, signature: Pkcs7Signature) -> ETtnResult: ...   # 3-bo'lim
 ```
 
-**Ma'lumot moslashtirish**: `einvoices(tenant_id, direction, operator, operator_doc_id, counterparty_id, related_doc, status, risk_flag, signed_at, payload)`; qizil faktura → kiruvchi QQS `vat_moves`ga **to'lovgacha yozilmaydi** (append-only registr, `status` ustuni yo'q — `kod-uchun/01-qarorlar.md` #5). BO-07/BO-10'dagi "kutilayotgan QQS krediti" ko'rsatkichi `einvoices.risk_flag='red'` va to'lanmagan qoldiqdan hisoblanadi (US-M07-03/US-M10-03).
+**Ma'lumot moslashtirish**: `einvoices(tenant_id, direction, operator, operator_doc_id, factura_type, related_einvoice_id, counterparty_id, related_doc, status, risk_flag, signed_at, payload)`; `factura_type` — `standard`/`additional`/`corrected`/…, `risk_flag` CHECK `('green','red','unknown')`, standart `'unknown'`. Qizil yoki `unknown` faktura → kiruvchi QQS `vat_moves`ga **to'lovgacha yozilmaydi** (append-only registr, qaror #5). BO-07/BO-10'dagi "kutilayotgan QQS krediti" `risk_flag IN ('red','unknown')` va to'lanmagan qoldiqdan hisoblanadi (US-M07-03/US-M10-03). Yetkazib beruvchiga qaytarishda QQS kamaytirish — yetkazib beruvchining **qo'shimcha (salbiy) EHF**i qabul qilingan davrda (`factura_type='additional'`, `related_einvoice_id` — asl EHF; SK 257, 269; VM 489 40–42-band).
 
-**Idempotentlik kaliti**: `operator_doc_id` (operatordan kelgan hujjat ID'si) + `tenant_id`; chiquvchi fakturada `client_event_id`.
+**Idempotentlik kaliti**: `operator_doc_id` + `tenant_id`; chiquvchi fakturada `client_event_id`.
 
-**Chiquvchi e-faktura oqimi (qaror #18 — chekdan keyin e-faktura, BP-13/BP-03)**: yagona yo'l:
+**Chiquvchi e-faktura oqimi (qaror #18 — chekdan keyin e-faktura, BP-13/BP-03)**:
 
-1. `POST /api/v1/einvoices` — `{direction:"out", source:"sale"|"manual", sale_id|null, counterparty_id, lines[]}`; B2B nasiya sotuvdan (`counterparty.kind=company`) server **avtomatik** `draft` yaratadi. Ruxsat — **`einvoice.create`** (05 §2.1, X-01).
+1. `POST /api/v1/einvoices` — `{direction:"out", source:"sale"|"manual", sale_id|null, counterparty_id, lines[]}`. Server **avtomatik** `draft` yaratadi, agar `counterparty.kind IN ('company','individual_entrepreneur')` **yoki** to'lov usuli `bank_transfer` bo'lsa (jismoniy shaxs bank orqali to'lasa — ikki tomonlama EHF ogohlantirishi). Jismoniy shaxsga kassa cheki bilan savdoda e-faktura talab qilinmaydi (SK 47-modda 3-qism; VM 489 3-band). Ruxsat — **`einvoice.create`**.
 2. `POST /api/v1/einvoices/from-receipt` (yoki `from-sale/{sale_id}`) — `{sale_id, counterparty_id}`; chekdan keyin alohida chiquvchi faktura so'ralsa (BP-13), `related_doc` orqali asl chekka bog'lanadi, **QQS ikki marta hisoblanmaydi va provodka yozilmaydi** (`13-provodka-qoidalari.md` 2.22) — xatolar `EINVOICE_ALREADY_LINKED`, `EINVOICE_AMOUNT_EXCEEDS_RECEIPT`, `EINVOICE_COUNTERPARTY_INCOMPLETE`.
-3. Imzolash/yuborish — kiruvchi fakturadagi bilan **bir xil** `sign-challenge`/`submit-signed` oqimi (E-IMZO, yo'nalishdan qat'i nazar umumiy), ruxsat `einvoice.sign` (Buxgalter); yuborish `outbox_jobs(kind=einvoice_send)` orqali — faqat **Faktura.uz** (tavsiya #4, MVP'da yagona operator).
-4. DB cheklovi — bitta hujjatga (chek/kirim) bitta **faol** chiquvchi faktura (`uq_einvoice_out_per_doc`, 02 §2.22).
+3. Imzolash/yuborish — kiruvchi fakturadagi bilan **bir xil** `sign-challenge`/`submit-signed` oqimi (E-IMZO, 5-bo'lim), ruxsat `einvoice.sign` (Buxgalter); yuborish `outbox_jobs(kind=einvoice_send)` orqali tenantning tanlangan operatori adapteri bilan.
+4. DB cheklovi — bitta hujjatga (chek/kirim) bitta **faol** chiquvchi faktura (`uq_einvoice_out_per_doc`).
 
-**Qayta urinish/backoff**: `base=1 daqiqa, factor=2, cap=1 soat, max_attempts=24` (taxminan 1 kun davomida); e-faktura qonuniy muddati OFD'dan farqli, qattiq soat chegarasi topilmadi — shuning uchun `failed` bo'lganda Buxgalterga ko'rinadigan ogohlantirish, avtomatik to'xtatish yo'q.
+**Qayta urinish/backoff**: `base=1 daqiqa, factor=2, cap=1 soat, max_attempts=24` (taxminan 1 kun); `failed` bo'lganda Buxgalterga ogohlantirish, avtomatik to'xtatish yo'q. Poll — har 10 daqiqada (`updated_from` = oxirgi muvaffaqiyatli poll − 5 daqiqa).
 
-**Xato UX**: Buxgalter BO-15 (kiruvchi/chiquvchi e-faktura markazi) ekranida ko'radi, qo'lda qayta yuboradi/E-IMZO bilan qayta imzolaydi. Faktura kelmasa/yuborilmasa boshqa modul (sotuv, ombor) to'xtamaydi — faqat QQS krediti/kreditorlik holati "kutilmoqda" qoladi.
+**Xato UX**: Buxgalter BO-15 (e-faktura markazi) ekranida ko'radi, qo'lda qayta yuboradi/E-IMZO bilan qayta imzolaydi. Faktura kelmasa/yuborilmasa boshqa modul (sotuv, ombor) to'xtamaydi — faqat QQS krediti/kreditorlik holati "kutilmoqda" qoladi.
 
-**Offline**: yo'q — M07 odatda internet mavjud joyda (ofis) bajariladi; offline bo'lsa, qabul hujjati mahalliy saqlanadi, faktura ulashi internet qaytganda.
+**Offline**: yo'q — M07 odatda internet mavjud joyda; offline bo'lsa qabul hujjati mahalliy saqlanadi, faktura ulashi internet qaytganda.
 
-**SLA**: qattiq davlat muddati topilmadi; amaliy maqsad — yetkazib beruvchiga to'lov va QQS hisobotigacha (oylik davr) yetib kelishi.
+**SLA**: qattiq davlat muddati yo'q; amaliy maqsad — QQS hisobotigacha (oylik davr) yetib kelishi.
 
-**Xavfsizlik**: operator login/parol yoki client_id/secret tenant darajasida shifrlangan; imzolash tokeni serverda saqlanmaydi (E-IMZO brauzerda, 5-bo'lim).
+**Xavfsizlik**: Faktura.uz — tenant login/parol va `client_id/secret` `tenant_secrets`da shifrlangan; Didox — platforma partner tokeni platforma sirlari ichida, tenant `user-key` faqat qisqa muddat keshda; imzolash kaliti serverga chiqmaydi (E-IMZO brauzerda, 5-bo'lim).
 
-**Monitoring**: BO-14 + BO-15; "qizil" faktura ulushi 10%ga yaqinlashganda Buxgalterga ogohlantirish (M10 bilan bog'liq).
+**Monitoring**: BO-14 + BO-15; "qizil" faktura ulushi 10%ga yaqinlashganda Buxgalterga ogohlantirish (M10).
 
-**MVP bosqichi**: MVP — **faqat Faktura.uz** majburiy (ochiq API hujjati tasdiqlangan, REGOS allaqachon ishlatadi); **Didox — MVP'dan keyingi birinchi integratsiya** (Didox API hujjati login ortida, faqat norasmiy SDK bor). **Zaxira yo'l**: Faktura.uz ham kutilganidan sekin bo'lsa — qo'lda hujjat yuklash (PDF/skan) bilan vaqtincha almashtiriladi.
+**MVP bosqichi**: MVP — Faktura.uz adapteri; Didox adapteri — operator tanlovi qayta ko'rilsa birinchi (test muhiti tayyor). **Zaxira yo'l**: operator kechiksa — qo'lda hujjat yuklash (PDF/skan) bilan vaqtincha.
 
 ### 2.1 Mermaid: kiruvchi e-faktura qabul qilish va imzolash
 
 ```mermaid
 sequenceDiagram
-    participant OP as Didox/Faktura.uz
+    participant OP as Faktura.uz/Didox
     participant W as E-faktura Worker
     participant DB as PostgreSQL
     participant UI as Back-office (brauzer, BO-15)
-    participant EI as E-IMZO.exe (lokal)
+    participant EI as E-IMZO (lokal)
     participant BUX as Buxgalter
 
-    OP->>W: Yangi kiruvchi faktura (poll — webhook mavjudligi ochiq savol)
-    W->>DB: einvoices(direction=in, status=draft, risk_flag)
+    W->>OP: poll (UpdatedFrom bo'yicha inkremental; webhook yo'q)
+    OP-->>W: Yangi kiruvchi fakturalar
+    W->>DB: einvoices(direction=in, status=draft, risk_flag=green|red|unknown)
     W->>DB: outbox_jobs(kind=telegram) → Buxgalterga ogohlantirish
     BUX->>UI: BO-15 ochadi, fakturani ko'rib chiqadi
-    UI->>EI: /frontend/challenge (imzolash so'rovi)
+    UI->>EI: imzolash so'rovi (hash/hujjat)
     EI->>BUX: kalit tanlash (PFX/ID-karta), parol
     EI-->>UI: PKCS#7 imzo
     UI->>DB: einvoices.status=signed, outbox_jobs(kind=einvoice_accept, status=queued)
@@ -209,7 +242,7 @@ sequenceDiagram
     W->>OP: imzolangan tasdiqlash (accept) yuborish
     alt Operator qabul qildi
         OP-->>W: status=accepted
-        W->>DB: einvoices.status=accepted; agar yashil — vat_moves(kind=input) yoziladi
+        W->>DB: einvoices.status=accepted; risk_flag=green bo'lsa — vat_moves(kind=input)
     else Rad etildi/xato
         OP-->>W: status=rejected/error
         W->>DB: outbox_jobs.status=retry yoki failed; Buxgalterga ko'rinadi (BO-15)
@@ -218,184 +251,168 @@ sequenceDiagram
 
 ---
 
-## 3. E-TTN (tovar-transport xati)
+## 3. E-TTN (tovar-transport yuk xati)
 
-**Maqsad va modullar**: tashilayotgan tovar uchun elektron yo'l xati — M07 (xarid, tashqi yetkazib berish), M06 (filiallararo ko'chirish — ichki ko'chirish uchun majburiyligi **ochiq savol**, `spec/kod-uchun/04-biznes-jarayonlar.md`, Ochiq savol 5).
+**Maqsad va modullar**: tovar tashilganda elektron yuk xati — M06 (filiallar/omborlar orasidagi ko'chirish) va M07 (kirim). **Ichki ko'chirishda ham majburiy** — "Ombordan omborga" rejimi (VM 249 31-ilova, VM 168 tahriri, 13-band): jo'natuvchi bir vaqtda yuk oluvchi, EHF chiqarilmaydi; istisno — qo'lda yoki jamoat transportida tashish (24-band). Asos: VM 249 31-ilova, VM 673 (muddatlar). Qaror #63.
 
-**Yo'nalish va trigger**: ko'pincha kiruvchi (yetkazib beruvchi tomonidan tuzilgan e-TTN'ni qabul qilish), ba'zan chiquvchi (filiallararo tashishda o'zimiz tuzsak).
+**Yo'nalish va trigger**: (a) **kiruvchi** — sotuv bilan bir vaqtda jo'natishda e-TTN e-faktura bilan **birlashtirilgan** (12, 33-band): kirimda alohida e-TTN emas, EHF payload'idan o'qiladi; (b) **chiquvchi (ichki)** — ko'chirish hujjati `post` qilinganda `ettn_documents(transport_type='warehouse_to_warehouse', status=draft)` yoziladi, jo'natuvchi Omborchi E-IMZO bilan imzolaydi → `outbox_jobs(kind=ettn_send)`; qabul qiluvchi filial tasdiqlaydi. `transfers.transport_mode='on_foot_or_public'` bo'lsa e-TTN talab qilinmaydi (standart `vehicle`).
 
-**API holati**: Didox va Faktura.uz orqali o'tishi kutiladi (ikkisi ham hujjat turlari ro'yxatida "TTN"ga mos keladigan narsani aniq ko'rsatmaydi — Faktura.uz'da "Akt va faktura" qisman mos bo'lishi mumkin, tasdiqlanmagan). Alohida mustaqil e-TTN API'si **ochiq manbada topilmadi** (`research_notes/texnik/09-soliq-integratsiyasi.md`). Majburiylik: VM 249-son (2021-04-28, 31-ilova, nizom) + VM 673-son (2023-12-21, muddatlar — 2024-04-01 yirik soliq to'lovchilar, 2024-07-01 hamma).
+**API holati**: kanal — faqat EDO operatori: Didox — "ТТН (новый)"; Faktura.uz — ommaviy hujjat turlari ro'yxatida aniq tur yo'q (Xat 4 bilan aniqlanadi). Alohida mustaqil e-TTN API yo'q.
 
-**Adapter interfeysi**:
-```python
-class ETtnAdapter(Protocol):
-    async def fetch_incoming(self, since: datetime) -> list[IncomingEttn]: ...
-    async def send(self, ettn_id: UUID, signature: Pkcs7Signature) -> ETtnResult: ...
-    async def get_status(self, operator_doc_id: str) -> ETtnStatus: ...
-```
+**Port**: `EInvoicePort.send_ettn` (2-bo'lim) + kiruvchi uchun `fetch_incoming` natijasidagi TTN qismi — alohida adapter yo'q.
 
-(E-faktura adapteriga juda o'xshash — amalda bir xil operator/kanal orqali, shuning uchun implementatsiyada `EInvoiceAdapter`ni kompozitsiya qilish mumkin.)
+**Ma'lumot moslashtirish**: `ettn_documents(tenant_id, einvoice_id NULL, transfer_id NULL, transport_type ('warehouse_to_warehouse'|'seller_to_buyer'|…), direction ('in'|'out'), status, operator_doc_id, signed_at)` — yozuvchilar: e-faktura importi (kiruvchi) va transfer `post` (ichki).
 
-**Ma'lumot moslashtirish**: `ettn_documents(tenant_id, einvoice_id, status, operator_doc_id)` — e-faktura bilan bog'langan (`11-malumotlar-modeli.md`, 9-bo'lim).
-
-**Idempotentlik kaliti**: `operator_doc_id` + `tenant_id`, xuddi e-faktura kabi.
+**Idempotentlik kaliti**: `operator_doc_id` + `tenant_id`; chiquvchida `transfer_id`.
 
 **Qayta urinish/backoff**: e-faktura bilan bir xil (`base=1 daqiqa, cap=1 soat, max_attempts=24`).
 
-**Xato UX**: Omborchi qabul hujjatini e-TTN'siz ham davom ettira oladi (ichki kirim), lekin tizim "E-TTN yo'q/kutilmoqda" belgisini saqlaydi — huquqiy xavf (BP-01, Ochiq savol).
+**Xato UX**: avtotransportda ko'chirish uchun e-TTN **tashish boshlanishidan oldin** rasmiylashtirilishi shart (16-band). Operator adapteri tayyor bo'lmasa yoki yuborish muvaffaqiyatsiz bo'lsa — Omborchi operator kabinetida rasmiylashtiradi va hujjatga `transfers.ettn_ref` + "e-TTN operator kabinetida rasmiylashtirildi" belgisini kiritadi; bo'sh qolsa ogohlantirish va M12 xavf ro'yxati. Ko'chirish posting'i bloklanmaydi.
 
-**Offline**: yo'q (ofis/ombor sharoitida).
+**Offline**: offline yaratilgan ko'chirish uchun e-TTN internet qaytgach, **tashishdan oldin** rasmiylashtiriladi (`16-offline-sync.md` §7).
 
-**SLA**: aniq muddat topilmadi; 5 yil saqlash (buxgalteriya hujjati sifatida — O'RQ-404, 29-modda).
+**SLA**: tashish boshlanishidan oldin; 5 yil saqlash (O'RQ-404, 29-modda).
 
-**Xavfsizlik/Monitoring**: e-faktura bilan bir xil kanal/kredensial.
+**Xavfsizlik/Monitoring**: e-faktura bilan bir xil kanal/kredensial; BO-14, BO-15.
 
-**MVP bosqichi**: **keyin** — faqat tashqi tashish bo'lgan xaridlarda kerak, ko'p kichik do'kon uchun ustunlik past; MVP'da "qo'lda belgilash" (bor/yo'q) bilan boshlanishi mumkin. **Zaxira yo'l**: e-faktura operatori orqali bitta "hujjat turi" sifatida ishlov berish, alohida adapter yozmaslik.
+**MVP bosqichi**: kiruvchi (EHF+TTN) — e-faktura bilan MVP'da; ichki ko'chirish e-TTN'i — MVP'da `ettn_documents` yozuvi + operator adapteri (Didox "ТТН (новый)"), Faktura.uz'da tur aniqlanguncha qo'lda `ettn_ref` zaxirasi.
 
 ---
 
 ## 4. Asl belgisi / CRPT Turon markirovkasi
 
-**Maqsad va modullar**: markirovkalangan tovar (suv, ichimlik, tamaki, alkogol, maishiy texnika, dori) sotuvda/qaytarishda/ko'chirishda kod tekshirish va holatini yozish — M01 (US-M01-03), M02, M06.
+**Maqsad va modullar**: markirovkalangan tovar (suv, ichimlik, tamaki, alkogol, maishiy texnika, dori va b.) bo'yicha kod nazorati — M01 (sotuv), M02 (qaytarish), M05/M15 (hisobdan chiqarish), M07 (kirim qabuli, yetkazib beruvchiga qaytarish). Qaror #17, #62.
 
-**Yo'nalish va trigger**: chiquvchi (backend → CRPT Turon, DataMatrix kod skanerlanganda, sotuv/qaytarish/ko'chirish yakunlanganda).
+**Yo'nalish va trigger**:
+- **Chakana sotuv va xaridordan qaytarish** — kod **fiskal chek ichida** (`items[].marking_codes[]` → OFD `product_label`) ketadi; OFD uni Asl belgisi'ga real vaqtda uzatadi (VM 833 75–77, 90-band; chekda kod majburiy — VM 23 4(б), 2026-07-01 dan). Sotuvchi CRPT'ni alohida "sotdim" deb chaqirmaydi.
+- **CRPT API** (backend → CRPT, `outbox_jobs`) — faqat: kod tekshiruvi (`marking_verify`), kirim qabul xabarnomasi (`marking_accept`), yetkazib beruvchiga qaytarish (`marking_supplier_return`), hisobdan chiqarish (`marking_writeoff`).
+- **Ichki ko'chirish** — CRPT xabarnomasi talab qilinmaydi (egalik o'tmaydi, VM 833 66–67-band); e-TTN esa majburiy (3-bo'lim).
 
-**API holati**: **Rasmiy, ochiq API texnik hujjati topilmadi** — `help.crpt-turon.uz` asosiy integratsiya bo'limlari **403 (kirish taqiqlangan)** bilan yopiq; integrator ro'yxatidan o'tish shartlari noma'lum (`research_notes/texnik/02-kassa-ofd-markirovka.md`, 3-bo'lim). Uchinchi tomon manbalardan tiklangan umumiy oqim: kod skanerlanadi → OFD orqali (yoki to'g'ridan-to'g'ri, aniq emas) Asl Belgisi tizimiga yuboriladi → haqiqiylik/sotilmaganlik tekshiriladi → "chiqarish" (spisaniye) qayd etiladi. Sandbox — **topilmadi/ochiq savol**.
+**API holati**: xTrace Open API v1.45.0 (PDF, RU/EN) — 2025-08-25 dan kabinetdagi "API keys" orqali bearer kalit, yuridik ahamiyatli hujjatlar uchun ERI; amallar: kodlar ro'yxati, kod ma'lumoti (`public/api/cod/private/codes`, egasi bo'lmasa `/public/codes`), kontragent tekshiruvi, transfer, agregatsiya — [help.crpt-turon.uz/…/36078638174481](https://help.crpt-turon.uz/hc/ru/articles/36078638174481). Ommaviy Swagger va test muhiti yo'q. "Ruxsat beruvchi rejim" (sotuvdan oldin majburiy online tekshiruv) normativ hujjatlarda topilmadi.
 
-**Adapter interfeysi**:
+**Port interfeysi**:
 ```python
-class MarkingAdapter(Protocol):
-    async def verify_code(self, code: str) -> MarkingVerifyResult: ...
-    async def sell(self, codes: list[str], sale_id: UUID) -> MarkingSellResult: ...
-    async def return_codes(self, codes: list[str], return_id: UUID) -> MarkingReturnResult: ...
-    async def transfer(self, codes: list[str], from_branch_id: UUID, to_branch_id: UUID) -> MarkingTransferResult: ...
-    async def write_off(self, codes: list[str], write_off_id: UUID) -> MarkingWriteOffResult: ...
+class MarkingPort(Protocol):
+    async def verify_code(self, code: str) -> MarkingVerifyResult: ...                     # ixtiyoriy sifat tekshiruvi
+    async def accept(self, codes: list[str], receipt_id: UUID) -> MarkingAcceptResult: ...  # kirim qabul xabarnomasi (EHF shaklida)
+    async def supplier_return(self, codes: list[str], return_id: UUID) -> MarkingResult: ...
+    async def write_off(self, codes: list[str], write_off_id: UUID) -> MarkingResult: ...
 ```
+Adapterlar: `CrptXtraceAdapter` (real, Bosqich 5), `FakeMarkingAdapter` (GS1 parse, dev/CI). Tenant siri — `crpt_api_key` (`tenant_secrets`).
 
-**Ma'lumot moslashtirish**: `marking_codes(tenant_id, code, product_id, status, last_doc_id, verified_at)` (`11-malumotlar-modeli.md`, 9-bo'lim); `status`: `in_stock` → `sold`/`returned`/`written_off`; offline sotuvda oraliq holat **`pending_verification`** (kod mahalliy yozilgan, CRPT tasdig'i internet qaytganda kutilmoqda, `16-offline-sync.md` §7) → `sold` (muvaffaqiyatli `verify_code`+`sell`dan keyin) yoki qoladi + ogohlantirish (`verify_failed`).
+**Sotuvdan oldingi tekshiruv — `MARKING_PRECHECK=off|warn|block`**, standart **`warn`** (qaror #62): online bo'lsa `verify_code` chaqiriladi; "yaroqsiz" javobda kassirga ogohlantirish + `audit_log`, sotuv davom etadi (`block` rejimida rad). **Majburiy, rejimdan qat'i nazar** (VM 943 2-ilova; PQ-190 7(в)(ii)): kodsiz markirovkali qator — chek yo'q; bitta chekda takroriy kod — chek yo'q; **avval sotilgan kod** — chek yo'q → offline'da ham **lokal takror-kod nazorati** (qurilma va tenant bo'yicha sinxronlangan `marking_codes`).
 
-**Idempotentlik kaliti**: `code` (DataMatrix, global noyob) + `doc_id` — bir xil kod bitta hujjatga ikki marta "chiqarilmaydi".
+**Ma'lumot moslashtirish**: `marking_codes(tenant_id, code, product_id, status, last_doc_id, verified_at)`; `status`: `in_stock` → `sold` (fiskal chek bilan) / `returned` / `written_off` / `returned_to_supplier`; `marking_product_groups.acceptance_deadline` (seed: `3_business_days` / `72_hours`).
 
-**Qayta urinish/backoff**: `verify` — sinxron, foydalanuvchi kutadi, **retry yo'q** (darhol natija kerak, kassir kutib turolmaydi, `base=yo'q, max_attempts=1-2, timeout=3s`); `sell`/`return`/`transfer` (yakuniy "chiqarish" qaydi) — asinxron outbox, `base=1 daqiqa, cap=30 daqiqa, max_attempts` — ko'chirish uchun **72 soat** oynasida (pilot normasi, ichki siyosat sifatida qabul qilindi).
+**Idempotentlik kaliti**: `code` (GS1 DataMatrix, global noyob) + `doc_id`.
 
-**Xato UX**: `verify` muvaffaqiyatsiz (noto'g'ri/takroriy/muddati o'tgan kod) — MVP standart siyosat **sotuvni rad etish** (kassir markirovkasiz tovar bilan davom etishi/almashtirishi mumkin) — bu **taxmin**, rasmiy talab tasdiqlanmagan (`spec/kod-uchun/03-modullar-talablari.md`, US-M01-03).
+**Qayta urinish/backoff**: `verify_code` — sinxron, `timeout=3s`, `max_attempts=1` (natija bo'lmasa `warn` rejimida ogohlantirish, `block` rejimida rad); `accept`/`supplier_return`/`write_off` — asinxron outbox, `base=1 daqiqa, cap=30 daqiqa`, guruh muddati oynasida.
 
-**Offline**: `verify_code` (real-vaqt CRPT tasdig'i) **ishlay olmaydi** — CRPT markaziy tizimga real-time bog'liq. Shunga qaramay, markirovkalangan tovarni **offline sotish ruxsat etiladi**, agar tovar narxi qurilmada ma'lum bo'lsa (POS'ga oldindan sinxronlangan/keshlangan katalog narxi): DataMatrix kod skanerlanadi, qurilmada faqat mahalliy format tekshiruvi o'tkaziladi, kod `marking_codes`ga (status kutilmoqda) va mahalliy event-logga yoziladi; internet qaytganda worker CRPT Turon'ga `verify_code` + `sell` so'rovini yuboradi (asinxron, `outbox_jobs(kind=marking_sell)`), natija `marking_codes.status=sold` (yoki `verify_failed` — bu holat Egasi/Buxgalterga ko'rinadi, keyingi tekshiruv/tuzatish talab qiladi). Agar tovar narxi qurilmada ma'lum **bo'lmasa** — bu tovar bilan sotuv offline rejimda **ruxsat etilmaydi**. Offline **ko'chirish** (o'z filiallar/omborlar orasida) — **ruxsat etiladi**, keyin sinxronlanadi, audit bilan (egasi o'zgarmaydi, 72 soatlik qoida subyektlar o'rtasidagi ko'chirishga tegishli ko'rinadi); offline **qaytarish** — **faqat internet bor paytda** (offline'da qaytarish tugmasi bloklanadi — rasmiy qaytarish cheki kodi kerak, firibgarlik xavfi yuqori). To'liq siyosat `16-offline-sync.md` §7 (qaror #17, #23 tavsiya #5). *Eslatma: bu mahsulot qarori; yuridik tasdiq (huquqshunos bilan) tavsiya etiladi, lekin spec darajasidagi qaror allaqachon qabul qilingan.*
+**Xato UX**: takroriy yoki avval sotilgan kod bilan chek shakllantirish **qonun bo'yicha taqiqlangan** — POS qatorni qabul qilmaydi. Kirim qabul xabarnomasi muddati yaqinlashsa/o'tsa — Omborchi/Buxgalterga ogohlantirish, kirim bloklanmaydi.
 
-**SLA**: ko'chirish **72 soat** — faqat tajriba loyihasi ishtirokchilari uchun (VMQ 23-son, 23.01.2026, 1-ilova Nizom; hozircha o'simlik yog'i pilot loyihasi), umumiy majburiy muddat sifatida tasdiqlanmagan; 2026-07-01'dan elektron hisob-fakturada kod avtomatik tekshirish va kassada avtomatik kiritish majburiy.
+**Offline**: **sotuv** — ruxsat (narx qurilmada ma'lum bo'lsa; kod chekka yoziladi, FM offline imzolaydi, chek 48 soat ichida OFD orqali Asl belgisi'ga yetadi; lokal takror-kod nazorati majburiy; narx noma'lum tovar offline sotilmaydi); **ichki ko'chirish** — ruxsat (audit bilan); **qaytarish** — **faqat online** (ichki ehtiyot tanlovi: kod holatini tekshirish, firibgarlik; qonun offline qaytarish chekini taqiqlamaydi — VM 833 84/90-band — kelajakda `FiscalPolicy.marking_offline_return=allow` bilan yumshatilishi mumkin). To'liq siyosat — `16-offline-sync.md` §7, qaror #17.
 
-**Xavfsizlik**: CRPT API kaliti **tenant darajasida** (har do'konning o'z "ishtirokchi" kalitida) shifrlangan saqlanadi (`tenant_secrets`); agar (2) proksi-hamkor yo'li ishlatilsa, u holda hamkor shartnomasi/kaliti **platforma darajasida** saqlanadi (bizning yagona integratsiya shartnomamiz orqali).
+**SLA**: kirim/yetkazib beruvchiga qaytarishda egalik o'tishi xabarnomasi (EHF shaklida) — **3 ish kuni**, lekin tovar uchinchi shaxsga berilgunga qadar (VM 833 66–67-band); suv/ichimlik (VM 631), dori (VM 149) va o'simlik yog'i pilot (VM 23) sxemalarida — **72 soat** (VM 631 dagi 3 ish kuni ↔ 72 soat ziddiyatida qat'iyrog'i — 72 soat). Muddat — `marking_product_groups.acceptance_deadline`. Ichki ko'chirish uchun CRPT muddati yo'q.
 
-**Monitoring**: BO-14 + har do'kon uchun "offline markirovka savdosi kutilmoqda" ogohlantirishi (internet qaytganda avtomatik tekshirish navbati).
+**Xavfsizlik**: CRPT API kaliti **tenant darajasida** (`tenant_secrets`, shifrlangan).
 
-**MVP bosqichi va integratsiya yo'li**: MVP — majburiy, lekin **eng yuqori texnik xavf**. Qaror: (1) **har bir do'kon o'zining bepul "ishtirokchi" (Participant) kabinetidan** CRPT Turon'da "API Key Manager" roli bilan API kalit yaratadi va tizimimizga kiritadi (tenant darajasidagi kalit, `tenant_secrets`da shifrlangan — F9 tasdiqlanmagan fakt bo'lgani uchun zaxira bilan); (2) agar bu yo'l Xat 2 javobi bilan rasman rad etilsa — reyestr hamkori (masalan hamkor allaqachon integrator maqomida bo'lgan MoySklad/E-POS/Smartup) orqali **proksi**; (3) ikkalasi ham ishga tushmasa — markirovkalangan tovar sotuvi tizimda **bloklanadi** (CRPT'siz sotilmaydi, qonunga zid bo'lmasligi uchun). **Xat 2 (CRPT Turon) javobi hali kutilmoqda** — uchinchi tomon SaaS'ning ishtirokchi kalitidan foydalanishi rasman ruxsat etilganmi, aniqlanmagan; shu sabab (1) — asosiy, (2)/(3) — zaxira zanjiri. Integratsiya vazifasi `27-backlog.md`da **MVP sprintiga** kiritilgan.
+**Monitoring**: BO-14 + kirim qabul xabarnomasi muddati hisoblagichi; `MARKING_PRECHECK=warn` ogohlantirishlari soni.
+
+**MVP bosqichi**: sotuv/qaytarish — fiskal chek bilan (`FakeFiscalAdapter` orqali MVP kodida), lokal takror-kod nazorati, `FakeMarkingAdapter`; real `CrptXtraceAdapter` (`verify`, `accept`, `supplier_return`, `write_off`) — Bosqich 5, Xat 2 javobidan keyin.
 
 ### 4.1 Mermaid: markirovkalangan tovar sotuvi
 
 ```mermaid
 sequenceDiagram
     participant K as Kassir (POS)
+    participant L as Lokal nazorat (Dexie marking_codes)
     participant API as Backend API
-    participant DB as PostgreSQL
-    participant Q as Navbat
-    participant MW as Markirovka Worker
-    participant CRPT as CRPT Turon (Asl belgisi)
+    participant CRPT as CRPT Turon (xTrace)
+    participant AG as Fiskal ko'prik (agent/hamkor)
+    participant OFD as OFD → Asl belgisi
 
-    K->>K: DataMatrix kodni skanerlaydi
-    K->>API: POST /marking/verify {code}
-    Note over K,API: (faqat tekshiruv, hech narsa yozmaydi; savatcha lokal)
-    alt Internet bor
-        API->>CRPT: verify_code(code) — sinxron, qisqa timeout
-        alt Kod yaroqli
-            CRPT-->>API: OK (sotilmagan, haqiqiy)
-            API-->>K: Chekka qo'shishga ruxsat
-        else Kod yaroqsiz/takroriy/muddati o'tgan
-            CRPT-->>API: xato
-            API-->>K: Sotuv rad etiladi (MVP taxmin siyosati)
+    K->>K: GS1 DataMatrix skanerlanadi
+    K->>L: chekda takrormi? avval sotilganmi?
+    alt Takror yoki avval sotilgan
+        L-->>K: Qator qabul qilinmaydi (qonuniy taqiq)
+    else Yangi kod
+        opt Online va MARKING_PRECHECK != off
+            K->>API: POST /marking/verify {code}
+            API->>CRPT: verify_code (timeout 3 s)
+            CRPT-->>API: holat
+            API-->>K: warn → ogohlantirish + audit / block → rad
         end
-    else Internet yo'q
-        Note over K,API: Real-vaqtda tekshirish imkoni yo'q (CRPT markaziy tizim)
-        alt Narx qurilmada ma'lum (keshlangan katalog, qaror #17)
-            API-->>K: Chekka qo'shishga ruxsat — kod mahalliy yoziladi,<br/>CRPT tasdig'i internet qaytganda
-        else Narx qurilmada noma'lum
-            API-->>K: Sotuv rad etiladi — narx online bo'lganda sinxronlanadi
-        end
+        K->>K: Qator chekka qo'shiladi (marking_codes[])
     end
-    API->>DB: sale_lines(marking_code), sotuv yakunlanadi
-    API->>Q: enqueue outbox_jobs(kind=marking_sell)
-    Q->>MW: job claimed
-    MW->>CRPT: sell(codes, sale_id) — "chiqarish" (spisaniye)
-    MW->>DB: marking_codes.status=sold yoki retry/failed
-    Note over API,DB: Fiskal chekning o'zi alohida OFD oqimi orqali yuboriladi (1.1-bo'lim)
+    K->>AG: register_sale(items[].marking_codes)
+    AG-->>K: fiscal_sign, qr_url (offline ham)
+    AG-)OFD: chek (product_label bilan) — OFD kodni Asl belgisi'ga uzatadi
 ```
 
 ---
 
 ## 5. E-IMZO (elektron raqamli imzo, brauzerda)
 
-**Maqsad va modullar**: e-faktura/e-TTN imzolash (M07), B2B chiquvchi faktura imzolash (M08), davlat hisobotiga tuzatish imzolash (M10/BP-08), M13 (audit — kim imzolagan).
+**Maqsad va modullar**: e-faktura/e-TTN/e-ishonchnoma imzolash (M06, M07), B2B chiquvchi faktura (M08), davlat hisobotiga tuzatish (M10/BP-08), M13 (audit — kim imzolagan).
 
-**Yo'nalish va trigger**: imzolashning o'zi **brauzerda, lokalda** — server faqat tayyor PKCS#7 imzoni qabul qiladi va tasdiqlaydi (`10-umumiy-arxitektura.md`: "server faqat imzolangan hujjatni oladi va operatorga yuboradi").
+**Yo'nalish va trigger**: imzolashning o'zi **brauzerda, lokalda** — server faqat tayyor PKCS#7 imzoni qabul qiladi, tekshiradi va operatorga yuboradi.
 
-**API holati**: Rasmiy dasturchi portali (OpenAPI/Swagger) **topilmadi**; yagona batafsil texnik hujjat — jamoatchilik GitHub repo [qo0p/e-imzo-doc](https://github.com/qo0p/e-imzo-doc). Qonun asosi aniq: O'RQ-793-son (2022-10-12), 2023-01-14 dan kuchda. **Sandbox tasdiqlandi**: `testvpn.e-imzo.uz:2443`, TestCA sertifikatlari, demo saytlar (`test.e-imzo.uz/demo/`), ID-karta emulyatori (`wss://test.e-imzo.uz/idcard-emulator`).
+**API holati**: rasmiy dasturchi portali yo'q; amaldagi qo'llanma — [qo0p/e-imzo-doc](https://github.com/qo0p/e-imzo-doc) (2026-10-09). JS kutubxonalari — `test.e-imzo.uz/demo/` dagi `e-imzo.js`, `e-imzo-client.js` (`CAPIWS`). Prod uchun НИЦ "Yangi texnologiyalar"dan (yt.uz, (71) 202-32-32, info@yt.uz) **uch komplekt**: (1) **API-KEY** — bitta prod domen uchun (har subdomen — alohida kalit; IP uchun berilmaydi; E-IMZO v6 kalitni domen bo'yicha o'zi yuklay oladi); (2) **VPN-kalit** E-IMZO-SERVER uchun (`vpn.e-imzo.uz:3443`, faqat O'zbekiston IP'laridan — server UzCloud'da); (3) SiteID (faqat ID-karta/mobil). **E-IMZO-SERVER** (Java 8) — litsenziya + yozma shartnoma bilan, yopiq Telegram kanal orqali. Test: `testvpn.e-imzo.uz:2443`, TestCA («CN=TestCA,O=test.e-imzo.uz»), `test.e-imzo.uz/demo/`, ID-karta emulyatori `wss://test.e-imzo.uz/idcard-emulator`, dev uchun E-IMZO tray-menyusidagi "Режим разработчика". Qonun asosi: O'RQ-793 (2022-10-12).
 
-**Adapter interfeysi** (backend tomoni — brauzer-server qismi, lokal E-IMZO.exe bilan gaplashuv frontendda):
+**Imzolash domeni**: imzolash sahifasi **yagona umumiy domenda** — `sign.<domen>`; tenantlarga alohida subdomen ishlatilmaydi (har biriga API-KEY kerak bo'lardi). Yangi imzolash domeni qo'shish = yangi API-KEY arizasi (ops chek-listi). Didox ham `Origin:https://{sayt}` ni talab qiladi — shu domen.
+
+**Port interfeysi** (backend; brauzer ↔ lokal E-IMZO gaplashuvi frontendda):
 ```python
-class SignatureVerificationAdapter(Protocol):
+class SignatureVerificationPort(Protocol):
     async def verify_pkcs7_attached(self, signed_blob: bytes) -> SignatureVerifyResult: ...
     async def verify_pkcs7_detached(self, document_hash: str, signature: bytes) -> SignatureVerifyResult: ...
     async def get_timestamp(self, pkcs7: bytes) -> TimestampedPkcs7: ...
 ```
+Server tomonidagi PKCS#7 tekshiruvi — E-IMZO-SERVER (shartnoma bo'yicha) orqali.
 
-**Ma'lumot moslashtirish**: `einvoices.signed_at`, imzolagan foydalanuvchi `audit_log(action=sign, entity, user_id)`; PKCS#7 blob hujjat bilan bog'lanib saqlanadi (S3/`attachments`).
+**Ma'lumot moslashtirish**: `einvoices.signed_at`, `audit_log(action=sign, entity, user_id)`; PKCS#7 blob hujjat bilan bog'lanib saqlanadi (S3/`attachments`).
 
-**Idempotentlik kaliti**: imzolanadigan hujjatning `document_hash` (bitta hujjat bir necha marta imzolansa, oxirgisi amal qiladi, eski imzolar audit uchun saqlanadi).
+**Idempotentlik kaliti**: imzolanadigan hujjatning `document_hash` (oxirgi imzo amal qiladi, eskilari audit uchun saqlanadi).
 
-**Qayta urinish/backoff**: imzolash o'zi foydalanuvchi amali (retry mantiqiy emas); backend tasdiqlash (`verify`) vaqtinchalik xato bo'lsa `base=10s, cap=1 daqiqa, max_attempts=5`.
+**Qayta urinish/backoff**: imzolash — foydalanuvchi amali; backend tekshiruvi vaqtinchalik xato bo'lsa `base=10s, cap=1 daqiqa, max_attempts=5`.
 
-**Xato UX**: imzolash muvaffaqiyatsiz bo'lsa (parol xato, sertifikat muddati o'tgan, E-IMZO.exe o'rnatilmagan) — Buxgalter/foydalanuvchiga aniq xabar, hujjat `draft` holatida qoladi, boshqa modullarga ta'sir qilmaydi.
+**Xato UX**: parol xato, sertifikat muddati o'tgan, E-IMZO o'rnatilmagan — aniq xabar, hujjat `draft` holatida qoladi.
 
-**Offline**: imzolash **online talab qiladi** (OCSP/TSA tekshiruvi `vpn.e-imzo.uz`ga bog'liq); offline rejimda imzolash kechiktiriladi.
+**Offline**: imzolash online talab qiladi (OCSP/TSA); offline'da kechiktiriladi.
 
-**SLA**: qattiq muddat yo'q, lekin e-faktura/hisobot muddatlariga bog'liq (masalan 5 kalendar kunlik tuzatish oynasida imzolash ulgurishi kerak).
+**SLA**: hujjat muddatlariga bog'liq (masalan davlat hisobotiga tuzatish — 5 ish kuni ichida).
 
-**Xavfsizlik**: xususiy kalit **hech qachon serverga yuborilmaydi** (E-IMZO.exe lokalda saqlaydi) — bu arxitektura jihatidan eng xavfsiz integratsiya. Server faqat PKCS#7 natijasini tasdiqlaydi.
+**Xavfsizlik**: xususiy kalit **hech qachon serverga yuborilmaydi**; server faqat PKCS#7 natijasini tekshiradi.
 
-**Monitoring**: imzolash muvaffaqiyatsizligi audit_log + BO-15'da ko'rinadi.
+**Monitoring**: imzolash muvaffaqiyatsizligi `audit_log` + BO-15.
 
-**MVP bosqichi**: MVP — majburiy (e-faktura/hisobot oqimining bir qismi). **Zaxira yo'l**: rasmiy hujjat yo'qligi sababli integratsiya kutilganidan ko'proq vaqt olishi mumkin — jadvalga bufer qo'shilishi va E-IMZO'ni allaqachon integratsiya qilgan (Didox, Faktura.uz) kompaniyalar bilan maslahatlashish tavsiya etiladi (`12-taxminlar-va-murojaatlar.md`, savol 5).
+**MVP bosqichi**: MVP — majburiy. **Bosqich 0 da yt.uz bilan shartnoma arizasi** (API-KEY `sign.<domen>` uchun + VPN-kalit + E-IMZO-SERVER litsenziyasi) — reyestr arizasi bilan parallel; dev/test — "Режим разработчика", TestCA va `testvpn` bilan, bloklanmaydi; prod jadvalida ~1 oy bufer.
 
 ---
 
-## 6. E-ishonchnoma (Vakolat.uz)
+## 6. E-ishonchnoma (EDO operatori orqali)
 
-**Maqsad va modullar**: yetkazib beruvchi vakili ishonchnoma bilan tovar topshirganda (M07/BP-01, qadam 1a) ishonchnomani tekshirish.
+**Maqsad va modullar**: tovar-moddiy zaxirani olish uchun ishonchnoma — **do'kon o'z xodimiga (Omborchi) beradi**, e-fakturadan **oldin**; yetkazib beruvchi uni tekshirib tasdiqlaydi va EHF'ni ishonchnoma asosida shakllantiradi; EHF'ni ishonchli shaxs E-IMZO bilan imzolaydi (VM 249 3-ilova 4, 14, 15-band). M07/BP-01 1a-qadam. Qaror #63.
 
-**Yo'nalish va trigger**: chiquvchi so'rov (backend → Vakolat.uz), tovar qabul qilishdan oldin, vakil orqali qabul qilinganda.
+**API holati**: TMZ ishonchnomasi — EDO operatori hujjati (Faktura.uz `PowerOfAttorney` = 20, Didox `Empowerment`) — `EInvoicePort.send_power_of_attorney` (2-bo'lim); alohida adapter yo'q. Vakolat.uz (VM 825) — davlat xizmatlari uchun, yuridik shaxslar uchun ixtiyoriy, TMZ qabulida talab qilinmaydi; Vakolat reyestri faqat ommaviy veb-qidiruv (`vakolat.adliya.uz/search`) — integratsiya yo'q.
 
-**API holati**: Majburiy 2026-01-01'dan (VM 825-son, 2025-12-25). Identifikatsiya **E-IMZO yoki Face ID (biometrik)** orqali — ikkisi ham mumkin, E-IMZO yagona majburiy yo'l emas (`research_notes/texnik/09-soliq-integratsiyasi.md`, tuzatilgan). **API hujjati topilmadi** — integratsiya usuli (REST, qanday autentifikatsiya) **ochiq savol**.
+**Yo'nalish va trigger**: chiquvchi — Menejer/Buxgalter ishonchnoma yaratadi (yetkazib beruvchi, tovar, muddat, ishonchli shaxs), Omborchi imzolaydi → `outbox_jobs(kind=poa_send)`.
 
-**Adapter interfeysi**:
-```python
-class PowerOfAttorneyAdapter(Protocol):
-    async def verify(self, poa_number: str, representative_pinfl: str, issuer_stir: str) -> PoAVerifyResult: ...
-```
+**Ma'lumot moslashtirish**: `goods_receipts.poa_number`, `poa_date`, `poa_einvoice_id` (EDO hujjati); EHF'da `doverennost_number`, `doverennost_date`.
 
-**Ma'lumot moslashtirish**: `goods_receipts`ga tegishli vakolat tekshiruvi natijasi (alohida jadval yo'q — implementatsiyada `goods_receipts.poa_verification JSONB` yoki alohida `poa_checks` jadvali kerak bo'lishi mumkin — ma'lumotlar modeli hujjatida kengaytiriladi).
+**Idempotentlik kaliti**: `poa_number + tenant_id`.
 
-**Idempotentlik kaliti**: `poa_number + receipt_id`.
+**Qayta urinish/backoff**: e-faktura bilan bir xil.
 
-**Qayta urinish/backoff**: `base=30s, cap=5 daqiqa, max_attempts=10` — qabul paytida tezkor javob kutiladi.
+**Xato UX**: ishonchnomasiz e-faktura vakil tomonidan imzolanmaydi — uni Buxgalter (direktor ERI bilan) imzolaydi; tizim kirimni bloklamaydi. Boshqa tashkilot Vakolat.uz ishonchnomasini ko'rsatsa — raqam va tekshiruv kodi qo'lda tekshiriladi, izoh maydoniga yoziladi.
 
-**Xato UX**: tekshirish muvaffaqiyatsiz/ishonchlar mavjud bo'lmasa — Omborchi qabulni **vakolat tasdiqlanmagan** deb belgilab davom ettiradi (qattiq bloklash siyosati tasdiqlanmagan, **taxmin**: ogohlantirish bilan davom etish, chunki rasmiy "majburiy taqiq" topilmadi).
+**Offline**: yo'q.
 
-**Offline**: yo'q (ofis/ombor, internet mavjud joy).
+**SLA**: EHF shakllantirilishidan oldin.
 
-**SLA**: aniq emas.
+**Xavfsizlik/Monitoring**: e-faktura bilan bir xil kanal/kredensial; BO-15.
 
-**Xavfsizlik/Monitoring**: platforma darajasida kredensial (agar kerak bo'lsa); BO-14'da holat.
-
-**MVP bosqichi**: **keyin** — faqat vakil orqali qabul qilinganda kerak, past chastota. MVP'da "ishonchnoma raqamini qo'lda yozib qo'yish" bilan boshlanishi mumkin, avtomatik tekshiruv keyingi bosqichda. **Zaxira yo'l**: API ochilmaguncha qo'lda tekshirish (Vakolat.uz veb-saytida qo'lda qidirish) + tizimda faqat izoh maydoni.
+**MVP bosqichi**: MVP — operator adapterida (Faktura.uz `PowerOfAttorney`); past chastota bo'lsa ham kod yo'li bir xil.
 
 ---
 
@@ -441,7 +458,7 @@ class ClassifierAdapter(Protocol):
 
 **Yo'nalish va trigger**: mantiqan kiruvchi (davlat → biz), lekin **texnik jihatdan push/pull API yo'q** — foydalanuvchi (Buxgalter) my.soliq.uz shaxsiy kabinetiga E-IMZO bilan kirib, hisobotni **qo'lda yuklab oladi** (PDF/Excel) va tizimga yuklaydi.
 
-**API holati**: **Rasmiy dasturiy (API) o'qish yo'li topilmadi** — bu `00-xulosa-va-ochiq-savollar.md`, `14-tekshiruv-xulosasi.md` va `12-taxminlar-va-murojaatlar.md`ning barchasida takrorlangan eng muhim ochiq savol/blokker. Huquqiy asos aniq: Soliq kodeksi 81-moddasi, O'RQ-1108-son (2025-12-25), [lex.uz/docs/-7944527](https://lex.uz/docs/-7944527).
+**API holati**: ommaviy dasturiy (API) o'qish yo'li **yo'q** — soliq to'lovchi uchun yagona kanal shaxsiy kabinet (VM 736 3¹-ilova 10-band); ichki my.soliq.uz endpoint'lari ishlatilmaydi. Soliq organi 6 ta soliq bo'yicha hisobotni (shu jumladan **QQS** va **aylanma solig'i**) avtomatik tuzib kabinetga joylaydi: QQS — keyingi oyning 15-sanasigacha (topshirish — 20-sana), aylanma — 10-sanagacha (topshirish — 15-sana). Granulyarlik: QQS — faktura darajasidagi reyestrlar + yig'indi; aylanma — faqat yig'indi. Soliq to'lovchi kabinetda **tasdiqlaydi** yoki **tuzatib taqdim etadi**; javob bermasa — rozilik (SK 81-modda 6–7-qism). Muddat o'tgach — aniqlashtirilgan hisobot (SK 83-modda).
 
 **Adapter interfeysi** (MVP — faylga asoslangan "adapter", tashqi tizimga chaqiruv emas):
 ```python
@@ -457,110 +474,112 @@ class StateReportAdapter(Protocol):
 
 **Idempotentlik kaliti**: `tenant_id + tax_type + period` — bir davr uchun bitta hisobot import qilinadi, qayta yuklash eskisini almashtiradi (versiyalash bilan).
 
-**Qayta urinish/backoff**: integratsiya yo'q — **retry tushunchasi qo'llanilmaydi**; o'rniga **eslatma job'lari** (`outbox_jobs(kind=state_report_reminder)`) 1-, 3-, 4-kunlarda (taxmin) Telegram/UI orqali Buxgalter/Egasiga yuboriladi.
+**Qayta urinish/backoff**: integratsiya yo'q — **retry tushunchasi qo'llanilmaydi**; o'rniga **eslatma job'lari** (`outbox_jobs(kind=state_report_reminder)`) hisobot kelgan kundan 1-, 3-, 4-kunlarda Telegram/UI orqali Buxgalter/Egasiga yuboriladi (qaror #50).
 
 **Xato UX**: fayl formatini tizim tanimasa — Buxgalter qiymatlarni **qo'lda** kiritadi (zahira yo'l); hisobot kelmasa ham ichki QQS hisob-kitobi (M10) normal davom etadi, faqat solishtirish `kutilmoqda` holatida qoladi.
 
 **Offline**: yo'q (shaxsiy kabinetga kirish, fayl yuklash — online amal).
 
-**SLA**: **5 kalendar kun** (min(e'lon+5 kun, qonuniy topshirish muddati)) — tuzatish kiritish uchun; o'tsa hisobot "davlat tuzgan holida topshirilgan" hisoblanadi (Soliq kodeksi 81-moddasi).
+**SLA**: **5 ish kuni** — joylashtirilgan kundan keyingi kundan, lekin hisobot topshirish muddatidan kechiktirmay (SK 5-modda 7-qism, 81-modda); javob berilmasa hisobot "davlat tuzgan holida topshirilgan" hisoblanadi.
 
 **Xavfsizlik**: yuklangan fayl (soliq hisoboti) `attachments`da shifrlangan S3'da; tizimda saqlanadigan shaxsiy/moliyaviy ma'lumot sifatida alohida ruxsat (faqat Buxgalter/Egasi).
 
-**Monitoring**: BO-14'da "qo'lda jarayon" sifatida belgilanadi (avtomatik ulanish yo'q); 5 kunlik taymer holati asosiy ko'rsatkich (M10 holat mashinasi: `kutilmoqda` → `mos keladi`/`farq topildi` → `tuzatish yuborildi`/`avtomatik qabul qilingan`).
+**Monitoring**: BO-14'da "qo'lda jarayon" sifatida belgilanadi (avtomatik ulanish yo'q); 5 ish kunlik taymer holati asosiy ko'rsatkich (M10 holat mashinasi: `kutilmoqda` → `mos keladi`/`farq topildi` → `tuzatish yuborildi`/`avtomatik qabul qilingan`).
 
-**MVP bosqichi**: MVP — qo'lda/yarim-avtomatik (majburiy funksiya, lekin avtomatlashtirilmagan). **Zaxira yo'l**: agar API rasmiy ravishda ham ochilmasa — doimiy qo'lda jarayon, faqat fayl parsing (AI-05 OCR/matn tahlili) bilan tezlashtiriladi. Rasmiy murojaat Xat 1'da yozilgan (`12-taxminlar-va-murojaatlar.md`, savol 4).
+**MVP bosqichi**: MVP — fayl yuklash + AI-05 tushuntirish (yakuniy MVP yo'li). API ochilsa — `StateReportAdapter.fetch_report` qo'shiladi, solishtirish mantiqi o'zgarmaydi.
 
 ---
 
-## 9. Click, Payme, Uzum, UzQR — do'kon QR to'lovlari VA bizning obuna billing'imiz (M17)
+## 9. Click, Payme, Uzum, UzQR — do'kon to'lovlari VA bizning obuna billing'imiz (M17)
 
-**Maqsad va modullar**: (a) mijozning do'konga to'lovi (M01, to'lov turi `click`/`payme`/`uzum` — **ixtiyoriy kanallar**). Alohida: 2026-07-01'dan barcha savdo va xizmat ko'rsatuvchi **yuridik shaxslar** uchun banklarda generatsiya qilingan **yagona QR kod** (UzQR) orqali to'lov qabul qilish ham majburiy, undan foydalanmaslik savdo qoidalarini buzish hisoblanadi (PF-246-son, 10.12.2025, 3-band "b"); PF-246 Click/Payme/Uzum'ni nomma-nom majburiy qilmaydi, YTT'lar bu bandda tilga olinmagan (9.1-bo'lim); (b) bizning platformamizning obuna to'lovi — do'kon Egasi bizga oylik/yillik to'laydi (M17, `billing_payments`).
+**Maqsad va modullar**: (a) mijozning do'konga to'lovi (M01; `sale_payments.method` = `click`/`payme`/`uzum`/`uzqr`/`card`); (b) platformamizning obuna to'lovi — do'kon Egasi bizga oylik/yillik to'laydi (M17, `billing_payments`).
 
-**Muhim ajratish**: bular **ikki butunlay alohida merchant hisobi**: (a) — har bir tenant (do'kon) **o'z** Click/Payme/Uzum merchant hisobiga ega (tenant kredensiali); (b) — **bizning** kompaniyamizning bitta umumiy merchant hisobi (platforma kredensiali). Adapter interfeysi bir xil, lekin konfiguratsiya kontekst (`tenant` vs `platform`) orqali ajratiladi.
+**Merchant modeli (qaror #46)**: (a) — har tenant **o'z** Click/Payme/Uzum/UzQR merchant hisobi va kalitlari (tenant kredensiali, `tenant_secrets`), pul to'g'ridan-to'g'ri do'konga tushadi; (b) — platformaning bitta merchant hisobi (platforma kredensiali). Split/marketplace modeli yo'q. Platforma faqat texnologik vositachi — to'lov xizmati hisoblanmaydi, **to'lov tashkiloti litsenziyasi kerak emas** (O'RQ-578 14-modda, istisno ro'yxati); begona pulni yig'ish modeliga o'tish litsenziya talabini keltirib chiqaradi (taqiq). Adapter interfeysi bir xil, konfiguratsiya kontekst (`shop` vs `billing`) orqali ajratiladi.
 
-**Yo'nalish va trigger**: chiquvchi (checkout yaratish) + kiruvchi (webhook — to'lov tizimi natijani push qiladi).
+**Fiskalizatsiya qoidasi**: do'kon sotuvida har bir to'lov usulida chekni **faqat bizning kassamiz** chiqaradi (VMQ-943 1-ilova 6-band; 1a-ilova 2-band 3–4-xatboshi, VMQ-393 tahriri — UzQR uchun ham). Provayderga faqat tayyor chek havolasi yuboriladi: Click — `POST /v2/merchant/payment/ofd_data/submit_qrcode`, Payme — `receipts.set_fiscal_data`, Uzum — `/dynamic-qr/.../fiscal` va FastPay `/fiscal`. **Provayder tomonidagi avtomatik fiskallashtirish o'chiq bo'lishi shart** — aks holda ikki marta fiskalizatsiya; tenant onboarding'ida har provayder kabineti uchun bu BO-14 tekshiruv bandi (Egasi tasdiqlaydi). Provayder fiskalizatsiyasi (`SetFiscalData`, `submit_items`, Uzum Fiscalization API) — faqat masofaviy savdo (1a-ilova 4–5-band) uchun; POS oqimida ishlatilmaydi. Platforma billingida (M17) chekni kim chiqarishi — `FiscalPolicy.issuer` (standart `merchant`).
 
-**API holati**:
-- **Payme**: rasmiy hujjat (`developer.help.paycom.uz`), protokol JSON-RPC uslubida (rasmiy hujjat "2.0" deb atamaydi), metodlar `CheckPerformTransaction/CreateTransaction/PerformTransaction/CancelTransaction/CheckTransaction/GetStatement/SetFiscalData`. **Sandbox bor**: `test.paycom.uz`. Komissiya: 1–2% (kanalga qarab).
-- **Click**: REST + MD5 imzo, ikki bosqichli Prepare/Complete ("Shop API"). Rasmiy sandbox hujjati **topilmadi**. Komissiya: 1–5% (kanal/karta turiga qarab, `business.click.uz`).
-- **Uzum**: dasturchi portali bor (`developer.uzumbank.uz`), protokol aralash (OpenAPI + ba'zi qismda JSON-RPC), to'liq aniqlanmagan. Test muhiti: **Uzum Checkout** uchun rasmiy test muhiti va test kartalari bor (HUMO/UzCard, 3-DS 777777; API kalit Uzum tomonidan beriladi — developer.uzumbank.uz/checkout, "Тестирование"); **Merchant API** (ilova orqali, vebxuk) hujjatida sandbox ko'rsatilmagan — Uzum menejeridan so'raladi. Komissiya: Uzum karta 0%, boshqa karta 0,4%.
-- Uchtasida ham **fiskal chekni kim chiqarishi** (to'lov tizimi "komissioner" sifatida, yoki merchant o'zi) huquqiy jihatdan ziddiyatli — ikki talqin bor (`03-efaktura-va-tolov.md`, 2.5-bo'lim). Tizim bu ikkisini ham zahira sifatida qo'llab-quvvatlashi kerak (konfiguratsiya bilan).
+**Yo'nalish va trigger**: chiquvchi (checkout/dinamik QR yaratish) + kiruvchi (webhook yoki holat so'rovi).
 
-**Adapter interfeysi**:
+**API holati** (2026-10-16 tekshirildi):
+- **Payme** — Merchant API (`developer.help.paycom.uz`, JSON-RPC uslubida): `CheckPerformTransaction/CreateTransaction/PerformTransaction/CancelTransaction/CheckTransaction/GetStatement/SetFiscalData`; Subscribe API (obuna billing): `cards.*` + `receipts.*`. Test — `test.paycom.uz`, `checkout.test.paycom.uz/api`. Komissiya 1–2%.
+- **Click** — SHOP API (Prepare/Complete, MD5 imzo) + Merchant API (REST `https://api.click.uz/v2/merchant/…`, `Auth: merchant_user_id:sha1(timestamp+secret_key):timestamp`): invoys, holat, reversal, **karta tokeni** (obuna uchun), **Click Pass** (kassir mijoz QR'ini skanerlaydi), fiskal ma'lumot (`ofd_data/submit_items` | `submit_qrcode`). **Rasmiy sandbox**: docs.click.uz "Тестовая площадка" + 15 ssenariyli Postman to'plami. Komissiya: QR/Click Pass Uzcard/Humo 1%, Visa 2%.
+- **Uzum** — Merchant API: Uzum'dan merchant serveriga **JSON vebxuklar** `/check`, `/create`, `/confirm`, `/reverse`, `/status` (OpenAPI 3.1, **Basic Auth**; JSON-RPC emas); `/confirm` javobsiz qolsa `/status` 10 martagacha qayta so'raladi; 30 daqiqada `/confirm` kelmasa tranzaksiya `FAILED`. Kassa uchun — **Dynamic QR** (`/api/dynamic-qr/merchant/payment/*`) va **FastPay**. Checkout test kartalari bor (HUMO 9860 0901 0121 9724, 3-DS 777777); Merchant API test kredensiali Uzum menejeridan; Fiscalization test xosti `test-ofd.ipt-merch.com`. Komissiya: Uzum karta 0%, boshqa karta 0,4%.
+
+**Port interfeysi**:
 ```python
-class PaymentAdapter(Protocol):
+class PaymentPort(Protocol):
     async def create_checkout(self, amount: Money, order_id: str, context: Literal["shop", "billing"]) -> CheckoutResult: ...
     async def handle_webhook(self, payload: dict, headers: dict) -> WebhookResult: ...
     async def check_transaction(self, provider_tx_id: str) -> TransactionStatus: ...
     async def cancel(self, provider_tx_id: str) -> CancelResult: ...
+    async def submit_fiscal_link(self, provider_tx_id: str, qr_url: str) -> None: ...   # Click submit_qrcode / Payme set_fiscal_data / Uzum /fiscal
 ```
 
 **Ma'lumot moslashtirish**:
-- Do'kon sotuvi: `sale_payments(method, amount, provider_tx_id)`.
-- Bizning billing: `billing_payments(tenant_id, amount, provider, provider_tx_id UNIQUE, status, paid_at)` (`11-malumotlar-modeli.md`, 2-bo'lim).
+- Do'kon sotuvi: `sale_payments(method, amount, provider_tx_id, qr_type, card_type, card_mask, rrn)` (qaror #64); `card_type` CHECK `('personal','corporate','social','unknown')`; `provider_tx_id` — `click`/`payme`/`uzum` va **dinamik** UzQR'da majburiy, statik UzQR'da yo'q (CHECK: `method NOT IN ('uzqr','click','payme','uzum') OR provider_tx_id IS NOT NULL OR (method='uzqr' AND qr_type='static')`).
+- Naqdsiz tushum avval **5710** ga, bank tasdig'i (`bank_settlements`) bilan 5110 ga (qaror #42); ekvayring/bank komissiyasi — **9430**.
+- Bizning billing: `billing_payments(tenant_id, kind, amount, provider, provider_tx_id UNIQUE, status, paid_at)`.
 
-**Idempotentlik kaliti**: `provider_tx_id` (tashqi tizim bergan tranzaksiya ID'si) — **UNIQUE** constraint `billing_payments`da; webhook ikki marta kelsa, ikkinchisi rad etiladi/no-op.
+**Idempotentlik kaliti**: `provider_tx_id` (UNIQUE `billing_payments`da); webhook ikki marta kelsa — no-op.
 
-**Qayta urinish/backoff**: `checkout` yaratish — foydalanuvchi kutadi, retry yo'q (xato bo'lsa darhol ko'rsatiladi); webhook qabul qilish — kelgan so'rovga darhol 200 qaytarish shart (aks holda tashqi tizim qayta-qayta yuboradi — bu o'zi "tashqi retry"); ichki reconcile job (`billing_webhook_reconcile`) `base=1 daqiqa, cap=10 daqiqa, max_attempts=10` — agar webhook ishlov berishda vaqtinchalik DB xatosi bo'lsa.
+**Qayta urinish/backoff**: `checkout` — foydalanuvchi kutadi, retry yo'q; webhook — darhol 200 (aks holda provayder qayta yuboradi); ichki reconcile (`billing_webhook_reconcile`) `base=1 daqiqa, cap=10 daqiqa, max_attempts=10`; `submit_fiscal_link` — outbox, `base=1 daqiqa, cap=1 soat, max_attempts=24` (chekning o'zi allaqachon berilgan, bu faqat provayderga xabar).
 
 **Xato UX**:
 - Do'kon sotuvida: to'lov muvaffaqiyatsiz bo'lsa kassir boshqa usul (naqd/karta) taklif qiladi — sotuv to'xtamaydi.
-- Bizning billingda: to'lov o'tmasa — 24 soatlik imtiyozdan keyin (US-M17-03) tenant uchun kirish **to'liq to'xtaydi**: barcha faol sessiya/tokenlar bekor qilinadi, har bir ochiq ekran (kassa va back-office, farqlanmasdan) login sahifasiga qaytariladi, login sahifasida "Obuna muddati tugagan" xabari + Click/Payme to'lov havolasi ko'rsatiladi, yangi login ham rad etiladi. To'lov kelgach darhol qayta ochiladi. Offline qurilma — mahalliy imzolangan litsenziya (`subscription_end + 24 soat`) muddati tugaganda o'zi mahalliy qulflanadi (serverga ulanishni kutmaydi). Xizmat shartlarida (ToS) do'konning kirish to'xtatilgan davrdagi fiskal/soliq majburiyatlari uchun o'zi javobgar ekani aniq yozilishi shart (huquqshunos bilan tasdiqlash tavsiya etiladi). Ikki tor istisno (`16-offline-sync.md` §3.5): **D1** — lokautdan oldin yaratilgan, hali yuborilmagan fiskal voqealar cheklangan `sync.drain` scope orqali baribir OFD'ga yetib boradi (yangi sotuv/login yo'q, 1-bo'lim); **D2** — lokaut davrida ma'lumot eksporti faqat to'lov sahifasidan, SMS OTP tasdig'i bilan ruxsat etiladi, boshqa barcha ekran yopiq.
+- Bizning billingda: to'lov o'tmasa — 24 soatlik imtiyozdan keyin (US-M17-03) tenant uchun kirish **to'liq to'xtaydi**: barcha faol sessiya/tokenlar bekor qilinadi, har bir ochiq ekran login sahifasiga qaytariladi, login sahifasida "Obuna muddati tugagan" xabari + Click/Payme to'lov havolasi, yangi login rad etiladi. To'lov kelgach darhol qayta ochiladi. Offline qurilma — mahalliy imzolangan litsenziya (`subscription_end + 24 soat`) muddati tugaganda o'zi qulflanadi. Xizmat shartlarida do'konning kirish to'xtatilgan davrdagi fiskal/soliq majburiyatlari uchun o'zi javobgar ekani yoziladi (qaror #15). Ikki tor istisno (`16-offline-sync.md` §3.5): **D1** — lokautdan oldin yaratilgan fiskal voqealar cheklangan `sync.drain` scope orqali baribir yetkaziladi (1-bo'lim); **D2** — lokautda ma'lumot eksporti faqat to'lov sahifasidan, SMS OTP tasdig'i bilan.
 
-**Offline**: yo'q — QR/karta to'lovi online amal; offline paytda faqat naqd/nasiya ishlaydi.
+**Offline**: Click/Payme/Uzum va dinamik UzQR — faqat online. Statik UzQR va mustaqil terminal (`card`) — qo'lda tasdiqlanadigan to'lov turlari (9.1, 9.2), kassa internetiga bog'liq emas.
 
-**SLA**: yagona (bank) QR kod orqali to'lov qabul qilish yuridik shaxslar uchun 2026-07-01'dan majburiy (PF-246-son, 3-band "b") — bu "muddat" emas, "doimiy majburiyat" boshlanish sanasi.
+**SLA**: qat'iy muddat yo'q; to'lov holati soniyalar ichida (Uzum — 30 daqiqalik tranzaksiya oynasi).
 
-**Xavfsizlik**: har tenant o'z Click/Payme/Uzum `merchant_id`/`secret_key`ni shifrlangan saqlaydi (`tenant_secrets`); bizning platforma kaliti alohida, yuqori maxfiylik darajasida (faqat billing worker'ga ko'rinadi). Webhook imzosi (Click MD5, Payme Basic Auth) har safar tekshiriladi — soxta webhook rad etiladi.
+**Xavfsizlik**: tenant kalitlari `tenant_secrets`da shifrlangan (qaror #46); platforma kaliti alohida, faqat billing worker'ga ko'rinadi. Webhook imzosi (Click MD5/SHA1, Payme Basic Auth, Uzum Basic Auth) har safar tekshiriladi — soxta webhook rad etiladi.
 
-**Monitoring**: BO-14 (do'kon darajasida — qaysi to'lov usuli ulangan) + ADM-01 (platforma darajasida — bizning billing holati, muvaffaqiyatsiz to'lovlar).
+**Monitoring**: BO-14 (do'kon darajasida — qaysi to'lov usuli ulangan, avto-fiskallashtirish o'chirilganligi tasdiqlanganmi) + ADM-01 (platforma billing holati).
 
-**MVP bosqichi**: MVP — majburiy ikkisi uchun ham (do'kon QR to'lovi va bizning billing). **Zaxira yo'l**: Click sandbox topilmasa — birinchi navbatda Payme (sandbox tasdiqlangan) bilan boshlash, Click/Uzum'ni parallel ravishda merchant hisobi ochib sinov qilish.
+**MVP bosqichi**: MVP — Payme va Click parallel (ikkalasida test muhiti bor), billing va do'kon to'lovi; Uzum — Checkout test muhiti bilan, Merchant API menejer kredensiali bilan.
 
 ### 9.1 UzQR (bank yagona QR)
 
-**Maqsad va modullar**: 2026-07-01'dan barcha savdo va xizmat ko'rsatuvchi **yuridik shaxslar** uchun banklarda generatsiya qilingan yagona QR kod (UzQR) orqali to'lov qabul qilish majburiy (PF-246-son, 10.12.2025, 3-band "b", [lex.uz/uz/docs/-7897630](https://lex.uz/uz/docs/-7897630)); YTT'lar uchun ixtiyoriy (PF-246 3-band "b" faqat yuridik shaxslarni nomlaydi). Yagona QR Click/Payme/Uzum'ning o'rnini bosmaydi — ular ixtiyoriy kanal sifatida qoladi ("ham majburiy"). M01, `sale_payments.method=uzqr`.
+**Maqsad va modullar**: yuridik shaxslar uchun bank UzQR orqali to'lov qabul qilish majburiy (PF-246 3-band "b"; CBU 5/11-son qoidalari, reg. 3817, 16.04.2026 dan; VMQ-75 189-band VMQ-393 tahriri). **Yakka tartibdagi tadbirkor va o'zini o'zi band qilganlar uchun ham** QR majburiy — to'lov tashkiloti raqamli platformasida generatsiya qilingan maxsus QR (PQ-247 7-band "a", 2026-01-01 dan; yo'qligi NKT qo'llamaslikka tenglashtiriladi) — tizimda `click`/`payme`/`uzum` QR'i bilan bajariladi, bank UzQR shart emas. UzQR Click/Payme/Uzum'ni almashtirmaydi — ular ham qoladi. M01, `sale_payments.method=uzqr`. Qaror #64.
 
-**Yo'nalish va trigger**: chiquvchi (checkout/QR generatsiyasi — statik yoki dinamik) + kiruvchi (bank tasdig'i — webhook yoki poll, aniqlanmagan).
+**API holati**: operator — Markaziy bankning **MUNIS** tizimi; ekvayer — merchantning hisob raqami ochilgan bank. Merchant kabineti **`uzqr.uz`** (E-IMZO bilan kirish): statik/dinamik QR yaratish, bloklash, tranzaksiyalar tarixi (oraliq ≤ 35 kun), **qaytarish (refund)**, CSV eksport, statik QR uchun Telegram-bot xabarnomasi. **Dinamik QR** — kassa dasturi kabinetda yaratilgan **API kalit** bilan ulanadi (kalit faqat dinamik QR'ga, bir marta ko'rsatiladi; CBU tavsiyasi: 1 kassa = 1 dinamik QR = 1 API kalit); kassa summa bilan QR'ni o'zi chiqaradi, mijoz skanerlaydi, kassa holatni oladi. **POS API texnik spetsifikatsiyasi ochiq emas** — CBU/MUNIS (1835) yoki ekvayer bankdan so'raladi. **Statik QR** — kassa bilan integratsiyasiz, to'lov faktini kassir mijoz telefonidan ko'rib qo'lda tasdiqlaydi. Merchant tarifi 0,65%, hisob raqamga ≤ 24 soat, faqat Uzcard/Humo. Virtual kassa UzQR tizimiga majburiy ulangan bo'lishi kerak — reyestr talabi (1-bo'lim).
 
-**API holati**: **Ochiq savol (tasdiqlanmagan)**: UzQR'ni banklar qanday API/vebxuk orqali tasdiqlashi va Markaziy bank yagona QR standarti texnik hujjati — bu tekshiruvda topilmadi. PF-246 faqat majburiyatni belgilaydi, texnik protokolni emas (Ochiq savollar, 13-band).
-
-**Adapter interfeysi** (Click/Payme/Uzum adapteri bilan bir xil shaklda, kontekst `uzqr`):
+**Port interfeysi**:
 ```python
-class UzqrAdapter(Protocol):
-    async def create_checkout(self, amount: Money, order_id: str, qr_type: Literal["static", "dynamic"]) -> CheckoutResult: ...
-    async def handle_webhook(self, payload: dict, headers: dict) -> WebhookResult: ...
+class UzqrPort(Protocol):
+    async def create_dynamic_qr(self, register_id: UUID, amount: Money, order_id: str) -> CheckoutResult: ...
     async def check_transaction(self, provider_tx_id: str) -> TransactionStatus: ...
+    async def refund(self, provider_tx_id: str, amount: Money) -> RefundResult: ...
 ```
+Adapterlar: `UzqrStubAdapter` (MVP — dinamik QR o'chiq), real adapter — POS API hujjati olingach. Statik QR port talab qilmaydi.
 
-**Ma'lumot moslashtirish**: `sale_payments(method: ...`uzqr`..., qr_type: `static`/`dynamic`/null)` — `uzqr` = bank tomonidan generatsiya qilingan yagona QR (`11-malumotlar-modeli.md`).
+**Ma'lumot moslashtirish**: `sale_payments(method='uzqr', qr_type='static'|'dynamic', provider_tx_id, terminal_ref)`; statik QR'da `provider_tx_id` yo'q, kassir ixtiyoriy ravishda to'lov raqamini `terminal_ref`ga kiritadi. `uzqr_api_key` — `tenant_secrets`da **kassa darajasida** (`tenant_secrets.cash_register_id`).
 
-**Idempotentlik kaliti**: `provider_tx_id` — Click/Payme/Uzum bilan bir xil naqsh.
+**Idempotentlik kaliti**: dinamik — `provider_tx_id`; statik — `client_event_id`.
 
-**Qayta urinish/backoff**: checkout yaratish — foydalanuvchi kutadi, retry yo'q; webhook — Click/Payme/Uzum bilan bir xil (yuqoridagi asosiy bo'lim).
+**Qayta urinish/backoff**: dinamik QR yaratish — foydalanuvchi kutadi, retry yo'q; holat so'rovi — har 2 s, QR amal qilish muddatigacha (muddati o'tgan QR bo'yicha to'lov qabul qilinmaydi — CBU qoidalari 32-band).
 
-**Xato UX**: bank tasdig'i kelmay qolsa (internet uzilishi yoki to'lov kechikishi) — chek "to'lov kutilmoqda" holatida qoladi, kassir boshqa to'lov usuliga o'tishi yoki bekor qilishi mumkin; ikki marta to'lov tushishining oldini olish uchun `provider_tx_id` bo'yicha idempotentlik.
+**Xato UX**: dinamik QR tasdig'i kelmasa — chek "to'lov kutilmoqda" holatida, kassir boshqa usulga o'tishi yoki bekor qilishi mumkin.
 
-**Offline**: yo'q — bank QR online amal; offline paytda faqat naqd/nasiya ishlaydi.
+**Offline**: dinamik UzQR — faqat online; statik UzQR — qo'lda tasdiq (mijoz o'z telefonidan to'laydi), tushum 5710 orqali `bank_settlements` bilan solishtiriladi (qaror #42).
 
-**SLA**: yuridik shaxslar uchun 2026-07-01'dan majburiy (PF-246-son, 3-band "b").
+**SLA**: hisob raqamga tushish ≤ 24 soat.
 
-**Xavfsizlik**: filial/tenant darajasida bank tomonidan berilgan QR rekvizitlari shifrlangan saqlanadi (`tenant_secrets`, Click/Payme bilan bir xil naqsh).
+**Xavfsizlik**: `uzqr_api_key` shifrlangan, kassa darajasida.
 
 **Monitoring**: BO-14, Click/Payme/Uzum bilan bitta qatorda.
 
-**MVP bosqichi**: MVP — yuridik shaxslar uchun majburiy. **Zaxira yo'l**: texnik protokol aniqlanmaguncha — statik QR (bosma) bilan boshlash, dinamik (summaga mos) QR keyinroq.
+**MVP bosqichi**: (1) **statik UzQR — qo'lda tasdiqlanadigan to'lov turi** hozir; (2) dinamik UzQR — `UzqrPort` stub, POS API hujjati olingach real adapter. Ikkala holatda ham fiskal chekni kassamiz chiqaradi, chekda to'lov shakli "QR-kodli to'lov".
 
 ### 9.2 Mustaqil bank terminali bilan "karta"ni qo'lda belgilash
 
-**Maqsad**: ko'p kichik do'konda kassa tizimiga integratsiyalanmagan, alohida bank POS-terminali bor — kassir to'lovni terminalda qabul qiladi va kassada shunchaki "karta" to'lov turini **qo'lda** belgilaydi (API integratsiya yo'q, chunki bu **mustaqil** uskuna).
+**Maqsad**: ko'p kichik do'konda kassa tizimiga integratsiyalanmagan alohida bank POS-terminali bor — kassir to'lovni terminalda qabul qiladi va kassada "karta" to'lov turini **qo'lda** belgilaydi.
 
-**Qaror**: ruxsat etiladi, **online va offline'da ikkisida ham**. `sale_payments.method='card'` tanlanganda ixtiyoriy **`terminal_ref`** maydoni (terminal operatsiya raqami, `11-malumotlar-modeli.md` §6) to'ldiriladi. Z-hisobotda (M16) "karta" jami alohida qatorda chiqadi; Egasi kun oxirida bu summani bank ko'chirmasi bilan qo'lda solishtiradi (kelishtirish tizimda avtomatlashtirilmagan, MVP'da qo'lda jarayon).
+**Huquqiy asos**: VMQ-943 1-ilova 6-band — terminal cheki + kassa fiskal cheki qonuniy model. Chekda majburiy (7-band, 2026-10-22 dan): to'lov shakli "bank kartalari" va **karta turi** (shaxsiy/korporativ/ijtimoiy); ijtimoiy kartada — karta niqobi (birinchi va oxirgi 4 raqam) va tranzaksiya unikal raqami (VMQ-610). Noto'g'ri belgilash (masalan karta to'lovini "naqd") — MJtK 175-modda (mansabdor shaxslarga 100 BHM).
 
-**Nega**: bozorda standart amaliyot (terminal kvitansiyasi va fiskal chek — ikki alohida hujjat, masalan uzum.uz); integratsiyalangan terminal veb-kassaga texnik jihatdan mos emas (WebUSB/Web Serial orqali bank terminali protokoli ochiq emas) va qimmat.
+**Qaror (qaror #64)**: ruxsat etiladi, **online va offline'da**. `sale_payments.method='card'` tanlanganda kassir terminal chekidan kiritadi: `card_type` (majburiy, standart `personal`; noma'lum bo'lsa `unknown`), ijtimoiy kartada `card_mask` (`^[0-9]{4}\*+[0-9]{4}$`) va `rrn` — majburiy. Z-hisobotda (M16) "karta" jami alohida qatorda; tushum 5710 → `bank_settlements` (BO-24) bilan solishtiriladi (qaror #42).
 
-**Ochiq savol**: O'zbekistonda to'lov turini qo'lda belgilashga yuridik cheklov/jarima bor-yo'qligi — yurist maslahati tavsiya etiladi (`tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md` #6, "Keyin tekshiriladi").
+**Nega**: bozorda standart amaliyot; integratsiyalangan bank terminali veb-kassaga ochiq protokol bilan ulanmaydi. Reyestr talabi (VMQ-393: karta/QR to'lovini qurilmaning o'zida qabul qilish **imkoniyati**) har do'konda integratsiyalangan terminalni majburlamaydi.
 
 ---
 
@@ -606,14 +625,18 @@ class GoogleOidcAdapter(Protocol):
 
 **Yo'nalish va trigger**: chiquvchi, `outbox_jobs(kind=sms)` — endi odatda faqat Telegram urinishi muvaffaqiyatsiz bo'lgandan keyin navbatga qo'yiladi.
 
-**API holati**: standart tanlov — **Eskiz.uz** (95 so'm/SMS, obuna to'lovi yo'q; `26-ochiq-savollar-reestri.md` #45, `25-nofunksional-talablar.md` §11), rasmiy shartnoma hali tuzilmagan. Provayder `SmsAdapter` porti ortida — almashtirish kod o'zgarishisiz.
+**API holati**: standart provayder — **Eskiz.uz** (`notify.eskiz.uz`): `POST /api/auth/login` → token 30 kun, `PATCH /api/auth/refresh`; `POST /api/message/sms/send` (`mobile_phone`, `message`, `from="4546"`, `callback_url`), `/sms/status_by_id/:id`, balans `/api/user/get-limit`; shablonlar `POST /api/user/template` (moderatsiya); statuslar `DELIVRD`/`UNDELIV`/`EXPIRED`/`REJECTD`. Narx 95 so'm/SMS, 100 ta bepul test SMS; test rejimida faqat ruxsat etilgan test matni yuboriladi. **Eskiz faqat O'zbekiston yuridik shaxslariga** xizmat qiladi — shartnoma kompaniya yuridik shaxsi tashkil etilgandan keyin. Muqobil: Telegram Gateway API (`sendVerificationMessage`, $0,01 yetkazilgan kod uchun) — `OtpPort` ortida keyin qo'shilishi mumkin.
 
-**Adapter interfeysi** (provayder tanlanmaguncha umumiy):
+**Port interfeysi** (`OtpPort` — kanal tanlovi: Telegram bot → SMS):
 ```python
-class SmsAdapter(Protocol):
+class OtpPort(Protocol):
+    async def send_otp(self, phone: str, code: str, purpose: str) -> OtpSendResult: ...   # channel: telegram | sms
+
+class SmsAdapter(Protocol):   # OtpPort ichidagi SMS kanali; adapterlar: EskizSmsAdapter, FakeSmsAdapter
     async def send(self, phone: str, text: str) -> SmsSendResult: ...
     async def get_status(self, provider_message_id: str) -> SmsStatus: ...
 ```
+Sozlamalar: `sms.sender="4546"`, `ESKIZ_TEST_MODE=true` (faqat ruxsat etilgan test matni), token keshi har 25 kunda yangilanadi; OTP shabloni: "Kod: {code}. [Brend] tizimiga kirish. Hech kimga bermang."
 
 **Ma'lumot moslashtirish**: `notifications_log(tenant_id, channel=sms, recipient, template, status, cost)` (`11-malumotlar-modeli.md`, 10-bo'lim).
 
@@ -631,7 +654,7 @@ class SmsAdapter(Protocol):
 
 **Monitoring**: `notifications_log` orqali yetkazilish foizi, xarajat (`cost`); BO-14'da "SMS" qatori.
 
-**MVP bosqichi**: MVP — majburiy, lekin **faqat zaxira sifatida** (Telegram-first — qaror #34, §11.1). Eskiz.uz — kandidat provayder (95 so'm/SMS, `25-nofunksional-talablar.md` §11), rasmiy shartnoma hali tasdiqlanmagan.
+**MVP bosqichi**: Bosqich 1 — Telegram OTP (asosiy) + `FakeSmsAdapter`; `EskizSmsAdapter` real rejimi — pilotdan oldin (Bosqich 6), shartnoma tuzilgach.
 
 ---
 
@@ -691,14 +714,9 @@ class TelegramAdapter(Protocol):
 
 **Yo'nalish va trigger**: chiquvchi, foydalanuvchi so'rovi yoki fon ishi (masalan kunlik qarz eslatmasi tayyorlash) trigger qiladi; `outbox_jobs(kind=ai)` orqali (AI chaqiruvi ham asinxron — UI "yozilmoqda..." holatini kutadi yoki natija tayyor bo'lganda yangilanadi).
 
-**API holati**: Claude API — tijorat shartlari bo'yicha to'liq ruxsat etilgan, rasmiy hujjat (`docs.claude.com`), standart model **Haiku 5.5** ($0,10–0,50 kirish / $0,50–2,50 chiqish, 1M token, hajmga qarab), murakkab tahlil uchun Sonnet 5.5/Sonnet 5 ($2/$10) — `claude.com/pricing` (2026-10-14 tekshirilgan). Claude Code CLI/claude.ai login orqali obuna ishlatish mahsulotda **ruxsat etilmaydi** (Agent SDK hujjati) — faqat to'g'ridan-to'g'ri API kaliti.
+**API holati**: Claude API — tijorat shartlari bo'yicha ruxsat etilgan, rasmiy hujjat (`platform.claude.com/docs`). Standart model **Claude Haiku 5.5** (`claude-haiku-5-5`: $0,10 kirish / $0,50 chiqish per 1M token, prompt ≤ 100 000 token bo'lganda; undan uzun promptda $0,50/$2,50; kesh o'qish $0,01; Batch −50%; rasm kirishini qo'llab-quvvatlaydi), murakkab tahlil va past ishonchli OCR uchun **Claude Sonnet 5.5** (`claude-sonnet-5-5`: $2/$10, kesh o'qish 0,05×) — narxlar 2026-10-16 da tekshirilgan, model jadvali `22-ai-qatlami.md` §2. Claude Code CLI/claude.ai login orqali obuna ishlatish mahsulotda **ruxsat etilmaydi** — faqat API kaliti.
 
-**Adapter interfeysi** (`22-ai-qatlami.md`da to'liq rasmiylashtiriladi, bu yerda faqat integratsiya nuqtai nazaridan):
-```python
-class AiProvider(Protocol):
-    async def complete(self, prompt: str, feature: str, max_tokens: int, model: str | None = None) -> AiResult: ...
-    async def complete_with_image(self, prompt: str, image: bytes, feature: str) -> AiResult: ...  # AI-03 OCR
-```
+**Port interfeysi** — `AiProvider` (`complete`, `complete_structured`, `vision_extract`, `submit_batch`), to'liq ta'rif va adapterlar (`FakeProvider`, `CliProvider` — faqat dev, `AnthropicApiProvider`, ixtiyoriy `BedrockEuProvider`) — `22-ai-qatlami.md` §1.
 
 **OCR — yagona yo'l**: AI-03 (qog'oz hujjat OCR) **`ai_ocr_jobs`** jadvali va **`POST /api/v1/ai/ocr/jobs`** (`doc_type_hint=purchase`) orqali bitta yagona manba sifatida ta'riflangan: fayl avval `POST /attachments` orqali yuklanadi, natija `poll GET /ai/ocr/jobs/{id}`, tasdiq `POST /ai/ocr/jobs/{id}/confirm` (`purchases.receive` + `ai.ocr.use`). To'liq oqim va ishonch chegaralari — `22-ai-qatlami.md` §10.
 
@@ -714,9 +732,9 @@ class AiProvider(Protocol):
 
 **SLA**: qattiq muddat yo'q; foydalanuvchi tajribasi darajasida tezlik kutiladi (bir necha soniya).
 
-**Xavfsizlik**: Claude API kaliti platforma darajasida shifrlangan (tenant'ga individual kalit emas — bitta platforma kaliti, tenant limiti `ai_requests` orqali kuzatiladi). O'zbekistonda ma'lumotni saqlash majburiy emas (faqat biometrik/genetik/telekom), lekin Claude API'ga yuboriladigan ma'lumot hajmini cheklash siyosati `22-ai-qatlami.md`da belgilanadi (ochiq savol, `10-umumiy-arxitektura.md`, Ochiq savol 3).
+**Xavfsizlik va shaxsiy ma'lumot (qaror #61)**: Claude API kaliti platforma darajasida shifrlangan (bitta platforma kaliti, tenant limiti `ai_requests` orqali kuzatiladi). Lokalizatsiya majburiyati faqat biometrik/genetik/telekom ma'lumotga tegishli (ZRU-547 27-1-modda), lekin **chet elga uzatish** alohida qoida bilan tartibga solinadi (15-modda, VMQ-415): AQSh faqat EU-US DPF ishtirokchilari uchun "teng himoya" ro'yxatida, Anthropic esa DPF ishtirokchisi emas. Shuning uchun: (a) promptga yuborishdan oldin jismoniy shaxs maydonlari **majburiy maskalanadi** (tenant o'chira olmaydi, `22-ai-qatlami.md` §7); (b) maskalab bo'lmaydigan AI-03 rasmlari `tenants.settings.ai_cross_border_enabled=true` (tenant foydalanish shartlarida chegaradan tashqari uzatishga rozilik bergan) bo'lgandagina yuboriladi; standart yo'l — rozilik + Anthropic API. Muqobil — VMQ-415 ro'yxatidagi davlatda ishlov beradigan endpoint (AWS Bedrock EU Geo profili, `AiProvider` ning `BedrockEuProvider` adapteri, `AI_PII_ROUTE` sozlamasi) — asoschi tanlovi. Shaxsiy ma'lumotga AI yordamida qonunga xilof ishlov berish — MJtK 46-2-modda 2-qism.
 
-**Monitoring**: `ai_requests` orqali xarajat/latency/xato darajasi; tenant oylik limiti (`plans.limits.ai_monthly_tokens`) tugaganda ogohlantirish (M17/M18).
+**Monitoring**: `ai_requests` orqali xarajat/latency/xato darajasi; tenant oylik limiti (`plans.limits.ai_monthly_tokens`) tugaganda ogohlantirish (M17/M18); `POST /ai/chat` rate-limit — 10 so'rov/daqiqa/foydalanuvchi, 300 so'rov/kun/tenant → `429 RATE_LIMITED` (qaror #55).
 
 **MVP bosqichi**: MVP — majburiy (asosiy AI qatlami). **Zaxira yo'l**: Claude API vaqtincha ishlamasa (tashqi uzilish) — barcha AI funksiyalari "hozircha mavjud emas" holatiga o'tadi, standart shablon matnlar (AI-06) va kod-hisoblangan raqamlar (AI-05'siz ham) ishlashda davom etadi; lokal/fine-tune model — faqat keyingi bosqich, MVP'da yo'q (tadqiqotda o'zbek tilida zaif/sekin deb baholangan).
 
@@ -724,81 +742,136 @@ class AiProvider(Protocol):
 
 ## 13. Test muhitiga kirish holati
 
-| Tizim | Hozirgi holat | Sandbox/test muhiti | Nima so'ralishi kerak | Murojaat (`12-taxminlar-va-murojaatlar.md`) |
+| Tizim | Hozirgi holat | Sandbox/test muhiti | Nima so'raladi | Murojaat |
 |---|---|---|---|---|
-| OFD / virtual kassa | Yo'q — mustaqil dastur reyestrga kiritilmagan | Noma'lum | Reyestrga kiritish narxi/muddati, sinov integratsiya kaliti | **Xat 1** (Soliq qo'mitasi / "Yangi texnologiyalar" DUK) |
-| Asl belgisi / CRPT Turon | Yo'q — integrator emasmiz, portal 403 | Topilmadi | Integrator maqomi, API hujjat, offline siyosat | **Xat 2** (CRPT Turon) |
-| Didox | Yo'q — login talab qiluvchi portal, hisob yo'q | Topilmadi | Hisob ochish, sandbox, narx, shartnoma | Yangi xat kerak — hali yozilmagan |
-| Faktura.uz | Qisman — ochiq API hujjati o'qildi, hisob/shartnoma yo'q | Topilmadi | Sandbox, narx, shartnoma shartlari | Yangi xat kerak — hali yozilmagan |
-| E-TTN | Didox/Faktura.uz kanali orqali kutiladi, alohida tasdiqlanmagan | Topilmadi | TTN hujjat turi aniqlashtirilishi | Didox/Faktura.uz xati bilan birga |
-| E-IMZO | **Bor** — `testvpn.e-imzo.uz`, jamoatchilik hujjat | ✅ Bor | Prod sertifikat olish jarayoni, qo'llab-quvvatlash kanali | **Xat 1** (qisman qo'shiladi) |
-| E-ishonchnoma (Vakolat.uz) | Yo'q | Topilmadi | API hujjat, integratsiya usuli (E-IMZO/Face ID) | Yangi xat kerak — hali yozilmagan |
-| MXIK (tasnif.soliq.uz) | **Bor** — ochiq veb, bepul qidiruv, jamoatchilik SDK | ✅ (alohida sandbox kerak emas — prod'ning o'zi ochiq) | — | — |
-| my.soliq.uz (davlat hisobotlari) | Yo'q — API umuman topilmadi | Yo'q | API mavjudligi, yarim-rasmiy yo'l (E-IMZO orqali?) | **Xat 1** |
-| Payme | **Bor** — `test.paycom.uz`, TEST_KEY | ✅ Bor | Prod merchant hisobi (har tenant + platforma) | — (merchant.payme.uz orqali o'z-o'zidan) |
-| Click | Topilmadi — rasmiy sandbox hujjati yo'q | Noma'lum | Sandbox mavjudligi, rasmiy tasdiq | Yangi so'rov/xat kerak |
-| Uzum | Qisman — Uzum Checkout test muhiti tasdiqlandi, Merchant API sandbox yo'q | ✅ (Uzum Checkout) / ❌ (Merchant API) | Merchant API sandbox, aniq protokol (OpenAPI/JSON-RPC) | Yangi so'rov/xat kerak |
-| UzQR (bank yagona QR) | Yo'q — texnik protokol aniqlanmagan | Topilmadi | Bank API/vebxuk formati, Markaziy bank yagona QR standarti hujjati | Yangi xat kerak — hali yozilmagan |
-| SMS provayder (faqat zaxira, qaror #34) | Eskiz.uz — standart tanlov (reestr #45) | — | Rasmiy shartnoma | Shartnoma kutilmoqda |
-| Telegram Bot API | **Bor** — ochiq, token bilan bepul | ✅ (cheklovsiz) | — | — |
-| Claude API | **Bor** — tijorat shartlari, API kalit mavjud | ✅ | Tenant limit/xarajat siyosati (`22-ai-qatlami.md`) | — |
-| Kiberxavfsizlik sertifikatlash (ЗРУ-764) | Majburiyligi noaniq — integratsiya emas, lekin loyiha jadvaliga ta'sir qiladi | — | Oddiy SaaS ERP'ga tegishliligi | **Xat 3** (csec.uz) |
-
-**Jami**: 17 band ichidan **5 tasida to'liq** (E-IMZO, MXIK, Payme, Telegram, Claude API) va **1 tasida qisman** (Uzum — Checkout test muhiti bor, Merchant API yo'q) ishlaydigan test/prod kirish bor; qolgan 11 tasida (shu jumladan UzQR) yo'q yoki noma'lum. Uch rasmiy xat loyihasi (`12-taxminlar-va-murojaatlar.md`) mavjud — Didox, Faktura.uz, Vakolat.uz, Click, Uzum (Merchant API) va UzQR uchun **yangi xat loyihalari hali yozilmagan**, bu o'zi ochiq ish sifatida qayd etiladi.
+| OFD / fiskal modul | Ommaviy bulut API yo'q; FM + lokal xizmat yoki hamkor bulut API | FiscalDriveService emulyatori (CI); test FM — hamkordan | Lokal ko'prik ruxsati, bulut rejimi, autentifikatsiya, sertifikatlash, test stend/FM, ulgurji narx, "ikkilamchi tizim" xavfi, "kredit" chek turi | **Xat 1** (Soliq qo'mitasi / "Yangi texnologiyalar" DUK), **Xat 9** (fiskal hamkor) |
+| Virtual kassa reyestri | Muddat va bosqichlar ma'lum (35–45 ish kuni), zaxira mablag' talab qilinmaydi | — | Kiberxavfsizlik markazi ekspertizasi narxi, virtual kassaga muvofiqlik sertifikati shartmi, 1 BHM birligi | **Xat 1**, **Xat 10**, csec.uz narx so'rovi |
+| Asl belgisi / CRPT Turon | xTrace Open API (kabinet API kaliti), ommaviy Swagger yo'q | Yo'q | Sotuvdan oldingi tekshiruv majburiyligi, `label` formati, hisobdan chiqarish metodi, SaaS uchun tenant kaliti, offline "avval ishlatilgan kod" | **Xat 2** (CRPT Turon) |
+| Faktura.uz | Ochiq API hujjati; hisob/shartnoma yo'q | Ommaviy emas (test xostlari 403) | Sandbox, narx, xavf darajasi maydoni, e-TTN hujjat turi | **Xat 4** |
+| Didox | Ochiq API hujjati; partner token — akkaunt-menejerdan | ✅ `testapi3.didox.uz` | Partner shartnomasi va narxi | Tijorat so'rovi |
+| E-TTN | Operator kanali orqali (Didox "ТТН (новый)") | Operator test muhiti bilan | Faktura.uz'dagi tur | Xat 4 bilan birga |
+| E-IMZO | Hujjat (`qo0p/e-imzo-doc`), TestCA, `testvpn` | ✅ Bor | Prod API-KEY (`sign.<domen>`), VPN-kalit, E-IMZO-SERVER litsenziyasi — narx va muddat | yt.uz shartnoma arizasi (Bosqich 0) |
+| E-ishonchnoma | EDO operatori hujjati (Faktura.uz `PowerOfAttorney`, Didox `Empowerment`) | Operator test muhiti bilan | — | — |
+| MXIK (tasnif.soliq.uz) | Ochiq veb, jamoatchilik SDK | ✅ (prod ochiq) | — | — |
+| my.soliq.uz | Ommaviy API yo'q — fayl yuklash | Yo'q | — | — |
+| Payme | Merchant + Subscribe API | ✅ `test.paycom.uz`, `checkout.test.paycom.uz` | Prod merchant hisobi (har tenant + platforma) | — |
+| Click | Merchant + SHOP API | ✅ Playground + Postman to'plami | Prod merchant hisobi | — |
+| Uzum | Merchant API (JSON vebxuk, Basic Auth), Checkout | ✅ Checkout / Merchant API — menejer kredensiali | Merchant API test kredensiali | Uzum menejeri |
+| UzQR (bank yagona QR) | Normativ va kabinet (`uzqr.uz`) ma'lum; POS API ochiq emas | Yo'q | Dinamik QR POS API spetsifikatsiyasi | CBU/MUNIS (1835) yoki ekvayer bank |
+| SMS (Eskiz.uz, zaxira) | API hujjati ochiq; faqat yuridik shaxslarga | ✅ Test rejimi (100 bepul SMS) | Shartnoma, OTP shabloni moderatsiyasi, operatorlar bo'yicha yetkazish | Eskiz (yuridik shaxsdan keyin) |
+| Telegram Bot API | Ochiq | ✅ | — | — |
+| Claude API | Tijorat shartlari, API kalit | ✅ | — | — |
+| Kiberxavfsizlik (ЗРУ-764) | Majburiy emas (KAI emas); virtual kassa reyestri uchun csec ekspertiza xulosasi — yuqoridagi qatorda | — | Ixtiyoriy tasdiq | **Xat 3** (ixtiyoriy) |
 
 ---
 
 ## 14. Qurilish tartibi (birinchi bosqichlar)
 
-Tanlov mezoni: (a) ochiq/tasdiqlangan API/sandbox birinchi, (b) qonuniy SLA bosimi (48 soat OFD) ustunlik beradi, (c) noaniq/yopiq API'lar oxirgi navbatda, parallel ravishda rasmiy murojaat bilan.
+Tanlov mezoni: (a) ochiq API/test muhiti birinchi, (b) qonuniy bosim (48 soat OFD) ustunlik beradi, (c) tashqi javobni kutayotganlar port + stub ortida, real adapter javobdan keyin.
 
-1. **OFD / virtual kassa** — markaziy funksiya, 48 soatlik qonuniy bosim; eng ko'p arxitektura (offline-first, outbox) shu atrofda quriladi. Zaxira: E-POS/UZKASSA bilan OEM muzokarasi parallel boshlanadi.
-2. **MXIK (tasnif.soliq.uz)** — eng oson, ochiq, chekning oldingi sharti (har tovar MXIK'siz chek chiqarib bo'lmaydi).
-3. **E-IMZO** — sandbox bor, e-faktura/hisobotning old sharti; birinchi navbatda shaklini (frontend-backend-E-IMZO.exe oqimi) ishlab chiqish.
-4. **Faktura.uz** (keyin Didox) — ochiq API hujjati bor, birinchi e-faktura adapterini shu bilan boshlash; Didox hisob ochilgandan keyin qo'shiladi.
-5. **Payme** (billing + do'kon to'lovi) — sandbox bor, bizning obuna oqimimiz (M17) shu bilan birinchi ishga tushadi; Click/Uzum parallel so'rov bilan qo'shiladi.
-6. **Telegram Bot API** — ochiq, tez, past xavf; M18 (bildirishnomalar) va BO-14 monitoring ekrani shu orqali birinchi "ko'rinadigan natija"ni beradi.
-7. **Claude API** — AI qatlami, boshqa integratsiyalardan mustaqil (`22-ai-qatlami.md` bilan parallel).
-8. **Click, Uzum** — sandbox/hujjat yetishmovchiligi sababli Payme'dan keyin, merchant hisobi ochib amaliy sinov bilan.
-9. **SMS provayder (zaxira kanal)** — Eskiz.uz adapteri (reestr #45), Telegram OTP bilan birga Bosqich 1'da (`27-backlog.md`).
-10. **Asl belgisi / CRPT Turon** — eng yuqori texnik xavf; rasmiy murojaat (Xat 2) bilan **parallel** boshlanadi, lekin modul relizi API javobiga bog'liq (zaxira: mavjud integrator orqali proxy).
-11. **e-TTN, e-ishonchnoma (Vakolat.uz)** — past chastota/past ustunlik, MVP'da "qo'lda belgilash" bilan boshlanadi, API ochilgach avtomatlashtiriladi.
-12. **my.soliq.uz** — API umuman yo'q; qo'lda fayl yuklash + AI-05 tushuntirish birinchi relizdan boshlab qo'lda ishlaydi (bu funksiyaning o'zi kechiktirilmaydi, faqat avtomatlashtirish kechiktiriladi).
+1. **`FiscalPort` + `FakeFiscalAdapter`/`FakeLocalBridge`** — Bosqich 0 dan; offline-first, 48 soatlik shkala va blok, `fm_state` shu atrofda quriladi. Reyestr arizasi va yt.uz arizasi — Bosqich 0.
+2. **MXIK (tasnif.soliq.uz)** — chekning oldingi sharti.
+3. **E-IMZO** — brauzer ↔ E-IMZO ↔ backend oqimi (TestCA).
+4. **Faktura.uz** (e-faktura, kiruvchi EHF+TTN, e-ishonchnoma) — `EInvoicePort`; Didox adapteri — operator tanlovi qayta ko'rilsa.
+5. **Payme va Click** (billing + do'kon to'lovi) — parallel, ikkalasida test muhiti bor; **Uzum** — Checkout test muhiti bilan; statik UzQR va qo'lda karta (`card_type`/`card_mask`/`rrn`).
+6. **Telegram Bot API** — M18, OTP asosiy kanal, BO-14 ogohlantirishlari.
+7. **Claude API** — AI qatlami (`22-ai-qatlami.md`), maskalash va `ai_cross_border_enabled` bilan.
+8. **SMS (zaxira)** — `OtpPort` ichida `FakeSmsAdapter`, real Eskiz — pilotdan oldin.
+9. **Markirovka** — fiskal chek ichida kod + lokal takror-kod nazorati (MVP kodi), `FakeMarkingAdapter`.
+10. **Ichki e-TTN** — transfer `post` → `ettn_documents` → operator.
+11. **Bosqich 5**: real fiskal adapter (lokal ko'prik — Do'kon agentining fiskal moduli, yoki hamkor bulut), `CrptXtraceAdapter`, dinamik UzQR (hujjat kelsa), Do'kon agentining printer/tarozi vazifalari (16-bo'lim).
+12. **my.soliq.uz** — fayl yuklash + AI-05, birinchi relizdan.
+13. **1C integratsiyasi** — MVP'dan keyin, **Bosqich 7** (qaror #37), Do'kon agentining 1C imkoniyati; kirish shartlari (P-01…P-22, OV kod-imzolash sertifikati) — `33-1c-integratsiya.md` §17.1.
+
+---
+
+## 15. 1C integratsiyasi (COM agent)
+
+**Qarorlar:** #36–#42. **To'liq spetsifikatsiya (yagona manba):** `33-1c-integratsiya.md` (server moduli `onec_integration`, DB, eksport hujjatlari, holat mashinasi, protokol, API, ruxsatlar, xato kodlari, ekranlar BO-22/BO-23); agent ichki tuzilishi — `34-1c-agent.md`. Bu bo'lim — qisqa xulosa.
+
+| Jihat | Qaror |
+|---|---|
+| Qamrov va bosqich | MVP'dan keyin, **Bosqich 7** (qaror #37); **99 000 tarif ichida** (qaror #41). Birinchi va yagona profil — `bp30_uz` («Бухгалтерия для Узбекистана», 3.0.64+); УТ UZ 11 / Розница UZ 3.0 — keyin. ERP yadrosi 1C'siz to'liq ishlaydi (qaror #36) |
+| Kanal | **Faqat COM** (`V83.COMConnector`): do'kon PK'sidagi **Do'kon agenti**ning 1C imkoniyati (C#/.NET Framework 4.8, per-user tray, 32/64-bit COM worker jarayonlari, qaror #38, #60; 16-bo'lim). **OData ishlatilmaydi**, mijoz 1C'dan hech narsa publish qilmaydi (veb-server, HTTP/web-servis yo'q), 1C ichiga `.epf`/kengaytma o'rnatilmaydi (qaror #41) |
+| Yo'nalish | **ERP → 1C bir tomonlama yozish** (qaror #37); 1C'dan faqat moslashtirish, tekshiruv va solishtirish uchun o'qiladi — 1C ma'lumoti ERP'ga hech qachon yozilmaydi |
+| Transport | **Pull**: agent bulutdan vazifani faqat chiquvchi HTTPS long-poll bilan tortadi (`/api/v1/onec-agent/*`), do'kon PK'sida kiruvchi port yo'q. Backend 1C'ga **o'zi chaqirmaydi**: `outbox_jobs` va 0-bo'limdagi worker/adapter/circuit-breaker naqshi o'rniga agent vazifalari navbati `onec_agent_tasks` (lease, heartbeat, qayta urinish, Ed25519 imzoli vazifalar — `33-1c-integratsiya.md` §9). Telegram xabarlari esa odatdagi `outbox_jobs(kind='telegram')` orqali |
+| Autentifikatsiya | OAuth mijozi `onec-agent`: ulash — RFC 8628 device grant (Egasi BO-22'da kodni tasdiqlaydi), keyin `client_credentials` + `private_key_jwt`; token `aud=urn:erp:onec-agent`, `scope=onec.agent` (`14-autentifikatsiya-oauth2.md` §2.3) |
+| Nima yuboriladi | Kunlik partiya (baza × hisob kuni): kunlik chakana sotuv — **har kassa × kun bitta «Отчет о розничных продажах»** (filial × kun — sozlama); qarzga va yuridik shaxsga sotuv — har chek alohida «Реализация товаров и услуг»; rejim standart **`full`** — kirim, yetkazib beruvchiga qaytarish, ko'chirish, hisobdan chiqarish, inventarizatsiya, qaytarishlar, qarz to'lovlari, kassa/pul hujjatlari ham; `sales_only` — faqat buxgalter so'rasa (qaror #39). Bank tushumi tasdig'i (`bank_settlements`, 5710 → 5110) va bank orqali to'lovlar — standart **o'chiq** (qaror #42). Tur katalogi — `33-1c-integratsiya.md` §6.2 |
+| Nima yuborilmaydi | Provodka, QQS registri, tannarx — 1C hujjatni o'zi o'tkazadi, buxgalteriya haqiqat manbai 1C'da (qaror #39). 1C ma'lumotnomalari jim yaratilmaydi — yangi tovar/kontragent faqat tasdiq bilan (`onec.refs.create`); Организация va QQS stavkasi hech qachon yaratilmaydi (qaror #40) |
+| Takrorsizlik va tasdiq | Har 1C obyektiga GUID'ni ERP beradi (`УстановитьСсылкуНового`) + `Комментарий` markeri + `onec_object_refs` daftari; partiya preview xeshi bilan `onec.export.approve` orqali tasdiqlanadi, avto-tasdiq standart o'chiq (faqat Egasi yoqadi, qaror #40). Uch qulf: server `write_enabled`, PK'dagi `pc_write_enabled`, partiya tasdig'i |
+| Tayyorlik | Smenalar yopilgan, filialning barcha faol POS qurilmalari kun yopilgandan keyin sinxronlangan (`/sync/push` `outbox_state` — `16-offline-sync.md` §3.1, §9), oldingi kunlar tugagan, 1C'da sana taqiqlanmagan, moslashtirish to'liq (`33-1c-integratsiya.md` §7.3) |
+| Qamrovdan tashqari | «Базовая» versiyalar (COM yo'q), bulutdagi 1C (1С:Фреш, ijara), sotish narxida hisob (2920/2980) bazalari — onboarding tekshiruvi aniq aytadi (qaror #41) |
+| Sirlar | 1C paroli va agent maxfiy kaliti faqat PK'da (DPAPI `CurrentUser`); server ularni hech qachon olmaydi (`15-xavfsizlik-va-audit.md` §4.1) |
+| Xatolar va monitoring | 75 ta `ONEC_*` kod (`17-api-umumiy.md` §15, «1C integratsiyasi» domeni) — sinf `transient`/`unknown`/`config`/`validation` qayta urinishni belgilaydi; BO-14 «1C» qatori, BO-23 kunlar kalendari, Telegram shablonlari (`onec_export_result`, `onec_problems`) |
+| Test muhiti | Rasmiy sandbox yo'q — pilot oldi testlari real «Бухгалтерия для Узбекистана 3.0.64.x» bazada (P-01…P-22, `33-1c-integratsiya.md` §16.1); 1C rekvizit nomlari *taxmin* — profil faylidan, metadata snapshot bilan tekshiriladi |
+
+---
+
+## 16. Do'kon agenti (qaror #60)
+
+**Nima**: do'kon Windows kompyuteridagi **bitta** lokal dastur — C#/.NET Framework 4.8, per-user tray-ilova, admin huquqisiz o'rnatiladi, faqat chiquvchi HTTPS — asosi `34-1c-agent.md` (supervisor, worker jarayonlari, DPAPI, o'rnatish, avto-yangilanish, kod-imzolash). Brauzer (PWA) quyidagilarni o'zi qila olmaydi, shuning uchun ular agentning imkoniyatlari:
+
+| Imkoniyat | Nima uchun brauzer qila olmaydi | Agentdagi vazifa | Bosqich |
+|---|---|---|---|
+| **Fiskal ko'prik** | FM'ga va hamkorning lokal xizmatiga to'g'ridan-to'g'ri ulanish yo'q | POS'ning `FiscalPort` chaqiruvlarini hamkor lokal xizmatiga (Multikassa `localhost:8080`, FiscalDriveService `127.0.0.1:3449`) uzatadi; `get_device_status`/`resend_unsent` davriy; holatni serverga hisobot qiladi | Bosqich 5 (lokal ko'prik tanlansa) |
+| **Xom TCP 9100 printerlar** | Brauzer xom TCP ocha olmaydi (Direct Sockets faqat Isolated Web Apps uchun) | ESC/POS baytlarini LAN printerga (`host:9100`) yuboradi | Bosqich 5 |
+| **Tarozi** | Yorliqli tarozilarga PLU yuklash — CAS TCP 20304, Shtrih-Print UDP 1111; brauzer xom TCP/UDP ocha olmaydi | PLU ro'yxatini tarozi protokoli bilan yuklaydi; MVP'da — CSV eksport (vendor dasturi bilan import). Kassadagi jonli og'irlik — desktop Chrome'da Web Serial (agentsiz), MVP'dan keyin | MVP'dan keyin |
+| **1C** | COM faqat Windows jarayonidan | `33-1c-integratsiya.md` §9.5 vazifalari | Bosqich 7 |
+
+**Ikki kanal**:
+1. **Lokal API (POS ↔ agent)** — `http://127.0.0.1:<port>/v1/*`, faqat loopback interfeysida tinglaydi. Kim ishlatadi: veb-kassa (fiskal chek, xom printer). Himoya: `Origin` oq ro'yxati (`https://app.<domen>`), CORS preflight va Private Network Access javobi (`Access-Control-Allow-Private-Network: true`), har so'rovda **qurilma lokal tokeni** (agent POS qurilmasi bilan bir marta bog'lanadi — server orqali almashtiriladigan `devices` yozuviga bog'liq qisqa muddatli token). Chrome 142+ da sahifa lokal tarmoq/loopback'ga birinchi murojaatda foydalanuvchidan ruxsat so'raydi (Local Network Access) — onboarding yo'riqnomasida. Lokal API internetsiz ham ishlaydi — offline savdoning asosiy sharti.
+2. **Bulut kanali (agent ↔ server)** — `33-1c-integratsiya.md` §9 dagi **bir xil** identifikatsiya va protokol: OAuth mijozi `onec-agent` (RFC 8628 device grant bilan ulash, keyin `client_credentials` + `private_key_jwt`, access token 10 daqiqa), yo'llar `/api/v1/onec-agent/*` (long-poll pull, Ed25519 imzoli vazifalar, lease/heartbeat). Bitta do'kon PK'si — bitta agent yozuvi (`devices.kind='onec_agent'`), imkoniyatlar sozlamada yoqiladi.
+
+**Bulut vazifa turlari — Bosqich 5 kengaytmasi** (`33` §9.5 oq ro'yxatiga qo'shiladi; `base_id = null`, 1C bazasi talab qilinmaydi):
+
+| `kind` | Vazifa | Natija |
+|---|---|---|
+| `fiscal.status` | FM holati: `fm_state`, yuborilmagan cheklar soni, eng eski yuborilmagan chek vaqti | `cash_registers.fm_state`, `fm_receipts_pending`, `last_unacked_receipt_at` yangilanadi |
+| `fiscal.resend_unsent` | Yuborilmagan cheklarni qayta yuborish (40 soatdan keyin server avtomatik qo'yadi, BO-14'da qo'lda ham) | `ResendResult` |
+| `fiscal.zreport` | Smena yopilishida Z-hisobotni FM'dan olish (POS yopiq bo'lsa) | `ZReport` |
+| `print.raw` | Back-office'dan LAN printerga chop etish (masalan qayta chek nusxasi, kassa hisoboti) | yuborildi / printer xatosi |
+| `scale.plu_upload` | PLU ro'yxatini yorliqli taroziga yuklash | yuklangan qatorlar soni / xato |
+
+Imkoniyat yoqilmagan agentga bu turdagi vazifa berilmaydi; agent noma'lum turni `33` §9.11 qoidasi bo'yicha rad etadi. Sotuv paytidagi fiskallashtirish va chek chop etish **bulut vazifasi emas** — POS ularni lokal API orqali bajaradi (internetga bog'liq emas).
+
+**Sirlar**: FM/hamkor lokal xizmat siri, 1C paroli, agent Ed25519 maxfiy kaliti — faqat PK'da (DPAPI `CurrentUser`); serverga chiqmaydi.
+
+**Kod-imzolash**: agent `.exe` va o'rnatuvchi Authenticode OV sertifikati bilan imzolanadi (`34-1c-agent.md` §4.5); lokal ko'prik tanlansa sertifikat Bosqich 5 dan oldin kerak.
+
+**Platforma oqibati**: lokal ko'prik rejimida veb-kassa — **Windows PK (Chrome/Edge) + Do'kon agenti**; Android Chrome va iOS'da fiskal kassa faqat hamkor bulut rejimida (1-bo'lim).
 
 ---
 
 ## Ochiq savollar
 
-1. CRPT Turon (Asl belgisi) integrator sifatida ro'yxatdan o'tish shartlari va API texnik spetsifikatsiyasi — `help.crpt-turon.uz` 403 bilan yopiq (Xat 2 javobini kutish).
-2. Markirovkalangan tovar offline siyosatining huquqiy tasdig'i — siyosatning o'zi (sotish/ko'chirish/qaytarish, 4-bo'lim) belgilangan, lekin huquqshunos tasdig'i hamon tavsiya etiladi (qaytarish — qonun talabi tasdiqlangan, ko'chirish — ehtiyotkor ichki tanlov).
-3. my.soliq.uz'dan hisobotni dasturiy (yoki yarim-rasmiy, E-IMZO orqali autentifikatsiyalangan) o'qish yo'li bormi — Xat 1 javobini kutish.
-4. Virtual kassa dasturini Davlat reyestriga kiritishning aniq narxi (sertifikatlash/ekspertiza xizmat haqi) — hamon topilmadi.
-5. Onlayn/QR to'lovda fiskal chekni kim chiqarishi (to'lov tizimi "komissioner" sifatida, yoki merchant o'zi) — ikki huquqiy talqin ziddiyatli, OFD operatori/Soliq qo'mitasi bilan aniqlashtirish kerak.
-6. Didox API'ga to'liq kirish (login), Click'ning rasmiy sandbox mavjudligi, Uzum Merchant API'ning aniq protokoli — uchtasi uchun ham yangi rasmiy murojaat xati hali yozilmagan.
-7. E-ishonchnoma (Vakolat.uz) tizimga qanday integratsiya qilinishi (API formati) va BP-01'da aniq qachon talab qilinishi.
-8. ЗРУ-764 (Kiberxavfsizlik) sertifikatlash talabining oddiy xususiy SaaS ERP'ga tegishliligi — "ha" bo'lsa, butun integratsiya/MVP jadvaliga katta ta'sir (Xat 3 javobini kutish).
-9. SMS provayder — standart tanlov Eskiz.uz (reestr #45); rasmiy shartnoma va O'zbekiston ichida OTP yetkazilish tezligi hali tasdiqlanmagan.
-10. `outbox_jobs.kind` ro'yxatini bu hujjatda ko'rsatilgan qo'shimcha qiymatlar (`einvoice_accept`, `ettn_send`, `marking_verify` va h.k.) bilan kengaytirish — `11-malumotlar-modeli.md`ga tegishli, ushbu fayl faqat talabni qayd etadi.
-11. Davlat xavf-baholash natijasi (yashil/qizil belgi, VM 830) tizimga qaysi kanal orqali (operator maydon sifatida, yoki alohida so'rov) yetib kelishi — aniqlashtirish kerak.
-12. Bizning billing (M17) uchun Click/Uzum sandbox topilmaguncha, test rejimi qanday simulyatsiya qilinadi (masalan qo'lda "to'landi" belgilash) — implementatsiya bosqichida hal qilinadi.
-13. UzQR'ni banklar qanday API/vebxuk orqali tasdiqlashi va Markaziy bank yagona QR standarti texnik hujjati — bu tekshiruvda topilmadi (9.1-bo'lim).
+Faqat tashqi javob kerak bo'lgan bandlar; har biri port + stub/flag ortida interim standart bilan kodlanadi.
+
+1. **Fiskal hamkor** — lokal ko'prik (PWA ↔ localhost) ruxsati, PK'siz bulut rejimi (iOS/Android yo'li shunga bog'liq), autentifikatsiya, dasturimizni sertifikatlash talabi, test stend va test FM, holat kodlari (`fm_state` xaritasi) — 26 #109 (OQ-012), 26 #89 (OQ-008). Interim: `FISCAL_PROVIDER=fake`; blok — Bosqich 5 real adapter.
+2. **"Kredit" turidagi chek** — qarzga sotuvda majburiymi va OFD chek turi kodi — 26 #9 (OQ-002). Interim: `FiscalPolicy.credit_sale_receipt='none'`.
+3. **"Ikkilamchi tizim" xavfi** (VMQ-393, 3-ilova 25-band) — "ERP + hamkor kassa" pilot modeliga ta'siri — 26 #169. **Karta/UzQR integratsiyasi reyestr sharti sifatida** qaysi bosqichda majburiy — 26 #170.
+4. **Reyestr xarajatlari** — Kiberxavfsizlik markazi ekspertizasi narxi, virtual kassaga muvofiqlik sertifikati shartmi, 1 BHM birligi (modul yoki subyekt) — 26 #42 (OQ-011).
+5. **Hamkor kassa narxi va qo'shimcha kassa narxi** — hamkor ulgurji narxi (chakana ~123 600 so'm/oy) va `extra_register` +39 000 so'm/oy — 26 #168.
+6. **CRPT Turon** — sotuvdan oldingi online tekshiruv majburiyligi, `label` formati, hisobdan chiqarish metodi, SaaS uchun tenant kaliti, offline chekda "avval ishlatilgan kod" tekshiruvi — 26 #40 (OQ-025). Interim: `MARKING_PRECHECK=warn`, `FakeMarkingAdapter`.
+7. **Faktura.uz** — xavf darajasi maydoni, sandbox, narx, e-TTN hujjat turi — 26 #47 (OQ-019). Interim: `risk_flag='unknown'` (qizil kabi).
+8. **E-IMZO** — API-KEY va E-IMZO-SERVER shartnomasi narxi va muddati — 26 #118 (OQ-028). Interim: TestCA + "Режим разработчика".
+9. **Dinamik UzQR POS API** spetsifikatsiyasi — 26 #49 (OQ-032). Interim: statik UzQR, `UzqrStubAdapter`.
+10. **Faqat elektron chek** (qog'ozsiz) do'kon savdosida ruxsat etiladimi — 26 #112 (OQ-018). Interim: standart bosma, elektron — zaxira.
+11. **Eskiz.uz** shartnomasi, OTP shabloni moderatsiyasi, operatorlar bo'yicha yetkazish — 26 #45 (OQ-102); yuridik shaxsdan keyin — 26 #130 (OQ-046).
+12. **AI'ga chegaradan tashqari uzatish** — rozilik matni va oferta bandi (yurist) — 26 #127 (OQ-042). Interim: maskalash majburiy, `ai_cross_border_enabled=false`.
+13. **Agent kod-imzolash OV sertifikati** (CA, yuridik shaxs) — 26 #105.
 
 ## Manbalar
 
-- `spec/kod-uchun/10-umumiy-arxitektura.md`, `11-malumotlar-modeli.md`
-- `spec/kod-uchun/03-modullar-talablari.md` (M01–M18), `04-biznes-jarayonlar.md` (BP-01…12), `09-ai-funksiyalar.md`, `spec/tarix/tuzatishlar-va-yechimlar.md`
-- `research_notes/texnik/00-xulosa-va-ochiq-savollar.md`
-- `research_notes/texnik/02-kassa-ofd-markirovka.md` (OFD, 48 soat, Asl belgisi)
-- `research_notes/texnik/03-efaktura-va-tolov.md` (Didox, Faktura.uz, E-IMZO, Payme/Click/Uzum)
-- `research_notes/texnik/09-soliq-integratsiyasi.md` (barcha davlat tizimlari jamlangan jadval)
-- `research_notes/texnik/10-bozorda-soliq-integratsiyasi.md` (raqobatchilar integratsiya holati)
-- `research_notes/texnik/12-taxminlar-va-murojaatlar.md` (taxminlar reyestri, xat loyihalari)
-- `research_notes/texnik/14-tekshiruv-xulosasi.md` (fakt-tekshiruv xulosasi)
-- [lex.uz/docs/4603329](https://lex.uz/docs/4603329) — VMQ-943 (OFD, 48 soat 1-ilova 31-band, reyestr 4-ilova)
-- [lex.uz/docs/8012407](https://www.lex.uz/docs/8012407) — 23-son qaror (markirovka, 72 soat)
-- [lex.uz/docs/-7962143](https://lex.uz/docs/-7962143) — VM 830-son (e-faktura xavf-baholash)
-- [lex.uz/docs/-7944527](https://lex.uz/docs/-7944527) — O'RQ-1108-son (davlat hisobotlari, 5 kalendar kun)
-- [lex.uz/uz/docs/-7897630](https://lex.uz/uz/docs/-7897630) — PF-246-son (yagona QR kod orqali to'lov qabul qilish majburiyligi, yuridik shaxslar)
-- [lex.uz/docs/-6234904](https://lex.uz/docs/-6234904) — O'RQ-793-son (E-IMZO qonuni)
-- [api.faktura.uz/help/](https://api.faktura.uz/help/), [developer.help.paycom.uz](https://developer.help.paycom.uz/), [docs.click.uz](https://docs.click.uz/), [developer.uzumbank.uz](https://developer.uzumbank.uz/en/)
-- [github.com/qo0p/e-imzo-doc](https://github.com/qo0p/e-imzo-doc), [tasnif.soliq.uz](https://tasnif.soliq.uz/)
+- `spec/kod-uchun/10-umumiy-arxitektura.md`, `11-malumotlar-modeli.md`, `16-offline-sync.md`, `24-frontend-arxitekturasi.md`, `01-qarorlar.md` (#17, #21, #36–#65)
+- `spec/kod-uchun/33-1c-integratsiya.md` (§9 agent protokoli), `34-1c-agent.md` (agent asosi); `research_notes/1c-integratsiya/00-xulosa.md`
+- `research_notes/ochiq-savollar/P1-soliq-fiskal.md` (OFD, 48 soat, reyestr, chek rekvizitlari, elektron chek, ikkilamchi tizim), `P2-efaktura-markirovka.md` (Faktura.uz, Didox, e-TTN, e-ishonchnoma, markirovka, E-IMZO), `P3-tolovlar-bank.md` (Click, Payme, Uzum, UzQR, karta, litsenziya), `P4-huquq-hosting.md` (AI chegaradan tashqari uzatish, ЗРУ-764), `P6-uskuna-ai-narx.md` (printer, tarozi, AI narxi), `D-qarorlar-va-E-standartlar.md` (E-bandlar interim standartlari)
+- [lex.uz/docs/4603329](https://lex.uz/docs/4603329) — VMQ-943 (OFD, 48 soat va blok, reyestr, chek rekvizitlari)
+- [lex.uz/docs/5205248](https://lex.uz/docs/5205248) — VM 833 (markirovka qoidalari); [lex.uz/docs/7540338](https://lex.uz/docs/7540338) — PQ-190
+- [lex.uz/docs/-5394977](https://lex.uz/docs/-5394977) — VM 249 (e-TTN 31-ilova, e-ishonchnoma 3-ilova)
+- [lex.uz/docs/-7962143](https://lex.uz/docs/-7962143) — VM 830 (e-faktura xavf-baholash)
+- [lex.uz/docs/-7944527](https://lex.uz/docs/-7944527) — O'RQ-1108 (davlat hisobotlari); [lex.uz/docs/-5115911](https://lex.uz/docs/-5115911) — VM 736
+- [lex.uz/docs/8139307](https://lex.uz/docs/8139307) — CBU 5/11 (UzQR); [lex.uz/docs/-7681520](https://lex.uz/docs/-7681520) — PQ-247; [lex.uz/docs/-4575786](https://lex.uz/docs/-4575786) — O'RQ-578
+- [lex.uz/docs/4396419](https://lex.uz/docs/4396419) — ZRU-547; [lex.uz/docs/8369688](https://lex.uz/docs/8369688) — VMQ-415
+- [api.faktura.uz/help/](https://api.faktura.uz/help/), [api-docs.didox.uz](https://api-docs.didox.uz/ru/home), [developer.help.paycom.uz](https://developer.help.paycom.uz/), [docs.click.uz](https://docs.click.uz/), [developer.uzumbank.uz](https://developer.uzumbank.uz/en/)
+- [github.com/qo0p/e-imzo-doc](https://github.com/qo0p/e-imzo-doc), [github.com/qo0p/fiscal-drive-service](https://github.com/qo0p/fiscal-drive-service), [docs-virtual-kassa.multibank.uz](https://docs-virtual-kassa.multibank.uz), [tasnif.soliq.uz](https://tasnif.soliq.uz/)
+- [developer.chrome.com/docs/iwa/direct-sockets](https://developer.chrome.com/docs/iwa/direct-sockets), [developer.chrome.com/blog/local-network-access](https://developer.chrome.com/blog/local-network-access)

@@ -242,9 +242,15 @@ Server discount'ni **qayta hisoblamaydi** (narx kabi "qotirilgan") — faqat: (1
 
 ### 4.5 Server javobi va fiskal holat
 
-`server`: `{id, number, fiscal_receipt_seq, fiscal: {status: "pending"}, warnings: []}` — `fiscal_receipt_seq` qurilma yuborgan `receipt_seq`ning aks-sadosi (server o'zi raqam bermaydi, A1-01). Fiskal belgi/QR keyingi `GET /api/v1/sync/pull`da yoki `GET /api/v1/fiscal-receipts/{id}`da keladi (14-bo'lim).
+`server`: `{id, number, fiscal_receipt_seq, fiscal: {status: "pending"|"deferred"}, warnings: []}` — `fiscal_receipt_seq` qurilma yuborgan `receipt_seq`ning aks-sadosi (server o'zi raqam bermaydi, A1-01). Fiskal belgi/QR keyingi `GET /api/v1/sync/pull`da yoki `GET /api/v1/fiscal-receipts/{id}`da keladi (14-bo'lim).
 
-*(2026-10-15: qabul-6/7, tasdiq kutilmoqda — standart qaror: fiskal chek matni UI tilidan qat'i nazar har doim **o'zbek (lotin)** tilida chiqariladi; rus tili — keyinroq ikkinchi qator sifatida qo'shiladi, R-05.)*
+**`fiscal.status` qiymati — qarzga sotuv, asoschi qarori Q3** *(2026-10-15)*:
+- `payments[]`da **faqat** `method=debt` bo'lsa — `fiscal_receipts` yozuvi **yaratilmaydi**, javobdagi `fiscal.status="deferred"` (chek chiqarilmaydi, `fiscal_receipt_seq` shunga qaramay saqlanadi — keyinchalik qarz to'langanda chiqariladigan chekda ishlatiladi, §12.2). Sotuv hujjatining o'zi (qoldiq −, qarz +) oddiy tartibda yoziladi.
+- **Aralash to'lov** (masalan qisman naqd + qisman qarz, `payments[]`da bir nechta usul) — naqd/karta/UzQR/Click/Payme/Uzum qismiga **darhol** oddiy fiskal chek chiqariladi (`fiscal_receipts.kind='sale'`, faqat non-debt qatorlar/summasi bilan), `fiscal.status="pending"→"sent"`; qarz qismiga mos chek **qarz to'langanda** chiqariladi (quyida). Javobda `fiscal.status` aralash holatda ham `"pending"` (non-debt qismi fiskallanadi) qaytadi.
+- Faqat naqd/karta/UzQR/Click/Payme/Uzum (qarz yo'q) — o'zgarishsiz, `fiscal.status="pending"`.
+- Amalga oshirish `FiscalPolicy` (tenant/global sozlama, `02-provodka-qoidalari.md` §5.x) ortida — buxgalter/yurist javobigacha standart yoqilgan holatda qoladi, kelajakda o'zgartirish migratsiyasiz.
+
+**Chek tili — asoschi qarori Q2** *(2026-10-15, R-05 o'rniga)*: chek matni/payload **ikki tilda** chiqadi — har bir tovar qatori `"{products.name} / {products.name_ru}"` (name_ru bo'lmasa faqat `name`); sarlavha/yakun matnlari ham ikki tilda ("Jami / Итого", "Qaytim / Сдача" va h.k., to'liq lug'at — chop etish shabloni, 4.9-bo'lim). Fiskal rekvizitlar (STIR, OFD QR, chek raqami) — OFD operatori talab qilgan formatda, tarjima qilinmaydi.
 
 ### 4.6 Xatolar (voqea darajasida)
 
@@ -261,6 +267,10 @@ Server discount'ni **qayta hisoblamaydi** (narx kabi "qotirilgan") — faqat: (1
 - `GET /api/v1/sales?number=&fiscal_receipt_seq=&shift_id=&counterparty_id=&doc_date__gte=&doc_date__lte=&status=&cursor=&limit=` → `{items:[{id, number, temp_number, doc_date, total, payments_summary, counterparty_id, is_offline, has_returns}], next_cursor}`.
 - `GET /api/v1/sales/{id}` → to'liq hujjat: qatorlar (`sale_line_id`, `qty`, `returned_qty` — hosila, `marking_code`), to'lovlar, fiskal holat. **`POST /sales/{id}/cancel` yo'q** — o'tkazilgan chek bekor qilinmaydi, tuzatish faqat `return.created` (Q9).
 - Huquq: `sales.create` (faqat o'z filiali, POS-05 chek qidiruvi) yoki `reports.sales.view` (BO-09).
+
+### 4.9 Chek chop etish shabloni — ikki til (asoschi qarori, Q2)
+
+Chek chop etish shabloni (`shared/lib/printer` adapteri — WebUSB/Serial/Bluetooth/tarmoq/bulut, `08-frontend-arxitekturasi.md` §6; native Android — `EscPosPrinterAdapter`/`FiscalPrinterAdapter`, `10-android-pos.md` §4) qator formatini quyidagicha quradi: `{products.name}` birinchi qatorda, agar `products.name_ru` bo'sh bo'lmasa — ikkinchi (kichikroq shrift) qatorda `"{products.name_ru}"`, yoki 80mm'da bitta qatorga sig'adigan `"{name} / {name_ru}"` shablonda. Standart lug'at (uz → ru) sarlavha/yakun matnlari uchun: `Jami`→`Итого`, `Chegirma`→`Скидка`, `Qaytim`→`Сдача`, `Naqd`→`Наличные`, `Karta`→`Карта`, `Qarz`→`Долг`, `Sana`→`Дата`, `Kassir`→`Кассир`. Fiskal rekvizitlar bloki (STIR/korxona nomi, OFD QR, fiskal belgi, chek raqami) — OFD operatori hujjatida ko'rsatilgan tayyor formatda chiqadi, tarjima qilinmaydi. Shablon joylashuvi: `receipt_templates/{80mm,58mm}.json` (print adapter konfiguratsiyasi — bulut-print/ESC-POS/fiskal printer ikkisi ham shu shablondan foydalanadi).
 
 ---
 
@@ -467,7 +477,7 @@ Javob: `{counterparty: {...}, balance: "230000.00", entries: [{id, doc_type, doc
 
 **Huquq**: `debts.payment.accept`. **US/ekran**: US-M08-04/09, POS-13, BO-06 "To'lov qabul qilish".
 
-*(2026-10-15: qabul-6/7, tasdiq kutilmoqda — standart qaror: qarz to'lovi uchun alohida fiskal chek chiqarilmaydi, buxgalter/OFD operatori javobigacha; `FiscalAdapter.issue_credit_payment()` porti keyinchalik yoqish uchun stub sifatida qoldiriladi, R-01.)*
+**Fiskal chek — asoschi qarori Q3** *(2026-10-15, reestr #9 — qaror qabul qilindi, qonuniylik tasdig'i ochiq)*: har bir `debt_payment.created` (`post` bosqichida, `FiscalPolicy` yoqilgan bo'lsa — standart yoqilgan) uchun `fiscal_receipts` yozuvi yaratiladi, `kind='debt_settlement'`, summasi = `amount`. Tovar qatorlari qo'lda kiritilmaydi — server §12.2 allokatsiya natijasidagi `debt_payment_allocations`dan qaysi `sales`ni qancha yopganini oladi va shu sotuv(lar)ning `sale_lines`idan **proporsional** (yopilgan summa ulushiga ko'ra) qator ro'yxatini chiqaradi (QQS ham shu nisbatda bo'linadi). `debt_openings` (eski qog'oz qarz) allokatsiyasiga mos qism — tovar qatorsiz, faqat umumiy summa bilan (asl tovar tarkibi tizimda yo'q). Chiqarilgan chek ikki tilda (Q2, 4.9-bo'lim). `FiscalAdapter.issue_credit_payment()` porti shu oqimni amalga oshiradi (eski "stub" holati — endi faol, kod `FiscalPolicy.debt_settlement_receipts_enabled` ortida, buxgalter/yurist tasdig'i kelganda o'chirish/o'zgartirish migratsiyasiz). Daromad/QQS tan olish vaqti (sotuvdami, to'lovdami) — **ochiq savol buxgalter uchun**, `02-provodka-qoidalari.md` §5.x'da belgilangan.
 
 | Maydon | Tur | Majburiy | Validatsiya |
 |---|---|---|---|
@@ -482,7 +492,7 @@ Javob: `{counterparty: {...}, balance: "230000.00", entries: [{id, doc_type, doc
 | `promise_date` | ISO sana\|null | yo'q | Yangi va'da sanasi (agar qoldiq qolsa) — qoldiq qolsa mijozning **joriy** va'da sanasi yangilanadi (`counterparties.debt_due_date`, B-01); `debt_payments.promise_date` ustuni saqlanadi (`sale_payments.due_date`dan farqli nom, DB-04/DB-08) *(2026-10-15: qabul-7, K1-09)* |
 | `comment` | string\|null | yo'q | Eski `note` o'rniga, DDL ustun nomi bilan bir xil *(2026-10-15: qabul-6, A1-03)* |
 
-**Allokatsiya**: server `amount`ni **eng eski ochiq qarzdan boshlab** (`debt_moves`, `due_date ASC`) avtomatik taqsimlaydi (`allocations` registrga yoziladi) — client allokatsiyani tanlamaydi. **Server javobi**: `{id, allocations: [{target_doc_type, target_doc_id, amount}], remaining_balance}` (eski `{debt_move_id, amount}` o'rniga — `debt_payment_allocations` ustunlari bilan bir xil, A1-13). **Offline**: to'liq ishlaydi.
+**Allokatsiya**: server `amount`ni **eng eski ochiq qarzdan boshlab** (`debt_moves`, `due_date ASC`) avtomatik taqsimlaydi (`allocations` registrga yoziladi) — client allokatsiyani tanlamaydi. **Server javobi**: `{id, allocations: [{target_doc_type, target_doc_id, amount}], remaining_balance, fiscal: {status: "pending"}}` (eski `{debt_move_id, amount}` o'rniga — `debt_payment_allocations` ustunlari bilan bir xil, A1-13; `fiscal` — Q3, yuqoridagi `debt_settlement` cheki). **Offline**: to'liq ishlaydi; qurilma oflayn bo'lsa `fiscal_receipts(kind=debt_settlement, status=pending, offline_since=...)` navbatga qo'yiladi, internet qaytganda `outbox_jobs(kind=ofd_send)` orqali OFD'ga yuboriladi (`04-offline-sync.md` §3.5/§7, `03-integratsiyalar.md` §1).
 
 ### 12.3 `POST /api/v1/debt-payments` (back-office)
 

@@ -153,7 +153,7 @@ Har endpoint jadvalida `permission` ustuni — `05-xavfsizlik-va-audit.md` §2.1
 | `kod — faqat Egasi` | `05-xavfsizlik-va-audit.md` §2.1'da "faqat Egasi" deb belgilangan (`debts.forgive`, `billing.manage`, `platform.admin`) |
 | `—` | Ruxsat tekshiruvi yo'q (faqat autentifikatsiya, masalan `GET /health`) |
 
-*(2026-10-15: qabul-6/7 — tasdiq kutilmoqda, founder standart qaror qo'llanildi: **Egasi — barcha tenant ruxsatlarining supersetiga ega**, `platform.admin`dan tashqari, limitlar cheksiz; yuqoridagi "`kod` — faqat Egasi" belgisi amalda boshqa rollar uchun cheklovni bildiradi — Egasiga har doim ruxsat berilgan.)*
+*(2026-10-15: asoschi qarori, Q1: **Egasi — barcha tenant ruxsatlarining supersetiga ega**, `platform.admin`dan tashqari, limitlar cheksiz; yuqoridagi "`kod` — faqat Egasi" belgisi amalda boshqa rollar uchun cheklovni bildiradi — Egasiga har doim ruxsat berilgan.)*
 
 ## 11. OpenAPI teglari
 
@@ -231,9 +231,13 @@ Bu — **yagona manba**; `code` ustuni barqaror (frontend/mobil/test shu bo'yich
 | `UNAUTHORIZED` | 401 | `errors.unauthorized` | Avval tizimga kiring | Сначала войдите в систему | Sessiya/token yo'q yoki yaroqsiz |
 | `INVALID_CREDENTIALS` | 401 | `errors.invalid_credentials` | Telefon raqami yoki parol noto'g'ri | Неверный номер телефона или пароль | Login urinishi muvaffaqiyatsiz |
 | `ACCOUNT_LOCKED` | 423 | `errors.account_locked` | Hisob vaqtincha bloklangan, keyinroq urinib ko'ring | Учётная запись временно заблокирована | Ko'p noto'g'ri urinishdan keyin (`12-autentifikatsiya-oauth2.md` §12) |
-| `OTP_INVALID` | 400 | `errors.otp_invalid` | SMS kod noto'g'ri | Неверный код из SMS | OTP mos kelmadi |
-| `OTP_EXPIRED` | 400 | `errors.otp_expired` | SMS kod muddati o'tgan, qayta so'rang | Код из SMS истёк, запросите новый | `otp_challenges.expires_at` o'tgan |
+| `OTP_INVALID` | 400 | `errors.otp_invalid` | Tasdiqlash kodi noto'g'ri | Неверный код подтверждения | OTP mos kelmadi (kanal — Telegram/SMS, `otp_challenges.channel`) *(2026-10-15: asoschi qarori, Q7 — matn kanal-agnostik qilindi)* |
+| `OTP_EXPIRED` | 400 | `errors.otp_expired` | Tasdiqlash kodi muddati o'tgan, qayta so'rang | Код подтверждения истёк, запросите новый | `otp_challenges.expires_at` o'tgan |
 | `OTP_MAX_ATTEMPTS` | 429 | `errors.otp_max_attempts` | Urinishlar soni tugadi, birozdan keyin qayta so'rang | Превышено число попыток, попробуйте позже | `otp_challenges.max_attempts` oshdi |
+| `OTP_CHANNEL_UNAVAILABLE` | 503 | `errors.otp_channel_unavailable` | Kod yuborib bo'lmadi (Telegram ham, SMS ham ishlamadi), birozdan keyin qayta urinib ko'ring | Не удалось отправить код (Telegram и SMS недоступны), попробуйте позже | **(asoschi qarori, Q7)** Telegram bot va SMS (zaxira) ikkisi ham muvaffaqiyatsiz — `12-autentifikatsiya-oauth2.md` §4.2 |
+| `TELEGRAM_NOT_LINKED` | 200 *(ma'lumot, xato emas)* | `errors.telegram_not_linked` | Telegram ulanmagan — kod SMS orqali yuborildi | Telegram не привязан — код отправлен по SMS | **(asoschi qarori, Q7)** `/auth/otp/request` javobida `channel_used="sms"` bilan birga, foydalanuvchiga Telegram ulashni tavsiya qilish uchun |
+| `GOOGLE_EMAIL_NOT_VERIFIED` | 403 | `errors.google_email_not_verified` | Google hisobingiz email manzili tasdiqlanmagan, boshqa usul bilan kiring | Email вашего аккаунта Google не подтверждён, войдите другим способом | **(asoschi qarori, Q7)** `12-autentifikatsiya-oauth2.md` §2.2 |
+| `GOOGLE_AUTH_FAILED` | 401 | `errors.google_auth_failed` | Google orqali kirish amalga oshmadi, qayta urinib ko'ring | Вход через Google не удался, попробуйте снова | **(asoschi qarori, Q7)** `12-autentifikatsiya-oauth2.md` §2.2 |
 | `CSRF_INVALID` | 403 | `errors.csrf_invalid` | Sahifa eskirgan, qayta yuklang | Страница устарела, обновите её | `X-CSRF-Token` yo'q/eskirgan (`05-xavfsizlik-va-audit.md` §1.3) |
 | `TOKEN_EXPIRED` | 401 | `errors.token_expired` | Sessiya muddati tugadi, qayta kiring | Сессия истекла, войдите снова | Access token `exp` o'tgan, refresh muvaffaqiyatsiz |
 | `TOKEN_REVOKED` | 401 | `errors.token_revoked` | Sessiya bekor qilingan | Сессия отменена | Refresh reuse detection yoki admin bekor qildi |

@@ -12,7 +12,8 @@
 6. **Offline-first kassa**: kassa avval o'z lokal bazasiga yozadi (veb: IndexedDB, Android: SQLite), keyin append-only outbox orqali serverga; server idempotent qabul qiladi (`04-offline-sync.md`).
 7. **Fon ishlari** (OFD'ga yuborish, e-faktura, hisobot solishtirish, eslatmalar, Telegram xabarlar, AI) — alohida worker jarayonlar, Redis navbati orqali; API so'rovi tashqi tizimni kutib turmaydi.
 8. **AI — chekka qatlam**: `AiProvider` porti (fake | cli | api), pul va soliqni hech qachon AI hisoblamaydi (`07-ai-qatlami.md`).
-9. **Autentifikatsiya — o'z OAuth 2.0 implementatsiyamiz**: API komponenti ham AS, ham RS; tashqi identity-provider yo'q, mock yo'q (`12-autentifikatsiya-oauth2.md`). Obuna muddati 24 soatlik imtiyozdan o'tganda kassa va kirish **to'liq to'xtaydi** (barcha sessiya/token bekor, faqat to'lov havolasi ochiq). *(2026-10-15: foydalanuvchi qarori)*
+9. **Autentifikatsiya — o'z OAuth 2.0 implementatsiyamiz**: API komponenti ham AS, ham RS; mock yo'q (`12-autentifikatsiya-oauth2.md`). Google — tashqi OIDC identity-provider sifatida **qo'shimcha** (majburiy emas) kirish yo'li, telefon+parolni almashtirmaydi (§2.2, asoschi qarori Q7). Obuna muddati 24 soatlik imtiyozdan o'tganda kassa va kirish **to'liq to'xtaydi** (barcha sessiya/token bekor, faqat to'lov havolasi ochiq). *(2026-10-15: foydalanuvchi qarori)*
+10. **Jamoa — asoschi + Claude (2 kishi)** *(2026-10-15: asoschi qarori, Q8)*: butun spec va backlog shu tarkibga mo'ljallangan — ketma-ket vertikal bo'laklar, qat'iy kalendar muddatlar yo'q, parallel ish oqimi yo'q (`11-backlog.md`); qo'llab-quvvatlash ham boshlang'ich bosqichda faqat asoschi (`06-nofunksional-talablar.md` §12).
 
 ---
 
@@ -100,7 +101,7 @@ Deploy: Docker konteynerlar (api, worker, scheduler, web statik, bot) + boshqari
 | 08-frontend-arxitekturasi.md | Veb: FSD, Effector, shadcn/ui, kutubxonalar | ✅ |
 | 09-backend-arxitekturasi.md | FastAPI modulli monolit, qatlamlar, kutubxonalar | ✅ |
 | 10-android-pos.md | Kotlin POS (keyingi bosqich) | ✅ |
-| 11-backlog.md | Birinchi sprintlar, tartib | ✅ |
+| 11-backlog.md | Ketma-ket bosqichlar (2 kishilik jamoa — asoschi + Claude), tartib | ✅ *(2026-10-15: asoschi qarori, Q8)* |
 | 12-autentifikatsiya-oauth2.md | OAuth 2.0 AS+RS, token, admin panel, obuna lokauti, offline litsenziya | ✅ *(2026-10-15: foydalanuvchi qarori)* |
 
 ## Ochiq savollar

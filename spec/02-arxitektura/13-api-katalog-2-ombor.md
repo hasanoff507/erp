@@ -69,7 +69,7 @@ Bu faylda har bir endpoint uchun: metod+yo'l, maqsad, ruxsat, so'rov sxemasi, ja
 | `low_stock` | bool | yo'q | `true` — faqat `qty <= min_stock` bo'lgan tovarlar (ombor join, X-Branch-Id ombori) |
 | `page`, `size` | int | yo'q | **page pagination** (Q10/A0-04 — ma'lumotnoma, cursor emas), standart `size=50`, max `200` |
 
-**Javob** `200`: `{items:[Product], total, page, size}`. `Product`: `id, name, category_id, unit_code, mxik_code, package_code, vat_rate, vat_exemption_code, is_marked, is_weighed, min_stock, archived_at, version, barcodes:[{id,barcode,kind,units_per_barcode}]`.
+**Javob** `200`: `{items:[Product], total, page, size}`. `Product`: `id, name, name_ru, category_id, unit_code, mxik_code, package_code, vat_rate, vat_exemption_code, is_marked, is_weighed, min_stock, archived_at, version, barcodes:[{id,barcode,kind,units_per_barcode}]` — `name_ru` ixtiyoriy (asoschi qarori, Q2).
 **Xatolar**: — (bo'sh ro'yxat — oddiy `200`).
 **Idempotentlik**: shart emas (o'qish).
 **Offline**: POS uchun katalog `/sync/pull?scope=catalog` orqali keshlanadi (`04-offline-sync.md` §1); bu endpoint faqat online back-office uchun.
@@ -82,7 +82,8 @@ Bu faylda har bir endpoint uchun: metod+yo'l, maqsad, ruxsat, so'rov sxemasi, ja
 
 | Maydon | Tur | Majburiy | Validatsiya |
 |---|---|---|---|
-| `name` | string | ha | 1–255 belgi |
+| `name` | string | ha | 1–255 belgi (o'zbek, asosiy) |
+| `name_ru` | string\|null | yo'q | 0–255 belgi — ixtiyoriy, chek/UI qatorida `"{name} / {name_ru}"` (asoschi qarori, Q2) |
 | `category_id` | UUID | yo'q | mavjud, arxivlanmagan kategoriya |
 | `unit_code` | string | ha | `units` jadvalida mavjud |
 | `mxik_code` | string\|null | yo'q | `NULL` ruxsat (DB-23) — 17 raqam agar berilsa; chekka chiqarishdan oldin majburiy (bu yerda bloklanmaydi, 8-xulosa). MXIK'siz tovar sotuv voqeasida `VALIDATION_ERROR` (`params.reason="mxik_missing"`) |

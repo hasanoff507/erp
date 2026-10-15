@@ -218,6 +218,7 @@ CREATE TABLE auth.otp_challenges (
   id           UUID PRIMARY KEY DEFAULT app.uuidv7(),
   phone        TEXT NOT NULL,
   purpose      TEXT NOT NULL CHECK (purpose IN ('signup','recovery','invite','admin_reset','pin_reset','data_export')),
+  channel      TEXT NOT NULL CHECK (channel IN ('telegram','sms')) DEFAULT 'telegram',  -- *(2026-10-15: asoschi qarori, Q7)* qaysi kanal orqali yuborilgani
   code_hash    TEXT NOT NULL,
   attempts     INT NOT NULL DEFAULT 0,
   max_attempts INT NOT NULL DEFAULT 5,
@@ -310,9 +311,9 @@ CREATE TABLE app.tenants (
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   version       INT NOT NULL DEFAULT 1
 );
--- *(2026-10-15: qabul-6/7 — tasdiq kutilmoqda)* Bitta tenant = bitta yuridik shaxs (STIR); ko'p yuridik shaxsli
--- egalar har bir shaxs uchun alohida tenant ochadi va memberships orqali ular o'rtasida almashadi
--- (founder tasdig'i kutilmoqda — qabul-7 "Founder ko'rib chiqishi kerak" #4, 02-provodka-qoidalari.md §5.4).
+-- *(2026-10-15: asoschi qarori, Q4)* Bitta tenant = bitta yuridik shaxs (STIR), ko'p filial/kassa/faoliyat turi
+-- (branches.activity_type) bitta tenant ichida; ko'p yuridik shaxsli egalar har bir shaxs uchun alohida tenant
+-- ochadi va memberships orqali ular o'rtasida almashadi (tasdiqlandi — 02-provodka-qoidalari.md §5.4).
 
 CREATE TABLE app.users (
   id         UUID PRIMARY KEY DEFAULT app.uuidv7(),
@@ -323,6 +324,22 @@ CREATE TABLE app.users (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   version    INT NOT NULL DEFAULT 1
 );
+
+-- *(2026-10-15: asoschi qarori, Q7)* Google bilan kirish — tashqi OIDC identity provider bog'lash
+-- (`12-autentifikatsiya-oauth2.md` §2.2). `users` kabi tenant-mustaqil (global), RLS yo'q — auth.* jadvallar
+-- qatorida emas, lekin shu sababli ham ilova darajasida faqat user_id orqali filtrlanadi.
+CREATE TABLE app.user_identities (
+  id                UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  user_id           UUID NOT NULL REFERENCES app.users(id),
+  provider          TEXT NOT NULL CHECK (provider IN ('google')),
+  provider_user_id  TEXT NOT NULL,              -- Google `sub`
+  email             TEXT NULL,
+  email_verified    BOOLEAN NOT NULL DEFAULT false,
+  linked_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (provider, provider_user_id)
+);
+CREATE INDEX idx_user_identities_user ON app.user_identities (user_id);
 
 -- endi auth.* va platform.* jadvallardagi "pastda qo'shiladi" deb belgilangan FK'lar:
 ALTER TABLE auth.user_credentials      ADD CONSTRAINT fk_uc_user      FOREIGN KEY (user_id) REFERENCES app.users(id);
@@ -552,6 +569,7 @@ CREATE TABLE app.products (
   id               UUID PRIMARY KEY DEFAULT app.uuidv7(),
   tenant_id        UUID NOT NULL REFERENCES app.tenants(id),
   name             TEXT NOT NULL,
+  name_ru          TEXT NULL,                  -- *(2026-10-15: asoschi qarori, Q2)* ixtiyoriy, chek/UI ikkinchi til qatori ("name / name_ru")
   category_id      UUID NULL REFERENCES app.product_categories(id),
   unit_code        TEXT NOT NULL REFERENCES platform.units(code),
   mxik_code        TEXT NULL CHECK (mxik_code IS NULL OR mxik_code ~ '^[0-9]{17}$'),  -- *(2026-10-15: qabul-6 — DB-23)* yaratishda bloklamaydi, sotuvdan oldin shart
@@ -1709,18 +1727,21 @@ DO UPDATE SET balance = app.debt_balances.balance + EXCLUDED.balance, updated_at
 ### 2.8 Fiskal, markirovka, e-hujjatlar, davlat hisoboti
 
 ```sql
--- *(2026-10-15: qabul-6/7 — DB-01)* kind='z_report' qo'shildi — smena yopilganda Z-hisobot shu jadvalga yoziladi
--- (sale_id/return_id/receipt_seq hammasi NULL, raqami = shifts.shift_no). Chek matni/payload har doim
--- **o'zbek lotin** tilida chiqariladi — *(tasdiq kutilmoqda, R-05 tavsiyasi: rus — keyinroq ikkinchi qator)*.
+-- *(2026-10-15: qabul-6/7 — DB-01; 2026-10-15: asoschi qarori Q2/Q3)* kind='z_report' — smena yopilganda Z-hisobot
+-- shu jadvalga yoziladi (sale_id/return_id/receipt_seq hammasi NULL, raqami = shifts.shift_no). kind='debt_settlement'
+-- qo'shildi (Q3) — qarz to'lovida chiqariladigan chek, debt_payment_id orqali bog'lanadi, cash_register_id/shift_id
+-- ixtiyoriy (bank/karta orqali to'lovda kassasiz). Chek matni/payload **ikki tilda** chiqariladi (Q2, o'zbek +
+-- ixtiyoriy rus — `products.name_ru`); eski "doim o'zbek lotin, R-05" taklifi Q2 bilan almashtirildi.
 CREATE TABLE app.fiscal_receipts (
   id               UUID PRIMARY KEY DEFAULT app.uuidv7(),
   tenant_id        UUID NOT NULL REFERENCES app.tenants(id),
-  kind             TEXT NOT NULL CHECK (kind IN ('sale','return','z_report')),
+  kind             TEXT NOT NULL CHECK (kind IN ('sale','return','z_report','debt_settlement')),  -- *(Q3: debt_settlement qo'shildi)*
   sale_id          UUID NULL REFERENCES app.sales(id),
   return_id        UUID NULL REFERENCES app.returns(id),
-  cash_register_id UUID NOT NULL REFERENCES app.cash_registers(id),
-  shift_id         UUID NOT NULL REFERENCES app.shifts(id),
-  receipt_seq      INT  NULL,            -- qurilma beradi; z_report'da NULL (raqami = shifts.shift_no)
+  debt_payment_id  UUID NULL REFERENCES app.debt_payments(id),  -- *(2026-10-15: asoschi qarori, Q3)* kind='debt_settlement'da majburiy
+  cash_register_id UUID NULL REFERENCES app.cash_registers(id),  -- *(Q3)* debt_settlement + bank/karta to'lovda NULL mumkin
+  shift_id         UUID NULL REFERENCES app.shifts(id),          -- *(Q3)* xuddi shunday
+  receipt_seq      INT  NULL,            -- qurilma beradi; z_report/debt_settlement'da NULL mumkin
   payload          JSONB NOT NULL,
   fiscal_sign      TEXT NULL,
   qr_url           TEXT NULL,
@@ -1731,9 +1752,10 @@ CREATE TABLE app.fiscal_receipts (
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   CHECK (
-       (kind = 'sale'     AND sale_id IS NOT NULL AND return_id IS NULL AND receipt_seq IS NOT NULL)
-    OR (kind = 'return'   AND return_id IS NOT NULL AND sale_id IS NULL AND receipt_seq IS NOT NULL)
-    OR (kind = 'z_report' AND sale_id IS NULL AND return_id IS NULL AND receipt_seq IS NULL)
+       (kind = 'sale'            AND sale_id IS NOT NULL AND return_id IS NULL AND debt_payment_id IS NULL AND receipt_seq IS NOT NULL AND cash_register_id IS NOT NULL AND shift_id IS NOT NULL)
+    OR (kind = 'return'          AND return_id IS NOT NULL AND sale_id IS NULL AND debt_payment_id IS NULL AND receipt_seq IS NOT NULL AND cash_register_id IS NOT NULL AND shift_id IS NOT NULL)
+    OR (kind = 'z_report'        AND sale_id IS NULL AND return_id IS NULL AND debt_payment_id IS NULL AND receipt_seq IS NULL AND cash_register_id IS NOT NULL AND shift_id IS NOT NULL)
+    OR (kind = 'debt_settlement' AND debt_payment_id IS NOT NULL AND sale_id IS NULL AND return_id IS NULL)
   ),
   UNIQUE (tenant_id, cash_register_id, shift_id, receipt_seq)
 );
@@ -2426,10 +2448,10 @@ INSERT INTO app.role_permissions (tenant_id, role_id, permission_code, limit_val
   (:tenant_id, :cashier_role_id, 'returns.approve',  100000.00),  -- so'm
   (:tenant_id, :cashier_role_id, 'cash.withdraw',    50000.00),   -- so'm
   (:tenant_id, :cashier_role_id, 'sales.void',       NULL);       -- limitsiz, audit bilan
--- *(2026-10-15: qabul-6/7 — tasdiq kutilmoqda)* Egasi roli — barcha tenant ruxsatlarining supersetiga ega bo'lishi
--- tavsiya etilgan (sotuv/smena/qaytarish/buxgalteriya ko'rish ham kiradi), limitlar cheksiz; to'liq matritsa va
--- amalga oshirish — `05-xavfsizlik-va-audit.md` §2.2 (ushbu fayl egasi emas), founder tasdig'i kutilmoqda
--- (qabul-7 "Founder ko'rib chiqishi kerak" #1).
+-- *(2026-10-15: asoschi qarori, Q1)* Egasi roli — barcha tenant ruxsatlarining supersetiga ega (sotuv/smena/
+-- qaytarish/buxgalteriya ko'rish ham kiradi), limitlar cheksiz; seed yuqoridagi namuna kabi har bir
+-- permission_code uchun (:tenant_id, :owner_role_id, <kod>, NULL) qatorlarini `05-xavfsizlik-va-audit.md` §2.1
+-- to'liq katalogidan generatsiya qiladi (ilova kodida, `platform.admin`dan tashqari) — to'liq matritsa §2.2'da.
 
 -- standart xarajat toifalari (09-backend §11, 11-backlog.md ro'yxati)
 INSERT INTO app.expense_categories (tenant_id, name, is_system) VALUES
@@ -2455,12 +2477,12 @@ INSERT INTO app.expense_categories (tenant_id, name, is_system) VALUES
 |---|---|---|
 | 0001 | `extensions_roles_schemas` | Sxemalar, kengaytmalar, rollar, `app.uuidv7()`, `app.set_updated_at()`, `app.forbid_mutation()` |
 | 0002 | `core_tenant_user` | `tenants`, `users`, `branches` (**+`code`**, DB-02), `branch_tax_settings`, `warehouses`, `cash_registers` (**+`ofd_status` CHECK**, DB-33), `devices`, `memberships`, `roles`, `role_permissions` |
-| 0003 | `auth_schema` | `auth.*` (6 jadval) + ularning `app.users`/`tenants`/`devices`ga FK'lari, `app.license_tokens` |
+| 0003 | `auth_schema` | `auth.*` (6 jadval, **+`otp_challenges.channel`** — asoschi qarori Q7) + ularning `app.users`/`tenants`/`devices`ga FK'lari, `app.license_tokens`, **`app.user_identities`** (Google OIDC bog'lash, Q7) |
 | 0004 | `label_templates` | **YANGI** — `platform.label_templates` (DB-27) |
 | 0005 | `valuation_method_history` | **YANGI** — `app.valuation_method_history` (DB-26) |
 | 0006 | `counterparty_statement_links` | **YANGI** — `app.counterparty_statement_links` (DB-28) |
 | 0007 | `platform_global` | `platform.plans`, `addons`, `units`, `oauth_clients`, `signing_keys`, `platform_admins` + `app.subscriptions`, `tenant_addons`, `billing_payments` (**+ davr/kvitansiya ustunlari**, DB-18), `tenant_tax_regimes` |
-| 0008 | `catalog_pricing` | `product_categories`, `products` (**`mxik_code` endi NULL**, DB-23), `product_barcodes`, `product_prices`, `label_print_queue`, `internal_barcode_seq`, `discount_rules` |
+| 0008 | `catalog_pricing` | `product_categories`, `products` (**`mxik_code` endi NULL**, DB-23; **+`name_ru` nullable — asoschi qarori Q2**), `product_barcodes`, `product_prices`, `label_print_queue`, `internal_barcode_seq`, `discount_rules` |
 | 0009 | `counterparties` | `counterparties` (**+`debt_due_date`**, qabul-7 B-01), `debt_doubtful_flags` |
 | 0010 | `approval_payment_infra` | **YANGI** — `approval_requests`, `doc_approvals`, `payment_checkouts` (DB-09/DB-10/DB-11) — `docs_sales`dan **oldin**, `sale_payments.checkout_ref` FK uchun |
 | 0011 | `docs_sales` | `shifts` (**to'liq qayta yozildi — `shift_no`/`variance`**, DB-07), `sales` (**+`is_offline`/`debt_limit_exceeded`**, DB-08), `sale_lines` (**+chegirma/QQS ustunlari**, DB-08), `sale_payments` (**+`due_date`/`checkout_ref`**, DB-08) |
@@ -2472,7 +2494,7 @@ INSERT INTO app.expense_categories (tenant_id, name, is_system) VALUES
 | 0017 | `docs_pricing_debts` | `price_changes`, `price_change_lines` (**+`valid_from`**, DB-25), `debt_openings` (**+`due_date`**, DB-24), `debt_payments` (**`method` to'liq ro'yxat + checkout/promise_date**, DB-04), `debt_payment_allocations`, `debt_writeoffs` (**+`reason`, `account_choice` default**, DB-24), `supplier_payments` (**+`cash_register_id`/`shift_id`**, DB-14), `supplier_payment_allocations` |
 | 0018 | `docs_expenses_cash` | `expense_categories` (**+`version`**, DB-33), `recurring_expenses` (**to'liq qayta yozildi**, DB-17), `attachments` (**+`content_type`/`original_name`/`sha256`/`kind` CHECK**, DB-22), `expenses`, `cash_movements`; shu revizionda `attachments` mavjud bo'lgach `ALTER TABLE billing_payments ADD CONSTRAINT fk_bp_invoice_attachment ...` (DB-18) |
 | 0019 | `doc_sequences` | `doc_sequences`, `app.next_doc_number()`; kod ro'yxatiga **`BX`=ledger_adjustments** (DB-12) |
-| 0020 | `fiscal_marking_edocs` | `fiscal_receipts` (**to'liq qayta yozildi — `kind`, z_report**, DB-01), `marking_codes` (**takror unique indeks olib tashlandi**, DB-33), `einvoices` (**status CHECK + summalar + `uq_einvoice_out_per_doc`**, DB-21), `ettn_documents`, `state_reports` (**+solishtirish ustunlari**, DB-20), `state_report_diffs`; shu revizionda `einvoices` mavjud bo'lgach `fk_gr_einvoice` (DB-06) |
+| 0020 | `fiscal_marking_edocs` | `fiscal_receipts` (**to'liq qayta yozildi — `kind`, z_report**, DB-01; **+`debt_settlement`, `debt_payment_id`, `cash_register_id`/`shift_id` nullable — asoschi qarori Q3**), `marking_codes` (**takror unique indeks olib tashlandi**, DB-33), `einvoices` (**status CHECK + summalar + `uq_einvoice_out_per_doc`**, DB-21), `ettn_documents`, `state_reports` (**+solishtirish ustunlari**, DB-20), `state_report_diffs`; shu revizionda `einvoices` mavjud bo'lgach `fk_gr_einvoice` (DB-06) |
 | 0021 | `ai_ocr_jobs` | **YANGI** — `app.ai_ocr_jobs` (DB-13, Q4) + `fk_gr_ocr_job` (`goods_receipts.ai_ocr_job_id` → `ai_ocr_jobs.id`) |
 | 0022 | `integration_sync` | `outbox_jobs` (**+`report_export`/`label_pdf` kind, job-progress ustunlari**, DB-19), `sync_receipts`, `idempotency_keys`, `recost_jobs`, `import_jobs` (**holatlar + `result`**, DB-29) |
 | 0023 | `notifications_ai` | `telegram_links`, `notification_settings`, `notifications_log`, `ai_requests`, `ai_training_samples`, `ai_feedback`, `tenant_glossary` |

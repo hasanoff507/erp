@@ -4,7 +4,7 @@
 
 ## Asosiy xulosalar
 
-1. **12 tashqi tizim**, barchasi **faqat backend worker'lar orqali** ulanadi (hech qanday klient to'g'ridan-to'g'ri tashqi tizimga chiqmaydi, E-IMZO imzolashdan tashqari — u brauzerda, lokal E-IMZO.exe bilan, `00-umumiy-arxitektura.md`). Har biri bitta umumiy **outbox/navbat naqshi** (`outbox_jobs`, 2-bo'lim) orqali ishlaydi — API so'rovi tashqi tizimni hech qachon kutmaydi.
+1. **13 tashqi tizim** (12 + Google OIDC, Q7 — 11-band), barchasi **faqat backend worker'lar orqali** ulanadi (Google OIDC — interaktiv login redirect, worker emas, lekin bir xil "tashqi tizim" ro'yxatida) (hech qanday klient to'g'ridan-to'g'ri tashqi tizimga chiqmaydi, E-IMZO imzolashdan tashqari — u brauzerda, lokal E-IMZO.exe bilan, `00-umumiy-arxitektura.md`). Har biri bitta umumiy **outbox/navbat naqshi** (`outbox_jobs`, 2-bo'lim) orqali ishlaydi — API so'rovi tashqi tizimni hech qachon kutmaydi.
 2. **Faqat 3 tizimda** to'liq ochiq, mustaqil tekshirilgan API hujjati va/yoki sandbox bor: **Faktura.uz** (`api.faktura.uz/help/`), **Payme** (`test.paycom.uz`), **E-IMZO** (`testvpn.e-imzo.uz`, jamoatchilik hujjati). Qolgan 9 tasida hujjat yopiq, login talab qiladi yoki umuman topilmadi — bu MVP jadvaliga to'g'ridan-to'g'ri xavf (`research_notes/texnik/14-tekshiruv-xulosasi.md`, 4-bo'lim).
 3. Uchta qattiq **SLA/muddat** butun arxitekturani belgilaydi: OFD offline chegarasi **48 soat** (VMQ-943, 1-ilova, 31-band), markirovkalangan tovar ko'chirish **72 soat** (23-son qaror, 2026-01-23), davlat hisobotini tuzatish **5 kalendar kun** (Soliq kodeksi 81-moddasi, O'RQ-1108). Uchtasi ham worker darajasida taymer va eskalatsiya bildirishnoma sifatida amalga oshiriladi.
 4. **my.soliq.uz uchun rasmiy API yo'q** — davlat hisobotini solishtirish (markaziy qiymat taklifi, M10/BP-08) MVP'da **qo'lda fayl yuklash** bilan boshlanadi; bu `08-mahsulot-modullari.md`/`00-xulosa-va-ochiq-savollar.md`dagi 1-raqamli texnik xavf.
@@ -14,6 +14,7 @@
 8. **BO-14 "Integratsiyalar holati"** ekrani — har bir tashqi tizim uchun: ulanganmi, oxirgi muvaffaqiyatli chaqiruv vaqti, navbatdagi/muvaffaqiyatsiz ishlar soni, qo'lda qayta urinish tugmasi. Bu ekran bo'lmasa, OFD/e-faktura muvaffaqiyatsizligi Egasi/Buxgalterga ko'rinmay qoladi.
 9. Qurilish tartibi (14-bo'lim): **OFD → MXIK → E-IMZO/e-faktura → Click/Payme (billing + do'kon) → Telegram/SMS → Claude API → Asl belgisi/e-TTN/e-ishonchnoma/my.soliq.uz** (eng ko'p noaniqlikka ega to'rttasi oxirida, parallel ravishda rasmiy murojaatlar bilan).
 10. Ko'p integratsiya uchun hal qiluvchi noaniqlik hali ham **ochiq savol** — bu fayl ularni "taxmin" deb aniq belgilaydi va `12-taxminlar-va-murojaatlar.md`dagi xat loyihalariga bog'laydi.
+11. **Google bilan kirish + Telegram OTP (asoschi qarori, Q7, 2026-10-15)**: Google OIDC — bizning OAuth AS'imizga ulangan tashqi identity provider (§9.1); OTP/parol tiklash/taklif/eksport/qarz eslatmalari — asosiy kanal **Telegram bot** (telefon "share contact" orqali ulanadi, §11.1), **SMS (Eskiz) faqat zaxira** (§10).
 
 ---
 
@@ -67,7 +68,7 @@ Bu ekran bo'lmasa, Egasi/Buxgalter OFD yoki e-faktura 48 soatdan ko'p muvaffaqiy
 
 **Maqsad va modullar**: har bir sotuv/qaytarish/Z-hisobotni fiskal chek sifatida davlat OFD'siga yuborish — qonuniy majburiy, M01, M02, M16 (Z-hisobot).
 
-**Yo'nalish va trigger**: chiquvchi (backend → OFD). Trigger: `sales`/`returns` o'tkazilganda va smena yopilganda (`fiscal_receipts` yozuvi + `outbox_jobs(kind=ofd_send)`).
+**Yo'nalish va trigger**: chiquvchi (backend → OFD). Trigger: `sales`/`returns` o'tkazilganda va smena yopilganda (`fiscal_receipts` yozuvi + `outbox_jobs(kind=ofd_send)`). **Qarz to'lovi** (`debt_payments` `post` bo'lganda) — asoschi qarori Q3, 2026-10-15: `fiscal_receipts(kind='debt_settlement')` yoziladi (qarzga sotuvda sotuv vaqtida chek chiqarilmaydi, faqat to'lov vaqtida), xuddi shu `outbox_jobs(kind=ofd_send)` navbati orqali yuboriladi — alohida yo'nalish/worker kerak emas (`02-provodka-qoidalari.md` §2.14, `13-api-katalog-1-kassa.md` §12.2).
 
 **API holati**: Rasmiy, ochiq "OFD API spetsifikatsiyasi" hujjati **topilmadi**; integratsiya "Yangi texnologiyalar" DUK bilan to'g'ridan-to'g'ri shartnoma asosida (`research_notes/texnik/02-kassa-ofd-markirovka.md`, "Chekni yuborish protokoli/API"). Mustaqil dasturni Davlat reyestriga kiritish (sertifikatlash) muddati **aniq**: Soliq qo'mitasi 20 ish kuni + Kiberxavfsizlik markazi 15 + fiskal operator (FMO) 10 + texnik tartibga solish agentligi 5 — jami taxminan 50 ish kunigacha (bosqichlar ketma-ket/parallelligi ochiq, VMQ-943 4-ilova). Narx hamon **ochiq savol** (zaxira mablag' talabidan virtual kassa mustasno, lekin sertifikatlash xizmat haqi so'mda topilmadi). Sandbox — **ochiq savol** (reyestrga kiritilmagan dastur uchun sinov integratsiya kaliti bormi — noma'lum).
 
@@ -77,10 +78,11 @@ class FiscalAdapter(Protocol):
     async def send_receipt(self, receipt: FiscalReceiptPayload) -> FiscalSendResult: ...
     async def send_correction(self, receipt: FiscalReceiptPayload, original_fiscal_sign: str) -> FiscalSendResult: ...
     async def send_zreport(self, shift_id: UUID, payload: ZReportPayload) -> FiscalSendResult: ...
+    async def issue_credit_payment(self, debt_payment: DebtPaymentFiscalPayload) -> FiscalSendResult: ...  # *(2026-10-15: asoschi qarori, Q3)* endi faol, eski "stub" holati bekor qilindi
     async def get_status(self, fiscal_receipt_id: UUID) -> FiscalStatus: ...
 ```
 
-**Ma'lumot moslashtirish**: `fiscal_receipts(sale_id/return_id, cash_register_id, shift_id, receipt_seq, payload JSONB, fiscal_sign, qr_url, sent_at, offline_since, status, attempts)`. `payload` — chek rekvizitlari: tovar nomi, miqdor, narx, **MXIK kod (17 raqam)** + o'lchov birligi, QQS stavkasi/summasi, to'lov turi, fiskal belgi, QR-kod (`research_notes/texnik/02-kassa-ofd-markirovka.md`, "Chek formati").
+**Ma'lumot moslashtirish**: `fiscal_receipts(kind: sale/return/z_report/debt_settlement, sale_id/return_id/debt_payment_id, cash_register_id, shift_id, receipt_seq, payload JSONB, fiscal_sign, qr_url, sent_at, offline_since, status, attempts)` — `kind='debt_settlement'` qarz to'lovida (Q3). `payload` — chek rekvizitlari: tovar nomi (`products.name`, ixtiyoriy `products.name_ru` — chek qatori ikki tilda, asoschi qarori Q2, `13-api-katalog-1-kassa.md` §4.9), miqdor, narx, **MXIK kod (17 raqam)** + o'lchov birligi, QQS stavkasi/summasi, to'lov turi, fiskal belgi, QR-kod (`research_notes/texnik/02-kassa-ofd-markirovka.md`, "Chek formati"). **OFD rekvizitlari** (STIR/korxona nomi, fiskal belgi, QR) — operator talab qilgan formatda, tarjima qilinmaydi.
 
 **Idempotentlik kaliti**: `cash_register_id + shift_id + receipt_seq` (kassa+smena ichida ketma-ket, offline qurilmada ham generatsiya qilinadi, OFD talabi) — shu uchlik qayta yuborilsa OFD bir xil chekni ikkinchi marta qabul qilmasligi kutiladi.
 
@@ -561,11 +563,47 @@ class UzqrAdapter(Protocol):
 
 ---
 
-## 10. SMS provayder
+## 9.1 Google OIDC — Google bilan kirish (asoschi qarori, Q7)
 
-**Maqsad va modullar**: ro'yxatdan o'tish OTP (M17, US-M17-01), mijozga qarz/to'lov eslatmasi (M08, US-M08-08/09, agar Telegram ulanmagan bo'lsa).
+**Maqsad va modullar**: ro'yxatdan o'tish/kirish uchun qo'shimcha usul — telefon+parolni almashtirmaydi, bizning OAuth AS'imizga **tashqi identity provider** sifatida ulanadi (M17, `12-autentifikatsiya-oauth2.md` §2.2).
 
-**Yo'nalish va trigger**: chiquvchi, `outbox_jobs(kind=sms)`.
+**Yo'nalish va trigger**: kiruvchi — foydalanuvchi "Google bilan kirish" tugmasini bosganda (`GET /auth/google/start` → Google → `GET /auth/google/callback`).
+
+**API holati**: Google OpenID Connect — **to'liq ochiq, rasmiy, bepul** (`accounts.google.com/.well-known/openid-configuration`); bizning tomondan faqat Google Cloud Console'da bitta OAuth 2.0 client (`web`+`android` uchun) ro'yxatdan o'tkaziladi, hech qanday to'lov yo'q.
+
+**Adapter interfeysi**:
+```python
+class GoogleOidcAdapter(Protocol):
+    async def build_auth_url(self, state: str, code_challenge: str) -> str: ...
+    async def exchange_code(self, code: str) -> GoogleIdToken: ...        # email, email_verified, sub
+    async def verify_id_token(self, id_token: str) -> GoogleIdToken: ...   # Android native oqimi uchun
+```
+
+**Ma'lumot moslashtirish**: `user_identities(user_id, provider='google', provider_user_id, email, email_verified, linked_at)` (`01-malumotlar-modeli.md` §1, `14-db-sxema.md`).
+
+**Idempotentlik kaliti**: `provider + provider_user_id` (UNIQUE) — bir xil Google hisobi ikkinchi marta bog'lanmaydi, mavjud bog'lanish ishlatiladi.
+
+**Qayta urinish/backoff**: yo'q — bu interaktiv login oqimi (foydalanuvchi xato bo'lsa qayta bosadi), fon ishi emas.
+
+**Xato UX**: `GOOGLE_EMAIL_NOT_VERIFIED` — "Google hisobingiz email tasdiqlanmagan, boshqa usul bilan kiring"; `GOOGLE_AUTH_FAILED` — "Google orqali kirish amalga oshmadi, qayta urinib ko'ring yoki telefon+parol bilan kiring".
+
+**Offline**: yo'q — Google login har doim internet talab qiladi (ROPC/offline variant yo'q, bu normal OIDC cheklovi); offline qurilmalarda allaqachon login qilingan sessiya/litsenziya tokeni ishlaydi (`12-autentifikatsiya-oauth2.md` §17).
+
+**SLA**: interaktiv, soniyalar ichida (Google o'z tomonidan).
+
+**Xavfsizlik**: Google OAuth client_secret platforma darajasida shifrlangan; ID token imzosi Google JWKS orqali tekshiriladi; `email_verified=false` har doim rad etiladi.
+
+**Monitoring**: `user_identities` orqali Google bilan bog'langan foydalanuvchilar ulushi — pilot ko'rsatkichi (qancha foydalanuvchi SMS zaxirasidan umuman voz kechadi).
+
+**MVP bosqichi**: MVP'da ixtiyoriy qo'shimcha usul sifatida qo'shiladi (`11-backlog.md`); telefon+parol — asosiy, majburiy yo'l o'zgarishsiz qoladi.
+
+---
+
+## 10. SMS provayder — faqat zaxira kanal (asoschi qarori, Q7)
+
+**Maqsad va modullar** *(2026-10-15: asoschi qarori, Q7 — rol yangilandi)*: OTP (ro'yxatdan o'tish, tiklash, taklif, eksport tasdig'i), mijozga qarz/to'lov eslatmasi — **faqat zaxira kanal**, asosiy kanal endi Telegram bot (§11.1). SMS ishlatiladi faqat: (a) foydalanuvchi Telegramga ulanmagan **va** Google bilan kirmagan, (b) Telegram yetkazib berish muvaffaqiyatsiz bo'lgan holatlarda.
+
+**Yo'nalish va trigger**: chiquvchi, `outbox_jobs(kind=sms)` — endi odatda faqat Telegram urinishi muvaffaqiyatsiz bo'lgandan keyin navbatga qo'yiladi.
 
 **API holati**: **Tanlanmagan — ochiq savol.** Tadqiqot fayllarida SMS provayder tanlanmagan (`spec/01-mahsulot/05-ai-funksiyalar.md`, AI-06 "Kanal" bandi). O'zbekiston bozorida SMS gateway xizmatlari mavjudligi umumiy ma'lum, lekin **konkret provayder, narx va API tadqiqot fayllarida tasdiqlanmagan/tekshirilmagan** — shuning uchun bu yerda hech qanday nom "fakt" sifatida keltirilmaydi.
 
@@ -592,7 +630,7 @@ class SmsAdapter(Protocol):
 
 **Monitoring**: `notifications_log` orqali yetkazilish foizi, xarajat (`cost`); BO-14'da "SMS" qatori.
 
-**MVP bosqichi**: MVP — majburiy (ro'yxatdan o'tish OTP uchun kamida). **Zaxira yo'l**: provayder tanlanmaguncha — Telegram-first strategiya (M18 allaqachon loyihalashtirilgan), SMS faqat OTP uchun minimal integratsiya bilan boshlanadi; qarz eslatmalari dastlab faqat Telegram + ekranda ko'rsatish orqali.
+**MVP bosqichi**: MVP — majburiy, lekin **faqat zaxira sifatida** (Telegram-first — asoschi qarori, Q7, §11.1). Eskiz.uz — kandidat provayder (95 so'm/SMS, `06-nofunksional-talablar.md` §11), rasmiy shartnoma hali tasdiqlanmagan.
 
 ---
 
@@ -629,6 +667,20 @@ class TelegramAdapter(Protocol):
 **Monitoring**: yetkazilish foizi, `telegram_links` faol/nofaol soni; BO-14 + BO-20 (Telegram sozlamalari).
 
 **MVP bosqichi**: MVP — majburiy (M18). **Zaxira yo'l**: Telegram butunlay ishlamasa (masalan mintaqaviy bloklanish xavfi) — faqat ekrandagi bildirishnoma + SMS (agar ulangan) zahira sifatida.
+
+### 11.1 Telegram orqali OTP yetkazish — asosiy kanal (asoschi qarori, Q7)
+
+**Oqim**: foydalanuvchi botga `/start` qiladi → bot "📱 Telefon raqamni ulashish" (Telegram native "share contact") tugmasini ko'rsatadi → foydalanuvchi bosganda Telegram o'zi tasdiqlangan telefon raqamini (foydalanuvchi akkauntiga bog'langan) botga yuboradi → bot `phone ↔ chat_id` juftligini `telegram_links`ga yozadi (bu yerda `tenant_id`/`user_id` **shart emas** — ro'yxatdan o'tishdan oldin ham ishlaydi, faqat telefon-chat bog'lanishi; tenant/user kontekst keyin login/signup paytida mavjud bo'lgan `telegram_links` yozuviga ulanadi).
+
+**OTP yuborish**: `POST /auth/otp/request` chaqirilganda server avval `telegram_links`da shu telefon uchun faol (`chat_id`) yozuv bor-yo'qligini tekshiradi:
+- **Bor** → bot orqali `send_message(chat_id, "Tasdiqlash kodingiz: {code}")` — bepul, odatda 1-2 soniyada yetib boradi.
+- **Yo'q** yoki bot xabari yuborilmadi (foydalanuvchi botni bloklagan, `chat not found` va h.k.) → avtomatik SMS'ga (Eskiz, §10) o'tiladi, `otp_challenges.channel='sms'` deb belgilanadi.
+
+**Ma'lumot moslashtirish**: `otp_challenges.channel` (`telegram`/`sms`), mavjud `telegram_links(tenant_id NULL mumkin, user_id NULL mumkin, chat_id, phone, linked_at)` — ro'yxatdan o'tishdan oldingi bog'lanish uchun `tenant_id`/`user_id` ustunlari bu bosqichda `NULL` bo'lishi mumkin (keyin signup/login paytida to'ldiriladi).
+
+**Xatolar** (`12-autentifikatsiya-oauth2.md` §4.2 bilan bir xil): `OTP_CHANNEL_UNAVAILABLE` (na Telegram, na SMS ishladi), `TELEGRAM_NOT_LINKED` (ma'lumot sifatida — xato emas, SMS'ga avtomatik o'tiladi).
+
+**Rate limit**: Telegram kanali uchun SMS'dan yuqoriroq (bepul, past xavf) — `12-autentifikatsiya-oauth2.md` §12 jadvaliga qarang.
 
 ---
 

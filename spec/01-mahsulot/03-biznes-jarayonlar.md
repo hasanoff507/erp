@@ -86,17 +86,19 @@ Manba: `02-kassa-ofd-markirovka.md` (fiskal chek, 48 soat qoidasi, Asl belgisi P
 
 ## BP-03: Sotuv — nasiya (qarzga sotish)
 
+*(2026-10-15: asoschi qarori, Q3 — avvalgi diagramma/jadval "nasiya sotuvda fiskal chek darhol chiqadi" deb ko'rsatgan edi, bu almashtirildi)*
+
 ```mermaid
 flowchart TD
     A["1-3. Tovar tanlash, markirovka,\nchegirma — BP-02 bilan bir xil"] --> B["4. Kassir 'nasiya' usulini tanlaydi,\nmijoz tanlanadi/yaratiladi"]
     B --> C{"Mijoz yuridik\nshaxs (B2B)?"}
     C -- "Ha" --> D["5a. E-faktura ham chiqariladi"]
-    C -- "Yo'q" --> E["5b. Faqat fiskal chek"]
-    D --> F["6. Fiskal chek OFD'ga yuboriladi\n(to'lov holati: nasiya)"]
+    C -- "Yo'q" --> E["5b. E-faktura yo'q"]
+    D --> F["6. Sotuv hujjati yoziladi\n(tovar qatorlari, qoldiq −);\nFISKAL CHEK HALI CHIQARILMAYDI\n(holat: deferred)"]
     E --> F
     F --> G["7. Debitorlik qarzi ochiladi,\nto'lov muddati belgilanadi (M08)"]
     G --> H["8. To'lov muddati yaqinlashganda AI\neslatma loyihasini tayyorlaydi,\nMenejer/Buxgalter tasdiqlab yuboradi"]
-    H --> I["9. To'lov kelganda — BP-11\n(nasiya qarzini undirish)"]
+    H --> I["9. To'lov kelganda — BP-11\n(nasiya qarzini undirish,\nSHU YERDA fiskal chek chiqadi)"]
 ```
 
 | Qadam | Rol | Modul | Hujjat | Davlat tizimi | Buxgalteriya effekti |
@@ -104,12 +106,12 @@ flowchart TD
 | 1-3 | Kassir | M01, M04, M03 | — | Asl belgisi, MXIK | BP-02 bilan bir xil |
 | 4 | Kassir | M08 | Mijoz kartasi | — | — |
 | 5a | Tizim | M08, M10 | E-faktura (agar B2B) | E-faktura, E-IMZO | — |
-| 6 | Tizim | M01 | Fiskal chek | Virtual kassa/OFD, MXIK | Savdo daromadi va QQS majburiyati hisoblanadi |
+| 6 | Tizim | M01, M08 | Sotuv hujjati (`deferred`) — **fiskal chek yo'q** | — | Ombor kamayadi; savdo daromadi/QQS **hali tan olinmaydi** (⚠ aniq vaqt — buxgalter/yurist tasdig'ini kutadi, `FiscalPolicy`) |
 | 7 | Tizim | M08 | Nasiya hujjati | — | Debitorlik qarzi ortadi (pul o'rniga) |
 | 8 | Tizim (AI) / Menejer | M08 | Eslatma matni (loyiha) | — | Effekt yo'q — AI faqat matn loyihasini tayyorlaydi, odam tasdiqlagandan keyin yuboriladi (AI-06, `05-ai-funksiyalar.md`) |
-| 9 | — | M08 | — | — | Davomi BP-11'da (nasiya qarzini undirish) |
+| 9 | — | M08 | **Fiskal chek shu yerda chiqadi** | — | Davomi BP-11'da (nasiya qarzini undirish) |
 
-Manba: `03-efaktura-va-tolov.md` (B2B e-faktura), `02-kassa-ofd-markirovka.md`. *Eslatma: B2C nasiya savdosida ham e-faktura kerakligi/kerak emasligi ochiq manbada aniq ko'rsatilmagan — "taxmin" sifatida belgilangan (faqat yuridik shaxslar uchun E-faktura shart, `03-fayl` 1.1-band).*
+Manba: `03-efaktura-va-tolov.md` (B2B e-faktura), `02-kassa-ofd-markirovka.md`; `spec/tekshiruv/asoschi-qarorlari-2026-10-15.md`, Q3. *Eslatma: B2C nasiya savdosida ham e-faktura kerakligi/kerak emasligi ochiq manbada aniq ko'rsatilmagan — "taxmin" sifatida belgilangan (faqat yuridik shaxslar uchun E-faktura shart, `03-fayl` 1.1-band).*
 
 ---
 
@@ -297,25 +299,26 @@ Manba: `08-mahsulot-modullari.md` ro'yxatidagi M05 moduli (`README.md` orqali um
 
 ## BP-11: Nasiya qarzini undirish (debitorlikni yopish)
 
+*(2026-10-15: asoschi qarori, Q3 — avvalgi diagramma/jadval va ochiq savol almashtirildi; endi aniq: fiskal chek asl sotuvda emas, aynan shu bosqichda chiqadi)*
+
 ```mermaid
 flowchart TD
     A["1. Mijoz nasiya qarzini\nto'lashga keladi/o'tkazadi"] --> B{"To'lov usuli\n(BP-05 bilan bir xil)"}
     B --> C["2. To'lov qabul qilinadi\n(naqd/karta/QR)"]
-    C --> D{"Yangi fiskal chek\nkerakmi?"}
-    D -- "Ochiq savol" --> E["3. To'lov tasdiqlanadi\n(hujjat turi aniq emas)"]
-    E --> F["4. Debitorlik qarzi\nqisman/to'liq yopiladi (M08)"]
-    F --> G["5. Agar qarz davom etsa —\nAI eslatma loyihasi davom etadi (BP-03)"]
+    C --> D["3. Debitorlik qarzi\nqisman/to'liq yopiladi (eng eski\nqarzdan, M08)"]
+    D --> E["4. To'langan summaga FISKAL CHEK\nchiqariladi (fiscal_receipts.kind=\ndebt_settlement); tovar qatorlari\nyopilgan sotuv(lar)dan proporsional"]
+    E --> F["5. Agar qarz davom etsa —\nAI eslatma loyihasi davom etadi (BP-03)"]
 ```
 
 | Qadam | Rol | Modul | Hujjat | Davlat tizimi | Buxgalteriya effekti |
 |---|---|---|---|---|---|
 | 1 | Mijoz/Kassir | M08 | — | — | — |
 | 2 | Kassir | M01, M08 | To'lov kvitansiyasi | Virtual kassa/OFD (BP-05 bilan bir xil) | Pul mablag'i ortadi |
-| 3 | Kassir | M08 | Nasiya to'lov hujjati | — | — |
-| 4 | Tizim | M08 | Avtomatik provodka | — | Debitorlik qarzi kamayadi |
+| 3 | Tizim | M08 | Avtomatik provodka | — | Debitorlik qarzi kamayadi |
+| 4 | Tizim | M01, M08 | **Fiskal chek** (`debt_settlement`) | Virtual kassa/OFD | Savdo daromadi va QQS majburiyati **shu bosqichda** hisoblanadi (⚠ standart ishchi qaror — aniq vaqt buxgalter/yurist tasdig'ini kutadi, `FiscalPolicy` sozlamasi) |
 | 5 | Tizim (AI) / Menejer | M08 | — | — | Effekt yo'q |
 
-Manba: `02-kassa-ofd-markirovka.md`, `09-soliq-integratsiyasi.md` (fiskal chek majburiyati asl savdo paytida qo'yiladi). *Ochiq savol: asl sotuvda fiskal chek allaqachon chiqarilgani uchun, keyinroq qarz to'langanda yangi fiskal chek kerak bo'lishi/kerak emasligi ochiq manbada ko'rsatilmagan (`02-fayl`, `03-fayl` bevosita javob bermaydi) — "taxmin": chek qayta chiqarilmaydi, faqat ichki to'lov hujjati yoziladi.*
+Manba: `02-kassa-ofd-markirovka.md`, `09-soliq-integratsiyasi.md`; `spec/tekshiruv/asoschi-qarorlari-2026-10-15.md`, Q3. *(2026-10-15: asoschi qarori bilan hal qilindi, Q3)* ~~Ochiq savol: asl sotuvda fiskal chek allaqachon chiqarilgani uchun, keyinroq qarz to'langanda yangi fiskal chek kerak bo'lishi/kerak emasligi ochiq manbada ko'rsatilmagan~~ — endi aniq: asl nasiya sotuvida fiskal chek **chiqarilmaydi** (BP-03), **har bir qarz to'lovida yangi fiskal chek chiqariladi**. ⚠ Qolgan ochiq qism — QQS/daromadni tan olish vaqti (sotuv vs to'lov) va bu tartibning soliq qonunchiligiga mosligi, buxgalter va yurist tasdig'ini kutadi.
 
 ---
 
@@ -374,7 +377,7 @@ Manba: `spec/01-mahsulot/02-modullar-talablari.md` (US-M01-06, M01 chekka holatl
 |---|---|---|---|---|---|---|---|---|
 | BP-01 Xarid | — | ✓ | ✓ | ✓ (qabulda) | ✓ | ✓ | ? (ochiq savol, vakil orqali qabulda) | — |
 | BP-02 Sotuv (kassa) | ✓ | — | — | ✓ | ✓ | — | — | — |
-| BP-03 Sotuv (nasiya) | ✓ | ✓ (B2B bo'lsa) | — | ✓ | ✓ | ✓ (B2B e-faktura) | — | — |
+| BP-03 Sotuv (nasiya) | **— (BP-11'da, Q3)** *(2026-10-15: asoschi qarori — avvalgi ✓ xato edi)* | ✓ (B2B bo'lsa, asl sotuv vaqtida) | — | ✓ | ✓ | ✓ (B2B e-faktura) | — | — |
 | BP-04 Qaytarish | ✓ | — | — | ✓ | ✓ | — | — | — |
 | BP-05 To'lov qabul qilish | ✓ | — | — | — | — | — | — | — |
 | BP-06 Buxgalteriya provodkalari | — | — | — | — | — | — | — | — |
@@ -403,7 +406,7 @@ Matritsa talab qilingan 6 majburiy davlat tizimining barchasini kamida bitta jar
 9. BP-08, 5a-qadamdagi tuzatishning aniq shakli (ariza? portalda to'g'ridan-to'g'ri tuzatish?) va yuborish kanali manbada tasvirlanmagan — faqat "tuzatish, qo'lda, E-IMZO bilan" deyilgan (`04-fayl`, 6.3-band); muddat (5 kalendar kun) va huquqiy asos (Soliq kodeksi 81-moddasi) endi aniq.
 10. E-ishonchnoma (Vakolat.uz) AIOS'ga qanday integratsiya qilinishi va BP-01'da aniq qachon talab qilinishi (har doim vakil orqali qabulda, yoki faqat ba'zi holatlarda) ochiq manbada ko'rsatilmagan — API hujjati topilmadi (`09-soliq-integratsiyasi.md`, 14-qator).
 11. BP-01, 3-qadamda davlat xavf-baholash natijasi (yashil/qizil) AIOS'ga qaysi kanal orqali yetib kelishi (EDO operatori — Didox/Faktura.uz orqali, yoki boshqa yo'l) ochiq manbada ko'rsatilmagan.
-12. BP-11'da nasiya qarzi to'langanda yangi fiskal chek chiqarilishi kerakligi/kerak emasligi ochiq manbada javobsiz qoldi — "taxmin" sifatida belgilangan.
+12. *(2026-10-15: asoschi qarori bilan hal qilindi, Q3)* ~~BP-11'da nasiya qarzi to'langanda yangi fiskal chek chiqarilishi kerakligi/kerak emasligi ochiq manbada javobsiz qoldi~~ — endi aniq: **ha**, BP-11'da har bir to'lovga yangi fiskal chek (`debt_settlement`) chiqariladi, asl BP-03 sotuvida chek chiqarilmaydi. ⚠ Qolgan ochiq qism: QQS/daromadni tan olish vaqti va bu tartibning qonuniyligi — buxgalter/yurist tasdig'ini kutadi (`spec/tekshiruv/asoschi-qarorlari-2026-10-15.md`, Q3).
 
 ## Manbalar
 

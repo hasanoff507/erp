@@ -302,7 +302,7 @@ Bitta ustun, pastki tab-bar (`Bosh sahifa / Hisobotlar / Qarzlar / AI / Sozlamal
 | **`SubscriptionRestrictedState`** | `403 SUBSCRIPTION_RESTRICTED` — to'liq ekran banner, to'lov havolasi, eksport havolasi (D2) | `payUrl`, `amountDue` |
 | **`MarkingBadge`** | Markirovka holati belgisi: `pending_verification` (fiscal-pending), `verified`, `verify_failed` | `status` |
 | **`MoneyDisplay`** | Faqat ko'rsatish uchun (formatlangan, rangli — musbat/manfiy) | `value: string`, `currency="UZS"`, `tone?` |
-| **`ReceiptPreview`** | 58/80mm chek oldindan ko'rish (ekranda, chop etishdan oldin) | `receipt`, `width: 58\|80` |
+| **`ReceiptPreview`** | 58/80mm chek oldindan ko'rish (ekranda, chop etishdan oldin); *(2026-10-15: asoschi qarori, Q2)* har bir qatorni ikki tilda ("{name} / {name_ru}") render qiladi | `receipt`, `width: 58\|80` |
 
 ---
 
@@ -451,6 +451,8 @@ Adapter: `shared/lib/printer` — `WebUsbPrinterAdapter` / `WebSerialPrinterAdap
 
 ### 13.1 Fiskal chek — 58mm / 80mm ESC/POS shablon
 
+*(2026-10-15: asoschi qarori, Q2 — avvalgi "faqat o'zbek" shablon ikki tilli qilib qayta yozildi)* Har bir tovar qatori, shuningdek sarlavha/yakun yorliqlari **"o'zbekcha / ruscha"** formatida (`name_ru` bo'sh bo'lsa faqat o'zbekcha qator qoladi, ikkinchi qator chiqmaydi). Fiskal rekvizitlar (STIR, MXIK, fiskal belgi, QR) OFD talab qilgan formatda — bular tarjima qilinmaydi.
+
 ```
        [Do'kon nomi]                 ← markazda, bold, 80mm: 32 belgi / 58mm: 24 belgi
    Manzil, telefon                   ← kichik shrift
@@ -459,28 +461,30 @@ Adapter: `shared/lib/printer` — `WebUsbPrinterAdapter` / `WebSerialPrinterAdap
   Chek № K-01-2026-000154   12.10.2026 22:41
   Kassir: Dilnoza               Smena №7
 ----------------------------------------
-  1. Non "Bekhurmon"
+  1. Non / Хлеб "Bekhurmon"
      2 x 12 000                        24 000
-  2. Coca-Cola 1.5L
+  2. Coca-Cola 1.5L                    ← name_ru yo'q, faqat bir qator
      1 x 18 000                        18 000
-  3. Sut "Oltin" 1L
+  3. Sut / Молоко "Oltin" 1L
      3 x 9 000                         27 000
 ----------------------------------------
-  Jami:                              69 000 so'm
-  Chegirma:                              0 so'm
-  QQS (12%, ichida):                  7 393 so'm
+  Jami / Итого:                      69 000 so'm
+  Chegirma / Скидка:                     0 so'm
+  QQS / НДС (12%, ichida):            7 393 so'm
 ----------------------------------------
-  To'lov: Naqd                       100 000 so'm
-  Qaytim:                             31 000 so'm
+  To'lov / Оплата: Naqd / Наличные  100 000 so'm
+  Qaytim / Возврат:                   31 000 so'm
 ----------------------------------------
       [Fiskal belgi: <fiscal_sign>]
       [QR-kod — OFD tekshirish]
       MXIK: aniqlangan tovarlar bo'yicha qatorda*
 ----------------------------------------
-      Rahmat! Yana kuting.
-      [NUSXA] ← faqat qayta chop etishda
+      Rahmat! Yana kuting. / Спасибо! Ждём вас.
+      [NUSXA / КОПИЯ] ← faqat qayta chop etishda
 ```
-`*` MXIK kodi har bir qator ostida kichik shrift bilan chiqarilishi — fiskal rekvizit talabi (`02-kassa-ofd-markirovka.md`), aniq joylashuv formati tasdiqlanmagan — **ochiq savol/moslashtiriladi**. 58mm'da qator kengligi 24 belgi (nom ikkinchi qatorga tushishi mumkin), 80mm'da 32 belgi.
+`*` MXIK kodi har bir qator ostida kichik shrift bilan chiqarilishi — fiskal rekvizit talabi (`02-kassa-ofd-markirovka.md`), aniq joylashuv formati tasdiqlanmagan — **ochiq savol/moslashtiriladi**. 58mm'da qator kengligi 24 belgi (nom ikkinchi qatorga tushishi mumkin — ikki tilli nom uzun bo'lsa ruscha qism alohida qatorga tushadi), 80mm'da 32 belgi.
+
+**To'lov turi yorliqlari (ikki tilda)**: Naqd/Наличные, Karta/Карта, UzQR/UzQR, Payme/Payme, Click/Click, Uzum/Uzum, Nasiya/В долг (faqat `debt_settlement` chekida ko'rinadi, oddiy sotuv chekida "Nasiya" qatori chiqmaydi — Q3, nasiya sotuvida bu shablonning o'zi chiqarilmaydi).
 
 > *(2026-10-15: qabul-6/7)* **QQS qatori aniqligi**: yuqoridagi shablonda `QQS (12%, ichida): 7 393 so'm` butun so'mda ko'rsatilgan, lekin fiskal chekning QQS summasi tiyin darajasidagi aniqlikni talab qilishi mumkin — bu pul qoidasining istisnosiga bog'liq (§0 band 1, p.5: fiskal chek/QQS hisobotlari OFD-talab aniqligida). Hozircha 2 xonali kasrga (`formatMoney(value, { precision: 2 })`) mo'ljallangan, aniq format OFD texnik spetsifikatsiyasi bilan yakunlanadi (pastda Ochiq savollar №6).
 

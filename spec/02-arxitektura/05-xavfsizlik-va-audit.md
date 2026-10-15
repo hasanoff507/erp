@@ -130,7 +130,7 @@ Har bir kod `role_permissions.permission_code` sifatida saqlanadi, zarur bo'lsa 
 
 Quyidagi jadval `01-rollar-va-ssenariylar.md` (6-bo'lim) dagi K/Y/T matritsasi bilan **izchil**: K→faqat `*.view`/ko'rish huquqlari, Y→yaratish kodlari, T→tasdiqlash/`*.approve`/`*.post` kodlari. "✓(limit)" — `role_permissions.limit_value` bilan cheklangan huquq.
 
-**Egasi ustuni — "barcha ruxsat" (superset)** *(2026-10-15: qabul-7 R-02/X-02, tasdiq kutilmoqda)*: avvalgi matritsada Egasida `sales.create`, `shift.open/close`, `returns.create`, `stock.count.create`, `transfer.*`, `purchases.*` (yaratish/qabul), `cash.count.shift`, `accounting.*` kabi operatsion kodlar yo'q edi — 1–3 xodimli do'konda Egasi ko'pincha o'zi kassada/omborda turadi. **Qaror (standart, asoschi tasdig'i kutilmoqda): Egasi — `platform.admin`dan tashqari barcha tenant ruxsatlarining supersetiga ega**, limitlar cheksiz. Quyidagi jadvalning Egasi ustuni shunga mos yangilangan (reestr #1, qabul-7 X-02).
+**Egasi ustuni — "barcha ruxsat" (superset)** *(2026-10-15: asoschi qarori, Q1)*: avvalgi matritsada Egasida `sales.create`, `shift.open/close`, `returns.create`, `stock.count.create`, `transfer.*`, `purchases.*` (yaratish/qabul), `cash.count.shift`, `accounting.*` kabi operatsion kodlar yo'q edi — 1–3 xodimli do'konda Egasi ko'pincha o'zi kassada/omborda turadi. **Qaror (asoschi tasdiqladi, 2026-10-15): Egasi — `platform.admin`dan tashqari barcha tenant ruxsatlarining supersetiga ega**, limitlar cheksiz. Quyidagi jadvalning Egasi ustuni shunga mos yangilangan (reestr #1, qabul-7 X-02, asoschi qarori Q1 bilan yakunlangan).
 
 | Ruxsat | Egasi | Menejer | Kassir | Omborchi | Buxgalter |
 |---|---|---|---|---|---|
@@ -189,7 +189,7 @@ Quyidagi jadval `01-rollar-va-ssenariylar.md` (6-bo'lim) dagi K/Y/T matritsasi b
 | `ai.chat.use` | ✓ | ✓ | – | – | ✓ |
 | `ai.ocr.use` | ✓ | ✓ | – | ✓ | ✓ |
 
-*(2026-10-14: tekshiruv — 12 qator §2.1 katalogida mavjud bo'lib, matritsada yetishmayotgan kodlar uchun qo'shildi; `expenses.approve`, `cash.deposit`, `cash.count.shift`, `notifications.manage`, `telegram.link` allaqachon mavjud bo'lgani uchun takrorlanmadi. `debts.payment.accept`, `debts.remind`, `catalog.manage`, `stock.opening.manage`, `valuation.settings.manage`, `integrations.retry`, `einvoice.create`, `settings.tenant` — qatorlari va Egasi ustunining to'liq yangilanishi `2026-10-15: qabul-6/7` — X-01/X-02, tasdiq kutilmoqda.)*
+*(2026-10-14: tekshiruv — 12 qator §2.1 katalogida mavjud bo'lib, matritsada yetishmayotgan kodlar uchun qo'shildi; `expenses.approve`, `cash.deposit`, `cash.count.shift`, `notifications.manage`, `telegram.link` allaqachon mavjud bo'lgani uchun takrorlanmadi. `debts.payment.accept`, `debts.remind`, `catalog.manage`, `stock.opening.manage`, `valuation.settings.manage`, `integrations.retry`, `einvoice.create`, `settings.tenant` — qatorlari va Egasi ustunining to'liq yangilanishi `2026-10-15: qabul-6/7` — X-01/X-02, **2026-10-15: asoschi qarori (Q1) bilan yakuniy tasdiqlandi**.)*
 
 *Izoh: kichik do'konda bir xodim bir nechta rolga ega bo'lishi mumkin (`memberships.role_ids[]`) — ruxsatlar jamlanadi, ziddiyatda yuqori huquq ustun bo'ladi (`02-modullar-talablari.md`, M13, chekka holat).*
 

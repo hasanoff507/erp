@@ -55,6 +55,7 @@ Barcha quyidagi raqamlar — **taxmin**, manbada son ko'rsatkich topilmagani sab
 | O'rtacha kassa/tenant | 1 (bazaga kiritilgan) + ixtiyoriy qo'shimcha (`addons.extra_register`) | Yagona tarif endi kassa soniga qarab bosqichlanmaydi — `01-malumotlar-modeli.md` §2 *(2026-10-15: foydalanuvchi qarori)* |
 | O'rtacha kunlik chek/kassa | 50–150 | Kichik chakana do'kon uchun odatiy taxmin, manbasiz |
 | O'rtacha AI so'rov/tenant/oy | ~300 | `05-ai-funksiyalar.md`, 5-bo'lim hisob-kitobida ishlatilgan taxmin |
+| **Soliq rejimi ulushi (QQS vs aylanma)** | **Oldindan taxmin yo'q — pilot ko'rsatkichi** | *(2026-10-15: asoschi qarori, Q5)* Avvalgi "segmentning >70%i aylanma solig'i to'lovchi" taxmini **rad etildi va olib tashlandi**; ikkala rejim (QQS, aylanma) arxitekturada **teng darajada birinchi toifali** (`02-provodka-qoidalari.md` §5.1/§4.3) — pilot davrida `tenant_tax_regimes` bo'yicha haqiqiy ulush o'lchanadi, sig'im/narx rejasi shunga moslashtiriladi |
 
 ### 3.2 100 tenant uchun misoliy infratuzilma va narx (UzCloud, manbali birlik narxlar)
 
@@ -212,7 +213,7 @@ Rasmiy WCAG audit tadqiqotda yo'q — faqat UX darajasidagi umumiy tamoyillar (`
 |---|---|---|
 | Hosting (UzCloud, 100 tenant sig'imida) | **~20 500 so'm** | 3.2-bo'lim hisobi, UzCloud birlik narxlaridan (`07-fayl`) — sig'im/o'lcham taxmin |
 | AI (Claude Haiku 5.5, ~300 so'rov/oy) | **~2 000–5 000 so'm** | `07-ai-qatlami.md` §13 — yagona tarif uchun birlashtirilgan budjet |
-| SMS (Eskiz.uz, **95 so'm/SMS**, F11 tasdiqlangan) | **~1 900–4 750 so'm** | `tekshiruv/savollar-yakuniy-tavsiyalar.md` F11; taxminiy 20–50 SMS/oy × 95 so'm |
+| SMS (Eskiz.uz, **95 so'm/SMS**) — **faqat zaxira kanal** (asoschi qarori, Q7: OTP/parol tiklash/xodim taklifi/eksport tasdig'i/qarz eslatmalari — asosiy kanal **Telegram bot**, bepul; Google bilan kirish SMS umuman ishlatmaydi) | **~0 so'm (asosiy holat)**; faqat Google ham, Telegram ham ulamagan foydalanuvchida zaxira sifatida ~1 900–4 750 so'm | `tekshiruv/savollar-yakuniy-tavsiyalar.md` F11; zaxira holat ulushi — pilotda o'lchanadi |
 | Click/Payme (bizning billing komissiyasi) | **~1 000 so'm** | 1–2% komissiya, 99 000 so'mdan |
 | **Fiskal modul (1 bazaga kiritilgan virtual kassa)** | **~35 000 so'm** (+ ~4 000 zahira ≈ **39 000**) | Pilot davrida reyestr hamkori haqi (biz to'laymiz) yoki o'z reyestrimizdagi 1 BHM/yil ÷ 12 ≈ 34 000–37 000 so'm (`03-integratsiyalar.md` §1, foydalanuvchi qarori) |
 | **Jami taxminiy xarajat/tenant/oy (1 kassa bilan)** | **≈ 60 000–68 000 so'm** | Komponentlarning real (hammasi bir vaqtda eng yuqori bo'lmaydigan) yig'indisi |
@@ -226,6 +227,8 @@ Rasmiy WCAG audit tadqiqotda yo'q — faqat UX darajasidagi umumiy tamoyillar (`
 
 ## 12. Qo'llab-quvvatlash modeli (support) *(2026-10-15: foydalanuvchi qarori — `tekshiruv/savollar-yakuniy-tavsiyalar.md` #12)*
 
+**Boshlang'ich bosqich — faqat asoschi (Q8, 2026-10-15)**: jamoa 2 kishilik (asoschi + Claude); alohida support operator ishga olinmaguncha barcha murojaatni (kritik ham, oddiy ham) **asoschi** shaxsan Telegram/telefon orqali qabul qiladi. Quyidagi jadvaldagi "1 operator" qatori — operator ishga olingandan keyingi (pilotdan keyingi) bosqich uchun, hozircha **rejalashtirilgan maqsad**, haqiqiy xarajat emas.
+
 | Band | Qaror |
 |---|---|
 | Kanallar | Telegram (mavjud bot ichida "/yordam") + bitta telefon raqami — BILLZ/mDokon ham aynan shu modelda |
@@ -233,8 +236,8 @@ Rasmiy WCAG audit tadqiqotda yo'q — faqat UX darajasidagi umumiy tamoyillar (`
 | Javob muddati — kritik (fiskal/OFD, markirovka, bloklanish) | Ish vaqtida **1 soat ichida** birinchi javob |
 | Javob muddati — oddiy savol | **24 soat** |
 | **Dam olish kuni navbatchilik** | Kritik muammolar uchun Telegram orqali **navbatchi (asoschi), 4 soat ichida** javob — shart, chunki juma 19:00'dan dushanba 09:00'gacha 62 soat, bu 48 soatlik OFD muddatidan uzun |
-| Xodim xarajati | ~6,7–7 mln so'm/oy (1 operator, taxmin) — dastlabki bosqichda **zarar** sifatida qabul qilinadi, 11-bo'limdagi marjadan alohida |
-| Qayta ko'rib chiqish | Tenant soni **300**ga yetganda narx/xodim nisbati qayta hisoblanadi |
+| Xodim xarajati | Boshlang'ich bosqich — **0** (asoschi o'zi, alohida xarajat yo'q); keyingi bosqich (operator yollanganda) ~6,7–7 mln so'm/oy (1 operator, taxmin) — 11-bo'limdagi marjadan alohida **zarar** sifatida qabul qilinadi |
+| Qayta ko'rib chiqish | Tenant soni **300**ga yetganda (yoki asoschi yolg'iz ulgurmay qolganda) operator yollanadi, narx/xodim nisbati qayta hisoblanadi |
 
 **Ishonch**: kanallar — yuqori (bozor amaliyoti bilan mos); SLA raqamlari va xodim soni — taxmin, pilotda tasdiqlanadi (murojaatlar soni, javob vaqti).
 

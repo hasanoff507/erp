@@ -6,6 +6,7 @@
 
 - **Route** — `apps/shell` routeri ichida, `@pages/*` paketiga mos (`08-frontend-arxitekturasi.md` §1). POS yo'llari `/pos/...`, back-office `/app/...`, login `/login`, onboarding `/onboarding`, platforma admin `/platform/...` (alohida `admin-bff`, `12-autentifikatsiya-oauth2.md` §18.1).
 - **Ruxsat (permission)** — `role_permissions.permission_code` formatida, scope prefiksi `12-autentifikatsiya-oauth2.md` §10 jadvaliga mos (`sales.*`, `stock.*`, `debts.*`, ...). Kod nomlari `spec/02-arxitektura/05-xavfsizlik-va-audit.md` ruxsat katalogi va `spec/tekshiruv/qabul-7-ekran-api.md` E-02 jadvali bilan moslashtirildi. *(2026-10-15: qabul-6/7)*
+- **Egasi — barcha ekranlarga kirish** *(2026-10-15: asoschi qarori, Q1)*: har bir ekran tafsilotidagi "Rol/ruxsat" qatorida faqat shu ekranning odatiy (operatsion) roli ko'rsatilgan; Egasi tenantning barcha ruxsatlarining supersetiga ega bo'lgani uchun (`01-rollar-va-ssenariylar.md`, 6-bo'lim) quyida alohida sanalmagan bo'lsa ham **har doim** har qanday ekranga (shu jumladan POS-01…15) kira oladi va shu ekrandagi har qanday `Y`/`T` amalni bajara oladi; faqat `platform.admin` (ADM-01) bundan mustasno.
 - **Ma'lumot manbai** — REST `/api/v1/<resource>` uslubida, kebab-case ko'plik yo'l (`/goods-receipts`), `spec/02-arxitektura/13-api-katalog-*.md` katalogiga mos nomlar bilan moslashtirildi (`spec/tekshiruv/qabul-7-ekran-api.md` E-01 jadvali); `/auth/*`, `/billing/pay`, `/billing/export-my-data` — `/api/v1`siz. *(2026-10-15: qabul-6/7)*
 - **Holatlar** — har ekranda quyidagi yetti holatning tegishlilari ko'rsatiladi: `loading` (skeleton), `empty` (`EmptyState`), `error` (`ErrorState`), `offline` (`OfflineBadge` + funksional cheklov), `no-permission` (`NoPermissionState`, 403 `PERMISSION_DENIED`), `subscription-restricted` (`SubscriptionRestrictedState`, 403 `SUBSCRIPTION_RESTRICTED` — faqat `/login`, to'lov va POS-01 bundan mustasno, chunki ular bu holatning o'zini ko'rsatadi), **`subscription-grace`** — `GET /billing/subscription.status=grace`: barcha ekran odatdagidek ishlaydi, shell tepasida qizil `aria-live="assertive"` banner «Obuna muddati o'tdi. {HH:mm} ichida to'lang, aks holda kassa to'xtaydi» + "To'lash" havolasi (BO-19); muddatdan 3/1/0 kun oldin sariq banner «Obuna {sana} da tugaydi» (US-M17-03). *(2026-10-15: qabul-6/7)*
 - **Audit/analytics** — `audit_log.action` — nuqtali `domen.fe'l` uslubida (masalan `sale.draft_voided`); mahsulot-analitika (faqat ichki telemetriya) voqealari — `snake_case` (masalan `receipt_printed`); ikkisi aralashtirilmaydi. *(2026-10-15: qabul-6/7, E-31)*
@@ -50,10 +51,10 @@
 |---|---|---|---|
 | PIN bilan kirish | — | Yo'q | PIN tasdiqlanadi; `shift.open` bor bo'lsa "Smenani ochish" qadami ko'rsatiladi, yo'q bo'lsa (Omborchi) to'g'ridan-to'g'ri POS-08/09/10 menyusiga o'tadi *(2026-10-15: qabul-6/7, E-29)* |
 | Smenani ochish | `shift.open` | Yo'q | `shift.opened` voqeasi, POS-02ga o'tish |
-| PIN/parolni unutdim | — | SMS OTP oynasi (`purpose=recovery`) | Yangi PIN/parol o'rnatish seansi |
+| PIN/parolni unutdim | — | *(2026-10-15: asoschi qarori, Q7)* OTP oynasi (`purpose=recovery`) — kod birinchi navbatda Telegram botga, ulanmagan bo'lsa SMS'ga (zaxira) | Yangi PIN/parol o'rnatish seansi |
 
 - **Ma'lumot manbai**: `POST /auth/pin/verify` (online qo'shimcha tasdiq, 4.3-bo'lim) *(2026-10-15: qabul-6/7, E-01 — `/api/v1`siz, 12-auth §20)*, outbox: `shift.opened` (`04-offline-sync.md` §2), `GET /auth/license` (litsenziya tokeni, offline qurilma).
-- **Holatlar**: `loading` (qurilma/filial ma'lumoti yuklanmoqda) · `empty` — yo'q (smena ochish bo'sh bo'lmaydi) · `error` (PIN noto'g'ri — standart xabar #17/#18) · `offline` (PIN mahalliy heshga qarshi tekshiriladi, litsenziya token amal qilsa) · `no-permission` — yo'q (login ekrani) · `subscription-restricted` — butun ekran qizil banner, PIN maydoni o'chirilgan; "Ma'lumotlarimni yuklab olish" tugmasi PIN ekranida emas — `/login?reason=subscription_expired`ga yo'naltiradi (telefon+parol identifikatsiyasi + `purpose=data_export` SMS-OTP, D2) (`12-autentifikatsiya-oauth2.md` §16) *(2026-10-15: qabul-6/7, E-04)* · **`subscription-grace`** — ekran odatdagidek ishlaydi, tepada qizil banner (yuqoridagi "Qanday o'qish kerak").
+- **Holatlar**: `loading` (qurilma/filial ma'lumoti yuklanmoqda) · `empty` — yo'q (smena ochish bo'sh bo'lmaydi) · `error` (PIN noto'g'ri — standart xabar #17/#18) · `offline` (PIN mahalliy heshga qarshi tekshiriladi, litsenziya token amal qilsa) · `no-permission` — yo'q (login ekrani) · `subscription-restricted` — butun ekran qizil banner, PIN maydoni o'chirilgan; "Ma'lumotlarimni yuklab olish" tugmasi PIN ekranida emas — `/login?reason=subscription_expired`ga yo'naltiradi (telefon+parol identifikatsiyasi + `purpose=data_export` OTP — *(2026-10-15: asoschi qarori, Q7)* Telegram bot birinchi, SMS zaxira, D2) (`12-autentifikatsiya-oauth2.md` §16) *(2026-10-15: qabul-6/7, E-04)* · **`subscription-grace`** — ekran odatdagidek ishlaydi, tepada qizil banner (yuqoridagi "Qanday o'qish kerak").
 - **Klaviatura**: raqam tugmalari PIN kiritadi, `Enter` tasdiqlaydi, `Esc` tozalaydi.
 - **Audit/analitika**: `login_success`, `login_failed`, `account_locked`, `shift.opened`, `pos_login_screen_viewed`.
 - **Bog'liq US**: US-M01-04, US-M17-03 (lockout holati), US-M13-06 (parol/PIN tiklash).
@@ -144,7 +145,8 @@
 └───────────────────────────────────────┘
 ```
 
-- **Maydonlar**: yo'q (faqat ko'rsatish ekrani) — `ReceiptPreview` komponenti chekni render qiladi (`08-dizayn-tizimi.md` §13.1).
+- **Maydonlar**: yo'q (faqat ko'rsatish ekrani) — `ReceiptPreview` komponenti chekni render qiladi (`08-dizayn-tizimi.md` §13.1). *(2026-10-15: asoschi qarori, Q2)* `ReceiptPreview` har bir tovar qatorini **ikki tilda** chiqaradi: `"{name} / {name_ru}"` (`name_ru` bo'sh bo'lsa faqat `name`), shuningdek sarlavha/yakun matnlari ikki tilda ("Jami / Итого", "Naqd / Наличные" va h.k., to'liq ro'yxat — `08-dizayn-tizimi.md` chek shabloni bo'limi).
+- *(2026-10-15: asoschi qarori, Q3)* **Nasiyaga sotuvda bu ekran ochilmaydi**: to'lov usuli to'liq "Nasiya" bo'lgan sotuvda fiskal chek shu zahotda chiqarilmaydi (`fiscal_receipts` yaratilmaydi, holat `deferred`) — POS-03 to'g'ridan-to'g'ri POS-06 (yoki POS-02'ga qaytish) ga o'tadi, bu ekran faqat **naqd/karta qismi bo'lgan** (to'liq yoki aralash to'lovning naqd qismi) sotuvlarda ko'rsatiladi. Qarz to'langanda chiqariladigan fiskal chek — alohida oqim, POS-13/BO-06 (`debt_settlement`).
 - **Amallar**:
 
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
@@ -209,7 +211,7 @@
 
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
 |---|---|---|---|
-| NASIYAGA RASMIYLASHTIR | `debts.create` | Limitdan oshsa `ApprovalDialog` (Menejer PIN; offlaynda bayroq bilan davom) | `sale.created` (`sale_payments.method=debt`, `due_date`=`promiseDate`) |
+| NASIYAGA RASMIYLASHTIR | `debts.create` | Limitdan oshsa `ApprovalDialog` (Menejer PIN; offlaynda bayroq bilan davom) | `sale.created` (`sale_payments.method=debt`, `due_date`=`promiseDate`), holat `deferred` — *(2026-10-15: asoschi qarori, Q3)* **fiskal chek chiqarilmaydi**, POS-04 ekrani ochilmaydi; chek qarz to'langanda (POS-13/BO-06, `debt_settlement`) chiqadi |
 
 - **Ma'lumot manbai**: `customers`/`debt_balances` (lokal, `04-offline-sync.md` §1); mijoz B2B bo'lsa `POST /api/v1/einvoices` (`direction=out`) — **katalogda yo'q, K1-04 bilan qo'shiladi** (BO-15da imzolanadi). *(2026-10-15: qabul-6/7, E-01)*
 - **Holatlar**: `loading` · `empty` (mijoz tanlanmagan) · `error` ("Limitdan oshdi — Menejer PIN kiriting") · `offline` (limit oxirgi sinxron ma'lumot asosida, sotuv **bloklanmaydi**, `limit_exceeded=true` bayrog'i) · `no-permission` — tugma ko'rinmaydi · `subscription-restricted` — kirilmaydi.
@@ -401,7 +403,7 @@
 
 ## POS-13 — Qarz daftari (tezkor)
 
-- **Maqsad**: mijoz qarzini ism/telefon bo'yicha tezkor ko'rish, to'lov qabul qilish; yangi qarz yozish endi POS-02 orqali normal (fiskal chekli) sotuv sifatida amalga oshadi — chek va tovarsiz qarz yo'q. *(2026-10-15: qabul-6/7, E-03)*
+- **Maqsad**: mijoz qarzini ism/telefon bo'yicha tezkor ko'rish, to'lov qabul qilish; yangi qarz yozish endi POS-02 orqali normal (tovar qatorlari bilan) sotuv sifatida amalga oshadi — tovarsiz, erkin summali qarz yo'q. *(2026-10-15: qabul-6/7, E-03; 2026-10-15: asoschi qarori, Q3 — "fiskal chekli" aniqlashtirildi)* Fiskal chek bu bosqichda **chiqarilmaydi** (holat `deferred`) — chek faqat qarz to'langanda chiqadi (pastda, TO'LOV QABUL QILISH).
 - **Rol/ruxsat**: Kassir, Egasi (`debts.create` yoki `debts.payment.accept` — ko'rish; `debts.create` — yozish; `debts.payment.accept` — to'lov qabul qilish). *(2026-10-15: qabul-6/7, E-02)*
 - **Route**: `/pos/debts`
 - **Layout**:
@@ -425,14 +427,14 @@
 | `payment.amount` | To'lov summasi | Сумма платежа | `MoneyInput` | Ha (to'lovda) | >0, ≤ joriy qarz (taxmin — ortig'ini qabul qilish siyosati ochiq) | — | — |
 | `promiseDate` | Yangi va'da sanasi | Новая обещанная дата | `Calendar` | Yo'q (qoldiq qolsa ixtiyoriy) | ≥ bugun | Bo'sh | — | *(2026-10-15: qabul-6/7, E-17, K1-09)* |
 
-*(2026-10-15: qabul-6/7, E-03)* `newDebt.amount`/`newDebt.note` maydonlari **olib tashlandi** — tovarsiz, chek va erkin summali qarz yozish qoidaga ("qarzli sotuv ham oddiy sotuv kabi fiskal chek bilan rasmiylashtiriladi", 02 M08 Qoidalar) zid edi.
+*(2026-10-15: qabul-6/7, E-03)* `newDebt.amount`/`newDebt.note` maydonlari **olib tashlandi** — tovarsiz, erkin summali qarz yozish qoidaga ("qarzga sotuv ham tovar qatorlari bilan oddiy sotuv hujjati sifatida yoziladi, faqat fiskal chek to'lovgacha kechiktiriladi", 02 M08 Qoidalar, Q3) zid edi.
 
 - **Amallar**:
 
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
 |---|---|---|---|
-| QARZ YOZISH | `debts.create` | Yo'q | POS-02ni shu mijoz tanlangan holda ochadi, to'lov usuli oldindan `debt` (POS-06 oqimi); natija — `sale.created` (`payments[].method=debt`) + fiskal chek *(2026-10-15: qabul-6/7, E-03 — to'liq qayta yozildi)* |
-| TO'LOV QABUL QILISH | `debts.payment.accept` | Yo'q | `debt_payment.created`, eng eski qarzdan yopiladi; qoldiq qolsa `promiseDate` bilan joriy va'da yangilanadi |
+| QARZ YOZISH | `debts.create` | Yo'q | POS-02ni shu mijoz tanlangan holda ochadi, to'lov usuli oldindan `debt` (POS-06 oqimi); natija — `sale.created` (`payments[].method=debt`), holat `deferred` — *(2026-10-15: asoschi qarori, Q3 — avvalgi "+ fiskal chek" qoidasi almashtirildi)* **fiskal chek bu bosqichda chiqarilmaydi** *(2026-10-15: qabul-6/7, E-03 — to'liq qayta yozildi)* |
+| TO'LOV QABUL QILISH | `debts.payment.accept` | Yo'q | `debt_payment.created` → `/post`, eng eski qarzdan yopiladi; qoldiq qolsa `promiseDate` bilan joriy va'da yangilanadi. *(2026-10-15: asoschi qarori, Q3)* **To'langan summaga fiskal chek chiqariladi** (`fiscal_receipts.kind=debt_settlement`), tovar qatorlari yopilgan sotuv(lar)dan proporsional; natijada POS-04 (chek) ekraniga o'tiladi |
 
 Tovarsiz "eski qarz"ni kiritish faqat BO-06 → "Boshlang'ich qarz" (`POST /api/v1/debt-openings`, faqat Egasi) orqali amalga oshadi. *(2026-10-15: qabul-6/7, E-03)*
 
@@ -533,7 +535,7 @@ Tovarsiz "eski qarz"ni kiritish faqat BO-06 → "Boshlang'ich qarz" (`POST /api/
 - **Maqsad**: back-office foydalanuvchilarini (Egasi/Menejer/Buxgalter) autentifikatsiya qilish.
 - **Rol/ruxsat**: Barcha (login ekrani — ruxsat talab qilinmaydi).
 - **Route**: `/login`
-- **Layout**:
+- **Layout**: *(2026-10-15: asoschi qarori, Q7 — "Google bilan kirish" tugmasi qo'shildi)*
 
 ```
 ┌─────────────────────────────────────────┐
@@ -542,6 +544,8 @@ Tovarsiz "eski qarz"ni kiritish faqat BO-06 → "Boshlang'ich qarz" (`POST /api/
 │   Telefon:  [ +998 __ ___ __ __ ]          │
 │   Parol:    [ ************ ]               │
 │          [  KIRISH  ]                      │
+│   ──────────── yoki ────────────           │
+│   [  G  Google bilan kirish  ]             │
 │   Parolni unutdim?                         │
 └─────────────────────────────────────────┘
 ```
@@ -550,20 +554,21 @@ Tovarsiz "eski qarz"ni kiritish faqat BO-06 → "Boshlang'ich qarz" (`POST /api/
 
 | Maydon | Label (uz) | Label (ru) | Tur/komponent | Majburiy | Validatsiya | Default | Max |
 |---|---|---|---|---|---|---|---|
-| `phone` | Telefon | Телефон | `Input` (mask `+998 XX XXX XX XX`) | Ha | `+998` bilan 9 raqam | — | 17 |
-| `password` | Parol | Пароль | `Input type=password` | Ha | ≥1 belgi (backend tekshiradi) | — | 128 |
+| `phone` | Telefon | Телефон | `Input` (mask `+998 XX XXX XX XX`) | Ha (telefon yo'li) | `+998` bilan 9 raqam | — | 17 |
+| `password` | Parol | Пароль | `Input type=password` | Ha (telefon yo'li) | ≥1 belgi (backend tekshiradi) | — | 128 |
 | `branchId` (login'dan keyin, bir nechta filial bo'lsa) | Filial | Филиал | `Select` | Ha (ko'p filial bo'lsa) | — | Birinchi filial | — |
 
-- **Amallar**:
+- **Amallar** *(2026-10-15: asoschi qarori, Q7)*:
 
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
 |---|---|---|---|
 | KIRISH | — | Yo'q | Front-channel Authorization Code+PKCE (`12-autentifikatsiya-oauth2.md` §2.1) → BFF cookie |
-| Parolni unutdim | — | Yo'q | SMS OTP oynasi (`purpose=recovery`) → yangi parol o'rnatish |
-| Ma'lumotlarimni yuklab olish (faqat `subscription-restricted`da ko'rinadi) | — | SMS OTP (`purpose=data_export`) | Bir martalik eksport havolasi (15 daqiqa, D2) |
+| **Google bilan kirish** | — | Yo'q | Google OIDC'ga redirect (bizning OAuth AS'da tashqi provayder) → qaytgach BFF cookie; birinchi marta kirishda hisob telefon raqami bilan bog'lanishi so'raladi (STIR/fiskal uchun) |
+| Parolni unutdim | — | Yo'q | OTP oynasi (`purpose=recovery`) — kod birinchi navbatda **Telegram bot**ga, Telegram ulanmagan bo'lsa **SMS**ga (zaxira) → yangi parol o'rnatish |
+| Ma'lumotlarimni yuklab olish (faqat `subscription-restricted`da ko'rinadi) | — | OTP (`purpose=data_export`) — Telegram bot birinchi, SMS zaxira | Bir martalik eksport havolasi (15 daqiqa, D2) |
 | To'lash (Click/Payme, faqat `subscription-restricted`da) | — | Yo'q | `pay_url`ga o'tish |
 
-- **Ma'lumot manbai**: `POST /auth/login`, `POST /auth/otp/request`, `POST /auth/otp/verify`, `GET /billing/pay`, `POST /billing/export-my-data`.
+- **Ma'lumot manbai**: `POST /auth/login`, `GET /auth/oauth/google/authorize` → `GET /auth/oauth/google/callback` (Q7), `POST /auth/otp/request`, `POST /auth/otp/verify`, `GET /billing/pay`, `POST /billing/export-my-data`.
 - **Holatlar**: `loading` · `empty` — yo'q · `error` ("Telefon yoki parol noto'g'ri", #18 — qaysi qism xato ekani oshkor qilinmaydi) · `offline` (PWA offline ombor/hisobot ko'rishga ruxsat beradi, lekin yangi login internetsiz ishlamaydi) · `no-permission` — yo'q · `subscription-restricted` — banner + to'lov havolasi + eksport havolasi, parol maydoni faol (identifikatsiya uchun), token berilmaydi.
 - **Klaviatura**: `Enter` kirishni yuboradi.
 - **Audit/analitika**: `login_success`, `login_failed`, `account_locked`, `otp_requested`, `otp_verified`, `data_export_during_restriction`.
@@ -694,6 +699,7 @@ Tovarsiz "eski qarz"ni kiritish faqat BO-06 → "Boshlang'ich qarz" (`POST /api/
 |---|---|---|---|---|---|---|---|
 | `newPrice` | Yangi narx | Новая цена | `MoneyInput` | Ha | >0 | Joriy narx | — |
 | `effectiveFrom` | Amal qilish sanasi | Дата применения | `Calendar` | Ha | ≥ bugun | Bugun | — |
+| `nameRu` *(2026-10-15: asoschi qarori, Q2)* | Rus tilidagi nomi | Название на русском | `Input` | Yo'q (ixtiyoriy) | Max 200 | Bo'sh | 200 — chekda "{name} / {nameRu}" ko'rinishida chiqadi (bo'sh bo'lsa faqat `name`), `products.name_ru` |
 | `rule.category` | Kategoriya | Категория | `Select` | Ha (qoida) | — | — | — |
 | `rule.percent` | Chegirma % | Скидка % | `Input` number | Ha (qoida) | 0–100 | — | 100 |
 | `rule.startDate`/`endDate` | Boshlanish/tugash | Начало/Конец | `Calendar` | Ha (qoida) | `endDate` ≥ `startDate` | — | — |
@@ -703,6 +709,7 @@ Tovarsiz "eski qarz"ni kiritish faqat BO-06 → "Boshlang'ich qarz" (`POST /api/
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
 |---|---|---|---|
 | SAQLASH (narx) | `prices.edit` | Limitdan katta o'zgarishda `pending_approval` → BO-16 | `POST /api/v1/price-changes` → `POST /api/v1/price-changes/{id}/post` (javob `posted` yoki `pending_approval`) — eski narx tarixga, yangi narx saqlanadi |
+| SAQLASH (`nameRu`) *(2026-10-15: asoschi qarori, Q2)* | `prices.edit` | Yo'q | `PATCH /api/v1/products/{id}` (`name_ru`) — tasdiqlash shart emas, darhol kuchga kiradi |
 | Qoida yaratish | `discount.rule.manage` | Yo'q | `discount_rule.created` |
 
 - **Ma'lumot manbai**: `GET /api/v1/products/{id}/prices` (tarix) + `POST /api/v1/price-changes` → `POST /api/v1/price-changes/{id}/post`; `GET/POST /api/v1/discount-rules` (+ `PATCH /{id}`, `POST /{id}/archive`). *(2026-10-15: qabul-6/7, E-01, 13-2 §4, 13-1 §8.2)*
@@ -737,8 +744,8 @@ Tovarsiz "eski qarz"ni kiritish faqat BO-06 → "Boshlang'ich qarz" (`POST /api/
 
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
 |---|---|---|---|
-| AI eslatmani ko'rish/yuborish | `debts.remind` | Yo'q (matn ko'rib chiqiladi, keyin yuboriladi) | Telegram/SMS orqali yuboriladi |
-| TO'LOV QABUL QILISH | `debts.payment.accept` | Yo'q | `POST /debt-payments` → `POST /debt-payments/{id}/post` |
+| AI eslatmani ko'rish/yuborish | `debts.remind` | Yo'q (matn ko'rib chiqiladi, keyin yuboriladi) | *(2026-10-15: asoschi qarori, Q7)* Telegram orqali birinchi navbatda, SMS — zaxira |
+| TO'LOV QABUL QILISH | `debts.payment.accept` | Yo'q | `POST /debt-payments` → `POST /debt-payments/{id}/post` — *(2026-10-15: asoschi qarori, Q3)* to'langan summaga fiskal chek chiqariladi (`fiscal_receipts.kind=debt_settlement`); tovar qatorlari yopilgan sotuv(lar)dan proporsional bo'linadi; qonuniylik (QQS/daromad tan olish vaqti) hali buxgalter/yurist tasdig'ini kutadi (`FiscalPolicy` sozlamasi) |
 | Shubhali deb belgilash | `debts.forgive` (faqat Egasi) | Sabab majburiy | `POST /debt-doubtful-flags` — provodka **yo'q**, faqat belgi |
 | Belgini olib tashlash | `debts.forgive` | Yo'q | `POST /debt-doubtful-flags/{id}/unflag` |
 | Qarzni kechish (hisobdan chiqarish) | `debts.forgive` (faqat Egasi) | Sabab majburiy + "Bu amal provodka yaratadi" | `POST /debt-writeoffs` → `/post` |
@@ -894,9 +901,9 @@ Tovarsiz "eski qarz"ni kiritish faqat BO-06 → "Boshlang'ich qarz" (`POST /api/
 
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
 |---|---|---|---|
-| + Xodim qo'shish | `settings.users` | Yo'q | SMS taklif kodi (`purpose=invite`) yuboriladi |
+| + Xodim qo'shish | `settings.users` | Yo'q | *(2026-10-15: asoschi qarori, Q7)* Taklif kodi (`purpose=invite`) — Telegram bot birinchi, SMS zaxira |
 | Bloklash/Blokdan chiqarish | `settings.users` | "Xodimni bloklaysizmi?" | Sessiyalar darhol revoke |
-| Parolni tiklash | `settings.users` | Yo'q | SMS tiklash kodi (`purpose=admin_reset`) |
+| Parolni tiklash | `settings.users` | Yo'q | *(2026-10-15: asoschi qarori, Q7)* Tiklash kodi (`purpose=admin_reset`) — Telegram bot birinchi, SMS zaxira |
 | PINni qayta o'rnatish | `settings.users` | Yo'q | Eski PIN bekor, keyingi kirishda yangi PIN majburiy |
 | Seanslarni tugatish | `settings.users` | Yo'q | Tanlangan sessiya/barcha sessiya bekor |
 | Qurilmani bekor qilish | `settings.users` | "Qurilmani bekor qilasizmi?" | `devices.revoked_at`, token/litsenziya bekor |
@@ -1180,22 +1187,24 @@ Tovarsiz "eski qarz"ni kiritish faqat BO-06 → "Boshlang'ich qarz" (`POST /api/
 
 ```
 ┌──────────────────────────────────────────────────┐
-│  ① Telefon+parol → ② Do'kon → ③ Tovarlar/Qoldiq →   │
-│  ④ Boshlang'ich qarzlar → ⑤ OFD/e-faktura →          │
-│  ⑥ Qurilma o'rnatish (/install, Android/iOS)        │
+│  ① Telefon+parol yoki Google → ② Do'kon →           │
+│  ③ Tovarlar/Qoldiq → ④ Boshlang'ich qarzlar →        │
+│  ⑤ OFD/e-faktura → ⑥ Qurilma o'rnatish (/install)    │
 ├──────────────────────────────────────────────────┤
 │   [ Joriy bosqich kontenti ]                        │
 │                      [ Orqaga ]   [ Davom ]         │
 └──────────────────────────────────────────────────┘
 ```
 
-- **Maydonlar** (bosqich bo'yicha):
+- **Maydonlar** (bosqich bo'yicha) — *(2026-10-15: asoschi qarori, Q7 — ① bosqich ikki usulga bo'lindi)*:
 
 | Bosqich | Maydon | Label (uz) | Label (ru) | Tur | Majburiy | Validatsiya | Default | Max |
 |---|---|---|---|---|---|---|---|---|
-| ① | `phone` | Telefon | Телефон | `Input` mask | Ha | `+998` | — | 17 |
-| ① | `otp` | SMS kod | SMS-код | `Input` 6 raqam | Ha | 6 raqam, 5 daq TTL | — | 6 |
-| ① | `password` | Parol | Пароль | `Input type=password` | Ha | ≥8 belgi | — | 128 — login telefon+parol bilan, parolsiz hisob kira olmaydi *(2026-10-15: qabul-6/7, E-27)* |
+| ① | `signupMethod` | Usul | Способ | Tugmalar: "Telefon + parol" / "**Google bilan kirish**" | Ha | — | Telefon + parol | — |
+| ①-telefon | `phone` | Telefon | Телефон | `Input` mask | Ha (telefon yo'li) | `+998` | — | 17 |
+| ①-telefon | `otp` | Tasdiqlash kodi | Код подтверждения | `Input` 6 raqam | Ha (telefon yo'li) | 6 raqam, 5 daq TTL; kod **Telegram bot**ga yuboriladi, foydalanuvchi hali botga ulanmagan bo'lsa bot havolasi ko'rsatiladi; Telegram mavjud bo'lmasa **SMS** (zaxira) | — | 6 |
+| ①-telefon | `password` | Parol | Пароль | `Input type=password` | Ha (telefon yo'li) | ≥8 belgi | — | 128 — login telefon+parol bilan, parolsiz hisob kira olmaydi *(2026-10-15: qabul-6/7, E-27)* |
+| ①-Google | — | — | — | Google OIDC redirect tugmasi | Ha (Google yo'li) | — | — | Qaytgandan keyin telefon raqami (STIR/fiskal uchun) so'raladi |
 | ② | `storeName` | Do'kon nomi | Название магазина | `Input` | Ha | 2–100 | — | 100 |
 | ② | `businessType` | Faoliyat turi | Вид деятельности | `Select` | Ha | Ro'yxatdan biri | — | — |
 | ③a "Tovarlar" | `method` | Kiritish usuli | Способ ввода | Tugmalar | Ha | Qo'lda/Excel-CSV/Foto (AI-03) | — | — |
@@ -1216,8 +1225,8 @@ Tovarsiz "eski qarz"ni kiritish faqat BO-06 → "Boshlang'ich qarz" (`POST /api/
 
 - **UX-INSTALL (⑥ bosqich)**: `<InstallGuide embedded />` — bu bosqich endi alohida `/install` route'ini ichiga oladi (nusxasi emas), batafsil — yuqoridagi **UX-INSTALL** bo'limi. *(2026-10-15: qabul-6/7, E-32)*
 - **Owner Telegram link**: ⑤ bosqichda (yoki keyin BO-20 orqali) "Telegram botni ulash" tezkor havolasi — BO-20 bilan bir xil oqim, lekin onboarding ichida qisqartirilgan (faqat QR, batafsil sozlama BO-20da).
-- **Ma'lumot manbai**: `POST /auth/signup` (A-01); `POST /auth/otp/request` (`purpose=signup`) + `POST /auth/otp/verify`; Excel/CSV: `GET /api/v1/import-jobs/templates/products` → `POST /api/v1/import-jobs` (`kind=products`) → `/validate` → `/commit`; qo'lda — `POST /api/v1/products`; boshlang'ich qoldiq — `POST /api/v1/import-jobs` (`kind=opening_stock`) yoki qo'lda `POST /stock-openings`; boshlang'ich qarzlar — `POST /api/v1/import-jobs` (`kind=opening_debts`) → `/validate` → `/commit`, qo'lda — `POST /api/v1/debt-openings` → `/post`; AI-03 foto — `POST /api/v1/attachments` → `POST /api/v1/ai/ocr/jobs` (`doc_type_hint=catalog`), ruxsat `ai.ocr.use`. *(2026-10-15: qabul-6/7, E-01/E-02/E-27, 12-auth §20, 13-2 §1/§6, 13-1 §12.4, 13-3 #73)*
-- **Holatlar**: `loading` (SMS kutilmoqda) · `empty` — yo'q (wizard har doim bo'sh boshlanadi) · `error` (SMS kelmadi — qayta yuborish, `OTP_INVALID`, telefon allaqachon ro'yxatda — `VALIDATION_ERROR`) · `offline` — wizard online talab qiladi (ro'yxatdan o'tish) · `no-permission` — yo'q · `subscription-restricted` — tegishli emas (hali obuna yo'q, 30 kun sinov avtomatik).
+- **Ma'lumot manbai**: `POST /auth/signup` (A-01, telefon yo'li) yoki `GET /auth/oauth/google/authorize` → `GET /auth/oauth/google/callback` (Google yo'li, Q7); `POST /auth/otp/request` (`purpose=signup`, Telegram bot birinchi/SMS zaxira) + `POST /auth/otp/verify`; Excel/CSV: `GET /api/v1/import-jobs/templates/products` → `POST /api/v1/import-jobs` (`kind=products`) → `/validate` → `/commit`; qo'lda — `POST /api/v1/products`; boshlang'ich qoldiq — `POST /api/v1/import-jobs` (`kind=opening_stock`) yoki qo'lda `POST /stock-openings`; boshlang'ich qarzlar — `POST /api/v1/import-jobs` (`kind=opening_debts`) → `/validate` → `/commit`, qo'lda — `POST /api/v1/debt-openings` → `/post`; AI-03 foto — `POST /api/v1/attachments` → `POST /api/v1/ai/ocr/jobs` (`doc_type_hint=catalog`), ruxsat `ai.ocr.use`. *(2026-10-15: qabul-6/7, E-01/E-02/E-27, 12-auth §20, 13-2 §1/§6, 13-1 §12.4, 13-3 #73)*
+- **Holatlar**: `loading` (OTP kutilmoqda — Telegram yoki SMS) · `empty` — yo'q (wizard har doim bo'sh boshlanadi) · `error` (OTP kelmadi — qayta yuborish/zaxira kanalga o'tish, `OTP_INVALID`, telefon allaqachon ro'yxatda — `VALIDATION_ERROR`; Google yo'lida — "Google autorizatsiyasi muvaffaqiyatsiz") · `offline` — wizard online talab qiladi (ro'yxatdan o'tish) · `no-permission` — yo'q · `subscription-restricted` — tegishli emas (hali obuna yo'q, 30 kun sinov avtomatik). *(2026-10-15: asoschi qarori, Q7)*
 - **Klaviatura**: `Enter` keyingi bosqichga o'tadi.
 - **Audit/analitika**: `onboarding_started`, `onboarding_step_completed`, `onboarding_completed`, `onboarding_skipped_step`.
 - **Bog'liq US**: US-M17-01, US-M04-04, US-M08-07.
@@ -1262,7 +1271,7 @@ Tovarsiz "eski qarz"ni kiritish faqat BO-06 → "Boshlang'ich qarz" (`POST /api/
 | Muddatni qo'lda uzaytirish | `platform.admin` | Yo'q (pilot uchun) | `subscriptions.current_period_end` uzayadi |
 | Barcha sessiyalarni tugatish | `platform.admin` | "Tenantning barcha sessiyalari bekor qilinadi" | Insident javobi — audit |
 | Egasi hisobini bloklash/blokdan chiqarish | `platform.admin` | "Egasi hisobini bloklaysizmi?" | Sessiyalar bekor (bloklashda) |
-| Egasi parolini tiklash | `platform.admin` | Yo'q | SMS tiklash kodi (`purpose=admin_reset`) |
+| Egasi parolini tiklash | `platform.admin` | Yo'q | *(2026-10-15: asoschi qarori, Q7)* Tiklash kodi (`purpose=admin_reset`) — Telegram bot birinchi, SMS zaxira |
 | Egasi sessiyalarini ko'rish/bekor qilish | `platform.admin` | Yo'q | `POST /platform/tenants/{id}/owner/sessions/{sid}/revoke` *(2026-10-15: qabul-6/7, E-01 — aniq yozildi)* |
 
 - **Ma'lumot manbai**: `GET /platform/tenants`, `GET /platform/tenants/{id}`, `POST /platform/tenants/{id}/extend-subscription`, `POST /platform/tenants/{id}/revoke-all-sessions`, `GET /platform/tenants/{id}/ai-usage`, `POST /platform/tenants/{id}/owner/block`, `/unblock`, `/reset-password`, `GET/POST /platform/tenants/{id}/owner/sessions`, `POST /platform/tenants/{id}/owner/sessions/{sid}/revoke`. *(2026-10-15: qabul-6/7, E-01)*

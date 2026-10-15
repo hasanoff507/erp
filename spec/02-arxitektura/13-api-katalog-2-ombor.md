@@ -2,7 +2,7 @@
 
 *2026-10-15 · Asos: `13-api-katalog-0-umumiy.md` (konventsiyalar, xato konverti — parallel yozilmoqda, shu fayl unga mos), `01-malumotlar-modeli.md` (§4 katalog/narx, §5 kontragentlar, §6 hujjatlar, §7 registrlar, §9), `02-provodka-qoidalari.md` (2.6–2.8, 2.12, 2.20, 2.21, 3-bo'lim FIFO/AVECO), `03-integratsiyalar.md` (§4 Asl belgisi, §5 E-IMZO, §6 Vakolat.uz, §7 MXIK), `04-offline-sync.md` (§1, §7), `05-xavfsizlik-va-audit.md` (§2.1–2.2 ruxsatlar), `09-backend-arxitekturasi.md` (posting service, navbat), `spec/01-mahsulot/02-modullar-talablari.md` (M04, M05, M06, M07, M09), `03-biznes-jarayonlar.md` (BP-01, BP-09, BP-10, BP-12), `04-ekranlar-va-ux.md` (BO-02…05, BO-18, POS-08…12), `05-ai-funksiyalar.md` (AI-03).*
 
-> **1C bilan bog'liqlik yo'q.** Bu API — noldan quriladigan tizimning o'z interfeysi; hech qanday tashqi buxgalteriya/ERP formatiga moslashtirilmagan.
+> Bu API — noldan quriladigan tizimning o'z interfeysi; hech qanday tashqi buxgalteriya/ERP formatiga moslashtirilmagan.
 
 ## Asosiy xulosalar
 

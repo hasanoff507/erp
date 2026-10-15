@@ -9,7 +9,7 @@ Bu papka — ilovani yozish uchun **yagona va to'liq** spetsifikatsiya. Kod faqa
 3. **Ziddiyat bo'lsa** ustunlik tartibi: `01-qarorlar.md` → mavzu bo'yicha asosiy fayl (masalan DB uchun `12`, API uchun `17–20`) → boshqalar.
 4. Belgilar: *taxmin* — tasdiqlanmagan raqam; *ochiq savol* — tashqi javob kutilmoqda (kod sozlama/adapter ortida yoziladi); *(qaror #N)* — `01-qarorlar.md` dagi qarorga havola. Fayllarda faqat **joriy haqiqat** yoziladi — o'zgarishlar tarixi git'da va `spec/tarix/` da.
 5. Har fayl boshida standart blok: **Maqsad · Kim uchun · Bog'liq fayllar · Holat**.
-6. Tashqi buxgalteriya/ERP tizimlari bilan hech qanday bog'liqlik yo'q — mahsulot noldan quriladi.
+6. Mahsulot noldan quriladi va yadro 1C'siz ishlaydi. 1C bilan bog'lanish faqat alohida **1C integratsiya moduli** orqali (qaror #36; tadqiqot — `research_notes/sonar-1c-integratsiya/`).
 
 ## O'qish tartibi
 

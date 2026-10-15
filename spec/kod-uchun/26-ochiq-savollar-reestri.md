@@ -128,6 +128,7 @@ Tashqi javob kerak emas, lekin asoschi yakuniy so'z aytishi kerak; kod hozir int
 1. Rasmiy xatlarni (Xat 1–10) kim imzolaydi — tavsiya #16, ochiq (`spec/tarix/tekshiruv/rasmiy-xatlar.md`).
 2. Omborchi tovar qabulini o'zi `post` qila oladimi — jadval A, #83 (interim: faqat `draft`).
 3. Ko'p bank hisobi — jadval A, #90 (interim: MVP'da yo'q, yagona `5110`).
+4. 1C integratsiya moduli (qaror #36): qamrov — faqat o'qish/AI tahlil, 1C ga yozish (taklif → tasdiq), 1C'dan ERP'ga ko'chirish; bosqich — MVP ichida yoki keyin; AIOS kodi ERP repo'siga ko'chiriladimi yoki alohida servis (adapter) bo'lib qoladimi. Interim: MVP rejasiga kiritilmagan, ERP yadrosi unga bog'liq emas (`research_notes/sonar-1c-integratsiya/00-xulosa.md` §6).
 
 ---
 

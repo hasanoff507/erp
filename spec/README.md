@@ -6,7 +6,7 @@ buxgalteriya va soliq hisobotigacha **bitta tizim** + o'zbek tilidagi AI yordamc
 
 ## Asosiy qarorlar (tadqiqotdan, o'zgarmaydi)
 
-- Tashqi buxgalteriya/ERP tizimlari bilan hech qanday bog'liqlik yo'q — mahsulot noldan qurilgan *(2026-10-15: qabul-5 KICHIK #12 bo'yicha neytral ifodaga almashtirildi)*.
+- Mahsulot noldan qurilgan, yadro 1C'siz ishlaydi. 1C bilan bog'lanish — alohida **1C integratsiya moduli** (AIOS asosida, Sonar AI namunasi; `kod-uchun/01-qarorlar.md` #36, `../research_notes/sonar-1c-integratsiya/`).
 - MVP 18 modul: kassa, qaytarish, chegirma, ombor qoldig'i, inventarizatsiya, ko'chirish, xarid,
   nasiya/qarz daftari, narxlar, QQS, buxgalteriya, hisobotlar, huquqlar, filiallar, xarajatlar,
   kassa pul harakati, obuna/ro'yxatdan o'tish, bildirishnomalar/Telegram bot (2026-10-14)

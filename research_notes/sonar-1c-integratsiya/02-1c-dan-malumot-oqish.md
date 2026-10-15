@@ -754,11 +754,11 @@ Ikkisi ham **tashqi kutubxonasiz**, `System.IO.Compression.ZipArchive` bilan xom
 
 ## O'z ilovamizda takrorlash uchun xulosa
 
-> Bu bo'lim ERP'ning **1C integratsiya moduli** uchun (asosi — AIOS, `E:/Project/universal_ai_platform`, ERP'ga integratsiya sifatida qo'shiladi).
+> Bu bo'lim ERP'ning **1C integratsiya moduli** uchun (modul noldan yoziladi).
 
-1. **COM worker (Windows agent)** — AIOS'ning hozirgi OData yo'li (`aios_connectors_onec/runtime.py`) yoniga Windows'da ishlaydigan alohida jarayon: `pywin32` (`win32com.client.Dispatch("V83.COMConnector")`) yoki .NET Framework worker. Protokol — Sonar'niki kabi stdin/stdout bitta-qatorli JSON (`probe/open/run/close`, `id` bo'yicha javob), bazaga bitta qulf, timeoutda jarayonni o'ldirish, 10 daqiqa bo'sh tursa yopish, 32/64-bit worker tanlash (§1).
+1. **COM worker (Windows agent)** — Windows'da ishlaydigan alohida jarayon: `pywin32` (`win32com.client.Dispatch("V83.COMConnector")`) yoki .NET Framework worker. Protokol — Sonar'niki kabi stdin/stdout bitta-qatorli JSON (`probe/open/run/close`, `id` bo'yicha javob), bazaga bitta qulf, timeoutda jarayonni o'ldirish, 10 daqiqa bo'sh tursa yopish, 32/64-bit worker tanlash (§1).
 2. **Pull agent** — server 1C'ga ulanmaydi: agent `hello` (10 daqiqada) / `poll` (0,25–60 s moslashuvchan) / `result` sikli bilan vazifa oladi; backoff `1,2,5,10,30,60 s` + jitter; `Revoked`da to'xtaydi. Port/VPN/OData publikatsiyasi kerak bo'lmaydi.
-3. **Tuzilmali so'rov DSL** — `QuerySpec` JSON (§4.2) Pydantic modellari bilan; nomlar metadata keshi bilan tekshiriladi, identifikatorlar `IsIdent/IsPath` regexidan o'tadi, qiymatlar faqat `&Параметр`; `ВЫБРАТЬ РАЗРЕШЕННЫЕ ПЕРВЫЕ limit+1`; yig'indilar 1C ichida (`СУММА`, `СГРУППИРОВАТЬ ПО`) — AIOS'dagi Python aggregator va OData `$apply 501` muammosi yo'qoladi.
+3. **Tuzilmali so'rov DSL** — `QuerySpec` JSON (§4.2) Pydantic modellari bilan; nomlar metadata keshi bilan tekshiriladi, identifikatorlar `IsIdent/IsPath` regexidan o'tadi, qiymatlar faqat `&Параметр`; `ВЫБРАТЬ РАЗРЕШЕННЫЕ ПЕРВЫЕ limit+1`; yig'indilar 1C ichida (`СУММА`, `СГРУППИРОВАТЬ ПО`).
 4. **Metadata kesh** — konfiguratsiya versiyasi o'zgarganda bekor qilinadi (TTL emas).
-5. **Tayyor hisobotlar** — ОСВ, kassa/bank kunma-kun, korrespondensiya, qarzlar, ombor, sotuv+ABC (§5.6) — AI parametr beradi, kod quradi. Kassa/bank kod jadvali (`50/5000/5010`, `51/5100/5110`) va subkonto nomi evristikasi — zaxira; asosiy "qaysi registr sotuv" xaritasi — bazani bir marta tahlil qiluvchi **server profili** (§5.7). AIOS'dagi "egasi tasdiqlagan concept" mexanizmi shu profilning o'rnini bosadi.
+5. **Tayyor hisobotlar** — ОСВ, kassa/bank kunma-kun, korrespondensiya, qarzlar, ombor, sotuv+ABC (§5.6) — AI parametr beradi, kod quradi. Kassa/bank kod jadvali (`50/5000/5010`, `51/5100/5110`) va subkonto nomi evristikasi — zaxira; asosiy "qaysi registr sotuv" xaritasi — bazani bir marta tahlil qiluvchi **server profili** (§5.7).
 6. **Limitlar** — AI'ga ≤300 qator + `truncated`, eksport 20 000, totals doim to'liq ma'lumotdan (§6).

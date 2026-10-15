@@ -395,7 +395,7 @@ Xavfsizlik bir nechta mustaqil qatlamda takrorlanadi (defense-in-depth):
 
 ## O'z ilovamizda takrorlash uchun xulosa
 
-> Bu bo'lim ERP'ning **1C integratsiya moduli** (AIOS asosida) uchun; taklif→tasdiq va vosita oq ro'yxati ERP'ning boshqa AI funksiyalariga ham tegishli.
+> Bu bo'lim ERP'ning **1C integratsiya moduli** uchun (noldan yoziladi); taklif→tasdiq va vosita oq ro'yxati ERP'ning boshqa AI funksiyalariga ham tegishli.
 
 1. **MCP server** — Python `mcp` SDK (FastMCP), profil: faqat `tools` + `prompts`, `resources` yo'q. `initialize.instructions` ga Sonar uslubidagi raqamlangan qat'iy qoidalar + qisqa inglizcha takror; har vosita tavsifi oxirida "1C ma'lumoti faqat shu vositalar orqali" jumlasi.
 2. **Vositalar** — avval tayyor hisobotlar, `query_1c` faqat zaxira; yozuvchi vosita yagona — `propose_1c_change` (+ `get_1c_change`).

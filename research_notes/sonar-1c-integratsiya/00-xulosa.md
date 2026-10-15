@@ -2,7 +2,7 @@
 
 **Manba:** `E:/Project/sonar/decompiled/` — `SonarSetup-1.1.5.exe` ning ILSpy dekompilyatsiyasi (~1000 `.cs` fayl, ~130 ming qator). Dastur ishga tushirilmagan; hamma xulosa kod bo'yicha, asosiy da'volar `file:line` bilan tekshirilgan.
 **Holat:** 2026-10-15. Hech narsa publish qilinmagan. Joylashuv: `research_notes/sonar-1c-integratsiya/`.
-**Kim uchun:** asoschi va ERP'ning **1C integratsiya moduli** (AIOS — `E:/Project/universal_ai_platform` — ERP'ga integratsiya sifatida qo'shiladi; Sonar shu modul uchun namuna/raqobatchi).
+**Kim uchun:** asoschi va ERP'ning **1C integratsiya moduli** (noldan yoziladi; Sonar — namuna va raqobatchi).
 **Huquqiy eslatma:** bu begona mahsulotning dekompilyatsiyasi. Undan **g'oya va arxitektura** olinadi, **kod ko'chirilmaydi**.
 
 ## Tafsilot fayllari
@@ -87,24 +87,15 @@ Dashboard, Telegram digest, ma'lumot sifati tekshiruvlari (Checks), bank ko'chir
 7. Login ekranidan va'da: «Hech narsa sizning tasdig'ingizsiz 1C da o'zgarmaydi».
 8. Admin huquqisiz o'rnatish, jim va imzolangan avto-yangilanish.
 
-## 4. AIOS (ERP 1C integratsiyasining asosi) bilan solishtirish va tavsiyalar
+## 4. ERP 1C integratsiya moduli uchun tavsiyalar
 
-| Mezon | AIOS (hozir) | Sonar |
-|---|---|---|
-| 1C ga ulanish | OData, HTTP Basic | COM, `V8x.COMConnector`, mahalliy worker |
-| 1C tomonda kerak | Veb-server + OData publikatsiyasi | Hech narsa |
-| Yig'indini kim hisoblaydi | Python aggregator (`$apply` 501) | 1C (`СУММА`, `СГРУППИРОВАТЬ ПО`) |
-| AI roli | Intent JSON, vositalar o'chirilgan | MCP agent, 19 vosita |
-| 1C ga yozish | `FakeApprovalGate` (flag bilan insonsiz) | Preview + xesh + «Bajarish» + idempotentlik |
-| Joylashuv | Server, 1 deploy = 1 baza | SaaS + mijoz kompyuteridagi agent (pull) |
-| Raqam to'g'riligi | Kod chiqaradi, `narration_guard` | 1C natijasidan, javobni AI yozadi |
+Modul ERP ichida **noldan** yoziladi; Sonar'dan faqat g'oya va arxitektura olinadi. Tavsiya etilgan ketma-ketlik:
 
-**ERP 1C integratsiya moduli (AIOS asosida) uchun tavsiya etilgan ketma-ketlik:**
-1. **Yozish uchun haqiqiy tasdiq** (eng muhim, xavf yuqori): `FakeApprovalGate` o'rniga 2.4-bo'limdagi taklif → preview → xesh → inson tasdig'i → `expect_version` → idempotentlik + marker. Sonar'ning zaif joyini takrorlamaslik: tasdiqlovchi rolini tekshirish.
-2. **Windows COM agenti** (`pywin32` yoki .NET Framework worker) + pull (`hello/poll/result`) — OData muammolari (filtr tushib qolishi, sahifa takrorlanishi, IIS URL limiti) yo'qoladi, yig'indi 1C ga o'tadi. OData yo'li zaxira bo'lib qoladi.
+1. **Yozish uchun inson tasdig'i** (eng muhim, xavf yuqori): 2.4-bo'limdagi taklif → preview → xesh → tasdiq → `expect_version` → idempotentlik + marker. Sonar'ning zaif joyini takrorlamaslik: tasdiqlovchining rolini tekshirish.
+2. **Windows COM agenti** (`pywin32` yoki .NET Framework worker) + pull (`hello/poll/result`) — 1C tomonda OData/veb-publikatsiya kerak bo'lmaydi, yig'indilar 1C ichida hisoblanadi.
 3. **Bazani avtomatik topish va «saqlash = sinash»** — `ibases.v8i` parser, registrdan COM detektori, DPAPI (`win32crypt`).
 4. **MCP server** (Python `mcp` SDK) — tayyor hisobotlar + `query_1c` zaxira + `propose_1c_change`; mahalliy relay (stdio → named pipe) va AI ilovalari config yozuvchisi.
-5. **Tuzilmali `query_1c` zaxira yo'li** — concept tasdiqlanmagan savollar uchun: AI JSON beradi, kod metadata bilan tekshiradi, natija «tasdiqlanmagan» cheklovi bilan belgilanadi.
+5. **Tuzilmali `query_1c` zaxira yo'li** — AI JSON beradi, kod metadata bilan tekshiradi, natija «tasdiqlanmagan so'rov» deb belgilanadi.
 
 **Olmaslik kerak:** `claude -p` orqali mijozning iste'molchi obunasidan foydalanish — Anthropic shartlari bilan tekshirilmaguncha ishlab chiqarishda API kalit rejimi xavfsizroq.
 
@@ -117,4 +108,4 @@ Dashboard, Telegram digest, ma'lumot sifati tekshiruvlari (Checks), bank ko'chir
 ## 6. Ochiq savollar (asoschi uchun)
 1. 1C integratsiyasi qamrovi: (a) faqat o'qish/AI tahlil, (b) 1C ga yozish ham, (c) 1C'dan ERP'ga ma'lumot ko'chirish (migratsiya) — qaysilari?
 2. Qaysi bosqichda: MVP ichida yoki MVP'dan keyin?
-3. AIOS kodi ERP repo'siga ko'chiriladimi yoki alohida servis (adapter orqali) bo'lib qoladimi?
+3. Windows agenti qaysi texnologiyada: Python (`pywin32`) yoki .NET Framework worker?

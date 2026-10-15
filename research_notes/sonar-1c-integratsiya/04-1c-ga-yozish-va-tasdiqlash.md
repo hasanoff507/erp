@@ -549,9 +549,9 @@ va tasdiqlangandan keyin `"status": "done"`, `"result": {"ref": {"guid": "...", 
 
 ## 9. O'z ilovamizda takrorlash uchun xulosa
 
-### 9.1. ERP 1C integratsiya moduli uchun (1C ga yozish, AIOS asosida)
+### 9.1. ERP 1C integratsiya moduli uchun (1C ga yozish)
 
-AIOS'da (integratsiyaning asosi) hozir `FakeApprovalGate` bor — flag yoqilsa yozuv insonsiz 1C ga tushadi. Sonar yo'li bilan almashtirish:
+AI 1C ga hech qachon to'g'ridan-to'g'ri yozmasligi kerak. Sonar yo'li asosida:
 
 1. `propose_1c_change` / `get_1c_change` — yagona yozuvchi vosita; `kind` oq ro'yxati (`create|update|post|unpost|mark_delete|unmark_delete|fill`), `delete` va oy yopish AI'ga ochiq emas.
 2. Preview va write — bitta kod yo'li (`write=False` → COM obyektiga qiymat qo'yiladi, `Записать` chaqirilmaydi, before/after o'qiladi, obyekt tashlanadi).
@@ -560,7 +560,7 @@ AIOS'da (integratsiyaning asosi) hozir `FakeApprovalGate` bor — flag yoqilsa y
 5. Havola faqat topiladi: 0 yoki 2+ → `ref_not_found`, hech qachon avtomatik yaratilmaydi.
 6. Idempotentlik: `idem = local:<id>:<hash12>` + jurnal (500 yozuv, atomik fayl) + 1C ichida `Комментарий = "Sonar #<id>"` markeri (timeoutdan keyin qayta urinish ikki marta yaratmaydi).
 7. Ikki qulf: kompaniya darajasida (server) + shu kompyuter darajasida `AllowWrite`; `WriteGuard` har yozuvda qayta tekshiradi; bazaga bitta yozish qulfi.
-8. Sonar'dagi zaif joy — AI yozuvida rol tekshiruvi yo'q (kompyuterdagi har kim tasdiqlay oladi); AIOS'da tasdiqlovchi rolini tekshirish kerak (`xodim < buxgalter < bosh_buxgalter < admin`, ikki kishilik tasdiq — MockServer'dagi `Satisfied` mantig'i).
+8. Sonar'dagi zaif joy — AI yozuvida rol tekshiruvi yo'q (kompyuterdagi har kim tasdiqlay oladi); bizda tasdiqlovchi rolini tekshirish kerak (`xodim < buxgalter < bosh_buxgalter < admin`, ikki kishilik tasdiq — MockServer'dagi `Satisfied` mantig'i).
 
 ### 9.2. ERP'ning o'z bazasiga AI yozuvlari uchun naqsh
 

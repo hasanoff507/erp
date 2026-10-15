@@ -6,7 +6,7 @@ buxgalteriya va soliq hisobotigacha **bitta tizim** + o'zbek tilidagi AI yordamc
 
 ## Asosiy qarorlar (tadqiqotdan, o'zgarmaydi)
 
-- 1C bilan hech qanday bog'liqlik yo'q.
+- Tashqi buxgalteriya/ERP tizimlari bilan hech qanday bog'liqlik yo'q — mahsulot noldan qurilgan *(2026-10-15: qabul-5 KICHIK #12 bo'yicha neytral ifodaga almashtirildi)*.
 - MVP 18 modul: kassa, qaytarish, chegirma, ombor qoldig'i, inventarizatsiya, ko'chirish, xarid,
   nasiya/qarz daftari, narxlar, QQS, buxgalteriya, hisobotlar, huquqlar, filiallar, xarajatlar,
   kassa pul harakati, obuna/ro'yxatdan o'tish, bildirishnomalar/Telegram bot (2026-10-14)
@@ -16,8 +16,10 @@ buxgalteriya va soliq hisobotigacha **bitta tizim** + o'zbek tilidagi AI yordamc
   (append-only event-log, 48 soat OFD chegarasi).
 - Stack (2026-10-14, foydalanuvchi qarori): backend — **Python + FastAPI**; birinchi navbatda **veb**
   (back-office + veb-kassa); Android POS (**Kotlin**) — keyingi bosqich, hujjatlari hozirdan tayyorlanadi.
-- AI: Claude API (Haiku 5.5 asosiy), `AiProvider` interfeysi; obuna/CLI faqat ishlab chiqishda.
+- AI: Claude API (Haiku 5.5 asosiy), `AiProvider` interfeysi; obuna/CLI faqat ishlab chiqishda. MVP'da **4 ta AI funksiya**: AI-01, AI-03 (hujjat OCR), AI-05, AI-06 *(2026-10-15: foydalanuvchi qarori — AI-03 qaytadan MVP'ga kiritildi)*.
 - Majburiy davlat tizimlari: virtual kassa/OFD, e-faktura, e-TTN, Asl belgisi, MXIK, e-ishonchnoma, E-IMZO, soliq hisobotlari.
+- Autentifikatsiya: o'z (mustaqil) OAuth 2.0 implementatsiyasi, hech qanday mock/soxta login yo'q; admin panel orqali foydalanuvchi qo'shish/bloklash/parol tiklash/sessiya boshqaruvi *(2026-10-15: foydalanuvchi qarori, `spec/02-arxitektura/12-autentifikatsiya-oauth2.md`)*.
+- Obuna to'lovi kechikkanda: 24 soatlik imtiyozdan keyin tenant uchun kirish **to'liq to'xtaydi** (barcha sessiya bekor, login rad etiladi, to'lov bilan darhol tiklanadi) *(2026-10-15: foydalanuvchi qarori)*. Tor istisno *(2026-10-15: foydalanuvchi qarori, D1)*: lokautdan oldin (imtiyoz davrida) offline yaratilgan, hali yuborilmagan cheklar fiskal 48 soat muddatini buzmasligi uchun fon rejimida (`sync.drain`) OFD'ga yuborilishda davom etadi — yangi sotuv, login va boshqa hamma narsa yopiq qoladi. Ma'lumotlarni eksport qilish lokaut paytida **faqat to'lov sahifasidan**, SMS kod bilan tasdiqlangandan keyin mumkin *(2026-10-15: foydalanuvchi qarori, D2)*.
 
 ## Manbalar (avval o'qing)
 

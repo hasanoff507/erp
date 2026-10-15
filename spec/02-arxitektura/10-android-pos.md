@@ -4,6 +4,8 @@
 
 > Bu hujjat **hozirdan tayyorlanadi, lekin amalga oshirish veb-kassadan keyingi bosqichda boshlanadi** (`spec/README.md`). Maqsad — veb bilan bitta backend/protokolni baham ko'rish, keyinroq boshlash tezroq bo'lishi uchun.
 
+> **Eslatma** *(2026-10-15: foydalanuvchi qarori, D3)*: bu hujjat — **native Kotlin** Android POS (keyingi bosqich). U **Android Chrome'dagi veb-kassa PWA**dan (hozir ham mavjud, `08-frontend-arxitekturasi.md` §6) alohida: veb-kassa Android Chrome'da WebUSB/Web Serial/Web Bluetooth orqali uskunaga to'g'ridan-to'g'ri ulanadi, native Android POS esa shu hujjatdagi `hardware/*` adapterlari (4-bo'lim) orqali ishlaydi — ikkisi bir xil backend/sync protokolidan foydalanadi (3-bo'lim), lekin uskuna integratsiyasi usuli farq qiladi. D3 qarori (iOS/iPadOS qo'llab-quvvatlash, bulut printer) native Android POS'ga ta'sir qilmaydi — bu faqat veb-kassa (brauzer) tomoniga tegishli.
+
 ## Asosiy xulosalar
 
 1. **Kotlin + Jetpack Compose**, lokal baza — **Room (SQLite)**; sinxronizatsiya — veb-kassa bilan **AYNAN BIR XIL** protokol va voqea formati (`04-offline-sync.md`: `client_event_id`, `device_id`, `seq`, `type`, `created_at`, `payload`; `POST /sync/push`, `GET /sync/pull?cursor=`) — ikki klient bitta backend kontraktini baham ko'radi, dublikat mantiq yozilmaydi.

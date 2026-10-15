@@ -107,12 +107,14 @@ Aniq vosita tanlovi (masalan Prometheus/Grafana/Loki yoki boshqa) — **ochiq sa
 
 ---
 
-## 6. Qo'llab-quvvatlanadigan brauzerlar va qurilmalar
+## 6. Qo'llab-quvvatlanadigan brauzerlar va qurilmalar *(2026-10-15: foydalanuvchi qarori — D3, avvalgi "faqat Chromium" qarorini almashtiradi)*
 
-- **Back-office PWA**: zamonaviy Chromium-asosli brauzerlar (Chrome, Edge) — asosiy maqsad; Safari/Firefox'da to'liq PWA/IndexedDB testdan o'tmagan (`08-frontend-arxitekturasi.md`, Ochiq savol 2: "Brauzer IndexedDB hajmi va tozalanishi (Safari/iOS cheklovlari) — veb-kassa uchun qo'llab-quvvatlanadigan brauzerlar ro'yxati, taklif: Chrome/Edge, Android Chrome").
-- **Veb-kassa (PWA, offline)**: Chrome/Edge desktop, Android Chrome — **taklif, hali yakuniy qaror emas** (xuddi shu ochiq savol).
-- **Android POS (keyingi bosqich)**: bozordagi uskunalar (UZKASSA N5 — Android 7.1, UZKASSA P100 — Android 5.1, PAX A930 — Android 7.1/PayDroid) asosida minimal **Android 5.1+** qo'llab-quvvatlanishi taxmin qilinadi (`06-raqobatchilar-texnik-va-uskunalar.md`, "Android POS terminallari" jadvali) — aniq minimal versiya `10-android-pos.md`da tasdiqlanadi.
-- Chek printeriga chop etish usuli (WebUSB/Web Serial — faqat Chrome) brauzer tanlovini yanada Chrome/Edge tomon siljitadi (`08-frontend-arxitekturasi.md`, Ochiq savol 1).
+- **Back-office PWA**: zamonaviy barcha brauzerlar (Chrome, Edge, Safari, Firefox) — ko'rish/boshqaruv ekranlari uskunaga bog'liq emas, hech qanday WebUSB/Web Serial/Web Bluetooth talab qilmaydi.
+- **Veb-kassa (PWA, offline)** — ikki qo'llab-quvvatlash darajasi:
+  - **Chrome/Edge (desktop) va Android Chrome** — to'liq qo'llab-quvvatlanadi, o'rnatilgan PWA sifatida; `navigator.storage.persist()` so'raladi; USB/Bluetooth uskunalar (WebUSB/Web Serial/Web Bluetooth) + tarmoq va bulut printerlar ishlaydi.
+  - **iPhone/iPad (Safari, iOS/iPadOS)** — **o'rnatilgan PWA (Home Screen'ga qo'shilgan)** sifatida qo'llab-quvvatlanadi. Cheklov: Safari'da WebUSB/Web Serial/Web Bluetooth yo'q va https PWA'dan oddiy http tarmoq printeriga ulanib bo'lmaydi (mixed content), shuning uchun chek chop etish **faqat** bulut printer (Star CloudPRNT / Epson Server Direct Print klassi) yoki elektron chek (QR/Telegram) orqali bo'ladi (`08-frontend-arxitekturasi.md` §6). O'rnatilmagan (faqat tab'da ochilgan) holatda Safari IndexedDB xotirasini agressiv tozalashi mumkin — shu sabab o'rnatish (Home Screen) **majburiy tavsiya**.
+- **Android POS (keyingi bosqich, native Kotlin)**: bozordagi uskunalar (UZKASSA N5 — Android 7.1, UZKASSA P100 — Android 5.1, PAX A930 — Android 7.1/PayDroid) asosida minimal **Android 5.1+** qo'llab-quvvatlanishi taxmin qilinadi (`06-raqobatchilar-texnik-va-uskunalar.md`, "Android POS terminallari" jadvali) — aniq minimal versiya `10-android-pos.md`da tasdiqlanadi; bu veb-kassa (Android Chrome PWA)dan alohida, keyingi bosqich mahsuloti.
+- Chek chop etish strategiyasi platformaga qarab farqlanadi — to'liq jadval `08-frontend-arxitekturasi.md` §6'da.
 
 ---
 
@@ -142,6 +144,9 @@ Aniq vosita tanlovi (masalan Prometheus/Grafana/Loki yoki boshqa) — **ochiq sa
 | MITSU RP-809 | 2 105 400 |
 | Sewoo SLK-TS400 | 2 382 186 |
 | Bixolon SRP-330 II | 2 977 733 |
+| Bulut printer (Star CloudPRNT / Epson Server Direct Print klassi, iOS veb-kassa uchun majburiy) | **narx tasdiqlanmagan** |
+
+*(2026-10-15: foydalanuvchi qarori, D3)* Bulut printerning O'zbekiston bozorida mavjudligi va narxi bu tekshiruvda topilmadi — ochiq savol (pastda).
 
 ### 7.3 Shtrix-kodli savdo tarozilari
 
@@ -223,7 +228,7 @@ Rasmiy WCAG audit tadqiqotda yo'q — faqat UX darajasidagi umumiy tamoyillar (`
 3. Sig'im rejasidagi tenant soni, o'rtacha kassa/tenant, kunlik chek soni — barchasi taxmin, pilot ma'lumoti bilan qayta hisoblanishi kerak.
 4. 1000 tenant uchun aniq infratuzilma o'lchami/narxi — bu hujjatda hisoblanmadi, keyingi moliyaviy rejalashtirish bosqichida.
 5. Tarozi va yorliq printeri protokoli — ochiq manbada topilmadi, pilot uskunalarida aniqlanadi (`04-ekranlar-va-ux.md`, Ochiq savol 5; `02-modullar-talablari.md`, US-M09-04).
-6. Qo'llab-quvvatlanadigan brauzerlar/Android versiyasi ro'yxati — hali yakuniy qaror emas (`08-frontend-arxitekturasi.md`, Ochiq savol 2).
+6. ~~Qo'llab-quvvatlanadigan brauzerlar/Android versiyasi ro'yxati~~ — **hal qilindi** (2026-10-15, D3, 6-bo'lim): Chrome/Edge/Android Chrome to'liq, iOS/iPadOS o'rnatilgan PWA + bulut printer. Ochiq qolgan qism: bulut printerning O'zbekistondagi narxi/mavjudligi va faqat-elektron chekning qonuniyligi (7.2-bo'lim, `08-frontend-arxitekturasi.md` §6).
 7. SMS provayder va aniq narx — tanlanmagan, bu 11-bo'limdagi xarajat jadvalining eng zaif qismi.
 8. Rasmiy accessibility (WCAG) audit — MVP'da qilinmagan, keyingi bosqich sifatida qoldirilgan.
 9. Observability vositasi (Prometheus/Grafana yoki boshqa) — `09-backend-arxitekturasi.md`da tanlanadi.

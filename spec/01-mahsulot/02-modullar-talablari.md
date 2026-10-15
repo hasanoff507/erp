@@ -31,6 +31,8 @@
 **US-M01-03**: Kassir sifatida markirovkalangan tovar (suv, ichimlik, tamaki va h.k.) sotishda kodni tekshirishni istayman.
 - Given tovar Asl belgisi bilan markirovkalangan, When kassir DataMatrix kodini skanerlaydi, Then tizim (online bo'lsa) kodni CRPT Turon tizimi orqali tekshiradi va "chiqarish" (spisaniye) amalini bajaradi.
 - Given kod noto'g'ri/takroriy/muddati o'tgan, When tekshiruv muvaffaqiyatsiz bo'ladi, Then MVP standart xatti-harakati sifatida **sotuv rad etiladi** (kassir qo'lda almashtirish/markirovkasiz tovar bilan davom etishi mumkin) — bu qat'iy taqiq siyosati **taxmin**, chunki CRPT Turon rasmiy API hujjati yopiq va aniq rasmiy talab topilmadi (`research_notes/texnik/02-kassa-ofd-markirovka.md`, 5-band; Ochiq savol 2, pastda).
+- *(2026-10-15: foydalanuvchi qarori)* Given internet yo'q (offline) va tovar narxi qurilmada ma'lum (keshlangan katalog narxi, M09), When kassir DataMatrix kodini skanerlaydi, Then sotuv **ruxsat etiladi** — kod mahalliy jurnalga yoziladi, CRPT Turon'da haqiqiylik tekshiruvi va "chiqarish"/"sotildi" belgisi internet qaytganda amalga oshiriladi (batafsil — Offline xatti-harakati, pastda).
+- Given internet yo'q va tovar narxi qurilmada ma'lum emas (hali sinxronlanmagan yangi tovar), When kassir shu tovarni sotishga harakat qiladi, Then sotuv **ruxsat etilmaydi** — narx online bo'lganda sinxronlangandan keyin sotiladi.
 
 **US-M01-04**: Kassir sifatida smenani ochish va yopishni (Z-hisobot) istayman.
 - Given ish kuni boshlanadi, When kassir boshlang'ich naqd summani kiritadi, Then smena "ochiq" holatga o'tadi.
@@ -42,11 +44,16 @@
 - Given tenant YTT (yakka tartibdagi tadbirkor), When sozlamalar ochiladi, Then yagona QR ixtiyoriy deb ko'rsatiladi (PF-246 3-band "b" faqat yuridik shaxslarni nomlaydi).
 - Yagona QR Click/Payme/Uzum'ning o'rnini bosmaydi: ular ixtiyoriy kanal sifatida qoladi ("ham majburiy").
 
+**US-M01-06** *(2026-10-15: foydalanuvchi qarori — qo'shildi, ochiq savol 12 yopildi)*: Buxgalter sifatida fiskal chek bilan allaqachon sotilgan tovarga keyinroq yuridik shaxs (B2B) mijoz e-faktura so'rasa, shu sotuv uchun chiquvchi e-faktura chiqarishni istayman.
+- Given tovar fiskal chek bilan (B2C yoki avvaldan e-fakturasiz) sotilgan, When mijoz (endi yuridik shaxs sifatida) keyinroq shu xaridga e-faktura talab qiladi, Then Buxgalter BO-15'da asl chekni tanlab yangi chiquvchi e-faktura yaratadi — bu e-faktura `einvoices.related_doc` orqali asl chekka bog'lanadi.
+- Given e-faktura chekka bog'langan, Then QQS **ikkinchi marta hisoblanmaydi** — e-faktura faqat asl chekda allaqachon hisoblangan QQS summasini rasmiylashtiradi (hujjat ko'rinishida); `ledger_entries`/`vat_moves` registrlariga yangi yozuv qo'shilmaydi (append-only saqlanadi), bog'lanish faqat hujjat darajasida `einvoices.related_doc` orqali JOIN bilan quriladi (`02-provodka-qoidalari.md` §2.22) *(2026-10-15: qabul-5 O13 bo'yicha aniqlashtirildi)*.
+- Given e-faktura E-IMZO bilan imzolanib EDO operatoriga yuborilgan, Then chek va e-faktura o'zaro ikki tomonlama ko'rinadi (chekdan e-fakturaga, e-fakturadan chekka).
+
 ### Davlat tizimlari bog'liqligi
 OFD (fiskal operator — "Yangi texnologiyalar" DUK), Asl belgisi (CRPT Turon), MXIK (chekning majburiy rekviziti), 2026-07-01'dan yuridik shaxslar uchun bank tomonidan generatsiya qilingan yagona QR kod (UzQR) orqali to'lov qabul qilish majburiy (PF-246-son, 10.12.2025, 3-band "b", [lex.uz/uz/docs/-7897630](https://lex.uz/uz/docs/-7897630)); Click/Payme/Uzum — ixtiyoriy kanallar. *(2026-10-14: tekshiruv)*
 
 ### Offline xatti-harakati
-Majburiy: append-only event-log (outbox naqshi), 48 soat OFD chegarasi. Markirovka tekshiruvi offline ishlay olmaydi (CRPT markaziy tizimga bog'liq) — MVP uchun ruxsat/taqiq siyosati **ochiq savol** (`research_notes/texnik/00-xulosa-va-ochiq-savollar.md`, 96-qator).
+Majburiy: append-only event-log (outbox naqshi), 48 soat OFD chegarasi. Markirovka tekshiruvi (CRPT Turon'da real-vaqt tasdiqlash) offline ishlay olmaydi (markaziy tizimga bog'liq) — lekin *(2026-10-15: foydalanuvchi qarori — avvalgi "ochiq savol" hal qilindi)* **markirovkalangan tovarni offline sotish RUXSAT ETILADI**, agar tovar narxi qurilmada ma'lum bo'lsa (POS'ga oldindan sinxronlangan/keshlangan katalog narxi, M09): DataMatrix kod skanerlanadi, qurilmada **faqat mahalliy** (kod formati/nazorat raqami) tekshiriladi va kod mahalliy jurnalga yoziladi, CRPT Turon'da haqiqiylik tekshiruvi va "chiqarish" (spisaniye)/"sotildi" belgisi internet qaytganda amalga oshiriladi (asinxron, outbox). Agar tovar narxi qurilmada ma'lum **bo'lmasa** (hali sinxronlanmagan yangi tovar) — bu tovar bilan sotuv offline rejimda **ruxsat etilmaydi**. Qaytarish/ko'chirish uchun offline siyosati hali **ochiq savol** (pastda) — faqat sotuv (bu modul) uchun qaror qabul qilindi. *Eslatma: bu mahsulot qarori; yuridik tasdiq (huquqshunos bilan) tavsiya etiladi, lekin spec darajasidagi qaror allaqachon qabul qilingan.*
 
 ### Chekka holatlar
 - Internet savdo o'rtasida uzilsa — chek offline rejimga avtomatik o'tishi kerak, mijoz kutib qolmasligi uchun.
@@ -56,7 +63,8 @@ Majburiy: append-only event-log (outbox naqshi), 48 soat OFD chegarasi. Markirov
 - *(2026-10-14: tekshiruv)* Yagona QR to'lovi bank tasdig'i kelmay qolsa (internet uzilishi yoki to'lov kechikishi) — chek "to'lov kutilmoqda" holatida qoladi, kassir boshqa to'lov usuliga o'tishi yoki bekor qilishi mumkin; ikki marta to'lov tushishining oldini olish uchun provider_tx_id bo'yicha idempotentlik.
 - *(2026-10-14: tekshiruv)* To'lovdan oldin qator o'chirilsa yoki chek bekor qilinsa (`sales.void`) — fiskal chek yo'q, lekin bekor qilingan qatorlar va summa `sale.draft_voided` voqeasi bilan audit uchun serverga yuboriladi; smena hisobotida bekor qilishlar soni va summasi ko'rsatiladi.
 - *(2026-10-14: tekshiruv)* Chekni qayta chop etish — nusxada "NUSXA" belgisi, har qayta chop etish audit jurnaliga yoziladi (kim, qachon, qaysi chek); son cheklanmaydi.
-- *(2026-10-14: tekshiruv)* Chek bilan sotilgan tovarga keyinroq yuridik shaxs mijoz e-faktura so'rasa — shu chekka bog'langan chiquvchi e-faktura yaratiladi (`einvoices.related_doc`), QQS ikkinchi marta hisoblanmaydi; qonuniy tartib — **ochiq savol 12**.
+- *(2026-10-15: foydalanuvchi qarori — talab sifatida belgilandi, ochiq savol 12 yopildi)* Chek bilan sotilgan tovarga keyinroq yuridik shaxs mijoz e-faktura so'rasa — bu **qo'llab-quvvatlanadi** (US-M01-06): shu chekka bog'langan chiquvchi e-faktura yaratiladi (`einvoices.related_doc`), QQS ikkinchi marta hisoblanmaydi.
+- *(2026-10-15: foydalanuvchi qarori — D3, qurilma/chop etish qamrovi)* **iPhone/iPad (iOS)**: AIOS kassa/back-office **o'rnatilgan PWA** sifatida (Home Screen'ga qo'shilgan) ishlaydi. iOS'da chek chop etish faqat **bulut-print (cloud-print) printer** (masalan Star CloudPRNT, Epson Server Direct Print — model **taxmin**, tasdiqlanmagan) orqali yoki **elektron chek** (QR-kod/Telegram orqali yuborish) bilan mumkin — iOS Safari/PWA USB/Bluetooth printer ulanishini qo'llab-quvvatlamaydi. **Chrome/Edge (Windows, Android, shu jumladan Android Chrome)** — USB, Bluetooth, tarmoq (LAN/Wi-Fi) va bulut printerlarning barchasini qo'llab-quvvatlaydi (`04-ekranlar-va-ux.md` §1.6). Bulut-print printerlarining O'zbekistonda mavjudligi/narxi va faqat-elektron-chek bilan cheklanishning fiskal/huquqiy ruxsati — **ochiq savol** (pastda).
 
 ---
 
@@ -138,7 +146,8 @@ Chegirma qoidalari oldindan POS'ga sinxronlanadi; offline rejimda oxirgi yuklang
 **US-M04-04**: Egasi/Menejer sifatida tizimga birinchi marta kirganda boshlang'ich tovar/qoldiq ro'yxatini tizimga kiritishni istayman *(2026-10-14: qo'shildi — koordinator direktivasi, `07-tuzatishlar-va-yechimlar.md`)*.
 - Given yangi tenant ro'yxatdan o'tgan, When Egasi/Menejer boshlang'ich katalog/qoldiqni kiritadi, Then uchta yo'l qo'llab-quvvatlanadi: (1) **qo'lda kiritish** (tovar-tovar), (2) **Excel/CSV shablon** orqali ommaviy import, (3) **AI-03** yordamida qog'oz katalog/qoldiq varag'i fotosidan kiritish (AI faqat o'qiydi, foydalanuvchi tasdiqlaydi).
 - **Boshqa hech qanday tashqi buxgalteriya/ERP tizimi bu ro'yxatda yo'q va hech qachon bo'lmaydi** — AIOS boshqa tizimlarning fayllarini o'qimaydi, ular bilan sinxronlanmaydi, ulardan hech qanday ma'lumot import qilinmaydi (`06-mvp-chegarasi.md`, Won't ro'yxati). Mavjud tizimlar faqat ma'lumotlar modelini loyihalashda struktura namunasi sifatida ishlatilgan, mahsulotning o'zida ular bilan aloqa yo'q *(2026-10-14: neytral ifodalandi — koordinator direktivasi)*.
-- *(2026-10-14: tekshiruv)* (3)-yo'l (AI-03) — MVP'dan keyin (`02-arxitektura/11-backlog.md`); MVP'da (1) va (2) mavjud. Kiritilgan qoldiq "boshlang'ich qoldiq" hujjati sifatida o'tkaziladi (chek/faktura yo'q, `02-provodka-qoidalari.md` 2.21).
+- *(2026-10-15: foydalanuvchi qarori)* (3)-yo'l (AI-03) — endi MVP ichida (2026-10-14'dagi "MVP'dan keyin" tekshiruv qarori bekor qilindi); MVP'da uchta yo'l (1), (2), (3) barchasi mavjud. Kiritilgan qoldiq "boshlang'ich qoldiq" hujjati sifatida o'tkaziladi (chek/faktura yo'q, `02-provodka-qoidalari.md` 2.21).
+- *(2026-10-15: kamchiliklar-yakuniy #18/9.2 bo'yicha qo'shildi)* **Excel/CSV shablon formati** (2-yo'l, `import_jobs`): `products.csv` — ustunlar `name, barcode, unit_code, mxik_code, vat_rate, price, category, is_marked`; `opening_stock.csv` — `barcode, qty, unit_cost, expiry_date`; `opening_debts.csv` — `name, phone, amount, direction` (`receivable`/`payable`), `date`. Kodlash UTF-8, ustun ajratgichi `;`, kasr son nuqta (`.`) bilan; validatsiya xatolari qator/maydon darajasida `import_jobs.errors`ga yoziladi (validate→commit ikki bosqich).
 
 **US-M04-05**: Egasi/Buxgalter sifatida tovar tannarxini hisoblash usulini korxonamga mos tanlashni istayman *(2026-10-14: qo'shildi — foydalanuvchi qarori: ikkala usul ham bo'lishi kerak)*.
 - Given korxona sozlamalarida "Hisob siyosati → zaxira baholash usuli" bor, When Egasi/Buxgalter usulni tanlaydi, Then ikki variant mavjud: **O'rtacha narx (AVECO)** — standart (default), kichik do'konlar uchun soddaroq; **FIFO** — kattaroq do'konlar/ulgurji uchun, partiya bo'yicha aniqroq tannarx. Ikkalasi BHMS №4 ga mos (LIFO yo'q) (`research_notes/texnik/01-erp-modullar-va-malumot-modeli.md`).
@@ -166,6 +175,7 @@ POS'dagi sotuv (kamayish) offline event-log orqali yoziladi va sinxronlanganda b
   - **O'tgan sanali hujjat** (kechikkan kirim, offline sotuv kech sinxronlangani, qaytarish) kiritilsa — shu sanadan keyingi tannarx avtomatik **qayta hisoblanadi** (qayta o'tkazish) va yopilgan davrga tegsa bloklanadi.
   - Offline POS sotuv paytida tannarxni hisoblamaydi — faqat miqdorni yozadi; tannarx serverda sinxronlashdan keyin hisoblanadi.
   - Manfiy qoldiqda sotuv bo'lsa (offline konflikt) — tannarx vaqtincha oxirgi ma'lum narx bilan olinadi va keyingi kirimda tuzatiladi.
+- *(2026-10-15: kamchiliklar-yakuniy #21 bo'yicha qo'shildi)* **Asosiy vosita vs tovar**: Asosiy vositalar (uskuna, jihoz va h.k.) M04 katalogiga tovar sifatida kiritilmaydi; ularning xaridi M15 (Xarajatlar) xarajati sifatida yoziladi, ombor/tannarx hisobiga kirmaydi. Tovar yaratish ekranida ogohlantirish matni ko'rsatiladi: "Agar bu uskuna/jihoz bo'lsa, uni Xarajatlar bo'limiga kiriting, tovar katalogiga emas."
 
 ---
 
@@ -472,7 +482,7 @@ Hisobotlar faqat online holatda to'liq va aniq; offline paytda faqat mahalliy ke
 
 ## M13 — Huquqlar
 
-**Maqsad**: rol asosida foydalanuvchi huquqlarini (ko'rish/yaratish/tasdiqlash) boshqarish, kichik do'konda rol birlashuviga imkon berish.
+**Maqsad**: rol asosida foydalanuvchi huquqlarini (ko'rish/yaratish/tasdiqlash) boshqarish, kichik do'konda rol birlashuviga imkon berish; *(2026-10-15: foydalanuvchi qarori)* shu bilan birga — Egasi uchun xodim/foydalanuvchi va ularning sessiyalarini (kirgan qurilmalar) to'liq boshqarish paneli. Autentifikatsiya **o'z (mustaqil) OAuth 2.0 implementatsiyasi** asosida quriladi, hech qanday mock/soxta login yo'q — texnik arxitektura `spec/02-arxitektura/12-autentifikatsiya-oauth2.md`da (alohida jamoa tomonidan yoziladi).
 
 ### Foydalanuvchi hikoyalari
 
@@ -485,15 +495,36 @@ Hisobotlar faqat online holatda to'liq va aniq; offline paytda faqat mahalliy ke
 **US-M13-03**: Menejer sifatida operatsiya chegaralarini (masalan chegirma/qaytarish limiti) rolga yoki shaxsga bog'lab sozlashni istayman.
 - Given limit o'zgartirilishi kerak, When Menejer yangi limitni kiritadi, Then bu limit tegishli rol/xodim uchun darhol kuchga kiradi.
 
+**US-M13-04** *(2026-10-15: foydalanuvchi qarori — qo'shildi; 2026-10-15: qabul-5 O10 bo'yicha tuzatildi — vaqtinchalik parol SMS'da ochiq yuborilmaydi)*: Egasi sifatida yangi xodimni admin panel orqali to'liq ma'lumoti bilan (telefon, ism, rol(lar), filial(lar)) qo'shishni istayman.
+- Given "Foydalanuvchi qo'shish" ochildi, When Egasi telefon raqami, to'liq ism, rol(lar) va qaysi filial(lar)da ishlaydi (M14) kiritadi, Then xodim yaratiladi va unga SMS orqali bir martalik taklif kodi (OTP, `purpose=invite`) yuboriladi; xodim shu kod bilan o'zi parol va/yoki PIN o'rnatadi (parol/PIN hech qachon SMS'da ochiq matnda yuborilmaydi).
+- Xodim faqat o'ziga tayinlangan filial(lar) ma'lumotini ko'radi/boshqaradi (boshqa filiallar yopiq).
+
+**US-M13-05** *(2026-10-15: foydalanuvchi qarori — qo'shildi)*: Egasi sifatida xodimni vaqtincha bloklashni/blokdan chiqarishni istayman.
+- Given xodim ro'yxatda tanlangan, When Egasi "Bloklash" bosadi, Then xodimning barcha faol sessiyalari/tokenlari darhol bekor qilinadi (revoke) va u qayta login qila olmaydi, toki Egasi "Blokdan chiqarish"ni bosmaguncha.
+- Xodim ishdan bo'shaganda ham xuddi shu "Bloklash" amali ishlatiladi — bu M13'dagi avvalgi "huquqni darhol bekor qilish" chekka holatini yopadi.
+
+**US-M13-06** *(2026-10-15: foydalanuvchi qarori — qo'shildi; 2026-10-15: qabul-5 O10 bo'yicha tuzatildi — vaqtinchalik parol SMS'da ochiq yuborilmaydi)*: Egasi sifatida xodimning parolini/PIN kodini qayta tiklashni (reset) istayman.
+- Given xodim parolini/PIN'ini unutgan, When Egasi "Parolni tiklash" bosadi, Then eski parol/PIN bekor qilinadi, xodimning barcha faol sessiyalari tugatiladi va unga SMS orqali bir martalik tiklash kodi (OTP, `purpose=admin_reset`) yuboriladi; xodim shu kod bilan yangi parol/PIN o'rnatadi (parol/PIN hech qachon SMS'da ochiq matnda yuborilmaydi).
+- Xodimning o'zi ham login ekranidan SMS OTP orqali parol tiklashni so'rashi mumkin (`04-ekranlar-va-ux.md`, BO-01/POS-01 login holatlari).
+
+**US-M13-07** *(2026-10-15: foydalanuvchi qarori — qo'shildi)*: Egasi sifatida har bir xodimning faol sessiyalarini (qaysi qurilma, qachon kirgan, oxirgi faollik) ko'rishni va kerak bo'lsa bekor qilishni istayman.
+- Given xodim tanlangan, When Egasi "Sessiyalar/qurilmalar" bo'limini ochadi, Then shu xodimning barcha faol sessiyalari (qurilma turi, IP/joylashuv — mavjud bo'lsa, kirgan vaqt, oxirgi faollik) ro'yxati ko'rinadi.
+- Given bitta sessiya shubhali (masalan yo'qolgan qurilma), When Egasi "Bekor qilish" bosadi, Then shu sessiyaning tokeni darhol bekor qilinadi, qurilma login ekraniga qaytariladi, boshqa sessiyalarga ta'sir qilmaydi.
+
+**US-M13-08** *(2026-10-15: foydalanuvchi qarori — qo'shildi; M17 US-M17-04 bilan bog'liq)*: Platforma admini sifatida tenantlar va ularning Egasi (owner) hisoblarini boshqarishni istayman.
+- Given platforma admin paneli (ADM-01), When admin tenant tanlaydi, Then Egasi hisobini bloklash/blokdan chiqarish, Egasi parolini tiklash va Egasining faol sessiyalarini ko'rish/bekor qilish mumkin (masalan nizoli holatda yoki to'lov bo'yicha).
+- Platforma admini oddiy tenant foydalanuvchilarining (Kassir/Menejer/Buxgalter) kundalik ma'lumotiga kirmaydi — faqat Egasi hisobi va obuna/texnik holat darajasida (`01-rollar-va-ssenariylar.md`, M15–M18 izohi: `platform.admin` tenant rollariga kirmaydi).
+
 ### Davlat tizimlari bog'liqligi
 To'g'ridan-to'g'ri davlat talabi yo'q; lekin E-IMZO bilan imzolangan hujjatlar (e-faktura, hisobotlar) uchun aniq qaysi shaxs imzolagani audit maqsadida kerak.
 
 ### Offline xatti-harakati
-Rol/huquqlar markazdan sinxronlanadi; offline rejimda faqat oxirgi sinxronlangan huquqlar amal qiladi, o'zgartirish faqat online holatda mumkin.
+Rol/huquqlar markazdan sinxronlanadi; offline rejimda faqat oxirgi sinxronlangan huquqlar amal qiladi, o'zgartirish faqat online holatda mumkin. *(2026-10-15: foydalanuvchi qarori)* Bloklash/sessiya bekor qilish amali internetga bog'liq — qurilma offline bo'lsa, bekor qilish shu qurilma keyingi marta internetga ulanganda kuchga kiradi.
 
 ### Chekka holatlar
-- Xodim ishdan bo'shaganda huquqni darhol (real-time) bekor qilish zarurati.
+- *(2026-10-15: hal qilindi — foydalanuvchi qarori)* ~~Xodim ishdan bo'shaganda huquqni darhol (real-time) bekor qilish zarurati~~ — endi US-M13-05/US-M13-07 orqali yechilgan: Egasi xodimni bloklaydi yoki aniq sessiyani bekor qiladi, token darhol amal qilmay qoladi.
 - Bir xodimga berilgan ikki rol o'rtasida huquq ziddiyati (masalan bir modulda bir rol "T" beradi, ikkinchisi bermaydi) — yuqori huquq ustun bo'lishi kerak.
+- Egasi o'zining yagona hisobini bloklay olmasligi kerak (tenant egasiz qolib ketmasin) — platforma admini orqali tiklash yo'li saqlanadi (US-M13-08).
 
 ---
 
@@ -603,26 +634,30 @@ To'liq offline ishlaydi (M01 bilan bir xil append-only jurnal).
 - Given sinov tugayapti yoki Egasi "Tarif" ni ochadi, When Start / Biznes / Pro (`06-mvp-chegarasi.md`, 3.3) va oylik/yillik (−20%) tanlanadi, Then to'lov Click yoki Payme orqali amalga oshiriladi va obuna muddati uzayadi; to'lov uchun hujjat beriladi.
 - Tarif limitlari tizimda qo'llanadi: kassa soni, filiallar, AI oylik limiti.
 
-**US-M17-03**: Egasi sifatida to'lov muddatini unutmasligim va muddat o'tsa ham darhol to'xtab qolmasligimni istayman *(2026-10-14: foydalanuvchi qarori — 24 soatlik imtiyoz)*.
+**US-M17-03**: Egasi sifatida to'lov muddatini unutmasligim va muddat o'tsa ham darhol to'xtab qolmasligimni istayman *(2026-10-14: foydalanuvchi qarori — 24 soatlik imtiyoz; 2026-10-15: foydalanuvchi qarori — imtiyozdan keyingi holat qayta belgilandi, quyida)*.
 - **Eslatmalar (muddatdan oldin):** to'lov sanasidan **3 kun**, **1 kun** oldin va **to'lov kuni ertalab** — Egasiga Telegram (M18), ilova ichida banner va SMS (Telegram ulanmagan bo'lsa). Xabarda: summa, tarif, "To'lash" havolasi (Click/Payme).
-- **Muddat o'tganda — 24 soatlik imtiyoz:** Given to'lov muddati o'tdi va to'lov kelmadi, Then tenant `grace` holatiga o'tadi va **24 soat davomida hamma narsa odatdagidek ishlaydi**; barcha ekranlarda qizil banner: "Obuna muddati o'tdi. 24 soat ichida to'lang, aks holda imkoniyatlar cheklanadi" + qolgan vaqt hisoblagichi.
+- **Muddat o'tganda — 24 soatlik imtiyoz:** Given to'lov muddati o'tdi va to'lov kelmadi, Then tenant `grace` holatiga o'tadi va **24 soat davomida hamma narsa odatdagidek ishlaydi** (kassa, back-office, AI — barchasi to'liq ishlaydi); barcha ekranlarda qizil banner: "Obuna muddati o'tdi. 24 soat ichida to'lang, aks holda kassa to'xtaydi" + qolgan vaqt hisoblagichi.
 - **Imtiyoz davomidagi eslatmalar:** muddat o'tishi bilan darhol, **12 soat qolganda** va **2 soat qolganda** — Telegram + banner + SMS.
-- **24 soat o'tgach:** Then tenant `restricted` holatiga o'tadi — back-office cheklanadi (yangi tovar, hisobotlar, AI yopiladi); **kassa sotuvi va fiskal chek ishlashda davom etadi** (kassani to'xtatish fiskal qoidabuzarlikka olib kelishi mumkin — **taklif**, huquqiy tasdiq kerak). Egasiga "Imkoniyatlar cheklandi" xabari.
-- To'lov kelishi bilan darhol `active` holatiga qaytadi va "To'lov qabul qilindi, rahmat" xabari ketadi.
-- Ma'lumotlarni eksport qilish (Excel) huquqi har doim saqlanadi.
+- **24 soat o'tgach — to'liq to'xtash** *(2026-10-15: foydalanuvchi qarori — avvalgi "kassa ishlayveradi, back-office cheklanadi" taklifi va unga tegishli huquqiy ochiq savol bekor qilindi)*: Given 24 soatlik imtiyoz tugadi va to'lov hali kelmadi, Then tenant `restricted` holatiga o'tadi va butun tenant uchun kirish **to'liq yopiladi**: (a) tenant'ning barcha faol sessiya/tokenlari serverda bekor qilinadi (revoke); (b) har bir ochiq ekran — kassa (Android POS/veb-kassa) va back-office — darhol login sahifasiga qaytariladi; (c) login sahifasida "Obuna muddati tugagan" xabari va Click/Payme orqali to'lov havolasi ko'rsatiladi; (d) shu tenant hisoblaridan **yangi kirish ham rad etiladi**, to'lov amalga oshmaguncha. Boshqacha aytganda, kassa sotuvi ham, back-office ham — **hech biri** ishlamaydi (avvalgi "kassa ishlayveradi" taklifi va unga bog'liq huquqiy ochiq savol olib tashlandi).
+- *(2026-10-15: foydalanuvchi qarori — D1, tor istisno)* **Lokautdan oldingi offline cheklarni yuborish (drain)**: yuqoridagi band bo'yicha `restricted` holatda yangi sotuv, login va boshqa barcha amal yopiq qoladi — lekin **lokautdan oldin** (24 soatlik imtiyoz davrida) offline qurilmada allaqachon yaratilgan, hali OFD'ga yuborilmagan cheklar fiskal 48 soatlik muddatni (VM 943) buzmasligi uchun fon rejimida (`sync.drain`) serverga va OFD'ga yuborilishda davom etadi. Bu yagona istisno: kassirga yangi ekran ochilmaydi, yangi sotuv qilib bo'lmaydi — faqat avval yaratilgan hujjatlar fonda yuboriladi.
+- **Offline qurilmalar**: internetga ulanmagan kassa/POS qurilmasi serverdan signal kutmaydi — qurilmadagi mahalliy imzolangan litsenziya (`subscription_end + 24 soat` muddat bilan) tugagan payt qurilma **o'zi mahalliy ravishda qulflanadi**; internet qaytib, yangi muddatli litsenziya tasdiqlanmaguncha qurilma qayta ochilmaydi. *(2026-10-15: foydalanuvchi qarori — O2)* To'lov qilinganda qurilma tokenlari bekor qilinmaydi, balki `suspended` holatidan tiklanadi — qurilma keyingi onlayn bo'lishida jim (silent) ravishda yangi litsenziya oladi va kassir qayta parol kiritmasdan, PIN bilan ishni davom ettiradi.
+- To'lov kelishi bilan darhol `active` holatiga qaytadi, kirish qayta ochiladi va "To'lov qabul qilindi, rahmat" xabari ketadi.
+- Ma'lumotlarni eksport qilish (Excel) huquqi `active` holatda odatdagidek ishlaydi. `restricted` holatda back-office/kassaning o'zi butunlay yopiq *(2026-10-15: tuzatildi — avvalgi "eksport huquqi har doim saqlanadi" qoidasi endi amal qilmaydi)*, lekin *(2026-10-15: foydalanuvchi qarori — D2, tor istisno)* login sahifasidagi to'lov havolasi ochadigan **to'lov sahifasidan** "Ma'lumotlarimni yuklab olish" tugmasi orqali, telefon raqamiga yuboriladigan **SMS kod bilan tasdiqlangandan keyin**, to'liq eksport (US-M17-05'dagi kabi ZIP) so'rash mumkin — bu login yoki boshqa hech qanday ekranni ochmaydi, faqat eksport faylini tayyorlab beradi.
+- **Foydalanish shartnomasi (ToS) eslatmasi** *(2026-10-15: foydalanuvchi qarori)*: xizmat shartlarida aniq ko'rsatilishi shart — to'lov kechiktirilib kassaga kirish to'xtatilgan davrda ham do'kon o'zining fiskal/soliq majburiyatlari uchun (agar savdo boshqa vosita bilan davom etsa) **to'liq o'zi javobgar** ekanligi; bu band huquqshunos bilan tasdiqlanishi tavsiya etiladi.
 
 **US-M17-04**: Platforma admini sifatida (bizning jamoa) tenantlar, obunalar, to'lovlar va limitlarni ko'rishni istayman.
 - Given ichki admin panel, When tenant tanlanadi, Then obuna holati, to'lov tarixi, AI sarfi, faol kassalar soni ko'rinadi; muddatni qo'lda uzaytirish (masalan pilot do'konlarga) mumkin.
 
 **US-M17-05** *(2026-10-14: tekshiruv, Could)*: Egasi sifatida xizmatdan chiqsam ham barcha ma'lumotlarimni olib ketishni istayman.
-- Given tenant `restricted` yoki `closed` holatda, When Egasi "To'liq eksport"ni bosadi, Then barcha ma'lumotnomalar, hujjatlar va registrlar CSV (har jadval alohida) + asosiy hisobotlar PDF bitta ZIP faylda yuklanadi; amal audit jurnaliga yoziladi.
+- Given tenant **o'z xohishi bilan** `closed` holatga o'tgan (xizmatdan voz kechgan, obuna to'lovi kechikkani uchun emas), When Egasi "To'liq eksport"ni bosadi, Then barcha ma'lumotnomalar, hujjatlar va registrlar CSV (har jadval alohida) + asosiy hisobotlar PDF bitta ZIP faylda yuklanadi; amal audit jurnaliga yoziladi.
 - Given tenant `closed`, Then ma'lumot kamida 90 kun (taxmin) eksport uchun saqlanadi; keyingi o'chirish tartibi huquqiy maslahatdan keyin (buxgalteriya hujjatlari muddati **kamida 5 yil (O'RQ-404, 29-modda)**).
+- *(2026-10-15: foydalanuvchi qarori — aniqlashtirildi; 2026-10-15: D2 bilan tor istisno qo'shildi)* `restricted` holat (to'lov kechikkani uchun kirish to'xtatilgan, US-M17-03) bu **to'liq** hikoyaga asosan **kirmaydi** — back-office/kassaga umuman kirib bo'lmaydi. Lekin tor istisno sifatida US-M17-03'dagi kabi **faqat to'lov sahifasidan, SMS kod bilan tasdiqlangan** "Ma'lumotlarimni yuklab olish" yo'li mavjud (login yoki boshqa ekranlar ochilmaydi). To'liq (barcha jadval/hisobotlar bilan) eksport faqat to'lov qilib `active` holatga qaytgandan keyin yoki ixtiyoriy `closed` oqimida mavjud.
 
 ### Davlat tizimlari bog'liqligi
 Mijozga bizning xizmatimiz uchun beriladigan hujjat — bizning yuridik shaxsimizning soliq majburiyati (mahsulot funksiyasi emas).
 
 ### Offline xatti-harakati
-Ro'yxatdan o'tish va to'lov — faqat online. Kassa offline paytda obuna holatini oxirgi ma'lum qiymat bo'yicha tekshiradi.
+Ro'yxatdan o'tish va to'lov — faqat online. *(2026-10-15: foydalanuvchi qarori)* Offline qurilma (internetga ulanmagan kassa) serverdan signal kutmaydi — qurilmada mahalliy saqlangan, imzolangan litsenziya (`subscription_end + 24 soat` muddat bilan) bor; shu muddat tugaganda qurilma **o'zi mahalliy ravishda qulflanadi** (login ekraniga qaytadi), internet qaytib yangi muddatli litsenziya tasdiqlanmaguncha qayta ochilmaydi.
 
 ### Chekka holatlar
 - To'lov o'tdi, lekin tizimga xabar kelmadi — Click/Payme holatini qayta tekshirish.
@@ -663,7 +698,7 @@ Server tomonida ishlaydi; kassa offline bo'lsa, ma'lumotlar sinxronlangach xabar
 ## Ochiq savollar
 
 1. Chegirma/qaytarish/narx o'zgarishi/nasiya limit summalari — ochiq manbada yo'q, biznes-qoida sifatida MVP oldidan sozlanishi kerak (`taxmin`, barcha modullarda takrorlanadi: M02, M03, M08, M09).
-2. Markirovkalangan tovarni offline sotish/qaytarish/ko'chirishda ruxsat/taqiq siyosati — CRPT Turon rasmiy API hujjatlari yopiq (`research_notes/texnik/02-kassa-ofd-markirovka.md`, ochiq savol 4), M01/M02/M06'ga tegishli.
+2. *(2026-10-15: qisman hal qilindi — foydalanuvchi qarori)* Markirovkalangan tovarni offline **sotish** siyosati M01 uchun endi aniq: narx qurilmada ma'lum bo'lsa ruxsat etiladi, bo'lmasa taqiqlanadi (yuqoridagi US-M01-03 va Offline xatti-harakati). Hali ochiq qolgan qism: offline **qaytarish** (M02) va **ko'chirish** (M06) siyosati — CRPT Turon rasmiy API hujjatlari yopiq (`research_notes/texnik/02-kassa-ofd-markirovka.md`, ochiq savol 4).
 3. M10'dagi davlat hisobotini solishtirish uchun aniq tolerance (ruxsat etilgan farq) va eskalatsiya jarayoni — tadqiqotda yo'q, arxitektura jamoasi bilan birga ishlab chiqilishi kerak.
 4. M11'dagi to'liq NSBU №21 hisob rejasi jadvali (barcha bo'lim/kichik hisob raqamlari) — tadqiqotda faqat qisman (I, II, V bo'lim) topildi, to'liq ro'yxat ochiq savol (`research_notes/texnik/01-erp-modullar-va-malumot-modeli.md`).
 5. M14'da ko'p filialli mijoz (nasiya) balansini konsolidatsiya qilish yoki filial bo'yicha ajratish — biznes qarori kerak.
@@ -673,7 +708,8 @@ Server tomonida ishlaydi; kassa offline bo'lsa, ma'lumotlar sinxronlangach xabar
 9. M07'da yetkazib beruvchi vakili ishonchnoma bilan kelganda, 2026-01-01'dan majburiy e-ishonchnoma (Vakolat.uz) tekshiruvi kerakmi — API hujjati topilmadi (`research_notes/texnik/09-soliq-integratsiyasi.md`, 14-qator).
 10. M08'da qarz to'lovi uchun alohida fiskal chek chiqarilishi kerakligi aniq manbada tasdiqlanmagan.
 11. M01'da markirovka kodi tekshiruvi muvaffaqiyatsiz bo'lganda "sotuvni rad etish" qat'iy siyosat sifatida to'g'ri yechimmi, yoki ogohlantirish bilan davom ettirish amaliyotda qo'llanilarmi — CRPT Turon rasmiy hujjati yopiqligi sababli tasdiqlanmagan.
-12. *(2026-10-14: tekshiruv)* Fiskal chek bilan sotilgan tovarga keyinroq e-faktura berish ruxsati va tartibi (M01).
+12. *(2026-10-15: hal qilindi — foydalanuvchi qarori)* ~~Fiskal chek bilan sotilgan tovarga keyinroq e-faktura berish ruxsati va tartibi (M01)~~ — endi mahsulot talabi sifatida qo'llab-quvvatlanadi: US-M01-06, `einvoices.related_doc` orqali chekka bog'lanadi, QQS ikkinchi marta hisoblanmaydi.
+13. *(2026-10-15: foydalanuvchi qarori — D3)* Bulut-print (cloud-print) chek printerlarining O'zbekistonda mavjudligi/narxi va iOS'da faqat elektron (QR/Telegram) chek chiqarishning huquqiy/fiskal jihatdan ruxsat etilganligi — ochiq savol (M01, qurilma/chop etish qamrovi).
 
 ## Manbalar
 
@@ -686,3 +722,4 @@ Server tomonida ishlaydi; kassa offline bo'lsa, ma'lumotlar sinxronlangach xabar
 - `research_notes/texnik/09-soliq-integratsiyasi.md`
 - `research_notes/texnik/11-raqobatchilar-kamchiliklari.md`
 - `spec/01-mahsulot/01-rollar-va-ssenariylar.md` (huquqlar matritsasi uchun o'zaro havola)
+- `spec/02-arxitektura/12-autentifikatsiya-oauth2.md` — autentifikatsiya arxitekturasi (o'z OAuth 2.0 implementatsiyasi, mock yo'q) — Foydalanuvchi qarori, 2026-10-15

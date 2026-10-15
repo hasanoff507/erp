@@ -197,7 +197,7 @@ O'zbek tili uchun rasmiy LLM/OCR benchmark yo'qligi (`05-ai-funksiyalar.md`, Aso
 
 ---
 
-## 10. OCR quvuri (AI-03)
+## 10. OCR quvuri (AI-03) *(2026-10-15: foydalanuvchi qarori — AI-03 MVP'da, bu quvur MVP sprintlarida quriladi)*
 
 ```mermaid
 flowchart TD
@@ -217,6 +217,7 @@ flowchart TD
 - Ishonch chegarasi (masalan 90%) — **taxmin**, MVP pilotida sozlanadi (`05-ai-funksiyalar.md`dagi aynan shu band bilan mos).
 - AI hech qachon hujjatni avtomatik tasdiqlamaydi yoki davlat tizimiga (Didox/Faktura.uz, e-TTN) yubormaydi — faqat loyiha tayyorlaydi; yakuniy tasdiq va yuborish har doim odam (Buxgalter/Omborchi) tomonidan.
 - Vision chaqiruvi narxi — **taxmin** (2-bo'lim, Ochiq savol 1 bilan bir xil): rasmiy vision-narx sahifada yo'q, matn narxiga yaqin deb baholangan.
+- *(2026-10-15: foydalanuvchi qarori)* AI-03 — 2026-10-14'dagi tekshiruv bosqichida vaqtincha "MVP'dan keyin"ga surilgan edi; bu qaror foydalanuvchi tomonidan bekor qilindi, AI-03 MVP'da qoladi, shuning uchun bu quvur birinchi relizdan boshlab quriladi (13-bo'lim xarajat jadvalida ham hisobga olingan).
 
 ---
 
@@ -297,3 +298,4 @@ Oylik so'rovlar soni (taxmin, tarif profiliga mos: Start — AI-05/AI-03 odatda 
 - `E:/Project/universal_ai_platform/src/backend/aios/application/companion/narration_guard.py` — deterministik raqamli nazorat naqshi.
 - `E:/Project/universal_ai_platform/src/backend/aios/interface/di_builders.py` — rejim almashtirish naqshi (DI).
 - `E:/Project/universal_ai_platform/src/backend/aios/infrastructure/observability/health_service.py` — gating vs reported readiness naqshi.
+- Foydalanuvchi qarori, 2026-10-15 — AI-03 (OCR) MVP'ga qaytarildi.

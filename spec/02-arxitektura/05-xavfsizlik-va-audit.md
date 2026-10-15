@@ -4,7 +4,7 @@
 
 ## Asosiy xulosalar
 
-1. **Autentifikatsiya ikki qatlamda**: telefon + SMS OTP bilan ro'yxatdan o'tish va parol/PIN bilan kirish (veb), kassa stansiyasida umumiy qurilmada tezkor PIN (4 raqam, taxmin); veb seansi **HttpOnly cookie + CSRF token** (`08-frontend-arxitekturasi.md`, 3-bo'lim — allaqachon qaror qilingan), Android POS uchun **qurilma tokeni** (Bearer; `devices` jadvali, `01-malumotlar-modeli.md`, 3-bo'lim); veb-kassa — sessiya cookie + lokal offline PIN, 401'da outbox saqlangan holda qayta kirish (`04-offline-sync.md` §3.4). *(2026-10-14: tekshiruv)*
+1. **Autentifikatsiya — o'z OAuth 2.0 implementatsiyamiz** (foydalanuvchi qarori, 2026-10-15): backend ham Authorization Server, ham Resource Server; to'liq protokol, saqlash, rotatsiya, bekor qilish tafsiloti **`12-autentifikatsiya-oauth2.md`da** — bu bo'lim endi faqat xulosa va havola. Veb (back-office+veb-kassa) — BFF naqshi, token brauzerga chiqmaydi, **HttpOnly cookie + CSRF token** (3-bo'lim, o'zgarmaydi) OAuth sessiyasini bildiradi; Android — public OAuth mijoz, to'g'ridan-to'g'ri Bearer access token; kassir **PIN — OAuth grant emas**, mahalliy tezkor almashish/tasdiqlash vositasi (`12-autentifikatsiya-oauth2.md` §4.3). *(2026-10-15: foydalanuvchi qarori)*
 2. **Huquqlar — kod darajasidagi ruxsat (`permission_code`) + ixtiyoriy limit** (`role_permissions.limit_value`, `01-malumotlar-modeli.md`), 5 standart rol (Egasi, Menejer, Kassir, Omborchi, Buxgalter) uchun standart matritsa `01-rollar-va-ssenariylar.md` (6-bo'lim, K/Y/T) bilan izchil loyihalashtirilgan; aniq limit summalari **tadqiqotda yo'q — taxmin**, MVP oldidan biznes-qoida sifatida sozlanadi.
 3. **PostgreSQL Row-Level Security (RLS) — tenant izolyatsiyasining asosiy (DB darajasidagi) mexanizmi**; ilova filtri (SQLAlchemy `with_loader_criteria`) — ikkinchi qatlam (`09-backend-arxitekturasi.md`, 4-xulosa). Har tranzaksiya `tenant_transaction(session, tenant_id)` helper orqali ochiladi, ichida `SELECT set_config('app.tenant_id', :tid, true)` bajariladi, har jadvalda siyosat; CI'da **har jadvalda RLS yoqilganini tekshiruvchi test** majburiy (`04-arxitektura-va-stack.md`, 1-bo'lim). *(2026-10-14: tekshiruv)*
 4. **Platform admin** (`platform_admins`) tenant RLS'ini **chetlab o'tadi**, lekin har bir kirish `audit_log`ga majburiy yoziladi (`01-malumotlar-modeli.md`, 2-bo'lim) — bu yagona qonuniy "bypass" yo'li.
@@ -14,41 +14,50 @@
 8. **Fiskal modul uchun kripto milliy standart aniq, umumiy dastur uchun majburiy kripto-algoritm standarti qonun darajasida topilmadi** — standart sanoat amaliyoti (TLS 1.2+, bcrypt/argon2) yetarli deb baholanadi (`07-fayl`, 3.2-bo'lim).
 9. **Kompleks muvofiqlik ikki ochiq savol bilan boshlanadi**: (a) ЗРУ-764 (Kiberxavfsizlik to'g'risida) sertifikatlash/ekspertiza talabining oddiy xususiy SaaS'ga tegishliligi aniqlanmagan — csec.uz'ga yozma so'rov tavsiya etiladi; (b) shaxsiy ma'lumotlar qonuni (ZRU-547/ЗРУ-666/ЗРУ-1125) bo'yicha lokalizatsiya faqat biometrik/genetik/telekom ma'lumotga tegishli, AIOS'ning odatiy ma'lumoti bu toifaga **kirmaydi** (`07-fayl`, 1.1 va 3.1-bo'lim).
 10. **PCI DSS qamrovi minimal**: karta ma'lumoti hech qachon bizning tizimimizda saqlanmaydi/qayta ishlanmaydi — to'lovlar Click/Payme/bank terminali orqali, ular o'z PCI-sertifikatlangan muhitida ishlaydi (`research_notes/texnik/03-efaktura-va-tolov.md`, 2.1–2.3-bo'lim izidan, mantiqiy xulosa — manbada PCI so'zi yo'q, **taxmin**).
+11. **Obuna muddati — qattiq to'xtatish**: 24 soatlik imtiyoz tugagach tenantning barcha sessiya/tokenlari bekor qilinadi, login rad etiladi (to'lov havolasi bundan mustasno); offline qurilma imzolangan litsenziya tokeni (`valid_until = subscription_end + 24 soat`) bilan serversiz ham mahalliy bloklanadi — to'liq mexanizm va fiskal oqibat izohi `12-autentifikatsiya-oauth2.md` §16–17'da. *(2026-10-15: foydalanuvchi qarori — avvalgi "kassa ishlashda davom etadi" taklifi bekor qilindi)*
 
 ---
 
 ## 1. Autentifikatsiya va seanslar
 
-### 1.1 Ro'yxatdan o'tish va kirish (veb, back-office)
+*(2026-10-15: foydalanuvchi qarori)* **To'liq protokol tafsiloti `12-autentifikatsiya-oauth2.md`ga ko'chirildi** — OAuth 2.0 AS/RS, mijozlar (BFF/Android/bot/admin), grant turlari, access/refresh token formati, imzolash kalitlari, bekor qilish/introspeksiya, tenant almashtirish, scope↔permission_code, obuna lokauti, offline litsenziya tokeni, admin panel API'lari. Bu bo'lim quyida faqat **xulosa va bu hujjat bilan izchil qoladigan** qism (CSRF, huquqlar/limit mexanizmi) ni saqlaydi.
+
+### 1.1 Ro'yxatdan o'tish va kirish (veb, back-office) — xulosa
 
 - Ro'yxatdan o'tish: telefon raqami → SMS OTP tasdiqlash → do'kon nomi/faoliyat turi (US-M17-01, BO-21, `02-modullar-talablari.md` M17). STIR, OFD, e-faktura ulash keyinroq, bosqichma-bosqich.
-- Kirish: telefon/login + parol (Egasi, Menejer, Buxgalter — back-office PWA) yoki PIN (Kassir, Omborchi — Android POS, POS-01 ekrani, `04-ekranlar-va-ux.md`).
-- Parol saqlash: **bcrypt yoki argon2** hash (`users.password_hash`), aniq algoritm tanlovi arxitektura qarori — milliy kripto standarti faqat fiskal modulga tegishli, umumiy dastur uchun qonuniy majburiyat topilmadi (`07-fayl`, 3.2-bo'lim). PIN uchun `users.pin_hash` — alohida, qisqa (4-6 raqam, **taxmin**) kod, faqat shu tenant/qurilma kontekstida tekshiriladi.
-- Qulflash siyosati (ketma-ket noto'g'ri urinishlardan keyin vaqtinchalik bloklash) — manbada yo'q, OWASP ASVS L2 bazaviy tavsiyasi sifatida qo'llanadi (**taxmin**, 8-bo'limga qarang).
+- Kirish: telefon + parol (Egasi, Menejer, Buxgalter) — OAuth Authorization Code+PKCE orqali, BFF naqshida (`12-autentifikatsiya-oauth2.md` §2, §4.1); kassir/omborchi — mahalliy PIN (1.2-bo'lim, OAuth grant emas).
+- Parol saqlash: **argon2id** (`user_credentials.password_hash`) — avvalgi "bcrypt yoki argon2" ochiq tanlovi endi aniq belgilandi (`12-autentifikatsiya-oauth2.md` §4.1, §13). *(2026-10-15: foydalanuvchi qarori — aniqlashtirildi)* PIN — `user_credentials.pin_hash`, alohida, qisqa (4-6 raqam, **taxmin**) kod, faqat shu tenant/qurilma kontekstida tekshiriladi.
+- Qulflash siyosati — brute-force himoyasi va rate limitlar bilan birga `12-autentifikatsiya-oauth2.md` §12'da to'liq (progressiv bloklash, OWASP ASVS L2 asosida, **taxmin**).
 
 ### 1.2 Kassir/Omborchi tezkor PIN (umumiy qurilma)
 
-- Bir nechta xodim bitta Android POS qurilmasidan smena bo'yicha almashib foydalanishi mumkin (`01-rollar-va-ssenariylar.md`, 0-bo'lim — rol birlashuvi kichik do'konda). PIN login lokal (offline) tekshiriladi, keyin serverga sinxronlanadi (POS-01 holat jadvali, `04-ekranlar-va-ux.md`).
-- PIN — faqat autentifikatsiya emas, shu bilan birga **tasdiqlash vositasi** (limitdan yuqori chegirma/qaytarish/nasiyada Menejer/Egasi PIN'i, 2.3-bo'lim).
-- Qurilma bekor qilinganda unda kirgan xodimlarning PIN'i majburiy almashtiriladi (`04-offline-sync.md` §9). *(2026-10-14: tekshiruv)*
+- Bir nechta xodim bitta qurilmadan (veb-kassa ham, Android POS ham) smena bo'yicha almashib foydalanishi mumkin (`01-rollar-va-ssenariylar.md`, 0-bo'lim). PIN — **OAuth grant emas**, mahalliy (offline ham) tekshiriladigan tezkor almashish/tasdiqlash vositasi; aniq ta'rifi va OAuth bilan munosabati `12-autentifikatsiya-oauth2.md` §4.3'da. *(2026-10-15: foydalanuvchi qarori — aniq ta'riflandi)*
+- PIN — shu bilan birga **tasdiqlash vositasi** (limitdan yuqori chegirma/qaytarish/nasiyada Menejer/Egasi PIN'i, 2.3-bo'lim).
+- Qurilma bekor qilinganda unda kirgan xodimlarning PIN'i majburiy almashtiriladi (`04-offline-sync.md` §9).
 
-### 1.3 Seanslar
+### 1.3 Seanslar va tokenlar
 
-| Mijoz | Seans turi | Tafsilot |
-|---|---|---|
-| Veb (back-office + veb-kassa) | **HttpOnly cookie** sessiya + **CSRF token** (POST/PUT/PATCH/DELETE'da) | Qaror allaqachon `08-frontend-arxitekturasi.md` (3-bo'lim) da qabul qilingan: `withCredentials: true`, interceptor CSRF tokenini qo'shadi. Sessiya: sirpanuvchi bo'sh turish muddati 12 soat, mutlaq muddat **7 kun** (**taxmin**). Mutlaq muddat 48 soatlik offline oynadan uzun bo'lishi shart. *(2026-10-14: tekshiruv)* |
-| Android POS (keyingi bosqich) | **Qurilma tokeni** (uzoq muddatli, `devices.id` bilan bog'langan) + refresh/rotatsiya | `devices` jadvali (`01-malumotlar-modeli.md`, 3-bo'lim): `last_seen_at`, `last_sync_at`, `app_version` — token shu yozuvga bog'lanadi. Refresh/rotatsiya aniq siklini (muddat, qayta chiqarish shartlari) manba bermaydi — **taxmin**: sanoat amaliyoti bo'yicha access token qisqa muddatli (masalan 15-60 daqiqa), refresh token uzoqroq (masalan 30 kun) va rotatsiya bilan |
-| Telegram bot | Chat ID + bir martalik ulash kodi (1.4-bo'lim) | `telegram_links` jadvali |
+Mijoz turlari, token formatlari, muddatlari, qurilmaga bog'lash — **to'liq `12-autentifikatsiya-oauth2.md` §2, §5–§9'da**. Qisqa xulosa:
+
+| Mijoz | Mexanizm |
+|---|---|
+| Veb (back-office + veb-kassa) | BFF: OAuth access/refresh token **serverda**, brauzerga faqat **HttpOnly cookie + CSRF token** (quyida) |
+| Android POS | Public OAuth mijoz, to'g'ridan-to'g'ri `Authorization: Bearer <access_token>` |
+| Telegram bot | Client Credentials (xizmat darajasida), `telegram_links` orqali foydalanuvchi/tenant konteksti |
 
 Barcha so'rovlarda yozuvchi amallar uchun **`Idempotency-Key`** majburiy (`08-frontend-arxitekturasi.md`, 3-bo'lim) — offline qayta yuborishda takror yozuvdan himoya, xavfsizlik nuqtai nazaridan ham takror-so'rov (replay) hujumini kamaytiradi. `/sync/push` bundan mustasno: dedupe har voqea bo'yicha `sync_receipts.client_event_id` orqali (`04-offline-sync.md` §3.1); `Idempotency-Key` faqat back-office REST yozuvchi so'rovlariga tegishli.
 
-**CSRF mexanizmi (sinxronizator-token)**: `GET /api/v1/auth/csrf` → klient tokenni xotirada saqlaydi → yozuvchi metodlarda (`POST`/`PUT`/`PATCH`/`DELETE`, shu jumladan **`/sync/push` va `/sync/pull` — cookie-autentifikatsiyali barcha so'rovlar**) `X-CSRF-Token` header'ida yuboradi. CSRF cookie yo'q (double-submit emas) — token sessiya ID'ga bog'langan, `itsdangerous` bilan imzolangan. Noto'g'ri/eskirgan token → `403 {code: CSRF_INVALID}` → klient tokenni bir marta qayta oladi va so'rovni takrorlaydi. **Qurilma tokeni (Bearer, faqat Android) CSRF tekshiruvidan ozod.** *(2026-10-14: tekshiruv)*
+**CSRF mexanizmi (sinxronizator-token) — o'zgarmaydi, hamon kerak**: BFF cookie OAuth sessiyasiga ishora qilsa ham, brauzer hamon cookie-asosli so'rov yuboradi, shuning uchun CSRF himoyasi to'liq saqlanadi: `GET /api/v1/auth/csrf` → klient tokenni xotirada saqlaydi → yozuvchi metodlarda (`POST`/`PUT`/`PATCH`/`DELETE`, shu jumladan **`/sync/push` va `/sync/pull` — cookie-autentifikatsiyali barcha so'rovlar**) `X-CSRF-Token` header'ida yuboradi. CSRF cookie yo'q (double-submit emas) — token sessiya ID'ga bog'langan, `itsdangerous` bilan imzolangan. Noto'g'ri/eskirgan token → `403 {code: CSRF_INVALID}` → klient tokenni bir marta qayta oladi va so'rovni takrorlaydi. **Bearer access token (Android, to'g'ridan-to'g'ri API chaqiruvi) CSRF tekshiruvidan ozod** — brauzer buni avtomatik biriktirmaydi. *(2026-10-15: foydalanuvchi qarori — CSRF mexanizmi o'zi o'zgarmadi, faqat OAuth asosiga bog'landi)*
 
 ### 1.4 Telegram ulash
 
 - Egasi (va ruxsat etilgan Menejer) back-office'da "Telegram ulash" tugmasini bosadi → bot havolasi/QR → bot ichida bir martalik kod → kod tasdiqlangach `telegram_links` (tenant_id, user_id, chat_id, linked_at) yoziladi (US-M18-01, `02-modullar-talablari.md`).
 - Xodim o'chirilganda uning Telegram ulanishi ham avtomatik bekor qilinishi shart (M18, chekka holat).
 - Mijozga qarz bildirishnomasi (US-M08-08) alohida kanal — Egasi/xodim botidan farqli, mijozning yozma roziligi (`counterparties.notify_consent`) bilan shartlangan.
+
+### 1.5 Ro'yxatdan o'tishda avtomatik yaratiladigan obyektlar (tenant provisioning)
+
+*(2026-10-15: kamchiliklar-yakuniy #44)* Ro'yxatdan o'tish (US-M17-01) **bitta tranzaksiyada** quyidagilarni yaratadi: `tenants`, `subscriptions` (`status=trial`, 30 kun), Egasi uchun `memberships` (barcha filialga — bo'sh `branch_ids`), 5 standart tizim roli + ularning `role_permissions` (`§2.2` standart matritsa), standart filial + standart ombor + standart kassa (`cash_registers`), `doc_sequences` boshlang'ich qatorlari, standart xarajat toifalari (`expense_categories`, `11-backlog.md` seed ro'yxati bilan bir xil), `tenants.settings.valuation_method='AVECO'` (standart). Hisob rejasi, `units`, `plans` — **global**, tenant uchun nusxalanmaydi; MXIK katalogi — tasnif.soliq.uz orqali tashqi manba, tenant ichida saqlanmaydi.
 
 ---
 
@@ -204,7 +213,8 @@ Har jadval uchun:
 
 ### 3.3 Har jadvalda RLS borligini tekshiruvchi test
 
-- CI'da avtomatik test: `information_schema`/`pg_class.relrowsecurity` orqali barcha biznes jadvallarini (istisno faqat `tenant_id`'siz global jadvallar — `plans`, `units`, `platform_admins`; `tenants` — `id = app.tenant_id` siyosati, `users` — membership siyosati, `01-malumotlar-modeli.md` 1-bo'lim) ro'yxatlab, har birida `relrowsecurity = true` va kamida bitta siyosat borligini tasdiqlaydi.
+- CI'da avtomatik test: `information_schema`/`pg_class.relrowsecurity` orqali barcha biznes jadvallarini (istisno faqat `tenant_id`'siz global jadvallar — `plans`, `units`, `platform_admins`, `oauth_clients`, `signing_keys`; `tenants` — `id = app.tenant_id` siyosati, `users` — membership siyosati, `01-malumotlar-modeli.md` 1-bo'lim) ro'yxatlab, har birida `relrowsecurity = true` va kamida bitta siyosat borligini tasdiqlaydi.
+- **Auth-sxema istisnosi** *(2026-10-15: qabul-5 — O7 tuzatish)*: `user_credentials`, `otp_challenges`, `login_attempts`, `authorization_codes`, `refresh_tokens`, `sessions` — standart `tenant_id` RLS siyosati **texnik jihatdan ishlamaydi** (login/ro'yxatdan o'tishda tenant konteksti hali yo'q, kod/token qidiruvi tenant kontekstidan oldin bo'ladi). Bu jadvallar alohida PostgreSQL `auth` sxemasida, ilova roliga to'g'ridan-to'g'ri ruxsat yo'q, kirish faqat `SECURITY DEFINER` funksiyalar orqali (`12-autentifikatsiya-oauth2.md` §19). CI testi bu ro'yxatni **alohida tekshiradi**: RLS siyosati o'rniga — (a) ilova (`app`) rolida bu jadvallarga `GRANT` yo'qligi, (b) kerakli `SECURITY DEFINER` funksiyalar mavjudligi va ichida tegishli tekshiruv borligi. `license_tokens` bu istisnoga **kirmaydi** — tenant/qurilma konteksti login'dan keyin mavjud, shuning uchun u standart `tenant_id` RLS ro'yxatida qoladi.
 - Yangi migratsiya `tenant_id`li jadval qo'shsa, lekin RLS siyosatini unutsa — CI **qizil** bo'ladi (bu `04-arxitektura-va-stack.md`, 1-bo'limdagi "alohida qat'iy RLS tekshiruvi shart" tavsiyasining konkret amalga oshirilishi).
 - Qo'shimcha integratsion test: ikki xil `tenant_id` bilan ma'lumot kiritilib, biri ikkinchisining yozuvini ko'ra olmasligi tekshiriladi (cross-tenant leak testi).
 - **Global jadvallar siyosati**: `users` jadvalida RLS yoqilgan, lekin `tenant_id` siyosati o'rniga membership siyosati qo'llanadi: `id = app.user_id` YOKI `EXISTS (memberships WHERE user_id = users.id AND tenant_id = app.tenant_id)`. Login va tenant tanlash tenant kontekstisiz ishlaydi — buning uchun ikkita `SECURITY DEFINER` funksiya: `auth_find_user(phone)` (faqat id va hash qaytaradi) va `auth_list_memberships(user_id)`. Scheduler ham shunga o'xshash `list_active_tenant_ids()` (`SECURITY DEFINER`) funksiyasidan foydalanadi, har tenant uchun alohida job navbatga qo'yadi (`09-backend-arxitekturasi.md`, 4-bo'lim).
@@ -237,7 +247,7 @@ Har jadval uchun:
 
 Tenant-specific integratsiya sirlari (ayniqsa Click/Payme, EDO) **shifrlangan holda** saqlanishi kerak — oddiy matn sifatida emas. Variantlar (manbada aniq UzCloud KMS xizmati tasdiqlanmagan — **ochiq savol/taxmin**, quyida):
 
-1. **Ilova darajasidagi envelope encryption** (tavsiya, UzCloud'da alohida KMS xizmati topilmagani sababli): har bir sir **Data Encryption Key (DEK)** bilan AES-256-GCM orqali shifrlanadi; DEK'lar o'zi platforma darajasidagi **Key Encryption Key (KEK)** bilan shifrlanib bazada saqlanadi; KEK — muhit o'zgaruvchisi/sir boshqaruv xizmatida (masalan HashiCorp Vault yoki shunga o'xshash — **taxmin**, UzCloud'da tayyor KMS borligi tasdiqlanmagan, `07-fayl`'da bu xizmat tilga olinmagan).
+1. **Ilova darajasidagi envelope encryption** (tavsiya, UzCloud'da alohida KMS xizmati topilmagani sababli): har bir sir **Data Encryption Key (DEK)** bilan AES-256-GCM orqali shifrlanadi; DEK'lar o'zi platforma darajasidagi **Key Encryption Key (KEK)** bilan shifrlanib bazada saqlanadi; KEK — muhit o'zgaruvchisi/sir boshqaruv xizmatida (masalan HashiCorp Vault yoki shunga o'xshash — **taxmin**, UzCloud'da tayyor KMS borligi tasdiqlanmagan, `07-fayl`'da bu xizmat tilga olinmagan). **MVP joylashuvi** *(2026-10-15: kamchiliklar-yakuniy #51)*: KEK — deploy-vaqtidagi sir (muhit o'zgaruvchisi), **faqat** `api`/`worker` konteyneriga uzatiladi (boshqa konteyner — `bot`, `scheduler` — kerak bo'lmasa olmaydi); rotatsiya — **yillik** (taxmin, `key_version` ustuni orqali eski DEK'lar qayta shifrlanadi). UzCloud rasmiy KMS-as-a-Service xizmatini tasdiqlasa, KEK saqlash joyi shunga ko'chiriladi — bu migratsiya DEK qiymatlarini o'zgartirmaydi, faqat KEK saqlanadigan joy almashadi.
 2. **PostgreSQL `pgcrypto`** — muqobil, lekin kalitni DB ichida saqlash xavfi (DB buzilsa kalit ham ochiladi) — faqat ikkinchi darajali himoya qatlami sifatida ko'rib chiqilishi mumkin, asosiy emas.
 3. **UzCloud'da KMS-as-a-Service** — rasmiy narx/sahifa tadqiqotda topilmadi (`07-fayl`, 2.1-bo'lim faqat VM/K8s/DBaaS/S3'ni sanab o'tadi, KMS yo'q) — agar kelajakda UzCloud bu xizmatni taqdim etsa, (1)dagi KEK saqlash joyi shunga ko'chiriladi.
 
@@ -284,6 +294,9 @@ Har bir sir yozuvida: `tenant_id`, `kind` (masalan `click_secret`, `didox_token`
 - Sir/kalit rotatsiyasi (4.2-bo'lim).
 - Ma'lumot eksporti (`reports.export`, tenant bo'yicha to'liq eksport, 7.3-bo'lim).
 - To'lovdan oldin chek qatori/chekni bekor qilish (`sale.draft_voided`), chekni qayta chop etish (`receipt.reprinted`), qurilmani bekor qilish va PIN majburiy almashtirish. *(2026-10-14: tekshiruv)*
+- **OAuth/autentifikatsiya voqealari (to'liq ro'yxat `12-autentifikatsiya-oauth2.md` §14'da)**: `login_success`/`login_failed`/`account_locked`, `otp_requested`/`otp_verified`/`otp_failed`, `password_changed`/`password_reset`, `pin_changed`/`pin_reset_forced`, `refresh_token_reuse_detected`, `session_revoked`/`all_sessions_revoked`, `tenant_switched`, `subscription_lockout_triggered`/`subscription_restored`, `signing_key_rotated`. *(2026-10-15: foydalanuvchi qarori)*
+- **Qo'shimcha voqealar** *(2026-10-15: qabul-5)*: `sync_drain_started`/`sync_drain_completed` (lokautdan oldingi offline cheklarni drenaj qilish, `12-autentifikatsiya-oauth2.md` §16.4), `data_export_during_restriction` (lokaut paytida to'lov-sahifa orqali eksport, §16.5), `platform_admin_mfa_failed` (§18.1).
+- **Markirovkalangan tovar offline audit voqealari** *(2026-10-15: kamchiliklar-yakuniy #1/#42)*: `marking.offline_sold` (actor_user_id, device_id, code, sale_id, price_source=`cache`, created_at), `marking.offline_refused_no_price`, `marking.verify_failed` (sinxronlanishdan keyin: noto'g'ri/takroriy kod yoki CRPT xatosi — Egasi/Buxgalterga M18 ogohlantirishi bilan birga) — to'liq siyosat `04-offline-sync.md` §7'da.
 
 ### 6.2 O'zgarmaslik (immutability)
 
@@ -303,16 +316,18 @@ Har bir sir yozuvida: `tenant_id`, `kind` (masalan `click_secret`, `didox_token`
 
 - UzCloud DBaaS — HA klaster + **avtomatik backup** + **PITR (Point-in-Time Recovery)** imkoniyati (`07-fayl`, 2.1-bo'lim; `04-arxitektura-va-stack.md`, 8-bo'lim jadvali).
 - Aniq backup chastotasi (kunlikmi, soatlikmi) va RPO/RTO raqami **rasmiy sahifada topilmadi** — **taxmin tavsiya**: operatsion backup kuniga 1 marta to'liq + doimiy WAL-asosidagi PITR (RPO — bir necha daqiqa, **taxmin**).
+- **Ichki maqsad (SLO)** *(2026-10-15: kamchiliklar-yakuniy #47/#48)*: **RPO ≤ 5 daqiqa** (PITR, WAL yuborish chastotasi asosida), **RTO ≤ 4 soat** (taxmin — to'liq restore + tekshirish uchun). Bu raqamlar qonuniy majburiyat emas, ichki maqsad; pilot bosqichida real o'lchov bilan tasdiqlanadi.
 - Saqlash muddati: operatsion backup **30 kun** (**taxmin**), arxiv backup **kamida 5 yil** (buxgalteriya hujjat muddatiga mos — O'RQ-404, 29-modda; soliq hujjatlari alohida 3 yil, Soliq kodeksi 84-modda) — `04-arxitektura-va-stack.md`, 7-bo'lim tavsiyasi. *(2026-10-14: tekshiruv)*
 
 ### 7.2 Tiklash sinovlari
 
 - Backup'dan tiklash muntazam **sinovdan o'tkazilishi** kerak (masalan choraklik, staging muhitida to'liq restore) — bu amaliyot manbada yo'q, OWASP/sanoat amaliyoti sifatida **taxmin** qo'shiladi (8-bo'limga qarang).
 - Sinov natijasi (muvaffaqiyatli/vaqt) ichki ravishda qayd etiladi (operatsion jurnal, `audit_log`ning o'zi emas — bu infratuzilma darajasidagi jurnal).
+- **Mas'ul va eskalatsiya** *(2026-10-15: kamchiliklar-yakuniy #48)*: sinov siklini DevOps (yoki shu vazifani bajaradigan rol) o'tkazadi, natija (sana, muvaffaqiyatli/yo'q, o'lchangan vaqt) operatsion jurnalga yoziladi; o'lchangan tiklash vaqti 7.1-bo'limdagi RTO maqsadidan (≤4 soat) oshsa — bu **insident** sifatida ko'rib chiqiladi (10-bo'lim oqimi bo'yicha).
 
 ### 7.3 Tenant bo'yicha eksport
 
-- Har bir tenant o'z ma'lumotini **istalgan vaqtda** eksport qila oladi: Excel/PDF hisobotlar (`reports.export`, BO-09, US-M12-03) — bu allaqachon mahsulot talabi sifatida mavjud va obuna to'xtagan taqdirda ham saqlanadi (US-M17-03: "Ma'lumotlarni eksport qilish huquqi har doim saqlanadi").
+- Har bir tenant o'z ma'lumotini **istalgan vaqtda** eksport qila oladi: Excel/PDF hisobotlar (`reports.export`, BO-09, US-M12-03) — bu `active`/`grace` holatda ishlaydi. ~~Obuna to'xtagan taqdirda ham eksport saqlanadi (US-M17-03)~~ — **2026-10-15 qarori bilan bekor qilindi**: `restricted`/`closed` holatda oddiy `reports.export` **yopiq** (US-M17-03/US-M17-05, `12-autentifikatsiya-oauth2.md` §16.1.1 — O1 tuzatish). Buning o'rniga foydalanuvchi qarori (D2, 2026-10-15): lokaut paytida ma'lumot eksporti **faqat** login/to'lov sahifasidagi alohida "Ma'lumotlarimni yuklab olish" yo'li orqali — parol tasdiqlash + SMS OTP (`purpose=data_export`) + tenant bo'yicha 1 marta/24 soat rate-limit + `data_export_during_restriction` audit yozuvi bilan (to'liq mexanizm `12-autentifikatsiya-oauth2.md` §16.5). *(2026-10-15: qabul-5/kamchiliklar-yakuniy ziddiyat 3 — tuzatildi)*
 - To'liq tenant ma'lumotlar bazasi eksporti (masalan tenant tizimdan chiqib ketganda) — alohida, kattaroq operatsiya (platform admin orqali, audit bilan) — **ochiq savol**: aniq format/SLA belgilanmagan — mahsulot talabi: US-M17-05 (MVP'dan keyin). *(2026-10-14: tekshiruv)*
 
 ---
@@ -324,7 +339,7 @@ Manbada aniq "OWASP ASVS L2" talabi tilga olinmagan — quyidagilar sanoat stand
 | Band | Talab | Manba/izoh |
 |---|---|---|
 | Transport | TLS 1.2+ barcha ulanishlarda | `04-arxitektura-va-stack.md`, 7-bo'lim |
-| Parol/PIN | bcrypt/argon2 heshlash | `04-arxitektura-va-stack.md`, 7-bo'lim |
+| Parol/PIN | **argon2id** heshlash (`12-autentifikatsiya-oauth2.md` §4.1 — avvalgi "bcrypt/argon2" ochiq tanlovi aniqlashtirildi) | `04-arxitektura-va-stack.md`, 7-bo'lim *(2026-10-15: kamchiliklar-yakuniy ziddiyat 5 — tuzatildi)* |
 | Sessiya | HttpOnly, Secure, SameSite cookie + CSRF token | `08-frontend-arxitekturasi.md`, 3-bo'lim (qaror allaqachon qabul qilingan) |
 | Kirish cheklovi (rate limiting) | Redis orqali, login/API darajasida | `00-umumiy-arxitektura.md` — Redis "rate-limit" vazifasi uchun allaqachon rejalashtirilgan |
 | CSP (Content Security Policy) | Veb frontendda standart sarlavhalar | **Taxmin** — frontend hujjatida alohida tilga olinmagan, bazaviy amaliyot sifatida qo'shiladi |
@@ -382,6 +397,7 @@ Manbada O'zbekiston qonunchiligida ma'lumot buzilishi (data breach) haqida davla
 
 ## Manbalar
 
+- `spec/02-arxitektura/12-autentifikatsiya-oauth2.md` — OAuth 2.0 AS/RS, token, obuna lokauti, offline litsenziya, admin panel (to'liq protokol tafsiloti). *(2026-10-15: foydalanuvchi qarori)*
 - `spec/02-arxitektura/00-umumiy-arxitektura.md`, `01-malumotlar-modeli.md`, `08-frontend-arxitekturasi.md`
 - `spec/01-mahsulot/01-rollar-va-ssenariylar.md` (huquqlar matritsasi), `02-modullar-talablari.md` (M01–M18, limit/PIN/audit talablari), `04-ekranlar-va-ux.md` (POS-01/06, BO-16 tasdiqlash oqimi), `05-ai-funksiyalar.md` (AI va ma'lumot minimizatsiyasi)
 - `research_notes/texnik/04-arxitektura-va-stack.md` (RLS, sertifikatlash, backup, kripto)

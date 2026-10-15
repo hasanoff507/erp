@@ -10,10 +10,11 @@
 4. Rad etilgan voqea **o'chirilmaydi** — lokal outbox'da xato belgisi bilan qoladi, foydalanuvchi uni ko'radi (POS-12) va amal qiladi (qayta urinish, qo'lda tuzatish yoki Menejerga eskalatsiya); boshqa (bog'liq bo'lmagan) voqealar bu orada davom etadi.
 5. To'qnashuvlar **delta (harakat) qo'shish** tamoyili bilan hal qilinadi, qiymatni to'g'ridan-to'g'ri almashtirish bilan emas: ombor qoldig'i manfiy bo'lsa ham sotuv **ruxsat etiladi**, qarz limiti oshsa ham sotuv **ruxsat etiladi** — ikkisi ham bayroq (flag) bilan belgilanadi va Egasi/Menejerga bildirishnoma boradi; faqat ma'lumotnoma (reference) maydonlari — ism, telefon, izoh kabilar — `version` ustuni bilan **last-writer-wins** (5-bo'lim).
 6. 48 soatlik fiskal muddat (`02-kassa-ofd-markirovka.md`, 1-ilova 31-band) — taymer birinchi offline voqea yaratilgan paytdan boshlanadi; 24/40 soatda ogohlantirish (**taxmin**, aniq soat manbada yo'q) qo'yilgan, lekin 48 soatda **yangi sotuvni bloklash qonunda topilmadi** — shu sabab bloklash emas, majburiy eskalatsiya + audit belgisi taklif qilinadi (6-bo'lim, ochiq savol).
-7. Markirovkalangan tovar offline sotuvi — `12-taxminlar-va-murojaatlar.md` (6-band) ishchi taxminiga ko'ra **vaqtincha cheklanadi, ogohlantirish bilan** (taqiq emas, lekin tavsiya — kechiktirish); internet qaytganda kod avtomatik tekshiriladi (7-bo'lim).
+7. Markirovkalangan tovar offline sotuvi *(2026-10-15: foydalanuvchi qarori)*: narx qurilmada **ma'lum** bo'lsa sotuv **ruxsat** (kod mahalliy yoziladi, internet qaytganda CRPT Turon'ga tekshirish/yuborish yuboriladi), narx **noma'lum** bo'lsa sotuv **taqiq** (US-M01-03, `02-modullar-talablari.md`; `03-integratsiyalar.md` §4) — eskirgan "vaqtincha cheklash, ogohlantirish bilan ruxsat" taxmini (7-bo'lim) bekor qilindi. Offline **qaytarish/ko'chirish** siyosati hali ochiq savol (Ochiq savol 2).
 8. Veb-kassada bir nechta tab ochilishi xavfli (ikki tab bitta lokal `seq` raqamini ikki marta bersa) — **Web Locks API** bilan yagona yozuvchi tab saylanadi, **BroadcastChannel** bilan holat (online/offline, yangi ma'lumot) boshqa tablarga tarqatiladi (10-bo'lim).
 9. Lokal ma'lumot shifrlanishi brauzerda OS darajasida (disk shifrlash tavsiyasi) + chiqishda (logout) Dexie bazasi to'liq tozalanadi; Android'da (keyingi bosqich) SQLCipher bilan butun Room bazasini shifrlash tavsiya etiladi (`10-android-pos.md`) (11-bo'lim).
 10. Test strategiyasi — tarmoq xatosi, soat farqi, ikki qurilmaning bir vaqtda to'qnashuvi, qayta yuborilgan voqea (duplicate), qurilma bekor qilinishi kabi stsenariylar uchun **chaos/tarmoq testlari** (Playwright network emulation, MSW) (12-bo'lim).
+11. **Autentifikatsiya endi OAuth 2.0 asosida** (`12-autentifikatsiya-oauth2.md`): sync uchun token — veb-kassada BFF cookie, Androidda to'g'ridan-to'g'ri Bearer access token, ikkisi ham qurilmaga bog'langan refresh token bilan (muddati 48 soatlik offline oynadan ancha uzun); kassir **PIN — OAuth grant emas**, mahalliy `actor_user_id` biriktiruvchi vosita (o'zgarmadi, §2 va §3.4). Obuna muddati tugagan tenant uchun qurilma imzolangan litsenziya tokeni bilan **serversiz** mahalliy bloklanadi (§3.5). *(2026-10-15: foydalanuvchi qarori)*
 
 ---
 
@@ -91,6 +92,7 @@ Qarzga sotish alohida voqea turi emas — `sale.created` ichida `sale_payments.m
 ```
 
 - **Partiya hajmi**: taxmin — 50 voqea/so'rov (katta hujjat ro'yxatlari uchun kam, tarmoq kechikishi uchun ko'p emas); aniq raqam yuklama sinovida tasdiqlanadi.
+- **Backpressure** *(2026-10-15: spec yozish bilan yopildi, kamchiliklar-yakuniy #41)*: server — qurilma boshiga **5 so'rov/soniya**, tenant boshiga bir vaqtda **4 ta** parallel `/sync/push` (taxmin); bu chegaralardan oshsa `429 Too Many Requests` + `Retry-After` qaytariladi. Qurilma — eksponensial backoff + jitter bilan qayta uriniladi (ofline sinxronlashda to'lib-toshgan outbox'ni birdan yuborishning oldini olish uchun).
 - **Idempotentlik**: server har bir `client_event_id`ni `sync_receipts`da tekshiradi (`01-malumotlar-modeli.md` §10). Oldin qabul qilingan voqea qayta yuborilsa — `status: "duplicate"`, bir xil natija (server raqami) qaytariladi, ikkinchi marta yozilmaydi.
 - **Fiskal raqam**: `receipt_seq` qurilmadan keladi; server uni o'zgartirmaydi, faqat `UNIQUE (tenant_id, cash_register_id, shift_id, receipt_seq)` bilan tekshiradi. Takror — `rejected`, `error_code: RECEIPT_SEQ_CONFLICT`, `retryable: false` (eskalatsiya). *(2026-10-14: tekshiruv)*
 - **Partiya "hammasi yoki hech narsa" emas** — har voqea alohida tranzaksiyada qayta ishlanadi; bittasi rad etilsa, qolganlari (bog'liq bo'lmasa) baribir qabul qilinadi (`results` massivi buni ko'rsatadi).
@@ -122,7 +124,18 @@ Server har bir voqeani: (1) sxema (JSON shakli, majburiy maydonlar), (2) qurilma
 
 **Rad etilganda**: voqea serverga yozilmaydi, lekin **qurilmadagi outbox'dan o'chirilmaydi** — `rejected` holatida, xato kodi va xabar bilan saqlanadi. POS-12 ekranida ("Sinxronlanmagan hujjatlar") bu voqea qizil belgi va aniq xato matni bilan ko'rinadi. Foydalanuvchi amali: (a) `retryable: true` bo'lsa — avtomatik/qo'lda qayta urinish, (b) `retryable: false` (masalan doimiy validatsiya xatosi) — qo'lda tuzatish yoki Menejerga/qo'llab-quvvatlashga eskalatsiya; hujjat hech qachon jim o'chirilmaydi (audit yaxlitligi uchun).
 
-**401 (sessiya tugagan)** — rad etish emas: voqealar `pending` holatida qoladi, `rejected` bo'lmaydi; push to'xtatiladi. POS ustida qayta kirish oynasi (parol yoki PIN) ochiladi, bunda **Dexie tozalanmaydi** — bu logout emas. Qayta kirishda server yangi sessiyani avvalgi `device_id`ga bog'laydi (boshqa tenant/qurilma bo'lsa push'ga ruxsat yo'q), keyin push `seq` tartibida davom etadi. `403 device_revoked` — 9-bo'lim. Veb-kassa uchun alohida qurilma tokeni/cookie yo'q — offline davr server autentifikatsiyasini talab qilmaydi (lokal PIN, 12-bo'lim), sessiya mutlaq muddati (7 kun) 48 soatdan uzun. Qurilma tokeni (Bearer) faqat Android uchun (`05-xavfsizlik-va-audit.md` §1.3). Veb-kassaning cookie-autentifikatsiyali so'rovlari (shu jumladan `/sync/push`/`/sync/pull`) `X-CSRF-Token` talab qiladi (`05-xavfsizlik-va-audit.md` §1.3). *(2026-10-14: tekshiruv)*
+**401 (access token/sessiya tugagan)** — rad etish emas: voqealar `pending` holatida qoladi, `rejected` bo'lmaydi; push to'xtatiladi. Avval qurilma **jim** (foydalanuvchidan so'ramasdan) OAuth refresh token bilan yangi access token olishga urinadi (`12-autentifikatsiya-oauth2.md` §7–8 — refresh token muddati qurilmaga bog'langan holda 48 soatdan ancha uzun); muvaffaqiyatli bo'lsa push davom etadi, foydalanuvchi hech narsa sezmaydi. Refresh ham muvaffaqiyatsiz bo'lsa (masalan mutlaq muddat tugagan yoki obuna `restricted`, pastda) — POS ustida qayta kirish oynasi ochiladi: **parol** bilan (Egasi/Menejer), shundan keyin kassir odatdagidek PIN bilan davom etadi — OTP kundalik login usuli emas, faqat ro'yxatdan o'tish/parol tiklashda ishlatiladi (`12-autentifikatsiya-oauth2.md` §4.2) *(2026-10-15)*. Bunda **Dexie tozalanmaydi** — bu logout emas. Qayta kirishda server yangi sessiyani avvalgi `device_id`ga bog'laydi (boshqa tenant/qurilma bo'lsa push'ga ruxsat yo'q), keyin push `seq` tartibida davom etadi. `403 device_revoked` — 9-bo'lim. Veb-kassa — BFF orqali cookie-autentifikatsiya (token brauzerga chiqmaydi), Android — to'g'ridan-to'g'ri Bearer access token; ikkisi ham endi OAuth 2.0 asosida (`12-autentifikatsiya-oauth2.md` §2, §5–7), eski "qurilma tokeni faqat Android" tafovuti **API chaqirish usuli** darajasida saqlanadi (veb-kassa hamon to'g'ridan-to'g'ri Bearer bilan chaqirmaydi), lekin veb-kassa endi ham `devices` yozuviga ega (litsenziya tokeni uchun, pastdagi "Obuna va offline litsenziya" bandi). Veb-kassaning cookie-autentifikatsiyali so'rovlari (shu jumladan `/sync/push`/`/sync/pull`) `X-CSRF-Token` talab qiladi (`05-xavfsizlik-va-audit.md` §1.3). *(2026-10-15: foydalanuvchi qarori — OAuth asosida yangilandi)*
+
+### 3.5 Obuna va offline litsenziya (foydalanuvchi qarori, 2026-10-15)
+
+Obuna muddati (24 soatlik imtiyoz) tugagan tenant uchun kassa **to'liq to'xtaydi** — bu eski "obuna tugaganda ham kassa ishlashda davom etadi" taklifini bekor qiladi. Mexanizm: har qurilma online bo'lganda imzolangan **litsenziya tokeni** (`license`, JWT: `tenant_id`, `device_id`, `valid_until = subscription_end + 24 soat`) oladi va mahalliy saqlaydi (Dexie `settings`); qurilma har ilova ochilganda/davriy va har yangi outbox yozishdan oldin bu tokenni **serversiz** tekshiradi — muddat o'tgan bo'lsa yangi sotuv/amalni mahalliy bloklaydi va **barcha ekranlar (ko'rish va eksport ham) yopiladi** — avvalgi "mavjud ma'lumotni ko'rish/eksport ochiq qoladi" qarori 2026-10-15'da bekor qilindi (tekshiruv O1 tuzatishi, US-M17-03/US-M17-05 bilan izchil).
+
+Ikki tor istisno *(2026-10-15: foydalanuvchi qarori)*:
+
+- **D1 — lokaut drain**: lokautdan oldin, imtiyoz davrida qurilmada yaratilgan va hali serverga yuborilmagan fiskal voqealar (cheklar) yo'qolmasligi uchun (48 soatlik fiskal muddat, 6-bo'lim) qurilmaning bekor qilinmagan refresh tokeni cheklangan **`sync.drain`** scope bilan access token oladi. Shu token bilan **faqat** `POST /sync/push` ishlaydi, u ham **faqat** `created_at <= grace_ends_at` (lokaut boshlangan payt) bo'lgan voqealar uchun — undan keyingi/yangi voqealar `rejected: SUBSCRIPTION_RESTRICTED` bilan qaytariladi. Boshqa hech qanday endpoint, ekran yoki yangi login ochilmaydi. Frontend bu holatni **logout deb hisoblamaydi** — Dexie/outbox o'chirilmaydi, fon rejimida drain davom etadi.
+- **D2 — faqat to'lov sahifasidan eksport**: lokaut davrida ma'lumot eksporti **faqat** to'lov (billing) sahifasidan, ro'yxatdagi telefon raqamiga yuborilgan SMS OTP tasdig'i bilan ruxsat etiladi; boshqa barcha ekran (kassa va back-office) yopiq qoladi.
+
+Bu ikkisi — fiskal 48 soatlik taymerdan (6-bo'lim) **mustaqil, alohida** muddat: ikkisi bir-biriga bog'liq emas, biri tugashi ikkinchisiga ta'sir qilmaydi. To'liq mexanizm, token formati va sequence diagramma — `12-autentifikatsiya-oauth2.md` §16–17 (drain — §16.4, foydalanuvchi tasdig'i so'ralsin).
 
 ---
 
@@ -219,14 +232,16 @@ sequenceDiagram
 
 ---
 
-## 7. Markirovkalangan tovar — offline siyosati
+## 7. Markirovkalangan tovar — offline siyosati *(2026-10-15: foydalanuvchi qarori)*
 
-Ishchi taxmin (`research_notes/texnik/12-taxminlar-va-murojaatlar.md`, 6-band; `04-arxitektura-va-stack.md` §2.4): markirovka (Asl belgisi/CRPT Turon) kodini offline tekshirish **mumkin emas** (markaziy tizimga bog'liq). Shu sabab:
+CRPT Turon'da kodni real vaqtda tekshirish offline holatda **mumkin emas** (markaziy tizimga bog'liq). Siyosat (`02-modullar-talablari.md` US-M01-03, `03-integratsiyalar.md` §4):
 
-- Offline holatda markirovkalangan tovar skanerlanganda, kassir kodni **kiritadi**, lekin tizim "chiqarish" (spisaniye) amalini **kechiktiradi** — chekka "⚠ markirovka tekshirilmagan, internet qaytganda tasdiqlanadi" belgisi qo'yiladi (POS-02/08/09/10, `04-ekranlar-va-ux.md` §1.7, §1.3).
-- Sotuvning o'zi **bloklanmaydi** (taqiq emas, ogohlantirish bilan ruxsat) — kassir sotuvni davom ettirishi yoki (agar vaqti bo'lsa) internet kutib keyinroq sotishni tanlashi mumkin; qaror kassirga qoldiriladi, tizim faqat ogohlantiradi.
-- Internet qaytganda, synced bo'lgan `sale.created` voqeasidagi markirovka kodlari fon rejimida (worker, `outbox_jobs.kind="marking_sell"`) CRPT Turon'ga yuboriladi; kod noto'g'ri/takroriy chiqsa — Egasi/Menejerga ogohlantirish (bu holatda tovar allaqachon sotilgan, orqaga qaytarib bo'lmaydi — faqat qayd va keyingi tekshiruv uchun belgi).
-- **Qat'iy taqiq siyosati rasmiy manbada tasdiqlanmagan** — bu taxmin, huquqiy maslahat bilan yakunlanishi kerak (`02-modullar-talablari.md`, US-M01-03; `04-ekranlar-va-ux.md`, Ochiq savol #3).
+- **Narx qurilmada ma'lum** (tovar va uning amaldagi narxi Dexie `catalog`/`prices`da bor) — sotuvga **ruxsat**. DataMatrix kod skanerlanadi, qurilmada faqat mahalliy format/nazorat raqami tekshiriladi, kod `marking_codes.status='pending_verification'` bilan (hamda outbox `sale.created` voqeasi payload'ida) yoziladi, chekka "⚠ Offlayn sotildi, CRPT tekshiruvi kutilmoqda" belgisi qo'yiladi (POS-02/08/09/10, `04-ekranlar-va-ux.md` §1.7, §1.3).
+- **Narx qurilmada noma'lum** (tovar hali sinxronlanmagan) — sotuv **ruxsat etilmaydi**, POS "Offlaynda sotib bo'lmaydi, narx noma'lum" xabarini ko'rsatadi. Kassir qarorni chetlab o'ta olmaydi.
+- Internet qaytganda worker `outbox_jobs(kind="marking_sell")` orqali CRPT Turon'ga `verify_code` + `sell` yuboradi; muvaffaqiyatli bo'lsa `marking_codes.status=sold`; `verify_failed` bo'lsa (noto'g'ri/takroriy kod yoki CRPT xatosi) Egasi/Buxgalterga ogohlantirish beriladi (tovar allaqachon sotilgan, orqaga qaytarib bo'lmaydi — faqat qayd va keyingi tuzatish uchun belgi).
+- **Audit voqealari** (`05-xavfsizlik-va-audit.md` §6.1 ro'yxatiga ham kiritiladi): `marking.offline_sold` (actor_user_id, device_id, code, sale_id, price_source=`cache`, created_at), `marking.offline_refused_no_price` (kassir taqiqqa uchragan urinish), `marking.verify_failed` (sync'dan keyingi noto'g'ri/takroriy kod yoki CRPT xatosi — M18 orqali Egasiga).
+- Offline **qaytarish/ko'chirish** (M02/M06) siyosati — hali ochiq savol (pastda, Ochiq savol 2).
+- Bu mahsulot qarori; huquqshunos tasdig'i tavsiya etiladi, lekin spec darajasidagi qaror allaqachon qabul qilingan.
 
 ---
 
@@ -243,13 +258,14 @@ Ishchi taxmin (`research_notes/texnik/12-taxminlar-va-murojaatlar.md`, 6-band; `
 
 - Qurilma birinchi marta login qilganda `devices` yozuvi avtomatik yaratiladi (`tenant_id`, `cash_register_id`, `kind`, `app_version`) — kichik do'kon uchun qo'shimcha tasdiqlash qadam qo'shilmaydi (tezkor ishga tushirish).
 - Egasi/Menejer qurilmalar ro'yxatini ko'radi va kerak bo'lsa **bekor qiladi** (masalan o'g'irlangan/eskirgan qurilma) — aniq ekran hozircha `04-ekranlar-va-ux.md`da yo'q, **ochiq savol** (pastda).
-- **Bekor qilingan qurilma**: keyingi `POST /sync/push` va `GET /sync/pull` so'rovlari `403 device_revoked` bilan rad etiladi. Lokal outbox'dagi hali yuborilmagan hujjatlar **jim yo'qolmaydi** — UI "Qurilma bloklandi, ma'lumotlarni eksport qiling" xabarini ko'rsatadi va Excel eksport imkoniyatini beradi (qog'oz chekka tushgan savdoni yo'qotmaslik uchun), shundan keyingina lokal baza tozalanadi. Aniq UX oqimi **ochiq savol**.
+- **Bekor qilingan qurilma**: `devices.revoked_at` o'rnatilishi bilan shu qurilmaga bog'langan **barcha OAuth refresh/access token va litsenziya tokeni** bekor qilinadi (`12-autentifikatsiya-oauth2.md` §7, §17) — keyingi `POST /sync/push` va `GET /sync/pull` so'rovlari `403 device_revoked` bilan rad etiladi. Lokal outbox'dagi hali yuborilmagan hujjatlar **jim yo'qolmaydi** — UI "Qurilma bloklandi, ma'lumotlarni eksport qiling" xabarini ko'rsatadi va Excel eksport imkoniyatini beradi (qog'oz chekka tushgan savdoni yo'qotmaslik uchun), shundan keyingina lokal baza tozalanadi. Aniq UX oqimi **ochiq savol**. *(2026-10-15: foydalanuvchi qarori — OAuth bekor qilish bilan bog'landi)*
 - Qurilma bekor qilinganda shu qurilmada oxirgi 30 kun (taxmin) ichida PIN bilan kirgan barcha xodimlarning PIN'i serverda bekor qilinadi va keyingi kirishda yangi PIN majburiy (lokal 4 raqamli PIN hashlari offline buzilishi oson). Ro'yxat va "Bekor qilish" — BO-11 "Qurilmalar" tabi. Ochiq savol 3 qisman hal qilindi. *(2026-10-14: tekshiruv)*
 
 ---
 
 ## 10. Saqlash chegaralari va tozalash
 
+- **Hajm taxmini** *(2026-10-15: spec yozish bilan yopildi, kamchiliklar-yakuniy #40)*: bitta outbox voqeasi ≈ 2 KB (JSON); 1 000 chek/kun × 2 kun offline ≈ 4 MB — kichik do'kon uchun amalda ahamiyatsiz. `navigator.storage.estimate()` orqali kvota kuzatiladi: 80%ga yetganda UI ogohlantiradi, 95%da chek tarixi keshi (UI ko'rsatish uchun, 90 kunlik oyna, pastda) qisqartiriladi — **`pending`/yuborilmagan outbox hech qachon o'chirilmaydi** (fiskal/audit yaxlitligi ustunlik qiladi).
 - Katalog/narx/mijoz keshlari — delta-sync bilan doimiy yangilanadi, qo'lda tozalash shart emas (hajm tenant ma'lumot hajmiga bog'liq).
 - Outbox voqealari — `accepted`/`duplicate` natija olgandan keyin darhol o'chirilmaydi, **taxmin: 7 kun** xavfsizlik buferi bilan saqlanadi (foydalanuvchi ko'rib chiqishi/eksport qilishi uchun), keyin avtomatik tozalanadi.
 - Sotuv/chek tarixi (UI ko'rsatish uchun lokal kesh) — **taxmin: 90 kunlik** aylanma oyna; eskisi serverdan talab bo'yicha olinadi (online bo'lganda).
@@ -296,7 +312,7 @@ Backend tomonida `/sync/push` va `/sync/pull` uchun OpenAPI sxemasiga mos kontra
 ## Ochiq savollar
 
 1. 48 soatda yangi sotuvni bloklash yoki faqat ogohlantirish — qonunda aniq topilmadi, taklif (6-bo'lim) huquqiy maslahat bilan tasdiqlanishi kerak.
-2. Markirovkalangan tovarni offline sotish siyosati (cheklash/ogohlantirish) — rasmiy manbada tasdiqlanmagan taxmin (7-bo'lim, `12-taxminlar-va-murojaatlar.md` 6-band).
+2. ~~Markirovkalangan tovarni offline sotish siyosati~~ — **hal qilindi** (2026-10-15, foydalanuvchi qarori, 7-bo'lim): narx qurilmada ma'lum bo'lsa ruxsat, noma'lum bo'lsa taqiq. Ochiq qolgan qism: offline **qaytarish va ko'chirish** (M02/M06) siyosati — ruxsat (sotuv kabi, keyin tasdiqlash) yoki taqiq — hali qaror qilinmagan.
 3. Qurilmani bekor qilish UX oqimi (qaysi ekranda, kim bekor qiladi, eksport jarayoni) — mahsulot ekranlarida hali yo'q (9-bo'lim).
 4. ~~Bitta smenani ikki qurilma baham ko'rganda fiskal chek raqamlash tartibi.~~ **Yopildi**: bitta smena — bitta qurilma (`shifts.device_id`, 3.3-bo'lim). *(2026-10-14: tekshiruv)*
 5. Aniq partiya hajmi (`/sync/push` necha voqea), `page_size` (`/sync/pull`), delta-sync chastotasi, outbox saqlash muddati (7 kun), chek tarixi oynasi (90 kun), PIN urinish soni (5) — barchasi **taxmin**, yuklama sinovida/pilotda aniqlanadi.
@@ -304,6 +320,7 @@ Backend tomonida `/sync/push` va `/sync/pull` uchun OpenAPI sxemasiga mos kontra
 
 ## Manbalar
 
+- `spec/02-arxitektura/12-autentifikatsiya-oauth2.md` — OAuth 2.0 token, refresh rotatsiyasi, offline litsenziya tokeni, obuna lokauti. *(2026-10-15: foydalanuvchi qarori)*
 - `research_notes/texnik/04-arxitektura-va-stack.md` — §2 (offline-first, event-log, konflikt), §6 (davlat hisoboti, bevosita bog'liq emas, lekin arxitektura uslubi).
 - `research_notes/texnik/02-kassa-ofd-markirovka.md` — §1 (48 soat, 1-ilova 31-band; OFD, fiskal modul).
 - `research_notes/texnik/12-taxminlar-va-murojaatlar.md` — 6-band (markirovka offline taxmini).

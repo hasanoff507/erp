@@ -8,7 +8,7 @@
 2. **Faqat 3 tizimda** to'liq ochiq, mustaqil tekshirilgan API hujjati va/yoki sandbox bor: **Faktura.uz** (`api.faktura.uz/help/`), **Payme** (`test.paycom.uz`), **E-IMZO** (`testvpn.e-imzo.uz`, jamoatchilik hujjati). Qolgan 9 tasida hujjat yopiq, login talab qiladi yoki umuman topilmadi — bu MVP jadvaliga to'g'ridan-to'g'ri xavf (`research_notes/texnik/14-tekshiruv-xulosasi.md`, 4-bo'lim).
 3. Uchta qattiq **SLA/muddat** butun arxitekturani belgilaydi: OFD offline chegarasi **48 soat** (VMQ-943, 1-ilova, 31-band), markirovkalangan tovar ko'chirish **72 soat** (23-son qaror, 2026-01-23), davlat hisobotini tuzatish **5 kalendar kun** (Soliq kodeksi 81-moddasi, O'RQ-1108). Uchtasi ham worker darajasida taymer va eskalatsiya bildirishnoma sifatida amalga oshiriladi.
 4. **my.soliq.uz uchun rasmiy API yo'q** — davlat hisobotini solishtirish (markaziy qiymat taklifi, M10/BP-08) MVP'da **qo'lda fayl yuklash** bilan boshlanadi; bu `08-mahsulot-modullari.md`/`00-xulosa-va-ochiq-savollar.md`dagi 1-raqamli texnik xavf.
-5. **CRPT Turon (Asl belgisi) integrator hujjatlari yopiq** (help.crpt-turon.uz, 403 xato) — markirovka moduli (M01/M02/M06) texnik xavf ostida; offline sotish siyosati (ruxsat/taqiq) hali **ochiq savol**, MVP standart taxmin — "sotuv rad etiladi".
+5. **CRPT Turon (Asl belgisi) integrator hujjatlari yopiq** (help.crpt-turon.uz, 403 xato) — markirovka moduli (M01/M02/M06) texnik xavf ostida; *(2026-10-15: foydalanuvchi qarori)* offline **sotish** siyosati endi aniq: narx qurilmada ma'lum bo'lsa ruxsat (CRPT tasdig'i internet qaytganda), bo'lmasa taqiq (4-bo'lim); online holatda kod yaroqsiz/takroriy bo'lsa hamon MVP standart taxmin — "sotuv rad etiladi". Offline **qaytarish/ko'chirish** siyosati hali ochiq savol.
 6. **Click, Payme, Uzum ikki alohida vazifada** ishlatiladi: (a) do'kon QR to'lovlari (mijoz do'konga to'laydi, do'konning o'z merchant hisobi) va (b) bizning obuna billing'imiz (M17, `billing_payments` — bizning merchant hisobimiz). Ikkisi texnik jihatdan bir xil adapter interfeysidan foydalanadi, lekin **kredensial va tenant kontekst butunlay ajratilgan**.
 7. Har bir integratsiya kredensiali (API kalit, sertifikat, merchant ID) **tenant darajasida shifrlangan** saqlanadi (`tenants.settings` JSONB emas — alohida `tenant_secrets` jadvali, shifrlangan ustun; tafsilot `05-xavfsizlik-va-audit.md`).
 8. **BO-14 "Integratsiyalar holati"** ekrani — har bir tashqi tizim uchun: ulanganmi, oxirgi muvaffaqiyatli chaqiruv vaqti, navbatdagi/muvaffaqiyatsiz ishlar soni, qo'lda qayta urinish tugmasi. Bu ekran bo'lmasa, OFD/e-faktura muvaffaqiyatsizligi Egasi/Buxgalterga ko'rinmay qoladi.
@@ -44,6 +44,8 @@ stateDiagram-v2
 - **Qayta urinish siyosati (umumiy formula)**: eksponensial backoff + jitter: `next_run_at = now() + min(cap, base * 2^attempts) + random(0, jitter)`. Har integratsiya o'z `base`/`cap`/`max_attempts`ini SLA'siga qarab belgilaydi (pastda har bo'limda).
 - **O'lik xat (dead-letter)**: `max_attempts` tugagach `status=failed`; job **o'chirilmaydi**, `last_error` va to'liq `payload` saqlanadi — qo'lda tekshirish/qayta urinish/bekor qilish uchun. Fiskal va e-faktura kabi huquqiy oqibati bor ishlarda `failed` holati **audit_log**ga ham yoziladi.
 - **Idempotentlik**: har job `idempotency_key` bilan (odatda `client_event_id` + `kind`, yoki tashqi tizim talab qilgan `merchant_trans_id`/`provider_tx_id`). Worker va tashqi tizim ikkisi ham qayta yuborilgan so'rovni xavfsiz rad etishi/bir xil natija qaytarishi kerak — bu ayniqsa offline sinxronlashda (bir xil chek ikki marta yuborilishi) va to'lov webhook'larida (bank ikki marta qayta yuborishi) muhim.
+- **Circuit-breaker** *(2026-10-15: spec yozish bilan yopildi, kamchiliklar-yakuniy #33)*: har adapter uchun alohida, tenant'dan mustaqil (bitta tenant bitta integratsiyani "buzmasligi" uchun) — 1 daqiqa ichida 5 ketma-ket vaqtinchalik xato (`transient`, pastda) kelsa breaker **ochiladi** (shu adapterga yangi chaqiruv yo'q, job'lar `retry` holatida navbatda qoladi), 5 daqiqadan keyin **half-open** holatida bitta sinov so'rovi yuboriladi — muvaffaqiyatli bo'lsa yopiladi, yo'q bo'lsa yana 5 daqiqa. Breaker ochiq holati BO-14'da 🔴 va M18 orqali ogohlantirish bilan ko'rinadi. **OFD'ning 48 soatlik qonuniy taymeri** (6-bo'lim, `04-offline-sync.md` §6) breaker holatidan **mustaqil** — breaker ochiq bo'lsa ham 48 soat hisoblanishda davom etadi (taxmin).
+- **Umumiy xato tasnifi** *(2026-10-15: spec yozish bilan yopildi, kamchiliklar-yakuniy #34)*: `transient` (timeout/5xx/429 → `retry`, backoff bilan qayta uriniladi), `auth` (401/403 → `failed`, BO-14'da "kredensial muammosi" matni bilan), `validation` (4xx, sxema/biznes qoida xatosi → `failed`, foydalanuvchiga tarjima qilingan matn), `duplicate` (tashqi tizim "allaqachon qabul qilingan" deb javob bersa → idempotent muvaffaqiyat, xato emas). Har integratsiyaning vendor-xos xato kodlari (masalan OFD 704031) ilova sifatida, hujjat kelganda qo'shiladi.
 
 ### BO-14 — "Integratsiyalar holati" ekrani (talab)
 
@@ -86,7 +88,7 @@ class FiscalAdapter(Protocol):
 
 **Xato UX**: kassir chekni normal chop etadi/ko'rsatadi ("offline" belgisi bilan) — **sotuv to'xtamaydi**. Fiskal modul texnik xatosi huquqiy javobgarlik keltirishi mumkin (`11-raqobatchilar-kamchiliklari.md`), shuning uchun xato faqat orqa fonda, foydalanuvchiga bloklovchi xato ko'rsatilmaydi.
 
-**Offline**: to'liq qo'llab-quvvatlanadi — bu integratsiyaning asosiy loyihalash sharti (`00-umumiy-arxitektura.md`, append-only event-log). Offline chek `fiscal_receipts.status=pending`, `offline_since` belgilanadi; internet qaytganda worker avtomatik yuboradi.
+**Offline**: to'liq qo'llab-quvvatlanadi — bu integratsiyaning asosiy loyihalash sharti (`00-umumiy-arxitektura.md`, append-only event-log). Offline chek `fiscal_receipts.status=pending`, `offline_since` belgilanadi; internet qaytganda worker avtomatik yuboradi. **Lokaut (obuna to'xtagan) holatida ham** — agar chek lokautdan **oldin** yaratilgan bo'lsa, qurilma uni cheklangan `sync.drain` scope orqali serverga topshiradi (`04-offline-sync.md` §3.5, D1, 2026-10-15); bir marta `fiscal_receipts`ga qabul qilingandan keyin worker→OFD oqimi yuqoridagidek, o'zgarishsiz davom etadi — D1 faqat **qurilma→server** `/sync/push` yo'lini cheklaydi, server→OFD yo'nalishiga ta'sir qilmaydi.
 
 **SLA**: **48 soat** (VMQ-943, 1-ilova, 31-band, [lex.uz/docs/4603329](https://lex.uz/docs/4603329)) — birlamchi manbadan tasdiqlangan.
 
@@ -154,7 +156,7 @@ class EInvoiceAdapter(Protocol):
     async def get_risk_flag(self, operator_doc_id: str) -> RiskFlag: ...  # yashil/qizil — kanal ochiq savol
 ```
 
-**Ma'lumot moslashtirish**: `einvoices(tenant_id, direction, operator, operator_doc_id, counterparty_id, related_doc, status, risk_flag, signed_at, payload)`; qizil faktura → `vat_moves.status` to'lovgacha "kutilmoqda" (US-M07-03/US-M10-03).
+**Ma'lumot moslashtirish**: `einvoices(tenant_id, direction, operator, operator_doc_id, counterparty_id, related_doc, status, risk_flag, signed_at, payload)`; qizil faktura → kiruvchi QQS `vat_moves`ga **to'lovgacha yozilmaydi** (append-only registr, `status` ustuni yo'q — `tekshiruv/00-qarorlar.md` #5). BO-07/BO-10'dagi "kutilayotgan QQS krediti" ko'rsatkichi `einvoices.risk_flag='red'` va to'lanmagan qoldiqdan hisoblanadi (US-M07-03/US-M10-03). *(2026-10-15: tekshiruv — eskirgan `vat_moves.status` eslatmasi olib tashlandi)*
 
 **Idempotentlik kaliti**: `operator_doc_id` (operatordan kelgan hujjat ID'si) + `tenant_id`; chiquvchi fakturada `client_event_id`.
 
@@ -258,7 +260,7 @@ class MarkingAdapter(Protocol):
     async def write_off(self, codes: list[str], write_off_id: UUID) -> MarkingWriteOffResult: ...
 ```
 
-**Ma'lumot moslashtirish**: `marking_codes(tenant_id, code, product_id, status, last_doc_id, verified_at)` (`01-malumotlar-modeli.md`, 9-bo'lim); `status`: `in_stock` → `sold`/`returned`/`written_off`.
+**Ma'lumot moslashtirish**: `marking_codes(tenant_id, code, product_id, status, last_doc_id, verified_at)` (`01-malumotlar-modeli.md`, 9-bo'lim); `status`: `in_stock` → `sold`/`returned`/`written_off`; offline sotuvda oraliq holat **`pending_verification`** (kod mahalliy yozilgan, CRPT tasdig'i internet qaytganda kutilmoqda, `04-offline-sync.md` §7) → `sold` (muvaffaqiyatli `verify_code`+`sell`dan keyin) yoki qoladi + ogohlantirish (`verify_failed`). *(2026-10-15: foydalanuvchi qarori)*
 
 **Idempotentlik kaliti**: `code` (DataMatrix, global noyob) + `doc_id` — bir xil kod bitta hujjatga ikki marta "chiqarilmaydi".
 
@@ -266,7 +268,7 @@ class MarkingAdapter(Protocol):
 
 **Xato UX**: `verify` muvaffaqiyatsiz (noto'g'ri/takroriy/muddati o'tgan kod) — MVP standart siyosat **sotuvni rad etish** (kassir markirovkasiz tovar bilan davom etishi/almashtirishi mumkin) — bu **taxmin**, rasmiy talab tasdiqlanmagan (`spec/01-mahsulot/02-modullar-talablari.md`, US-M01-03).
 
-**Offline**: **ishlay olmaydi** — CRPT markaziy tizimga real-time bog'liq. Internetsiz do'konda markirovkalangan tovar sotish siyosati (ruxsat/taqiq) **ochiq savol**; taqiq bo'lsa jarima xavfi (aylanmaning 2–20%i, `00-xulosa-va-ochiq-savollar.md`, bonus-xavf).
+**Offline**: `verify_code` (real-vaqt CRPT tasdig'i) **ishlay olmaydi** — CRPT markaziy tizimga real-time bog'liq. *(2026-10-15: foydalanuvchi qarori — avvalgi "ochiq savol" hal qilindi)* Shunga qaramay, markirovkalangan tovarni **offline sotish ruxsat etiladi**, agar tovar narxi qurilmada ma'lum bo'lsa (POS'ga oldindan sinxronlangan/keshlangan katalog narxi): DataMatrix kod skanerlanadi, qurilmada faqat mahalliy format tekshiruvi o'tkaziladi, kod `marking_codes`ga (status kutilmoqda) va mahalliy event-logga yoziladi; internet qaytganda worker CRPT Turon'ga `verify_code` + `sell` so'rovini yuboradi (asinxron, `outbox_jobs(kind=marking_sell)`), natija `marking_codes.status=sold` (yoki `verify_failed` — bu holat Egasi/Buxgalterga ko'rinadi, keyingi tekshiruv/tuzatish talab qiladi). Agar tovar narxi qurilmada ma'lum **bo'lmasa** — bu tovar bilan sotuv offline rejimda **ruxsat etilmaydi**. Offline **qaytarish/ko'chirish** siyosati hali ochiq (quyida). *Eslatma: bu mahsulot qarori; yuridik tasdiq (huquqshunos bilan) tavsiya etiladi, lekin spec darajasidagi qaror allaqachon qabul qilingan.*
 
 **SLA**: ko'chirish **72 soat** — faqat tajriba loyihasi ishtirokchilari uchun (VMQ 23-son, 23.01.2026, 1-ilova Nizom; hozircha o'simlik yog'i pilot loyihasi), umumiy majburiy muddat sifatida tasdiqlanmagan; 2026-07-01'dan elektron hisob-fakturada kod avtomatik tekshirish va kassada avtomatik kiritish majburiy. *(2026-10-14: tekshiruv)*
 
@@ -274,7 +276,7 @@ class MarkingAdapter(Protocol):
 
 **Monitoring**: BO-14 + har do'kon uchun "offline markirovka savdosi kutilmoqda" ogohlantirishi (internet qaytganda avtomatik tekshirish navbati).
 
-**MVP bosqichi**: MVP — majburiy, lekin **eng yuqori texnik xavf**. **Zaxira yo'l**: API ochilmasa/sekin bo'lsa — mavjud integrator (MoySklad, E-POS, Smartup) orqali proxy sifatida ulash, yoki markirovka modulini keyingi relizga ko'chirish (`12-taxminlar-va-murojaatlar.md`, savol 2).
+**MVP bosqichi**: MVP — majburiy, lekin **eng yuqori texnik xavf**. **Zaxira yo'l**: API ochilmasa/sekin bo'lsa — mavjud integrator (MoySklad, E-POS, Smartup) orqali proxy sifatida ulash, yoki markirovka modulini keyingi relizga ko'chirish (`12-taxminlar-va-murojaatlar.md`, savol 2). **Eslatma**: `11-backlog.md` hamon CRPT Turon integratsiyasining o'zini "MVP'dan keyin" deb belgilagan, ammo markirovkalangan tovar sotuvi (shu band, US-M01-03) MVP talabi — bu ziddiyat `11-backlog.md`da **ochiq savol** sifatida qayd etilgan, foydalanuvchi qarori kerak (2026-10-15).
 
 ### 4.1 Mermaid: markirovkalangan tovar sotuvi
 
@@ -301,7 +303,11 @@ sequenceDiagram
         end
     else Internet yo'q
         Note over K,API: Real-vaqtda tekshirish imkoni yo'q (CRPT markaziy tizim)
-        Note over K,API: Offline siyosat — ochiq savol (ruxsat/taqiq)
+        alt Narx qurilmada ma'lum (keshlangan katalog, 2026-10-15 qarori)
+            API-->>K: Chekka qo'shishga ruxsat — kod mahalliy yoziladi,<br/>CRPT tasdig'i internet qaytganda
+        else Narx qurilmada noma'lum
+            API-->>K: Sotuv rad etiladi — narx online bo'lganda sinxronlanadi
+        end
     end
     API->>DB: sale_lines(marking_code), sotuv yakunlanadi
     API->>Q: enqueue outbox_jobs(kind=marking_sell)
@@ -488,7 +494,7 @@ class PaymentAdapter(Protocol):
 
 **Xato UX**:
 - Do'kon sotuvida: to'lov muvaffaqiyatsiz bo'lsa kassir boshqa usul (naqd/karta) taklif qiladi — sotuv to'xtamaydi.
-- Bizning billingda: to'lov o'tmasa — 24 soatlik imtiyozdan keyin (US-M17-03) back-office **cheklangan rejimga** o'tadi, lekin **kassa va fiskal chek ishlashda davom etadi** (US-M17-03, huquqiy tasdiq kerak — ochiq savol).
+- Bizning billingda: to'lov o'tmasa — 24 soatlik imtiyozdan keyin (US-M17-03) *(2026-10-15: foydalanuvchi qarori — qayta belgilandi)* tenant uchun kirish **to'liq to'xtaydi**: barcha faol sessiya/tokenlar bekor qilinadi, har bir ochiq ekran (kassa va back-office, farqlanmasdan) login sahifasiga qaytariladi, login sahifasida "Obuna muddati tugagan" xabari + Click/Payme to'lov havolasi ko'rsatiladi, yangi login ham rad etiladi. To'lov kelgach darhol qayta ochiladi. Offline qurilma — mahalliy imzolangan litsenziya (`subscription_end + 24 soat`) muddati tugaganda o'zi mahalliy qulflanadi (serverga ulanishni kutmaydi). Avvalgi "kassa ishlayveradi, back-office cheklanadi" taklifi va unga tegishli huquqiy ochiq savol olib tashlandi; endi xizmat shartlarida (ToS) do'konning kirish to'xtatilgan davrdagi fiskal/soliq majburiyatlari uchun o'zi javobgar ekani aniq yozilishi shart (huquqshunos bilan tasdiqlash tavsiya etiladi). Ikki tor istisno *(2026-10-15: foydalanuvchi qarori, `04-offline-sync.md` §3.5)*: **D1** — lokautdan oldin yaratilgan, hali yuborilmagan fiskal voqealar cheklangan `sync.drain` scope orqali baribir OFD'ga yetib boradi (yangi sotuv/login yo'q, 1-bo'lim); **D2** — lokaut davrida ma'lumot eksporti faqat to'lov sahifasidan, SMS OTP tasdig'i bilan ruxsat etiladi, boshqa barcha ekran yopiq.
 
 **Offline**: yo'q — QR/karta to'lovi online amal; offline paytda faqat naqd/nasiya ishlaydi.
 
@@ -690,7 +696,7 @@ Tanlov mezoni: (a) ochiq/tasdiqlangan API/sandbox birinchi, (b) qonuniy SLA bosi
 ## Ochiq savollar
 
 1. CRPT Turon (Asl belgisi) integrator sifatida ro'yxatdan o'tish shartlari va API texnik spetsifikatsiyasi — `help.crpt-turon.uz` 403 bilan yopiq (Xat 2 javobini kutish).
-2. Offline rejimda markirovkalangan tovar sotish siyosati (ruxsat/taqiq) — hali ishlab chiqarilmagan, huquqiy maslahat kerak.
+2. *(2026-10-15: qisman hal qilindi — foydalanuvchi qarori)* Offline rejimda markirovkalangan tovar **sotish** siyosati endi aniq (4-bo'lim: narx ma'lum bo'lsa ruxsat, bo'lmasa taqiq); huquqiy tasdiq hamon tavsiya etiladi. Offline **qaytarish/ko'chirish** siyosati hali ishlab chiqarilmagan.
 3. my.soliq.uz'dan hisobotni dasturiy (yoki yarim-rasmiy, E-IMZO orqali autentifikatsiyalangan) o'qish yo'li bormi — Xat 1 javobini kutish.
 4. Virtual kassa dasturini Davlat reyestriga kiritishning aniq narxi (sertifikatlash/ekspertiza xizmat haqi) — hamon topilmadi.
 5. Onlayn/QR to'lovda fiskal chekni kim chiqarishi (to'lov tizimi "komissioner" sifatida, yoki merchant o'zi) — ikki huquqiy talqin ziddiyatli, OFD operatori/Soliq qo'mitasi bilan aniqlashtirish kerak.
@@ -722,3 +728,4 @@ Tanlov mezoni: (a) ochiq/tasdiqlangan API/sandbox birinchi, (b) qonuniy SLA bosi
 - [lex.uz/docs/-6234904](https://lex.uz/docs/-6234904) — O'RQ-793-son (E-IMZO qonuni)
 - [api.faktura.uz/help/](https://api.faktura.uz/help/), [developer.help.paycom.uz](https://developer.help.paycom.uz/), [docs.click.uz](https://docs.click.uz/), [developer.uzumbank.uz](https://developer.uzumbank.uz/en/)
 - [github.com/qo0p/e-imzo-doc](https://github.com/qo0p/e-imzo-doc), [tasnif.soliq.uz](https://tasnif.soliq.uz/)
+- Foydalanuvchi qarori, 2026-10-15 — obuna kechikkanda to'liq to'xtash (9-bo'lim); markirovkalangan tovar offline sotish siyosati (4-bo'lim)

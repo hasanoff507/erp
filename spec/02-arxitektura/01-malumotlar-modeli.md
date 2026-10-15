@@ -25,7 +25,7 @@
 | Matn | Nomlar lotin/kirill/rus aralash bo'lishi mumkin; qidiruv uchun `pg_trgm` indeks |
 | Tenant izolyatsiyasi | Har jadvalda RLS siyosati: `tenant_id = current_setting('app.tenant_id')` (`05-xavfsizlik-va-audit.md`) |
 | Versiya | Ma'lumotnomalarda `version INT` — optimistik qulflash (ikki kishi bir vaqtda tahrirlasa) |
-| RLS istisnolari | `tenant_id`'siz global jadvallar: `plans`, `units`, `platform_admins` (ilova roliga faqat SELECT, `platform_admins`ga umuman yo'q). `tenants` — siyosat `id = app.tenant_id`. `users` — siyosat `id = app.user_id OR EXISTS(memberships m WHERE m.user_id = users.id AND m.tenant_id = app.tenant_id)`; login/tenant tanlash — `SECURITY DEFINER` funksiyalar `auth_find_user(phone)`, `auth_list_memberships(user_id)` orqali *(2026-10-14: tekshiruv)* |
+| RLS istisnolari | `tenant_id`'siz global jadvallar: `plans`, `units`, `platform_admins`, `oauth_clients`, `signing_keys` (ilova roliga faqat SELECT, `platform_admins`ga umuman yo'q). `tenants` — siyosat `id = app.tenant_id`. `users` — siyosat `id = app.user_id OR EXISTS(memberships m WHERE m.user_id = users.id AND m.tenant_id = app.tenant_id)`; login/tenant tanlash — `SECURITY DEFINER` funksiyalar `auth_find_user(phone)`, `auth_list_memberships(user_id)` orqali. **Auth-sxema jadvallari** *(2026-10-15: qabul-5 — O7 tuzatish, standart `tenant_id` RLS bu jadvallarda texnik jihatdan ishlamaydi)*: `user_credentials`, `otp_challenges`, `login_attempts`, `authorization_codes`, `refresh_tokens`, `sessions` — alohida PostgreSQL `auth` sxemasida, ilova roliga to'g'ridan-to'g'ri ruxsat yo'q, kirish faqat `SECURITY DEFINER` funksiyalar orqali (`auth_find_user`, `auth_consume_code`, `auth_rotate_refresh`, `auth_revoke_tenant`, `auth_suspend_tenant` — `12-autentifikatsiya-oauth2.md` §19). **`license_tokens`** — bundan mustasno, standart `tenant_id` RLS (10.1-bo'lim) |
 
 ## 2. Platforma (M17)
 
@@ -35,7 +35,8 @@
 | `plans` | id, code (`start`/`biznes`/`pro`), price_month, price_year, limits JSONB (`max_registers`, `max_branches`, `ai_monthly_tokens`, …) | Tariflar (`06-mvp-chegarasi.md` 3.3) |
 | `subscriptions` | tenant_id (UNIQUE — bitta tenant, bitta qator), plan_id, period (`month`/`year`), current_period_end (trial'da = trial tugash sanasi), grace_ends_at, status (`trial`/`active`/`grace`/`restricted`/`closed`) | Tenant hayot siklining **yagona** manbai; holat mashinasi 8-bo'limda *(2026-10-14: tekshiruv)* |
 | `billing_payments` | tenant_id, amount, provider (`click`/`payme`), provider_tx_id (unique), status, paid_at | Bizning daromad; webhook idempotent |
-| `platform_admins` | id, email, role | Ichki admin (ADM-01), tenantlarga RLS'siz kiradi — faqat audit bilan |
+| `platform_admins` | id, **user_id** (→ `users`), role, **mfa_secret_encrypted**, **allowed_ips** | Ichki admin (ADM-01), tenantlarga RLS'siz kiradi — faqat audit bilan. Kredensial endi `user_id` orqali `user_credentials`dan keladi, login'da majburiy TOTP (`12-autentifikatsiya-oauth2.md` §18.1, O8 tuzatish) *(2026-10-15: qabul-5)* |
+| **`tenant_tax_regimes`** *(2026-10-15: kamchiliklar-yakuniy #18)* | tenant_id, valid_from (oy 1-sanasi), regime (`vat`/`turnover`) | Tenant darajasidagi soliq rejimi tarixi — rejim faqat oy boshidan o'zgaradi, o'tgan davrlar qayta hisoblanmaydi; 1 mlrd so'm chegarasidan oshganini tizim ogohlantiradi, o'tishni Buxgalter belgilaydi (`02-provodka-qoidalari.md` §4.3 bilan birga ishlaydi) |
 
 ## 3. Tashkilot, foydalanuvchilar, huquqlar (M13, M14)
 
@@ -45,8 +46,9 @@
 | `branch_tax_settings` | branch_id, valid_from, settlement_category, activity_type | Aylanma solig'i stavkasi tarixi — yangi qiymat faqat `valid_from` sanasidan qo'llanadi, oldingi davrlar qayta hisoblanmaydi *(2026-10-14: tekshiruv)* |
 | `warehouses` | tenant_id, branch_id, name, type (`store`/`stock`) | MVP: har filialda 1 ta ombor (avtomatik) |
 | `cash_registers` | tenant_id, branch_id, name, kind (`web`/`android`), fiscal_module_id, ofd_status | Kassa (virtual kassa ID shu yerda) |
-| `devices` | tenant_id, cash_register_id, kind (`web`/`android`), token_hash (**faqat android**, Bearer), token_expires_at, revoked_at, revoked_by, last_seen_at, last_sync_at, app_version | Offline sync uchun. Qurilma tokeni (Bearer) faqat Android uchun; veb-kassa — sessiya cookie (`05-xavfsizlik-va-audit.md` 1-bo'lim) *(2026-10-14: tekshiruv)* |
-| `users` | id, phone (unique global), name, password_hash/pin_hash, locale | Bir odam bir nechta tenantda ishlashi mumkin |
+| `devices` | tenant_id, cash_register_id, kind (`web`/`android`), revoked_at, revoked_by, last_seen_at, last_sync_at, app_version | Offline sync uchun. **`token_hash`/`token_expires_at` olib tashlandi** — endi `refresh_tokens.device_id`/`license_tokens.device_id` orqali bog'lanadi (`12-autentifikatsiya-oauth2.md` §19); **veb-kassa endi ham `devices` yozuviga ega** (litsenziya tokeni uchun, to'g'ridan-to'g'ri API chaqirmaydi — hamon cookie+BFF), faqat Android to'g'ridan-to'g'ri Bearer bilan API chaqiradi *(2026-10-15: foydalanuvchi qarori)* |
+| `users` | id, phone (unique global), name, locale | Bir odam bir nechta tenantda ishlashi mumkin. Parol/PIN heshlari — `user_credentials`ga ko'chirildi (quyida) *(2026-10-15: foydalanuvchi qarori; 2026-10-15: qabul-5 — KICHIK 11, "Kalendar" atamasi "Parol/PIN heshlari" bilan almashtirildi)* |
+| `user_credentials` | user_id (PK/FK), password_hash, **password_algo** (= `argon2id`), password_updated_at, pin_hash, pin_updated_at, failed_login_count, locked_until, **must_change_password**, **must_change_pin** | Sirlarni `users`dan ajratish; to'liq tafsilot `12-autentifikatsiya-oauth2.md` §19. `password_algo` ustuni qo'shildi (12-auth §19 bilan moslashtirildi); oxirgi ikki ustun — Egasi `admin_reset`/`pin_reset` OTP bilan tiklaganda `true` (O10 tuzatish) *(2026-10-15: foydalanuvchi qarori; 2026-10-15: qabul-5)* |
 | `memberships` | tenant_id, user_id, role_ids[], branch_ids[] (bo'sh = hammasi), status | Kim qaysi do'konda, qaysi filialda |
 | `roles` | tenant_id, name, is_system (`owner`/`manager`/`cashier`/`storekeeper`/`accountant`) | Standart 5 rol + o'zinikini yaratish |
 | `role_permissions` | role_id, permission_code, limit_value (null) | Masalan `discount.give` limit 10%, `cash.withdraw` limit 500 000 |
@@ -65,11 +67,13 @@
 | `internal_barcode_seq` | tenant_id, next_value | Ichki kodlar diapazoni (masalan `2000000…`) — tashqi EAN bilan to'qnashmaydi |
 | `discount_rules` | tenant_id, name, scope (`product`/`category`/`all`), target_ids[], kind (`percent`/`amount`/`n_plus_m`), value, branch_ids[] (bo'sh = hammasi), valid_from, valid_to, priority, archived_at | US-M03-02 (MVP'dan keyin); bitta chek qatoriga eng yuqori `priority`li bitta qoida (**taxmin**) *(2026-10-14: tekshiruv)* |
 
+**Birlik konversiyasi va yaxlitlash qoidasi** *(2026-10-15: kamchiliklar-yakuniy #5)*: qoldiq har doim `products.unit_code` (asosiy birlik)da saqlanadi. Qadoq/quti shtrix-kodi (`product_barcodes.units_per_barcode`) skanerlanganda miqdor shu koeffitsientga ko'paytirilib asosiy birlikka o'tkaziladi. `units.is_fractional=false` bo'lgan birlikda miqdor **butun son** bo'lishi majburiy (validatsiya — kasr kiritilsa rad etiladi); `is_fractional=true`da miqdor `NUMERIC(18,3)` to'liq aniqlik bilan. Qator summasi = narx × miqdor, natija **tiyingacha ROUND_HALF_UP** bilan yaxlitlanadi.
+
 ## 5. Kontragentlar (M07, M08)
 
 | Jadval | Asosiy maydonlar | Izoh |
 |---|---|---|
-| `counterparties` | tenant_id, kind (`person`/`company`), name, phone, stir (yuridik), is_customer, is_supplier, credit_limit (null = limitsiz), notify_consent (bool + sana), telegram_chat_id, note | Mijoz ham, yetkazib beruvchi ham bitta jadvalda |
+| `counterparties` | tenant_id, kind (`person`/`company`), name, phone, stir (yuridik), **legal_address**, **bank_account**, **bank_mfo**, **vat_payer BOOL**, **vat_payer_checked_at**, is_customer, is_supplier, credit_limit (null = limitsiz), notify_consent (bool + sana), telegram_chat_id, note | Mijoz ham, yetkazib beruvchi ham bitta jadvalda. *(2026-10-15: kamchiliklar-yakuniy #10/#11)* Yangi ustunlar — B2B e-faktura uchun shart: STIR kiritilganda rekvizitlar EDO operatoridan (masalan Faktura.uz `CheckCompanyExist/:inn`) avto-to'ldiriladi; `legal_address`/`bank_account`/`bank_mfo`siz B2B chiquvchi e-faktura yaratilmaydi. `vat_payer=false` bo'lgan yetkazib beruvchi — AI-03 (hujjat OCR) qamrovini aniqlashda ishlatiladi. |
 
 ## 6. Hujjatlar
 
@@ -79,7 +83,7 @@ Barcha hujjatlarda umumiy sarlavha (**yagona ro'yxat**, boshqa joyda takrorlanma
 |---|---|---|---|
 | `shifts` | — | M01, M16 | ochilish/yopilish, boshlang'ich va sanalgan naqd |
 | `sales` (chek) | `sale_lines` (product, qty, price, discount, vat_rate, vat_amount, cost_amount, marking_code (markirovkalangan tovarda **qty = 1** majburiy — har kod alohida qator), lot_allocations JSONB), `sale_payments` (method: `cash`/`card`/`uzqr`/`click`/`payme`/`uzum`/`debt`, amount, provider_tx_id, qr_type: `static`/`dynamic`/null — `uzqr` = bank tomonidan generatsiya qilingan yagona QR, PF-246 bo'yicha yuridik shaxslar uchun 2026-07-01'dan majburiy) | M01, M03, M08 | qoldiq −, tannarx, kassa naqd +, qarz + (nasiya), QQS, buxgalteriya *(2026-10-14: tekshiruv)* |
-| `returns` | `return_lines` (sale_line_id, qty) | M02 | qoldiq +, kassa −/qarz −, QQS −, buxgalteriya |
+| `returns` | `return_lines` (**sale_line_id (null = chek topilmagan qaytarish)**, qty) | M02 | qoldiq +, kassa −/qarz −, QQS −, buxgalteriya |
 | `purchase_orders` | `po_lines` | M07 | — (rejalashtirish, registrga ta'sir yo'q) |
 | `goods_receipts` (kirim) | `receipt_lines` (product, qty, cost, vat, expiry_date (ixtiyoriy)) | M07 | yangi partiya (lot), qoldiq +, yetkazib beruvchiga qarz + (nasiya bo'lsa), kirish QQS *(2026-10-14: tekshiruv)* |
 | `supplier_returns` (yetkazib beruvchiga qaytarish) | `supplier_return_lines` (receipt_line_id, lot_id, qty, cost, vat) | M07 | qoldiq − (asl partiyadan), yetkazib beruvchiga qarz − (yoki debitorlik), kiritiladigan QQS − *(2026-10-14: tekshiruv)* |
@@ -94,6 +98,8 @@ Barcha hujjatlarda umumiy sarlavha (**yagona ro'yxat**, boshqa joyda takrorlanma
 | `supplier_payments` | `allocations` | M07, M08 | yetkazib beruvchiga qarz −, kassa/bank − |
 | `expenses` | — (category_id, amount, source: `cash`/`bank`/`card`, cash_register_id + shift_id (source=`cash` bo'lsa majburiy), attachment_id, recurring_rule_id) | M15 | kassa/bank −, xarajat *(2026-10-14: tekshiruv)* |
 | `cash_movements` (kassa pul harakati) | — (direction `in`/`out`, reason: `collection` (inkasso)/`deposit`/`owner_withdrawal`/`other`) | M16 | kassa naqd ±. Xarajat to'lovi bu hujjat **emas** — `ExpensePostingService` `cash_moves`ni o'zi yozadi *(2026-10-14: tekshiruv)* |
+
+**Qaytarish invarianti va chek topilmagan qaytarish** *(2026-10-15: kamchiliklar-yakuniy #8)*: `SUM(return_lines.qty) WHERE sale_line_id=X AND status=posted ≤ sale_lines.qty` — `ReturnPostingService` asl sotuv qatorini qulflab (`09-backend-arxitekturasi.md` §2.1 bilan bir xil qulflash tartibida) tekshiradi; oshib ketsa `RETURN_QTY_EXCEEDED` xato kodi (offline holatda POS ekranida rad etiladi, serverga yetganda qayta tekshiriladi). **Chek topilmagan qaytarish** (`sale_line_id=NULL`): faqat Menejer/Egasi PIN tasdig'i bilan, narx — qaytarish paytidagi joriy narx (asl chek narxi emas, chunki asl chek yo'q), alohida hisobotda ajratilgan holda ko'rsatiladi (oddiy qaytarishlar bilan aralashtirilmaydi).
 
 Qo'shimcha: `expense_categories`, `recurring_expenses` (rule: summa, kun, davr), `attachments` (S3 kaliti, turi, hajmi).
 
@@ -120,6 +126,7 @@ Barcha registrlarda umumiy ustunlar: `id, tenant_id, doc_type, doc_id, reversal_
 | Obyekt | Holatlar |
 |---|---|
 | Chek (`sales`) | `draft` (faqat qurilmada) → `posted` → `cancelled`. Fiskal holat bu yerda **emas** — `fiscal_receipts.status`: `pending` → `sent` → `fiscalized` / `failed` (qayta urinish). Qaytarilganlik holati saqlanmaydi — `return_lines` yig'indisidan hisoblanadi; `draft` bekor qilinsa → `sale.draft_voided` audit voqeasi (registrga ta'sirsiz) *(2026-10-14: tekshiruv)* |
+| **Xaridnoma (`purchase_orders`)** *(2026-10-15: kamchiliklar-yakuniy #3)* | `draft` → `sent` → `partially_received` → `closed` / `cancelled`; holat `goods_receipts.po_id` bo'yicha qabul qilingan qatorlar yig'indisidan hisoblanadi (saqlanadigan ustun emas); `closed`dan keyin tahrir taqiq |
 | Kirim (`goods_receipts`) | `draft` → `posted` → (`cancelled` — storno yozuvlar bilan) |
 | Yetkazib beruvchiga qaytarish | `draft` → `posted` → (`cancelled` — storno yozuvlar bilan) *(2026-10-14: tekshiruv)* |
 | Narx o'zgarishi (`price_changes`) | `draft` → `pending_approval` (limitdan katta, US-M09-02) → `posted` / `rejected` *(2026-10-14: tekshiruv)* |
@@ -128,7 +135,8 @@ Barcha registrlarda umumiy ustunlar: `id, tenant_id, doc_type, doc_id, reversal_
 | Smena | `open` → `closing` (naqd sanalmoqda) → `closed` (Z-hisobot) |
 | E-faktura | `draft` → `signed` → `sent` → `accepted` / `rejected` / `cancelled`; xavf belgisi `green`/`red` (VM 830) |
 | Davlat hisoboti (`state_reports`) | `uploaded` → `compared` → `match` / `diff_found` → `correction_sent` / `auto_accepted` (5 kalendar kun o'tdi) |
-| Obuna | `subscriptions.status` (yagona manba): `trial` → `active` → `grace` (**24 soat**, eslatmalar: −3 kun, −1 kun, to'lov kuni, 0 / 12 / 2 soat qolganda) → `restricted` (kassa ishlaydi) → `active` (to'lov) / `closed` *(2026-10-14: tekshiruv)* |
+| Obuna | `subscriptions.status` (yagona manba): `trial` → `active` → `grace` (**24 soat**, eslatmalar: −3 kun, −1 kun, to'lov kuni, 0 / 12 / 2 soat qolganda) → **`restricted` (kassa va barcha kirish TO'LIQ TO'XTAYDI — barcha sessiya/refresh-token `suspended` holatiga o'tadi (to'liq bekor emas — O2 tuzatish), login rad etiladi, faqat to'lov havolasi va tor `sync.drain` drenaj yo'li ochiq; `12-autentifikatsiya-oauth2.md` §16.1.3, §16.4)** → `active` (to'lov, `suspended` tokenlar tozalanadi, kirish darhol tiklanadi) / `closed` *(2026-10-15: foydalanuvchi qarori — avvalgi "kassa ishlaydi" taklifi bekor qilindi; 2026-10-15: qabul-5 — K3/O2 tuzatish)* |
+| **Nasiya qarzi** (har `debt_moves` receivable qatori, hisoblangan) *(2026-10-15: kamchiliklar-yakuniy #3)* | `open` → `partially_paid` → `paid`; `written_off` (`debt_writeoffs`, faqat Egasi); `overdue` — saqlanadigan holat emas, `due_date < bugun` bo'lganda hisoblangan bayroq |
 | Integratsiya ishi (`outbox_jobs`) | `queued` → `running` → `done` / `retry` (backoff) → `failed` (qo'lda ko'rish) |
 
 ## 9. Fiskal, markirovka, e-hujjatlar, davlat hisoboti
@@ -136,7 +144,7 @@ Barcha registrlarda umumiy ustunlar: `id, tenant_id, doc_type, doc_id, reversal_
 | Jadval | Asosiy maydonlar |
 |---|---|
 | `fiscal_receipts` | tenant_id, sale_id/return_id, cash_register_id, shift_id, receipt_seq (**qurilma beradi**, smena ichida ketma-ket; UNIQUE (tenant_id, cash_register_id, shift_id, receipt_seq)), payload JSONB, fiscal_sign, qr_url, sent_at, offline_since, status (`pending`/`sent`/`fiscalized`/`failed`), attempts |
-| `marking_codes` | tenant_id, code (DataMatrix), product_id, status (`in_stock`/`sold`/`returned`/`written_off`/`returned_to_supplier`), last_doc_id, verified_at *(2026-10-14: tekshiruv)* |
+| `marking_codes` | tenant_id, code (DataMatrix), product_id, status (`in_stock`/`sold`/`returned`/`written_off`/`returned_to_supplier`/**`pending_verification`**), last_doc_id, verified_at *(2026-10-14: tekshiruv; 2026-10-15: kamchiliklar-yakuniy #1/#25 — `pending_verification` qo'shildi: offline sotilgan, internet qaytganda CRPT tekshiruvi kutilayotgan kod)* |
 | `einvoices` | tenant_id, direction (`in`/`out`), operator (`didox`/`faktura`), operator_doc_id, counterparty_id, related_doc (receipt/sale), status, risk_flag, signed_at, payload |
 | `ettn_documents` | tenant_id, einvoice_id, status, operator_doc_id | 
 | `state_reports` | tenant_id, tax_type (`vat`/`turnover`/`property`/`land`/`pit`/`social`), period, published_at, deadline_at (= min(published_at + 5 kalendar kun, filing deadline)), file_attachment_id, status |
@@ -160,6 +168,21 @@ Barcha registrlarda umumiy ustunlar: `id, tenant_id, doc_type, doc_id, reversal_
 | `tenant_glossary` | tenant_id, term, meaning ("kola" → mahsulot) | AI uchun do'kon "xotirasi" |
 | `audit_log` | tenant_id, user_id, action, entity, entity_id, before JSONB, after JSONB, ip, device_id, at | `05-xavfsizlik-va-audit.md` |
 | `period_closings` | tenant_id, period, closed_at, closed_by | Yopilgan davrga yozish taqiqlanadi |
+
+## 10.1 Autentifikatsiya jadvallari (OAuth 2.0) *(2026-10-15: foydalanuvchi qarori)*
+
+To'liq ustun ro'yxati va RLS holati — `12-autentifikatsiya-oauth2.md` §19. Qisqa ro'yxat:
+
+| Jadval | Asosiy maydonlar | Izoh |
+|---|---|---|
+| `oauth_clients` | id, client_id, client_type (`confidential`/`public`), name, client_secret_encrypted, redirect_uris[], allowed_grant_types[], allowed_scopes[] | — |
+| `authorization_codes` | code_hash, client_id, user_id, tenant_id, code_challenge, code_challenge_method, redirect_uri, scope, expires_at, used_at | — |
+| `refresh_tokens` | id, token_hash, family_id, client_id, user_id, tenant_id, device_id, scope, issued_at, expires_at, used_at, replaced_by_id, revoked_at, revoked_reason, **suspended_at** | `suspended_at` — obuna lokautida (`revoked_reason='subscription'`), to'liq bekor emas, faqat `scope=sync.drain`ga toraytiradi; to'lovdan keyin tozalanadi *(2026-10-15: qabul-5 — K3/O2)* |
+| `sessions` | id (=`sid`), user_id, tenant_id, client_id, device_id, current_refresh_token_id, created_at, last_seen_at, idle_expires_at, absolute_expires_at, revoked_at | — |
+| `signing_keys` | kid, algorithm (`EdDSA`/`ES256`), **purpose** (`access`/`license`), public_key, private_key_encrypted, status (`next`/`active`/`retired`) | `purpose` — access token va litsenziya tokeni endi alohida kalit bilan imzolanadi *(2026-10-15: qabul-5 — O5)* |
+| `otp_challenges` | id, phone, purpose (`signup`/`recovery`/**`invite`**/**`admin_reset`**/**`pin_reset`**/**`data_export`**), code_hash, attempts, max_attempts, expires_at, verified_at | *(2026-10-15: qabul-5 — O10)* |
+| `login_attempts` | id, phone, ip, success, failure_reason, created_at | — |
+| `license_tokens` | id, tenant_id, device_id, issued_at, valid_until, jti, **server_time** | `server_time` — qurilmaning soat-orqaga-surish himoyasi uchun (O3) |
 
 ## 11. Raqamlash
 
@@ -209,6 +232,7 @@ erDiagram
 
 ## Manbalar
 
+- `spec/02-arxitektura/12-autentifikatsiya-oauth2.md` — OAuth 2.0 jadvallari (to'liq ustun ro'yxati), `devices`/`users` o'zgarishi, obuna lokauti. *(2026-10-15: foydalanuvchi qarori)*
 - `spec/01-mahsulot/02-modullar-talablari.md` — M01–M18, US-M04-05 (partiyalar, qayta hisoblash), US-M08-05…11 (qarz daftari).
 - `spec/01-mahsulot/03-biznes-jarayonlar.md` — BP-01…12 (hujjat oqimlari va buxgalteriya ta'siri).
 - `research_notes/texnik/01-erp-modullar-va-malumot-modeli.md` — hujjat/registr modeli, MXIK, BHMS-4, NSBU 21.

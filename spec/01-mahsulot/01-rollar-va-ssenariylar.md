@@ -222,13 +222,15 @@ Belgilar: **K** = ko'rish, **Y** = yaratish, **T** = tasdiqlash. "–" = huquq y
 
 *M15–M18 izohi (2026-10-14): Kassir xarajatni faqat M16 "Pul olish → Xarajat to'lovi" orqali yozadi (M15'ga avtomatik tushadi); M17 `billing.manage` faqat Egasi; platforma admini (ADM-01, `platform.admin`) tenant rollariga kirmaydi — `05-xavfsizlik-va-audit.md` §3.4.*
 
+*M13 izohi (2026-10-15: foydalanuvchi qarori): M13 endi faqat rol/huquq emas — Egasi uchun to'liq foydalanuvchi boshqaruvi (xodim qo'shish, bloklash, parol/PIN tiklash, faol sessiya/qurilmalarni ko'rish va bekor qilish — US-M13-04…07) ham shu modulga kiradi; platforma admini (ADM-01) faqat tenant Egasi (owner) hisobi darajasida shu funksiyalarga ega (US-M13-08). Autentifikatsiya — o'z OAuth 2.0 implementatsiyasi, mock yo'q (`spec/02-arxitektura/12-autentifikatsiya-oauth2.md`).*
+
 ---
 
 ## Ochiq savollar
 
 1. Huquqlar matritsasidagi aniq taqsimot (6-bo'lim) tadqiqot fayllarida tayyor jadval sifatida topilmadi — bu hujjatda loyihalashtirilgan taxmin; MVP ishlab chiqishdan oldin foydalanuvchi bilan tasdiqlanishi kerak.
 2. Chegirma/qaytarish/nasiya uchun aniq summa limitlari (masalan, Kassir qancha so'mgacha tasdiqsiz chegirma berishi mumkin) — ochiq manbada yo'q, biznes-qoida sifatida sozlash kerak (`taxmin`).
-3. Markirovkalangan tovar offline sotilganda kassir nima qilishi kerak (ruxsat/taqiq siyosati) — `research_notes/texnik/00-xulosa-va-ochiq-savollar.md` (96-qator, "6-xavf") bu masalani hali hal qilinmagan deb belgilagan.
+3. *(2026-10-15: hal qilindi — foydalanuvchi qarori)* Markirovkalangan tovar offline sotilganda kassir nima qilishi kerak — endi aniq: narx qurilmada ma'lum bo'lsa sotuvga ruxsat (CRPT tekshiruvi internet qaytganda), narx noma'lum bo'lsa taqiq (`02-modullar-talablari.md`, US-M01-03). Qaytarish/ko'chirish uchun siyosat hali ochiq.
 4. Kichik do'konda bir necha rol birlashuvi uchun aniq segment chegaralari (1-3 xodim, 4+ xodim) — bu hujjatdagi 0-bo'limdagi guruhlash taxminiy, tadqiqotda raqam bilan tasdiqlanmagan.
 5. Buxgalterning **5 kalendar kunlik** davlat hisobotini solishtirish jarayonida aniq ish oqimi (kim birinchi ko'radi, qanday eskalatsiya) — `02-arxitektura` jamoasi bilan birga ishlab chiqilishi kerak *(2026-10-14: "5 ish kuni" → "5 kalendar kun" tuzatildi, muddatning o'zi va huquqiy asosi endi aniq)*.
 6. Omborchi tovar qabul qilganda, yetkazib beruvchi vakilining ishonchnomasini 2026-01-01 dan majburiy Vakolat.uz orqali tekshirish kerakmi — `research_notes/texnik/09-soliq-integratsiyasi.md` (E-ishonchnoma bandi) bu talabni qayd etadi, lekin API hujjati topilmagan va bu jarayonning M07 moduliga aniq qanday integratsiya qilinishi ochiq.
@@ -244,3 +246,4 @@ Belgilar: **K** = ko'rish, **Y** = yaratish, **T** = tasdiqlash. "–" = huquq y
 - `research_notes/texnik/11-raqobatchilar-kamchiliklari.md`
 - `research_notes/AI ERP startap Ozbekistonda/04_sohalar.md`
 - `research_notes/texnik/tekshiruv-2026-10-14/` — 2026-10-14 fakt-tekshiruv natijalari
+- `spec/02-arxitektura/12-autentifikatsiya-oauth2.md` — autentifikatsiya arxitekturasi — Foydalanuvchi qarori, 2026-10-15

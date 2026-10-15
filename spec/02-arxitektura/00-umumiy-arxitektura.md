@@ -12,6 +12,7 @@
 6. **Offline-first kassa**: kassa avval o'z lokal bazasiga yozadi (veb: IndexedDB, Android: SQLite), keyin append-only outbox orqali serverga; server idempotent qabul qiladi (`04-offline-sync.md`).
 7. **Fon ishlari** (OFD'ga yuborish, e-faktura, hisobot solishtirish, eslatmalar, Telegram xabarlar, AI) — alohida worker jarayonlar, Redis navbati orqali; API so'rovi tashqi tizimni kutib turmaydi.
 8. **AI — chekka qatlam**: `AiProvider` porti (fake | cli | api), pul va soliqni hech qachon AI hisoblamaydi (`07-ai-qatlami.md`).
+9. **Autentifikatsiya — o'z OAuth 2.0 implementatsiyamiz**: API komponenti ham AS, ham RS; tashqi identity-provider yo'q, mock yo'q (`12-autentifikatsiya-oauth2.md`). Obuna muddati 24 soatlik imtiyozdan o'tganda kassa va kirish **to'liq to'xtaydi** (barcha sessiya/token bekor, faqat to'lov havolasi ochiq). *(2026-10-15: foydalanuvchi qarori)*
 
 ---
 
@@ -56,7 +57,7 @@ flowchart LR
 |---|---|---|
 | Veb ilova | React + Vite + TS, FSD, Effector, shadcn/ui, PWA | Back-office va veb-kassa (`08-frontend-arxitekturasi.md`) |
 | Android POS | Kotlin, SQLite (Room) | Keyingi bosqich (`10-android-pos.md`) |
-| API | Python 3.13, FastAPI, Pydantic v2, SQLAlchemy 2 + Alembic | Barcha biznes amallar, autentifikatsiya, huquqlar |
+| API | Python 3.13, FastAPI, Pydantic v2, SQLAlchemy 2 + Alembic | Barcha biznes amallar, huquqlar; **shuningdek o'z OAuth 2.0 Authorization Server + Resource Server** (`12-autentifikatsiya-oauth2.md`, foydalanuvchi qarori 2026-10-15) — uchinchi tomon auth xizmati yo'q |
 | Worker'lar | Python, `SAQ` (Redis navbati; `09-backend-arxitekturasi.md`) *(2026-10-14: tekshiruv — arq o'rniga SAQ)* | Tashqi tizimlarga yuborish, qayta urinish, AI, xabarlar |
 | Rejalashtiruvchi | worker ichida cron (masalan `SAQ` cron) | Kunlik hisobot, eslatmalar, obuna muddati, davlat hisobotini tekshirish |
 | Baza | PostgreSQL 16+ (UzCloud DBaaS) | Hamma ma'lumot, RLS bilan tenant ajratish |
@@ -100,6 +101,7 @@ Deploy: Docker konteynerlar (api, worker, scheduler, web statik, bot) + boshqari
 | 09-backend-arxitekturasi.md | FastAPI modulli monolit, qatlamlar, kutubxonalar | ✅ |
 | 10-android-pos.md | Kotlin POS (keyingi bosqich) | ✅ |
 | 11-backlog.md | Birinchi sprintlar, tartib | ✅ |
+| 12-autentifikatsiya-oauth2.md | OAuth 2.0 AS+RS, token, admin panel, obuna lokauti, offline litsenziya | ✅ *(2026-10-15: foydalanuvchi qarori)* |
 
 ## Ochiq savollar
 
@@ -109,6 +111,7 @@ Deploy: Docker konteynerlar (api, worker, scheduler, web statik, bot) + boshqari
 
 ## Manbalar
 
+- `spec/02-arxitektura/12-autentifikatsiya-oauth2.md` — OAuth 2.0 AS/RS, obuna lokauti. *(2026-10-15: foydalanuvchi qarori)*
 - `research_notes/texnik/04-arxitektura-va-stack.md` (multi-tenant, offline-first, event-log, Android, PostgreSQL).
 - `research_notes/texnik/07-hosting-lokalizatsiya-xavfsizlik.md` (UzCloud, lokalizatsiya).
 - `spec/01-mahsulot/02-modullar-talablari.md` (M01–M18), `05-ai-funksiyalar.md` (5-bo'lim).

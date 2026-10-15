@@ -231,6 +231,10 @@ Buxgalteriya provodkasi **yaratilmaydi** — faqat boshlang'ich/sanalgan naqd `c
 
 *QQS yozilmaydi. 8720 — taxmin, 2.13 bilan bir xil (ogohlantirish 12-band).*
 
+### 2.22 Chek asosida keyinroq chiquvchi e-faktura (`einvoice_from_receipt`) *(2026-10-15: qabul-5 — foydalanuvchi qarori, US-M01-06, BP-13)*
+
+Provodka **yo'q**: bu holatda `ledger_entries` va `vat_moves`ga **yangi qator yozilmaydi** — daromad va chiquvchi QQS allaqachon 2.1–2.4-bandlar bo'yicha **chek paytida** yozilgan; e-faktura keyinroq chiqarilishi QQS'ni ikkinchi marta hisoblamaydi. Bog'lanish faqat **hujjat darajasida**: `einvoices(direction=out, related_doc=receipt)`. `vat_moves` qatori **o'zgartirilmaydi** (append-only tamoyili saqlanadi, `01-malumotlar-modeli.md` §1/§7) — "chek ↔ e-faktura" ko'rinishi `einvoices.related_doc` orqali JOIN bilan quriladi, UPDATE orqali emas. **Cheklov**: bitta chekka bitta faol (`cancelled` bo'lmagan) chiquvchi e-faktura; e-faktura summasi chek summasidan (qaytarishlar ayirilgan holda) oshmaydi. BO-10 solishtirishida chekka bog'langan chiquvchi e-fakturalar alohida belgilanadi — davlat hisobotida ikki marta hisoblangan aylanma ko'rinsa, bu holat farq sababi sifatida ko'rsatiladi (huquqiy/texnik tasdiq — soliq tizimi bu bog'lanishni fiskal belgi rekviziti orqali qanday ko'rishi — `11-backlog.md` 0-bosqich (d) bilan bog'liq, ochiq).
+
 ---
 
 ## 3. COGS: FIFO va AVECO
@@ -304,6 +308,8 @@ Bu summa 2026-01-01'dan davlat (Soliq qo'mitasi) o'zi tuzgan QQS hisoboti bilan 
 
 QQS to'lamaydigan tenant uchun 4410/6410(QQS)/`vat_moves` yozuvlari yaratilmaydi; o'rniga oy yakunida: `Aylanma_solig'i = Davr_aylanmasi (9020 netto + 9040/9050 tuzatilgan) × stavka`. 2026-yil stavkalari — Soliq kodeksi **467-moddasi** (66-bob; O'RQ-1108 tahririda, 2026-01-01'dan): umumiy **4%**; chakana savdo joylashuvga qarab **4% / 2% / 1%** (100 ming+ aholili shahar / boshqa aholi punkti / borish qiyin va tog'li tuman — `branches.settlement_category`, `01-malumotlar-modeli.md` 3-bo'lim), tamaki **4%**; YTT va o'zini o'zi band qilganlar **1%**. Aylanma solig'i to'lovchisi bo'lish chegarasi (jami daromad 1 mlrd so'mgacha) — 461-modda ([lex.uz/docs/4674902](https://lex.uz/docs/4674902)). Shuning uchun tenant/filial sozlamasida "aholi punkti toifasi" maydoni kerak. Ichki aylanma solig'i summasi ham xuddi QQS kabi davlat hisoboti bilan 5 kalendar kunlik tartibda solishtiriladi (US-M10-04). *(2026-10-14: tekshiruv)*
 
+**Tenant darajasidagi rejim (QQS vs aylanma)** *(2026-10-15: kamchiliklar-yakuniy #18)*: `branch_tax_settings` faqat aylanma solig'i **stavkasi** uchun (aholi punkti toifasi) kerakli ma'lumotni beradi; qaysi **rejim** (`vat` yoki `turnover`) qo'llanishi — yangi `tenant_tax_regimes(tenant_id, valid_from, regime)` jadvalida (`01-malumotlar-modeli.md` §2) tarix bilan saqlanadi. Rejim faqat oy boshidan o'zgaradi (`valid_from` — oyning 1-sanasi), o'tgan davrlar qayta hisoblanmaydi; 1 mlrd so'm chegarasidan oshganini tizim ogohlantiradi, lekin o'tishni **Buxgalter** qo'lda belgilaydi (avtomatik emas).
+
 ---
 
 ## 5. Davr yopish, storno, yaxlitlash, ko'p filial
@@ -325,6 +331,7 @@ flowchart TD
 - **Oylik yopish** (MVP, US-M11-02): faqat `period_closings` orqali **bloklash** + balans/foyda-zarar hisoboti generatsiyasi; hisoblar jismoniy nolga tushirilmaydi (bu rasmiy amaliyotda odatda yillik).
 - **Yillik yopish**: daromad/xarajat hisoblari (9020, 9040, 9050, 9120, 9410, 9420, 9430) yakuniy natija hisobiga (9910) yopiladi, so'ng 9910 → 8710 (joriy davr taqsimlanmagan foydasi) → (taqsimlangandan keyin) 8720 (to'plangan foyda).
 - Yopilgan davrga tegishli har qanday tuzatish — faqat yangi, joriy ochiq davrdagi storno + tuzatuvchi yozuv bilan, hech qachon eski yozuvni o'zgartirmasdan.
+- **Qayta ochish siyosati** *(2026-10-15: kamchiliklar-yakuniy #16)*: MVP'da yopilgan davr **qayta ochilmaydi** — tuzatish faqat joriy ochiq davrda, tuzatuvchi hujjat orqali (yangi `correction_of_period` maydoni — yopilgan qaysi davrga tegishli ekanini belgilaydi) + audit yozuvi bilan kiritiladi. Davrni qayta ochish (agar kerak bo'lsa) — faqat Buxgalter tasdig'idan keyin alohida ko'rib chiqiladigan, MVP'dan tashqari jarayon.
 
 ### 5.2 Teskari (storno) qoidasi
 

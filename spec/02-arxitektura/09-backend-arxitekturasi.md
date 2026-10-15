@@ -14,6 +14,7 @@
 8. **Namuna loyihadan farqlanadi**: u — har mijoz uchun alohida stack (bitta tenant); bu loyiha — **bitta umumiy stack, ko'p tenant, RLS bilan**: `api`/`worker` gorizontal ko'payadi, `scheduler` yagona nusxa bo'lishi kerak (Postgres advisory lock bilan) (adapterlar: OFD/e-faktura/Asl belgisi/Click-Payme adapterlari).
 9. API — `/api/v1`, xato formati `{code, message_key, details}` (frontenddagi zod/i18next bilan bir xil shakl), `Idempotency-Key` Redis tezkor qulf + Postgres doimiy jurnal bilan, optimistik qulflash `version` maydoni orqali.
 10. Test strategiyasi — bitlik testlar provodka qoidalari uchun sonli misollar bilan, `testcontainers` orqali haqiqiy Postgres'da integratsiya va RLS izolyatsiya testlari, `schemathesis` OpenAPI'dan kontrakt testlari.
+11. **Autentifikatsiya — o'z OAuth 2.0 AS+RS implementatsiyasi** (`app/modules/auth/`, foydalanuvchi qarori, 2026-10-15): protokol skeleti **Authlib** (RFC 6749/7636/7009/7662/8414/9068), JWT/JWKS — **joserfc**, parol/PIN — **argon2-cffi (argon2id)**; barcha storage/rotatsiya/obuna-tekshiruv mantiqi bizning kod. To'liq dizayn — `12-autentifikatsiya-oauth2.md`. *(2026-10-15: foydalanuvchi qarori)*
 
 ---
 
@@ -27,7 +28,7 @@ backend/
 │   │   ├── db/
 │   │   │   ├── session.py            # async engine, AsyncSession, tenant_transaction() + set_config('app.tenant_id', …, true)
 │   │   │   └── base.py               # DeclarativeBase, umumiy mixin'lar (TenantMixin, TimestampMixin)
-│   │   ├── auth/                     # sessiya cookie, CSRF, JWT (ichki admin), parol hash
+│   │   ├── auth/                     # BFF cookie/CSRF, OAuth claims dependency (require_subscription_ok, current_user), JWKS keshi — amalga oshirish `modules/auth/`da
 │   │   ├── permissions.py            # require_permission("sales.create") dependency
 │   │   ├── idempotency.py            # Idempotency-Key middleware + repo
 │   │   ├── errors.py                 # AppError, exception handler'lar, {code,message_key,details}
@@ -45,7 +46,8 @@ backend/
 │   │   ├── vat/                      # M10 QQS hisob-kitobi, davlat hisoboti solishtirish
 │   │   ├── accounting/               # M11 buxgalteriya provodkasi, oy yopish
 │   │   ├── reports/                  # M12 hisobot va dashboard query'lari (faqat o'qish)
-│   │   ├── access/                   # M13 foydalanuvchi, rol, ruxsat, auth
+│   │   ├── auth/                     # **(2026-10-15: foydalanuvchi qarori)** OAuth 2.0 AS+RS: /oauth/*, /auth/*, /admin/users, Authlib integratsiyasi, token/sessiya/litsenziya jadvallari (`12-autentifikatsiya-oauth2.md`)
+│   │   ├── access/                   # M13 rol/ruxsat katalogi, role_permissions (foydalanuvchi CRUD'i endi `auth/`da)
 │   │   ├── branches/                 # M14 filial, ombor, kassa apparati, qurilma ro'yxati
 │   │   ├── expenses/                 # M15 xarajat, toifa, takrorlanuvchi xarajat
 │   │   ├── cash/                     # M16 kassa naqd pul harakati, smena sanash
@@ -214,8 +216,10 @@ sequenceDiagram
 | Optimistik qulflash | Ma'lumotnomalarda (`products`, `product_prices`, …) `version INT`. `PATCH` so'rovi `version`ni tanada talab qiladi; mos kelmasa `409 {code: VERSION_CONFLICT}`. Hujjatlarda kerak emas — ular `posted`dan keyin umuman o'zgarmaydi (faqat teskari hujjat) |
 | OpenAPI teglari | Har modul — bitta tag (`sales`, `returns`, `debts`, …), router `tags=[...]` orqali; `operation_id` qo'lda beriladi (`sales_create`, `sales_list`) — orval generatsiya qilgan funksiya nomi shundan keladi (`08-frontend-arxitekturasi.md`, 3-bo'lim) |
 | Davr yopilgan | `409 {code: PERIOD_CLOSED}` — yopilgan davrga yozishga urinish |
-| Auth | HttpOnly, Secure, SameSite=Lax sessiya cookie. CSRF — sessiya ID'ga bog'langan, `itsdangerous` bilan imzolangan token: `GET /api/v1/auth/csrf` → klient xotirada saqlaydi → yozuvchi metodlarda `X-CSRF-Token` header. CSRF cookie yo'q (double-submit emas). Noto'g'ri yoki eskirgan token → `403 {code: CSRF_INVALID}` → klient tokenni bir marta qayta oladi va so'rovni takrorlaydi. Bearer qurilma tokeni (Android) CSRF tekshiruvidan ozod. *(2026-10-14: tekshiruv)* |
-| Rate limit | `slowapi` — login va AI endpoint'larda qattiqroq limit (brute-force/AI xarajat nazorati) |
+| Auth | **OAuth 2.0 (AS+RS, `app/modules/auth/`)** — to'liq dizayn `12-autentifikatsiya-oauth2.md`da. Veb: BFF, HttpOnly/Secure/SameSite=Lax sessiya cookie (OAuth token brauzerga chiqmaydi); Android: to'g'ridan-to'g'ri `Authorization: Bearer <access_token>`. CSRF — o'zgarmagan: sessiya ID'ga bog'langan, `itsdangerous` bilan imzolangan token (`GET /api/v1/auth/csrf` → `X-CSRF-Token`), CSRF cookie yo'q. Noto'g'ri/eskirgan token → `403 {code: CSRF_INVALID}`. Bearer access token (Android) CSRF tekshiruvidan ozod. Har so'rovda qo'shimcha `require_subscription_ok` dependency (Redis-kesh) — `403 {code: SUBSCRIPTION_RESTRICTED}`. *(2026-10-15: foydalanuvchi qarori)* |
+| Rate limit | `slowapi` — login, OTP, refresh va AI endpoint'larda qattiqroq limit (brute-force/AI xarajat nazorati, `12-autentifikatsiya-oauth2.md` §12) |
+
+**Middleware/dependency tartibi** (har himoyalangan so'rovda, tashqaridan ichkariga): (1) CORS → (2) CSRF tekshiruvi (faqat cookie-autentifikatsiyali so'rovlarda, Bearer'da yo'q) → (3) auth — cookie'dan `sid`/Bearer'dan JWT orqali claims chiqarish, imzoni/`sid`-revoke keshini tekshirish (`12-autentifikatsiya-oauth2.md` §5) → (4) `require_subscription_ok` — Redis `sub_status` keshi (Redis ishlamasa `subscriptions.status` to'g'ridan-to'g'ri DB'dan, fail-to-DB — `12-autentifikatsiya-oauth2.md` §16.1.1, KICHIK 9), `restricted`/`closed` bo'lsa darhol `403` (istisnolar: `/auth/*`, `/billing/pay`, `/sync/push` **faqat `scope=sync.drain`** bilan va faqat lokautdan oldingi voqealar uchun — `12-autentifikatsiya-oauth2.md` §16.1, §16.4; eksport bu ro'yxatda **yo'q** — lokautda yopiq, D2 bo'yicha alohida `/billing/export-my-data` yo'li bor) → (5) `current_branch_scope`/`X-Branch-Id` tekshiruvi → (6) `require_permission("<code>")` — `role_permissions`+`limit_value` → (7) `Idempotency-Key` tekshiruvi (yozuvchi so'rovlarda) → (8) `tenant_transaction` ochiladi, biznes kod ishga tushadi. *(2026-10-15: qabul-5 — O1/K3/KICHIK 9 tuzatish)*
 
 ---
 
@@ -260,7 +264,9 @@ Cron (`workers/cron.py`) ro'yxati: davlat hisobotini kunlik tekshirish, qarz esl
 | Trace | **OpenTelemetry** (FastAPI + SQLAlchemy instrumentatsiyasi) | So'rov → posting → worker zanjirini kuzatish |
 | Metrika | **prometheus-client** | `/metrics`; posting latensiyasi, navbat chuqurligi, AI xarajati |
 | Xato kuzatish | **sentry-sdk** | FastAPI/Starlette integratsiyasi tayyor |
-| Parol/PIN hash | **passlib[argon2]** (argon2-cffi) | Argon2 — zamonaviy standart, OWASP tavsiyasi |
+| Parol/PIN hash | **passlib[argon2]** (argon2-cffi), aniq algoritm **argon2id** | OWASP tavsiyasi (`12-autentifikatsiya-oauth2.md` §4.1, §13) *(2026-10-15: foydalanuvchi qarori — aniqlashtirildi)* |
+| OAuth 2.0 protokol skeleti | **Authlib** | RFC 6749/7636/7009/7662/8414/9068 — `authlib.oauth2.rfc6749` abstrakt grant/klient sinflari, storage hook'lari bizning SQLAlchemy repozitorilarimizga bog'lanadi (`12-autentifikatsiya-oauth2.md` §1) *(2026-10-15: foydalanuvchi qarori)* |
+| JWT/JWS/JWK (access token, JWKS, litsenziya tokeni) | **joserfc** (Authlib muallifi, EdDSA/ES256) | `PyJWT` — muqobil. `12-autentifikatsiya-oauth2.md` §5–6, §17 *(2026-10-15: foydalanuvchi qarori)* |
 | CSRF | **itsdangerous** | Django/Flask'da sinalgan imzolash primitiv; cookie-based sessiyada sessiyaga bog'langan sinxronizator-token uchun yetarli, `fastapi-csrf-protect`ka nisbatan ko'proq qo'llab-quvvatlanadi |
 | Rate limit | **slowapi** | `limits` kutubxonasini o'raydi, Redis backend, FastAPI dependency sifatida |
 | Fayl yuklash | **python-multipart** | FastAPI'ga fayl/forma qabul qilish uchun shart (xarajat cheki fotosi, Excel import) |
@@ -286,6 +292,7 @@ Cron (`workers/cron.py`) ro'yxati: davlat hisobotini kunlik tekshirish, qarz esl
 | Domain/bitlik | `pytest` + `factory-boy` (fixture factory, SQLAlchemy'siz) | Posting qoidalari — 2.2-bandidagi kabi **sonli misollar**: FIFO/AVECO hisob-kitobi, QQS summasi, qarz limiti chegarasi, chegirma manfiy narxga olib kelmasligi. Har holat — Given/When/Then (mahsulot hujjatlaridagi US formatiga mos) |
 | Integratsiya | `pytest-asyncio` + `testcontainers[postgres]` | Haqiqiy PostgreSQL konteynerida: posting tranzaksiyasi, parallel ikki sotuv bitta oxirgi tovarga (`FOR UPDATE` ishlayotganini tekshirish), recost job, Alembic migratsiyalarini oxirigacha ishga tushirish |
 | RLS izolyatsiya | `testcontainers[postgres]` | Ikki tenant yaratiladi, `tenant_id=A` kontekstida yozilgan qator `tenant_id=B` kontekstidan **ko'rinmasligi** tasdiqlanadi (RLS siyosati + `set_config('app.tenant_id', …, true)` ikkisi birga, `tenant_transaction()` ichida); RLS siyosati ataylab o'chirilgan holat ham testlanadi (kod xatosi RLS'siz ham xavfsiz qolishini tekshirish uchun — ikkinchi himoya qatlami, Asosiy xulosa 4). Worker: tenant A job'i B'ni ko'rmasligi, `tenant_id`'siz job rad etilishi, bitta ulanishda ketma-ket job'lar orasida kontekst qolmasligi (`05-xavfsizlik-va-audit.md` §3.3). *(2026-10-14: tekshiruv)* |
+| **OAuth/autentifikatsiya** | `testcontainers[postgres,redis]`, `httpx.AsyncClient` — **mock yo'q** | To'liq Authorization Code+PKCE oqimi, refresh rotatsiyasi+reuse detection, revoke/introspect, obuna lokauti (grace→restricted→to'lov), brute-force, qurilma bekor qilish → token rad etilishi. To'liq ro'yxat `12-autentifikatsiya-oauth2.md` §21. *(2026-10-15: foydalanuvchi qarori)* |
 | Kontrakt | `schemathesis` | Ishga tushirilgan API'ning `/openapi.json`'idan avtomatik so'rov generatsiyasi — frontend orval generatsiyasi bilan backend sxemasi mos kelishini kafolatlaydi (CI'da `api:gen` tekshiruvi bilan birga) |
 | E2E (tanlab) | `httpx.AsyncClient` + `pytest-asyncio` | Bitta hujjat oqimi boshidan oxirigacha: sotuv → qaytarish → buxgalteriya yozuvi → hisobot |
 
@@ -408,6 +415,7 @@ Seed — Alembic "data migration" emas (bazani versiyalash bilan aralashtirmasli
 
 ## Manbalar
 
+- `spec/02-arxitektura/12-autentifikatsiya-oauth2.md` — OAuth 2.0 AS/RS, Authlib/joserfc tanlovi, token jadvallari, obuna lokauti. *(2026-10-15: foydalanuvchi qarori)*
 - `spec/02-arxitektura/00-umumiy-arxitektura.md` — komponentlar, muhitlar, navbat ochiq savoli.
 - `spec/02-arxitektura/01-malumotlar-modeli.md` — jadvallar, registrlar, holat mashinalari, raqamlash.
 - `spec/02-arxitektura/08-frontend-arxitekturasi.md` — API konventsiyalari (cookie/CSRF, Idempotency-Key, X-Branch-Id, xato formati, orval).

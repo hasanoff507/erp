@@ -269,7 +269,7 @@ CRPT Turon'da kodni real vaqtda tekshirish offline holatda **mumkin emas** (mark
 - Katalog/narx/mijoz keshlari — delta-sync bilan doimiy yangilanadi, qo'lda tozalash shart emas (hajm tenant ma'lumot hajmiga bog'liq).
 - Outbox voqealari — `accepted`/`duplicate` natija olgandan keyin darhol o'chirilmaydi, **taxmin: 7 kun** xavfsizlik buferi bilan saqlanadi (foydalanuvchi ko'rib chiqishi/eksport qilishi uchun), keyin avtomatik tozalanadi.
 - Sotuv/chek tarixi (UI ko'rsatish uchun lokal kesh) — **taxmin: 90 kunlik** aylanma oyna; eskisi serverdan talab bo'yicha olinadi (online bo'lganda).
-- Brauzer IndexedDB hajmi/tozalanishi (ayniqsa Safari/iOS'da ITP agressiv tozalashi) sababli **veb-kassa faqat Chromium**: Chrome/Edge (desktop) va Android Chrome, o'rnatilgan PWA sifatida; ishga tushganda `navigator.storage.persist()` so'raladi. Safari/iOS veb-kassa uchun qo'llab-quvvatlanmaydi (IndexedDB tozalanish xavfi, WebUSB/Web Serial yo'q). Back-office — barcha zamonaviy brauzerlar (`08-frontend-arxitekturasi.md` Ochiq savol #2 qarori). *(2026-10-14: tekshiruv)*
+- ~~Veb-kassa faqat Chromium~~ *(2026-10-15: D3 bilan almashtirildi)*: veb-kassa Chrome/Edge/Android Chrome'da va **iPhone/iPad'da o'rnatilgan PWA** sifatida ishlaydi; ishga tushganda `navigator.storage.persist()` so'raladi; iOS'da faqat o'rnatilgan PWA (o'rnatilmagan sayt ma'lumoti tozalanishi mumkin) va chop etish faqat bulutli printer yoki elektron chek orqali (`08-frontend-arxitekturasi.md` §6, `06-nofunksional-talablar.md` §6).
 
 ---
 

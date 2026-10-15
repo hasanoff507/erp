@@ -12,9 +12,9 @@ teams exist, each with its own repeated/continued Claude Code sessions:
   **Integrator** (a2b0a4c6), reviewer **Tekshiruvchi** (8d7f8c5d). Produced `research_notes/texnik/*`.
 - **Mahsulot** (product, ports 4150-4159) — lead **Architect** (65ba0d36), scout/planner **Mahsulotchi**
   (19a7e373), workers **UX** (09d65ca2), **Jarayonchi** (33e775d5), **AI-mahsulot** (a258f890), reviewer
-  **Tekshiruvchi** (08e25695). Produced `spec/01-mahsulot/*`.
+  **Tekshiruvchi** (08e25695). Produced `spec/kod-uchun/*`.
 - **Arxitektura** (ports 4160-4169) — per `.toa/brain/teams/arxitektura-975bf7.md`, **never produced anything**
-  ("Recently accepted: none yet"); `spec/02-arxitektura/` does not exist on disk. No session file for it was
+  ("Recently accepted: none yet"); `spec/kod-uchun/` does not exist on disk. No session file for it was
   found among the 18 transcripts — it may not have logged, or its folder is simply absent.
 
 Two Claude Docs artifacts matter:
@@ -95,15 +95,15 @@ relay). Human writes casual Uzbek (Latin), no punctuation discipline.
 
 | Decision | Source | Status on disk |
 |---|---|---|
-| **Qaror: loyihada 1C ishlatilmaydi va tilga olinmaydi (2026-10-12, 2026-10-14)** | Human, bb22ded9 L85 (2026-10-12); reaffirmed 2026-10-14 | Landed: `01-erp-modullar-va-malumot-modeli.md` contains only vendor-neutral ERP concepts; `00-xulosa-va-ochiq-savollar.md` main finding #1 states the no-integration rule; `spec/01-mahsulot/*` never proposes any such integration. |
-| **Tax-system integration is the core differentiator** (no Uzbek ERP/POS competitor currently integrates with tax systems) | Human, bb22ded9 L85 | Landed: `09-soliq-integratsiyasi.md`, `10-bozorda-soliq-integratsiyasi.md` (competitor gap table), `00-fayl` main finding #1, `spec/01-mahsulot/03-biznes-jarayonlar.md` point 8 ("bozorda hech bir mahsulot ...birgalikda to'liq qoplamaydi — bu AIOS uchun farqlanish nuqtasi"). |
+| **Qaror: loyihada 1C ishlatilmaydi va tilga olinmaydi (2026-10-12, 2026-10-14)** | Human, bb22ded9 L85 (2026-10-12); reaffirmed 2026-10-14 | Landed: `01-erp-modullar-va-malumot-modeli.md` contains only vendor-neutral ERP concepts; `00-xulosa-va-ochiq-savollar.md` main finding #1 states the no-integration rule; `spec/kod-uchun/*` never proposes any such integration. |
+| **Tax-system integration is the core differentiator** (no Uzbek ERP/POS competitor currently integrates with tax systems) | Human, bb22ded9 L85 | Landed: `09-soliq-integratsiyasi.md`, `10-bozorda-soliq-integratsiyasi.md` (competitor gap table), `00-fayl` main finding #1, `spec/kod-uchun/04-biznes-jarayonlar.md` point 8 ("bozorda hech bir mahsulot ...birgalikda to'liq qoplamaydi — bu AIOS uchun farqlanish nuqtasi"). |
 | **All team agents run on Claude Haiku** | Human, ebe4fb8c L141, L150 | Process decision, not file content — confirmed by `.toa/brain` notes authored "Architect (architect)" etc. and the gotcha note about Haiku's research errors (§4). |
 | **All research output written into a shared Claude Docs artifact** | Human, bb22ded9 L565 | Followed — artifact `e57e7cd7-...` is cited as primary source throughout `00-13` files. |
-| **MVP = 14 modules** (kassa, qaytarish, chegirma, ombor qoldig'i, inventarizatsiya, ko'chirish, xarid, nasiya, narxlar, QQS, buxgalteriya, hisobotlar, huquqlar, filiallar); payroll/CRM/manufacturing deferred | Research team, `00-xulosa-va-ochiq-savollar.md` main finding #2 | Matches `spec/01-mahsulot/02-modullar-talablari.md` and `06-mvp-chegarasi.md`. |
-| **8 mandatory government systems**: virtual kassa/OFD, e-faktura, e-TTN, Asl belgisi (markirovka), MXIK, e-ishonchnoma (Vakolat.uz), E-IMZO, soliq hisobotlari (my.soliq.uz) | `00-fayl` main finding #3 | `spec/01-mahsulot/03-biznes-jarayonlar.md` builds a matrix explicitly noting 6 of the 8 are "required" in the strict sense and 2 (e-ishonchnoma, soliq hisobotlari) are added as extra columns — see §7 for the "6 vs 8" nuance. |
-| **Architecture**: multi-tenant single DB + `tenant_id` + Postgres RLS; offline-first append-only event log (no CRDT); Android-native (Kotlin) POS, PWA back-office; Postgres via UzCloud DBaaS; hosting on UzCloud/Uztelecom is a *business* choice, not a legal mandate (only biometric/genetic/telecom data must stay local) | `00-fayl` §2 table, from `research_notes/texnik/04, 07` | No contradiction found in spec files; Arxitektura team (who owns `spec/02-arxitektura/`) never started, so this is still only in research notes, not yet a ratified architecture spec. |
-| **Pricing**: original tiers 149k/349k/699k so'm/month (from the Oct 10 market-research doc, `.toa/brain/notes/ai-erp-market-research-doc.md`) | Mega-lead brain note, Oct 10 | **Not carried forward as fixed tiers** — `spec/01-mahsulot/06-mvp-chegarasi.md` line 99 instead gives a "loose anchor" range of 69,000–999,000 so'm/month derived from competitor pricing (REGOS Start–BILLZ Pro) and explicitly marks ARPU as **"Taxmin"** (assumption), not a decided price. This is a drift from the original directive worth flagging (see §7). |
-| **New central value proposition (2026 tax-law change)**: from 2026-01-01 the tax committee itself drafts VAT/other declarations from receipts/e-invoices, giving the business 5 working days to review/object; product's core value becomes *reconciling the government's report against internal books*, not declaration-writing | Research team, `.toa/brain/notes/soliq-2026-dan-hisobotlarni-davlat-o-zi-tuzadi.md`; `00-fayl` main finding #5 | Landed in `spec/01-mahsulot/01, 02, 03, 06` (all reference the 5-day reconciliation flow); law/decree number for the 5-day rule was **never found** (flagged open in `02-modullar-talablari.md` point 8 and `00-fayl` open question #... — still open, see §5). |
+| **MVP = 14 modules** (kassa, qaytarish, chegirma, ombor qoldig'i, inventarizatsiya, ko'chirish, xarid, nasiya, narxlar, QQS, buxgalteriya, hisobotlar, huquqlar, filiallar); payroll/CRM/manufacturing deferred | Research team, `00-xulosa-va-ochiq-savollar.md` main finding #2 | Matches `spec/kod-uchun/03-modullar-talablari.md` and `05-mvp-chegarasi.md`. |
+| **8 mandatory government systems**: virtual kassa/OFD, e-faktura, e-TTN, Asl belgisi (markirovka), MXIK, e-ishonchnoma (Vakolat.uz), E-IMZO, soliq hisobotlari (my.soliq.uz) | `00-fayl` main finding #3 | `spec/kod-uchun/04-biznes-jarayonlar.md` builds a matrix explicitly noting 6 of the 8 are "required" in the strict sense and 2 (e-ishonchnoma, soliq hisobotlari) are added as extra columns — see §7 for the "6 vs 8" nuance. |
+| **Architecture**: multi-tenant single DB + `tenant_id` + Postgres RLS; offline-first append-only event log (no CRDT); Android-native (Kotlin) POS, PWA back-office; Postgres via UzCloud DBaaS; hosting on UzCloud/Uztelecom is a *business* choice, not a legal mandate (only biometric/genetic/telecom data must stay local) | `00-fayl` §2 table, from `research_notes/texnik/04, 07` | No contradiction found in spec files; Arxitektura team (who owns `spec/kod-uchun/`) never started, so this is still only in research notes, not yet a ratified architecture spec. |
+| **Pricing**: original tiers 149k/349k/699k so'm/month (from the Oct 10 market-research doc, `.toa/brain/notes/ai-erp-market-research-doc.md`) | Mega-lead brain note, Oct 10 | **Not carried forward as fixed tiers** — `spec/kod-uchun/05-mvp-chegarasi.md` line 99 instead gives a "loose anchor" range of 69,000–999,000 so'm/month derived from competitor pricing (REGOS Start–BILLZ Pro) and explicitly marks ARPU as **"Taxmin"** (assumption), not a decided price. This is a drift from the original directive worth flagging (see §7). |
+| **New central value proposition (2026 tax-law change)**: from 2026-01-01 the tax committee itself drafts VAT/other declarations from receipts/e-invoices, giving the business 5 working days to review/object; product's core value becomes *reconciling the government's report against internal books*, not declaration-writing | Research team, `.toa/brain/notes/soliq-2026-dan-hisobotlarni-davlat-o-zi-tuzadi.md`; `00-fayl` main finding #5 | Landed in `spec/kod-uchun/01, 02, 03, 06` (all reference the 5-day reconciliation flow); law/decree number for the 5-day rule was **never found** (flagged open in `03-modullar-talablari.md` point 8 and `00-fayl` open question #... — still open, see §5). |
 
 ---
 
@@ -181,16 +181,16 @@ and Integrator agents.
 11. **Scanning-error statistic (80–90%) — risk of being misread as a per-scan POS failure rate.**
     Originates in `00-xulosa-va-ochiq-savollar.md` main finding #6 (supply-chain/batch level, from gazeta.uz
     2026-04-14). The Mahsulot team's reviewer flagged (proposed gotcha, see §4 below) that spec drafts could
-    misstate this as a POS-level scan-failure rate. **Landed: yes** — current `spec/01-mahsulot/01-rollar...md`
-    line 138, `04-ekranlar-va-ux.md` line 454, and `06-mvp-chegarasi.md` line 91 all correctly qualify it as
+    misstate this as a POS-level scan-failure rate. **Landed: yes** — current `spec/kod-uchun/01-rollar...md`
+    line 138, `06-ekranlar-umumiy.md` line 454, and `05-mvp-chegarasi.md` line 91 all correctly qualify it as
     supply-chain/batch-level and explicitly say the POS-level rate is a separate, unmeasured quantity.
 
 12. **Risk-assessment decree for e-invoices — was called "PQ-830"; correct form is "VM Qarori №830-son".**
-    Flagged by Mahsulot team reviewer (proposed gotcha note, §4). **Landed: yes** — `spec/01-mahsulot/02, 03`
+    Flagged by Mahsulot team reviewer (proposed gotcha note, §4). **Landed: yes** — `spec/kod-uchun/02, 03`
     both consistently use "VM Qarori №830-son" now.
 
 13. **E-ishonchnoma (Vakolat.uz) dropped from "6 mandatory systems" lists.**
-    Flagged by Mahsulot team reviewer. **Landed: yes** — `03-biznes-jarayonlar.md` explicitly explains the
+    Flagged by Mahsulot team reviewer. **Landed: yes** — `04-biznes-jarayonlar.md` explicitly explains the
     6-vs-8 discrepancy (the matrix's "6 required systems" are the process-matrix minimum; e-ishonchnoma and
     soliq-hisobotlari are 2 more of the 8 overall, added as extra columns for representative/reconciliation cases).
 
@@ -221,7 +221,7 @@ and Integrator agents.
    4. The e-invoice risk-assessment decree is "VM Qarori №830", not "PQ-830".
    5. E-ishonchnoma (Vakolat.uz), mandatory from 2026-01-01, kept falling out of "6 mandatory systems" lists even
       though the README counts 8.
-   **Verification against current files**: all 5 items are in fact addressed in the current `spec/01-mahsulot/*`
+   **Verification against current files**: all 5 items are in fact addressed in the current `spec/kod-uchun/*`
    content (see §3 items 11–13 above, plus OCR scope confirmed limited to receipts/waybills in `04/05-fayl`
    cross-references). So although the proposal note itself was never formally "accepted" in the brain (status
    stays "proposed" — nobody promoted it), **the underlying corrections were made** in the spec files. This is a
@@ -251,7 +251,7 @@ From `research_notes/texnik/00-xulosa-va-ochiq-savollar.md` §"Ochiq savollar" a
 in the history):
 
 1. **VAT standard rate 12% (Tax Code art. 258)** — never independently read from lex.uz; the whole chain
-   (`01-fayl` → `08-fayl` → `spec/02-modullar-talablari.md` US-M10-01 → `spec/04-ekranlar-va-ux.md` BO-07) all
+   (`01-fayl` → `08-fayl` → `spec/03-modullar-talablari.md` US-M10-01 → `spec/06-ekranlar-umumiy.md` BO-07) all
    cite the same two secondary sources (kovchegpremium.com, uz24.uz). Flagged as the **highest-impact** open
    item because it underlies all VAT computation logic (M09, M10, BP-02…08).
 2. **"5 ish kuni" (5 working days) government-report-reconciliation rule** — law/decree number never found
@@ -282,8 +282,8 @@ in the history):
 11. **Local POS competitor complaints (BILLZ, REGOS, Smartup, UZKASSA, mDokon)** — no genuine customer
     complaints found in any open source (Google Play, forums, infostart.ru all returned nothing /429 errors);
     recommendation to interview 10–15 shop owners directly remains undone.
-12. **`spec/02-arxitektura/` was never written** — the Research team's fact-check in `13-fayl` could only cover
-    `spec/01-mahsulot/`, explicitly noting Arxitektura's output needs its own separate fact-check once it exists.
+12. **`spec/kod-uchun/` was never written** — the Research team's fact-check in `13-fayl` could only cover
+    `spec/kod-uchun/`, explicitly noting Arxitektura's output needs its own separate fact-check once it exists.
     As of the end of the history it still does not exist.
 
 ---
@@ -303,12 +303,12 @@ in the history):
 ## 7. Contradictions between the chat history and current files on disk
 
 1. **Pricing tiers drifted.** Oct 10 directive/brain-note fixed tiers at 149k/349k/699k so'm/month. The current
-   `spec/01-mahsulot/06-mvp-chegarasi.md` (line 99) does **not** use these numbers — it gives a much wider,
+   `spec/kod-uchun/05-mvp-chegarasi.md` (line 99) does **not** use these numbers — it gives a much wider,
    explicitly-labeled "Taxmin" (assumption) range of 69,000–999,000 so'm/month anchored to *competitor* pricing
    (REGOS Start–BILLZ Pro), not the original research doc's tiers. No transcript shows an explicit decision to
    abandon the original tiers; it appears to have been silently superseded during the Mahsulot team's spec work.
 2. **"6 majburiy tizim" vs "8 majburiy tizim" terminology is inconsistent across spec files** (`02-modullar-
-   talablari.md` and `03-biznes-jarayonlar.md` both explain the discrepancy inline, but a reader skimming only
+   talablari.md` and `04-biznes-jarayonlar.md` both explain the discrepancy inline, but a reader skimming only
    `02-fayl`'s "Davlat tizimlari bog'liqligi" section would see "6" without the explanation visible in `03-fayl`).
    Already flagged by the Mahsulot reviewer (§3 item 13) and reconciled, but the terminology split (6 "process-
    matrix-required" vs 8 "overall mandatory") is not uniformly labeled across every file that uses either number.
@@ -323,7 +323,7 @@ in the history):
    `30567d1d`) ran as "Modelchi, a worker" on the same team (teamId `6b7ac535-...`, confirmed via fleet mail at
    ebe4fb8c L526 naming Modelchi's retries). The brain's roster reflects a later/final snapshot after Modelchi's
    role ended or was dropped; historical transcripts still show Modelchi as an active team member.
-5. **`spec/02-arxitektura/` referenced as existing/non-empty in places it should not be**: `13-spec-faktlar-
+5. **`spec/kod-uchun/` referenced as existing/non-empty in places it should not be**: `13-spec-faktlar-
    tekshiruvi.md` point 1 correctly notes it was empty at check time; this is consistent with disk state (folder
    does not exist). No contradiction here, just confirming the Arxitektura team's output never materialized by
    the end of the captured history.

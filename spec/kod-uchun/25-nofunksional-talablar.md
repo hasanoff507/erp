@@ -1,0 +1,266 @@
+# Nofunksional talablar
+
+*2026-10-14 · Asos: `spec/kod-uchun/10-umumiy-arxitektura.md`, `11-malumotlar-modeli.md`, `24-frontend-arxitekturasi.md`, `15-xavfsizlik-va-audit.md` (5-bo'lim — AI xarajat taxmini), `spec/kod-uchun/03-modullar-talablari.md`, `06-ekranlar-umumiy.md` (tezlik/UX taxminlari), `05-mvp-chegarasi.md` (tariflar), `09-ai-funksiyalar.md` (5-bo'lim — AI narx hisob-kitobi), `research_notes/texnik/07-hosting-lokalizatsiya-xavfsizlik.md` (UzCloud narxlari, saqlash muddati), `research_notes/texnik/06-raqobatchilar-texnik-va-uskunalar.md` (uskuna narxlari).*
+
+## Asosiy xulosalar
+
+1. **Barcha tezlik/sig'im ko'rsatkichlari (POS skan-dan-qatorgacha, chek yakunlash vaqti, API p95) manbada raqam bilan tasdiqlanmagan — hammasi `taxmin`**, chunki mahsulot hali ishga tushmagan va O'zbekiston raqobatchilari ham bu ko'rsatkichlarni rasmiy sahifalarida e'lon qilmaydi (`06-ekranlar-umumiy.md`, Asosiy xulosa #10; `05-mvp-chegarasi.md`, 3.1-bo'lim).
+2. **Qonuniy majburiy, manbali muddatlar ikkitagina**: offline chekning OFD'ga yetib borishi — **48 soat** (VM 943-son qaror, 1-ilova, 31-band) va markirovkalangan tovarni ko'chirish — **72 soat** (23-son qaror, 2026-01-23); boshqa barcha "tezlik maqsadi" taxmin (`05-mvp-chegarasi.md`, 3.1-bo'lim).
+3. **Sig'im rejasi (100 → 1000 tenant) va o'rtacha ko'rsatkichlar (kassa soni, kunlik savdo) manbada yo'q — taxmin**; shu taxminlar ustiga UzCloud'ning manbali narx jadvali (`07-hosting-...md`, 2.1-bo'lim) qo'llanib, VM/DB o'lchami va narxi hisoblab chiqiladi.
+4. **Mavjudlik maqsadi uchun rasmiy shartnoma SLA raqami yo'q** — UzCloud faqat infratuzilma darajasidagi da'vo (**99,982%**, <1,5 soat/yil) beradi, bu rasmiy oferta SLA'si emas (`07-fayl`, 2.1-bo'lim); MVP maqsadi shu sababli **taxmin**.
+5. **Uskunalar narxi va protokollari manbali**: shtrix-kod skaner (USB HID/keyboard-wedge), chek printeri (ESC/POS), Android POS terminal (UZKASSA N5/P100, A-Pay P10) — barchasi narx bilan `06-raqobatchilar-texnik-va-uskunalar.md`dan; **tarozi protokoli va yorliq printeri protokoli tadqiqotda topilmadi — ochiq savol**.
+6. **Lokalizatsiya**: o'zbek (lotin) — asosiy, rus — ikkinchi til (allaqachon qaror, `24-frontend-arxitekturasi.md`); kirill qidiruv `pg_trgm` indeks orqali (`11-malumotlar-modeli.md`, 1-bo'lim) — bu allaqachon qabul qilingan texnik yechim.
+7. **Ma'lumot saqlash muddati**: buxgalteriya hujjatlari hisobot yilidan keyin kamida **5 yil** (Buxgalteriya hisobi to'g'risidagi qonun, O'RQ-404, 29-modda), soliq hujjatlari **3 yil** (2024-01-01'dan) — bu ikkinchisi qonuniy, manbali (`07-fayl`, 3.3-bo'lim); audit log va backup muddatlari buxgalteriya muddatiga tenglashtirilgan ichki siyosat (`15-xavfsizlik-va-audit.md`, 6.3 va 7.1-bo'lim). *(2026-10-14: tekshiruv)*
+8. **Narx modeli — yagona tarif, 99 000 so'm/oy** *(2026-10-15: foydalanuvchi qarori)*: eski Start/Biznes/Pro uch-tariflilik bekor qilindi; hammasi kiradi (modul, AI, Telegram) + 1 virtual kassa bazada, qo'shimcha kassa +39 000 so'm/oy, yillik −20%, 30 kunlik sinov. **Tenant-boshiga xarajat jadvali — hisoblanadi, lekin to'liq taxmin zanjiri**: hosting (UzCloud narxlaridan hisoblangan), AI (`22-ai-qatlami.md` §13), SMS (Eskiz.uz, F11 tasdiqlangan), fiskal modul (~35–39 ming/kassa) — 1 kassa bilan jami ≈60 000–68 000 so'm, marja ≈31 000–39 000 so'm (11-bo'lim).
+9. **Observability (log, metrika, tracing, alerting) va qo'llab-quvvatlanadigan brauzerlar ro'yxati manbada yo'q** — ikkala band ham sanoat amaliyoti/ichki arxitektura qarori sifatida **taxmin** taklif qilinadi.
+10. **Accessibility** uchun faqat UX darajasidagi umumiy tamoyillar bor (katta shrift, yuqori kontrast, 56×56dp teginish maydoni — hammasi taxmin, `06-ekranlar-umumiy.md`, 1.4-1.5-bo'lim); rasmiy WCAG audit **tadqiqotda yo'q — ochiq savol**.
+
+---
+
+## 1. Ishlash tezligi (SLO)
+
+Barcha quyidagi raqamlar — **taxmin**, manbada son ko'rsatkich topilmagani sababli (`06-ekranlar-umumiy.md`, Asosiy xulosa #10; `05-mvp-chegarasi.md`, 3.1-bo'lim: "O'rtacha chek yaratish vaqti — taxmin, manbada aniq raqam yo'q"). Pilot davrida ichki telemetriya (POS event-log vaqt belgilari) orqali real raqamga almashtiriladi.
+
+| Ko'rsatkich | Maqsad (taxmin) | Izoh |
+|---|---|---|
+| Shtrix-kod skanerlashdan chekka qator qo'shilishigacha (lokal, POS) | **< 100 ms** | Lokal SQLite/IndexedDB operatsiyasi, server kutilmaydi |
+| Chekni yakunlash (to'lov tasdig'idan chek chiqishigacha, lokal) | **< 1 s** | Offline rejimda ham — fiskal/OFD yuborish **asinxron navbatda**, foydalanuvchini kutdirmaydi (`10-umumiy-arxitektura.md`, 7-band: "fon ishlari... API so'rovi tashqi tizimni kutib turmaydi") |
+| API javob vaqti, p95 (o'qish so'rovlari, masalan qoldiq/narx) | **< 300 ms** | Backend ichida, tashqi tizim kutilmaydi |
+| API javob vaqti, p95 (yozuvchi so'rovlar, masalan sotuv posting) | **< 800 ms** | Bitta DB tranzaksiyada hujjat+registr+provodka (`11-malumotlar-modeli.md`, Asosiy xulosa #4) — OFD/EDO yuborish bu vaqtga kirmaydi (navbatga tushadi) |
+| AI chat javobi (AI-01) | **< 3 s** (birinchi token) | LLM API chaqiruvi tashqi tarmoqqa bog'liq, qonuniy/manbali chegara emas |
+| Offline chekning OFD'ga yetib borishi | **≤ 48 soat** (100% talab) | **Qonuniy majburiy** (VM 943-son qaror, 1-ilova, 31-band — `research_notes/texnik/02-kassa-ofd-markirovka.md`) |
+| Markirovkalangan tovar ko'chirish muddati | **≤ 72 soat** (100% talab) | **Qonuniy majburiy** (23-son qaror, 2026-01-23) |
+| Davlat hisoboti tafovutini hal qilish | **≤ 5 kalendar kun** | **Qonuniy majburiy** (Soliq kodeksi 81-moddasi, O'RQ-1108, lex.uz/docs/-7944527) |
+
+---
+
+## 2. Mavjudlik va texnik xizmat ko'rsatish oynasi
+
+- **Infratuzilma darajasidagi da'vo**: UzCloud 99,982% (<1,5 soat/yil uzilish) — bu data-markaz infratuzilmasining o'zi uchun da'vo, **rasmiy shartnoma (oferta) SLA raqami emas** (`07-fayl`, 2.1-bo'lim: "Rasmiy ommaviy oferta hujjatida aniq foizli SLA topilmadi").
+- **MVP mavjudlik maqsadi (taxmin)**: oylik **99,5%** (≈ 3,6 soat/oy ruxsat etilgan uzilish) — bu UzCloud'ning o'z infratuzilma da'vosidan pastroq, chunki ilova darajasidagi (API, deploy, bug) uzilishlar ham hisobga olinadi; manbada aniq shartnoma SLA topilmaganidan kelib chiqib **taxmin** sifatida belgilanadi.
+- **Texnik xizmat oynasi (taxmin)**: haftalik, past-trafik vaqtida (masalan yakshanba 02:00–04:00 Toshkent vaqti) — manbada yo'q, odatiy SaaS amaliyoti. Kassa **offline-first** bo'lgani uchun rejali texnik ish davomida ham savdo to'xtamaydi (local-first arxitektura, `04-arxitektura-va-stack.md`, 4-band) — faqat sinxronizatsiya kechikadi.
+- Offline-first arxitektura o'zi mavjudlik riskini kamaytiradi: internet/elektr uzilishi dalolatlangan (2022 Qoraqalpog'iston, yillik imtihon kuni to'xtatilishi, 2022 mintaqaviy elektr avariyasi, 2024-2025 Toshkent uzilishlari — `07-fayl`, 4-bo'lim) — bu uzilishlar backend emas, mijoz tarafidagi tarmoq uzilishi, shuning uchun backend SLA'siga kiritilmaydi, lekin mahsulot darajasida "mavjudlik" tushunchasini kengaytiradi.
+
+---
+
+## 3. Sig'im rejasi va UzCloud o'lchami/narxi
+
+### 3.1 Taxminiy o'sish va yuklama (hammasi **taxmin**, manbada yo'q)
+
+| Parametr | Qiymat (taxmin) | Izoh |
+|---|---|---|
+| Birinchi 3 oy (pilot) | 20–50 tenant | `05-mvp-chegarasi.md`, 3.2-bo'lim: "Pilot mijozlar soni — taxmin, manbada yo'q" |
+| 6-12 oy | ~100 tenant | Maqsad, manbasiz |
+| 18-24 oy | ~1000 tenant | Maqsad, manbasiz |
+| O'rtacha kassa/tenant | 1 (bazaga kiritilgan) + ixtiyoriy qo'shimcha (`addons.extra_register`) | Yagona tarif endi kassa soniga qarab bosqichlanmaydi — `11-malumotlar-modeli.md` §2 *(2026-10-15: foydalanuvchi qarori)* |
+| O'rtacha kunlik chek/kassa | 50–150 | Kichik chakana do'kon uchun odatiy taxmin, manbasiz |
+| O'rtacha AI so'rov/tenant/oy | ~300 | `09-ai-funksiyalar.md`, 5-bo'lim hisob-kitobida ishlatilgan taxmin |
+| **Soliq rejimi ulushi (QQS vs aylanma)** | **Oldindan taxmin yo'q — pilot ko'rsatkichi** | *(2026-10-15: asoschi qarori, Q5)* Avvalgi "segmentning >70%i aylanma solig'i to'lovchi" taxmini **rad etildi va olib tashlandi**; ikkala rejim (QQS, aylanma) arxitekturada **teng darajada birinchi toifali** (`13-provodka-qoidalari.md` §5.1/§4.3) — pilot davrida `tenant_tax_regimes` bo'yicha haqiqiy ulush o'lchanadi, sig'im/narx rejasi shunga moslashtiriladi |
+
+### 3.2 100 tenant uchun misoliy infratuzilma va narx (UzCloud, manbali birlik narxlar)
+
+UzCloud birlik narxlari (`07-hosting-lokalizatsiya-xavfsizlik.md`, 2.1-bo'lim, 2026-10-10 holatiga, QQS bilan): vCPU — 85 000 so'm/oy; RAM — 12 000 so'm/oy/GB; SSD NVMe — 3 300 so'm/oy/GB; ochiq IPv4 — 50 000 so'm/oy; S3 Standard — 450 so'm/GB/oy saqlash + 300 so'm/GB chiquvchi trafik.
+
+| Komponent | O'lcham (taxmin) | Hisob | Narx/oy (so'm) |
+|---|---|---|---|
+| API VM (FastAPI, bir nechta nusxa) | 4 vCPU, 8 GB RAM, 50 GB NVMe | 4×85 000 + 8×12 000 + 50×3 300 | 340 000+96 000+165 000 = **601 000** |
+| Worker VM (navbat, fon ishlari) | 2 vCPU, 4 GB RAM, 30 GB NVMe | 2×85 000 + 4×12 000 + 30×3 300 | 170 000+48 000+99 000 = **317 000** |
+| PostgreSQL DBaaS (HA, PITR) | 4 vCPU, 16 GB RAM, 100 GB NVMe | 4×85 000 + 16×12 000 + 100×3 300 | 340 000+192 000+330 000 = **862 000** |
+| Redis VM (kesh/navbat/rate-limit) | 1 vCPU, 2 GB RAM, 10 GB NVMe | 85 000+24 000+33 000 | **142 000** |
+| S3 (chek/faktura PDF, foto) | ~50 GB saqlash + ~10 GB chiquvchi | 50×450 + 10×300 | 22 500+3 000 = **25 500** |
+| Ochiq IPv4 (API + zahira) | 2 ta | 2×50 000 | **100 000** |
+| **Jami infratuzilma/oy** | — | — | **≈ 2 047 500 so'm** |
+| **Tenant-boshiga hosting (100 tenant uchun)** | — | 2 047 500 ÷ 100 | **≈ 20 500 so'm/oy** |
+
+*Eslatma: bu — **to'liq taxmin zanjiri** (o'lchamlar ham, tenant soni ham manbasiz); faqat birlik narxlar (`07-fayl`dan) manbali. Managed Kubernetes (HA boshqaruv paneli 1 500 000 so'm/oy, `07-fayl`) bu hisobga kiritilmagan — MVP bosqichida oddiy VM yetarli deb taxmin qilinadi, Kubernetes 4-bo'limdagi kengaytirish yo'lida.*
+
+### 3.3 1000 tenant uchun masshtablash yo'nalishi
+
+- Chiziqli emas: 100→1000 tenantda API/worker VM **gorizontal** ko'payadi (bir nechta nusxa, load balancer), DBaaS **vertikal** kattalashadi (ko'proq vCPU/RAM) va/yoki o'qish replikalari qo'shiladi; S3/Redis xarajati trafikka proporsional o'sadi.
+- Taxminiy 1000 tenant uchun infratuzilma **~6-8x** (100 tenant narxidan), chunki DBaaS va API VM o'lchami ham kattalashadi, faqat sodda chiziqli ko'paytirish emas — **aniq raqam yo'q, keyingi moliyaviy rejalashtirish bosqichida hisoblanadi** (taxmin, bu hujjatda yakuniy raqam berilmaydi).
+- Managed Kubernetes (`07-fayl`, HA boshqaruv paneli 1 500 000 so'm/oy) — 1000 tenant bosqichida API/worker avtomatik masshtablash uchun ko'rib chiqiladi (4-bo'lim).
+
+---
+
+## 4. Masshtablash yo'li (scalability)
+
+1. **Multi-tenant model**: MVP — umumiy baza + `tenant_id` + RLS (past xarajat, tez ishga tushirish, `04-arxitektura-va-stack.md`, 1-bo'lim). Yirik/nozik mijozlar uchun **schema-per-tenant**ga o'tish yo'li ochiq qoldiriladi (PostgreSQL'da schema qo'shish downtime'siz).
+2. **API/worker**: statelesness tufayli gorizontal masshtablash (ko'proq VM nusxasi, Managed Kubernetes'ga o'tish) — yuklama oshganda birinchi qadam.
+3. **Baza**: vertikal kattalashtirish (ko'proq vCPU/RAM) birinchi, keyin o'qish replikalari (hisobotlar/AI so'rovlari uchun) — yozuvchi tranzaksiyalar asosiy DBaaS'da qoladi (bitta tranzaksiya qoidasi, `11-malumotlar-modeli.md`, Asosiy xulosa #4 buzilmasligi uchun).
+4. **Navbat/fon ishlari**: Redis asosidagi navbat (**SAQ** — `23-backend-arxitekturasi.md`) workerlar sonini mustaqil masshtablashga imkon beradi. *(2026-10-14: tekshiruv)*
+5. **Fayl ombori**: S3-mos, chegarasiz masshtablanadi (UzCloud S3, `07-fayl`, 2.1-bo'lim).
+
+---
+
+## 5. Kuzatuvchanlik (observability)
+
+Manbada aniq vosita/qaror topilmadi — quyidagi tavsiya **taxmin**, loyihaning boshqa texnologik qarorlari (Python/FastAPI, Redis, PostgreSQL) bilan izchil:
+
+| Qatlam | Tavsiya (taxmin) | Maqsad |
+|---|---|---|
+| Strukturaviy loglar | JSON formatda, `tenant_id`/`request_id` bilan har satrda | Tenant bo'yicha filtrlash, xato tezkor topish |
+| Metrikalar | So'rov soni/kechikish/xato darajasi (API, worker), DB ulanish pool holati | Kengaytirish qarorlariga asos |
+| Tracing | So'rov → tranzaksiya → navbat ishi zanjiri | Ayniqsa OFD/EDO/AI kabi tashqi chaqiruvlar kechikishini kuzatish |
+| Alerting | Offline kassa 24/48 soat chegarasiga yaqinlashganda, navbat ishi muvaffaqiyatsiz urinishlar soni, DB/Redis mavjudligi | 48/72 soatlik qonuniy chegaralar bilan bog'liq (1-bo'lim) — bu signal `04-arxitektura-va-stack.md`, 2.4-bo'limda allaqachon talab qilingan ("kassa X soat sinxronlanmasa, markaziy tizim ogohlantirish yuborishi shart") |
+| Tenant-boshiga sarf | AI tokeni/xarajati (`ai_requests` jadvali, `11-malumotlar-modeli.md`), SMS/Telegram xabar soni (`notifications_log`) | Tarif limitlarini kuzatish (M17), billing bilan bog'lanish |
+
+Aniq vosita tanlovi (masalan Prometheus/Grafana/Loki yoki boshqa) — **ochiq savol**, `23-backend-arxitekturasi.md`da hal qilinadi.
+
+---
+
+## 6. Qo'llab-quvvatlanadigan brauzerlar va qurilmalar *(2026-10-15: foydalanuvchi qarori — D3, avvalgi "faqat Chromium" qarorini almashtiradi)*
+
+- **Back-office PWA**: zamonaviy barcha brauzerlar (Chrome, Edge, Safari, Firefox) — ko'rish/boshqaruv ekranlari uskunaga bog'liq emas, hech qanday WebUSB/Web Serial/Web Bluetooth talab qilmaydi.
+- **Veb-kassa (PWA, offline)** — ikki qo'llab-quvvatlash darajasi:
+  - **Chrome/Edge (desktop) va Android Chrome** — to'liq qo'llab-quvvatlanadi, o'rnatilgan PWA sifatida; `navigator.storage.persist()` so'raladi; USB/Bluetooth uskunalar (WebUSB/Web Serial/Web Bluetooth) + tarmoq va bulut printerlar ishlaydi.
+  - **iPhone/iPad (Safari, iOS/iPadOS)** — **o'rnatilgan PWA (Home Screen'ga qo'shilgan)** sifatida qo'llab-quvvatlanadi. Cheklov: Safari'da WebUSB/Web Serial/Web Bluetooth yo'q va https PWA'dan oddiy http tarmoq printeriga ulanib bo'lmaydi (mixed content), shuning uchun chek chop etish **faqat** bulut printer (Star CloudPRNT / Epson Server Direct Print klassi) yoki elektron chek (QR/Telegram) orqali bo'ladi (`24-frontend-arxitekturasi.md` §6). O'rnatilmagan (faqat tab'da ochilgan) holatda Safari IndexedDB xotirasini agressiv tozalashi mumkin — shu sabab o'rnatish (Home Screen) **majburiy tavsiya**.
+- **Android POS (keyingi bosqich, native Kotlin)**: bozordagi uskunalar (UZKASSA N5 — Android 7.1, UZKASSA P100 — Android 5.1, PAX A930 — Android 7.1/PayDroid) asosida minimal **Android 5.1+** qo'llab-quvvatlanishi taxmin qilinadi (`06-raqobatchilar-texnik-va-uskunalar.md`, "Android POS terminallari" jadvali) — aniq minimal versiya `28-android-pos.md`da tasdiqlanadi; bu veb-kassa (Android Chrome PWA)dan alohida, keyingi bosqich mahsuloti.
+- Chek chop etish strategiyasi platformaga qarab farqlanadi — to'liq jadval `24-frontend-arxitekturasi.md` §6'da.
+
+---
+
+## 7. Uskunalar ro'yxati (narx bilan, `research_notes/texnik/06-raqobatchilar-texnik-va-uskunalar.md`dan)
+
+### 7.1 Shtrix-kod skanerlari (USB HID / "keyboard wedge" protokoli)
+
+| Model | Narx (so'm) |
+|---|---|
+| Arzon simli modellar | ~554 100 dan |
+| MERTECH CL-2310 HR P2D SUPERLEAD (simsiz) | 1 500 000 |
+| MERTECH CL-2320 (simsiz) | 1 414 700 |
+| MERTECH CL-2410 (simsiz) | 1 500 000–1 532 600 |
+| Honeywell Youjie HF600 | 1 778 400 |
+| Honeywell MS7120 Orbit | 2 696 844 |
+
+### 7.2 Chek printerlari (ESC/POS protokoli)
+
+| Model | Narx (so'm) |
+|---|---|
+| Xprinter T80 | ~$40 |
+| Xprinter XP-58IIT | ~297 000–360 000 |
+| GP-C180I | 353 814 |
+| MHT-P58C | 355 000 |
+| Xprinter LP-U58 | 396 000 |
+| Xprinter XP-Q200II | 1 607 976 |
+| MITSU RP-809 | 2 105 400 |
+| Sewoo SLK-TS400 | 2 382 186 |
+| Bixolon SRP-330 II | 2 977 733 |
+| Bulut printer (Star CloudPRNT / Epson Server Direct Print klassi, iOS veb-kassa uchun majburiy) | **narx tasdiqlanmagan** |
+
+*(2026-10-15: foydalanuvchi qarori, D3)* Bulut printerning O'zbekiston bozorida mavjudligi va narxi bu tekshiruvda topilmadi — ochiq savol (pastda).
+
+### 7.3 Shtrix-kodli savdo tarozilari
+
+| Model | Narx (so'm) | Izoh |
+|---|---|---|
+| AOTE 777 (40 kg, 5 g aniqlik) | manbada yo'q | — |
+| Umumiy diapazon | 250 000–750 000+ | Aniq ulanish protokoli (masalan CAS/Shtrix-M) **ochiq manbada topilmadi** — faqat "Frontol/LiteBox bilan integratsiya" umumiy da'vosi bor |
+
+### 7.4 Yorliq printeri
+
+- Narx va aniq protokol tadqiqotda **topilmadi** — `spec/kod-uchun/03-modullar-talablari.md` (US-M09-04) buni ochiq savol deb belgilagan. Umumiy o'lcham taxmin (58×40 mm) — manba yo'q.
+
+### 7.5 Android POS terminallari
+
+| Model | Narx (so'm) | Texnik |
+|---|---|---|
+| UZKASSA N5 | 3 315 000 | Android 7.1, 8GB/1GB |
+| UZKASSA P100 | 1 950 000 | Android 5.1, Quad-Core 1.0GHz, 8GB/1GB |
+| A-Pay P10 | 2 699 000 | — |
+
+*Virtual kassa rejimida alohida jismoniy fiskal modul shart emas — internetga ulangan qurilma (smartfon/planshet/PC) + dastur yetarli; chek printeri/skaner ixtiyoriy, lekin amalda deyarli barcha vendorlar tavsiya qiladi (`06-fayl`, "Virtual kassa uchun minimal uskuna talabi").*
+
+---
+
+## 8. Lokalizatsiya
+
+- **Asosiy til — o'zbek (lotin), ikkinchi til — rus** (allaqachon qaror, `24-frontend-arxitekturasi.md`, i18next/react-i18next). Til almashtirish tugmasi barcha ekranlarda bir xil joyda (`06-ekranlar-umumiy.md`, 1.4-bo'lim).
+- **Kirill qidiruv**: nomlar lotin/kirill/rus aralash bo'lishi mumkin, qidiruv `pg_trgm` indeks orqali (`11-malumotlar-modeli.md`, 1-bo'lim — allaqachon qaror).
+- Chekni ikki tilda chiqarish — **ochiq savol/taxmin** (`06-ekranlar-umumiy.md`, Ochiq savol 1).
+
+---
+
+## 9. Accessibility (asosiy)
+
+Rasmiy WCAG audit tadqiqotda yo'q — faqat UX darajasidagi umumiy tamoyillar (`06-ekranlar-umumiy.md`, 1.4-1.5-bo'lim), hammasi **taxmin**:
+
+- Narx/summa raqamlari — eng katta shrift (boshqa matndan kamida ~1,5x).
+- Yuqori kontrast (oq fonda qora/to'q ko'k matn; xato — qizil, muvaffaqiyat — yashil).
+- Teginish maydoni kamida **56×56 dp** (taxmin, aniq standart manbada yo'q).
+- To'liq ekran o'quvchi (screen reader) yoki klaviatura-only navigatsiya darajasidagi rasmiy audit — **MVP'da qilinmagan, keyingi bosqich/ochiq savol**.
+
+---
+
+## 10. Ma'lumot saqlash muddati (retention)
+
+| Ma'lumot turi | Muddat | Manba/holat |
+|---|---|---|
+| Buxgalteriya birlamchi hujjatlari va registrlari | **Kamida 5 yil** (hisobot yilidan keyin) | "Buxgalteriya hisobi to'g'risida"gi Qonun (O'RQ-404, 13.04.2016, yangi tahrir), 29-modda (O'RQ-683 tahririda) — birlamchi manba [lex.uz/docs/-2931253](https://lex.uz/docs/-2931253) *(2026-10-14: tekshiruv)* |
+| Soliq hujjatlari | **3 yil** (2024-01-01'dan) | Soliq kodeksi 22-modda (1-qism, 7-xatboshi) va 84-modda (saqlash, kamida 3 yil), 88-modda (3 yillik da'vo muddati; 84-moddaning 2-qismidagi shartli imtiyozlarda uzayadi) — birlamchi manba [lex.uz/docs/4674902](https://lex.uz/docs/4674902). "13 yilgacha" — tasdiqlanmagan (270/306-moddalarda saqlash qoidasi yo'q) *(2026-10-14: tekshiruv)* |
+| `audit_log` | **Kamida 5 yil** (ichki siyosat) | Qonuniy minimum topilmadi — buxgalteriya hujjat muddatiga tenglashtirildi (`15-xavfsizlik-va-audit.md`, 6.3-bo'lim) *(2026-10-14: tekshiruv)* |
+| Operatsion backup | **30 kun** (taxmin) | `15-xavfsizlik-va-audit.md`, 7.1-bo'lim |
+| Arxiv backup | **≥ 5 yil** (buxgalteriya muddatiga mos) | `04-arxitektura-va-stack.md`, 7-bo'lim tavsiyasi *(2026-10-14: tekshiruv)* |
+| `ai_requests` (AI so'rov jurnali) | **Taxmin — 1 yil** | Manbada yo'q, xarajat audit/billing nazorati uchun ichki qaror |
+| `notifications_log` (SMS/Telegram) | **Taxmin — 1 yil** | Manbada yo'q |
+
+---
+
+## 11. Tenant-boshiga xarajat taxmini va unit-iqtisod — yagona 99 000 so'm/oy tarif *(2026-10-15: foydalanuvchi qarori — narx modeli, `tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md` #2/#13)*
+
+**Narx modeli**: eskirgan uch-tarifli tizim (Start 49 000 / Biznes 129 000 / Pro 249 000) **bekor qilindi**. Endi **bitta tarif — 99 000 so'm/oy**, hammasi kiradi (barcha modul, AI oylik limiti, Telegram bot) + **1 virtual kassa bazaga kiritilgan**; qo'shimcha virtual kassa — **+39 000 so'm/oy/kassa** (`addons.extra_register`, `11-malumotlar-modeli.md` §2); yillik to'lovda **−20%** chegirma (950 400 so'm/yil); **30 kunlik sinov muddati**. Quyidagi jadval — bitta kassali tenant uchun xarajat/marja hisobi:
+
+| Xarajat komponenti | Taxminiy summa/tenant/oy | Manba/izoh |
+|---|---|---|
+| Hosting (UzCloud, 100 tenant sig'imida) | **~20 500 so'm** | 3.2-bo'lim hisobi, UzCloud birlik narxlaridan (`07-fayl`) — sig'im/o'lcham taxmin |
+| AI (Claude Haiku 5.5, ~300 so'rov/oy) | **~2 000–5 000 so'm** | `22-ai-qatlami.md` §13 — yagona tarif uchun birlashtirilgan budjet |
+| SMS (Eskiz.uz, **95 so'm/SMS**) — **faqat zaxira kanal** (asoschi qarori, Q7: OTP/parol tiklash/xodim taklifi/eksport tasdig'i/qarz eslatmalari — asosiy kanal **Telegram bot**, bepul; Google bilan kirish SMS umuman ishlatmaydi) | **~0 so'm (asosiy holat)**; faqat Google ham, Telegram ham ulamagan foydalanuvchida zaxira sifatida ~1 900–4 750 so'm | `tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md` F11; zaxira holat ulushi — pilotda o'lchanadi |
+| Click/Payme (bizning billing komissiyasi) | **~1 000 so'm** | 1–2% komissiya, 99 000 so'mdan |
+| **Fiskal modul (1 bazaga kiritilgan virtual kassa)** | **~35 000 so'm** (+ ~4 000 zahira ≈ **39 000**) | Pilot davrida reyestr hamkori haqi (biz to'laymiz) yoki o'z reyestrimizdagi 1 BHM/yil ÷ 12 ≈ 34 000–37 000 so'm (`21-integratsiyalar.md` §1, foydalanuvchi qarori) |
+| **Jami taxminiy xarajat/tenant/oy (1 kassa bilan)** | **≈ 60 000–68 000 so'm** | Komponentlarning real (hammasi bir vaqtda eng yuqori bo'lmaydigan) yig'indisi |
+| Yagona tarif narxi | **99 000 so'm/oy** | Foydalanuvchi qarori, 2026-10-15 |
+| **Taxminiy marja (1 kassa bilan)** | **≈ 31 000–39 000 so'm/oy** | Qo'llab-quvvatlash xodimi xarajati (12-bo'lim) bu marjadan alohida, dastlabki bosqichda zarar sifatida qabul qilinadi |
+| Qo'shimcha kassa (`extra_register` addon) | +39 000 so'm/oy narx, ~35–39 000 so'm xarajat | Qo'shimcha kassa narxi o'z xarajatini deyarli to'liq qoplaydi — marja asosiy tarifdan keladi |
+
+**Muhim ogohlantirish**: bu jadvaldagi deyarli barcha raqam (sig'im, so'rov soni, fiskal modul narxi) **taxmin zanjiri** — faqat UzCloud birlik narxlari, Eskiz.uz SMS narxi (F11) va AI narx formulasi manbali. Marja (≈31 000–39 000 so'm) qo'llab-quvvatlash xodimi va integrator xarajatlarini hali o'z ichiga olmaydi — bular 12-bo'limda alohida ko'rib chiqiladi; **real pilot ma'lumoti bilan qayta tasdiqlash shart**.
+
+---
+
+## 12. Qo'llab-quvvatlash modeli (support) *(2026-10-15: foydalanuvchi qarori — `tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md` #12)*
+
+**Boshlang'ich bosqich — faqat asoschi (Q8, 2026-10-15)**: jamoa 2 kishilik (asoschi + Claude); alohida support operator ishga olinmaguncha barcha murojaatni (kritik ham, oddiy ham) **asoschi** shaxsan Telegram/telefon orqali qabul qiladi. Quyidagi jadvaldagi "1 operator" qatori — operator ishga olingandan keyingi (pilotdan keyingi) bosqich uchun, hozircha **rejalashtirilgan maqsad**, haqiqiy xarajat emas.
+
+| Band | Qaror |
+|---|---|
+| Kanallar | Telegram (mavjud bot ichida "/yordam") + bitta telefon raqami — BILLZ/mDokon ham aynan shu modelda |
+| Ish vaqti | Ish kunlari **09:00–19:00** (Toshkent) |
+| Javob muddati — kritik (fiskal/OFD, markirovka, bloklanish) | Ish vaqtida **1 soat ichida** birinchi javob |
+| Javob muddati — oddiy savol | **24 soat** |
+| **Dam olish kuni navbatchilik** | Kritik muammolar uchun Telegram orqali **navbatchi (asoschi), 4 soat ichida** javob — shart, chunki juma 19:00'dan dushanba 09:00'gacha 62 soat, bu 48 soatlik OFD muddatidan uzun |
+| Xodim xarajati | Boshlang'ich bosqich — **0** (asoschi o'zi, alohida xarajat yo'q); keyingi bosqich (operator yollanganda) ~6,7–7 mln so'm/oy (1 operator, taxmin) — 11-bo'limdagi marjadan alohida **zarar** sifatida qabul qilinadi |
+| Qayta ko'rib chiqish | Tenant soni **300**ga yetganda (yoki asoschi yolg'iz ulgurmay qolganda) operator yollanadi, narx/xodim nisbati qayta hisoblanadi |
+
+**Ishonch**: kanallar — yuqori (bozor amaliyoti bilan mos); SLA raqamlari va xodim soni — taxmin, pilotda tasdiqlanadi (murojaatlar soni, javob vaqti).
+
+---
+
+## Ochiq savollar
+
+1. Barcha tezlik maqsadlari (1-bo'lim, qonuniy majburiy 48/72 soat/5 kun bundan mustasno) — manbada raqam yo'q, pilot davrida ichki telemetriya bilan tasdiqlanishi shart.
+2. Aniq mavjudlik SLA foizi — UzCloud'ning rasmiy oferta hujjatida topilmadi, sotuvchi bilan to'g'ridan-to'g'ri so'rov kerak (`07-fayl`, Ochiq savol 6).
+3. Sig'im rejasidagi tenant soni, o'rtacha kassa/tenant, kunlik chek soni — barchasi taxmin, pilot ma'lumoti bilan qayta hisoblanishi kerak.
+4. 1000 tenant uchun aniq infratuzilma o'lchami/narxi — bu hujjatda hisoblanmadi, keyingi moliyaviy rejalashtirish bosqichida.
+5. Tarozi va yorliq printeri protokoli — ochiq manbada topilmadi, pilot uskunalarida aniqlanadi (`06-ekranlar-umumiy.md`, Ochiq savol 5; `03-modullar-talablari.md`, US-M09-04).
+6. ~~Qo'llab-quvvatlanadigan brauzerlar/Android versiyasi ro'yxati~~ — **hal qilindi** (2026-10-15, D3, 6-bo'lim): Chrome/Edge/Android Chrome to'liq, iOS/iPadOS o'rnatilgan PWA + bulut printer. Ochiq qolgan qism: bulut printerning O'zbekistondagi narxi/mavjudligi va faqat-elektron chekning qonuniyligi (7.2-bo'lim, `24-frontend-arxitekturasi.md` §6).
+7. ~~SMS provayder va aniq narx~~ — **qisman hal qilindi**: Eskiz.uz narxi (95 so'm/SMS) F11 bilan tasdiqlangan (11-bo'lim), lekin rasmiy provayder tanlovi hali biznes qarori sifatida yakunlanmagan.
+8. Rasmiy accessibility (WCAG) audit — MVP'da qilinmagan, keyingi bosqich sifatida qoldirilgan.
+9. Observability vositasi (Prometheus/Grafana yoki boshqa) — `23-backend-arxitekturasi.md`da tanlanadi.
+10. Tenant-boshiga xarajat jadvalidagi (11-bo'lim) marja (≈31 000–39 000 so'm) qo'llab-quvvatlash (12-bo'lim, ~6,7–7 mln so'm/oy) va integrator xarajatlarini hisobga olmagani — bu raqamlar pilot va real operatsion xarajat bilan qayta tasdiqlanishi shart; 300 to'lovchi tenantga yetganda narx/xodim nisbati qayta ko'riladi (12-bo'lim).
+
+## Manbalar
+
+- `spec/kod-uchun/10-umumiy-arxitektura.md`, `11-malumotlar-modeli.md`, `24-frontend-arxitekturasi.md`, `15-xavfsizlik-va-audit.md`
+- `spec/kod-uchun/03-modullar-talablari.md`, `06-ekranlar-umumiy.md`, `09-ai-funksiyalar.md` (5-bo'lim — AI narx hisobi), `05-mvp-chegarasi.md` (3.3-bo'lim — tariflar va unit-iqtisod talabi)
+- `research_notes/texnik/04-arxitektura-va-stack.md` (multi-tenant, masshtablash, backup)
+- `research_notes/texnik/07-hosting-lokalizatsiya-xavfsizlik.md` (UzCloud narx jadvali, saqlash muddatlari, internet/elektr uzilishlari)
+- `research_notes/texnik/06-raqobatchilar-texnik-va-uskunalar.md` (uskunalar narxi, protokollar)
+- `research_notes/texnik/02-kassa-ofd-markirovka.md` (48 soat, 72 soat qonuniy muddatlar)

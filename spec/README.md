@@ -18,8 +18,8 @@ buxgalteriya va soliq hisobotigacha **bitta tizim** + o'zbek tilidagi AI yordamc
   (back-office + veb-kassa); Android POS (**Kotlin**) — keyingi bosqich, hujjatlari hozirdan tayyorlanadi.
 - AI: Claude API (Haiku 5.5 asosiy), `AiProvider` interfeysi; obuna/CLI faqat ishlab chiqishda. MVP'da **4 ta AI funksiya**: AI-01, AI-03 (hujjat OCR), AI-05, AI-06 *(2026-10-15: foydalanuvchi qarori — AI-03 qaytadan MVP'ga kiritildi)*.
 - Majburiy davlat tizimlari: virtual kassa/OFD, e-faktura, e-TTN, Asl belgisi, MXIK, e-ishonchnoma, E-IMZO, soliq hisobotlari.
-- Autentifikatsiya: o'z (mustaqil) OAuth 2.0 implementatsiyasi, hech qanday mock/soxta login yo'q; admin panel orqali foydalanuvchi qo'shish/bloklash/parol tiklash/sessiya boshqaruvi *(2026-10-15: foydalanuvchi qarori, `spec/02-arxitektura/12-autentifikatsiya-oauth2.md`)*. *(2026-10-15: asoschi qarori, Q7)* Ro'yxatdan o'tish/kirish — telefon+parol **yoki "Google bilan kirish"** (Google OIDC, bizning OAuth AS'da tashqi provayder sifatida); tasdiqlash kodi (OTP), parol tiklash, xodim taklifi, eksport tasdig'i va mijoz qarz eslatmalari — **Telegram bot** orqali birinchi navbatda, SMS (Eskiz) faqat Google ham, Telegram ham yo'q foydalanuvchi uchun **zaxira** (Google'ning SMS-asosli telefon autentifikatsiyasi pullik bo'lgani uchun ishlatilmaydi).
-- Narx *(2026-10-15: foydalanuvchi qarori)*: **yagona tarif — 99 000 so'm/oy, hammasi narxga kiradi** (18 modul, 1 virtual kassa, AI oylik limiti, Telegram bot); qo'shimcha kassa +39 000 so'm/oy (taxmin); eski Start/Biznes/Pro (49k/129k/249k) uchburchagi bekor qilindi, faqat tarixiy ma'lumot sifatida saqlanadi (`spec/01-mahsulot/06-mvp-chegarasi.md`, 3.3-bo'lim).
+- Autentifikatsiya: o'z (mustaqil) OAuth 2.0 implementatsiyasi, hech qanday mock/soxta login yo'q; admin panel orqali foydalanuvchi qo'shish/bloklash/parol tiklash/sessiya boshqaruvi *(2026-10-15: foydalanuvchi qarori, `spec/kod-uchun/14-autentifikatsiya-oauth2.md`)*. *(2026-10-15: asoschi qarori, Q7)* Ro'yxatdan o'tish/kirish — telefon+parol **yoki "Google bilan kirish"** (Google OIDC, bizning OAuth AS'da tashqi provayder sifatida); tasdiqlash kodi (OTP), parol tiklash, xodim taklifi, eksport tasdig'i va mijoz qarz eslatmalari — **Telegram bot** orqali birinchi navbatda, SMS (Eskiz) faqat Google ham, Telegram ham yo'q foydalanuvchi uchun **zaxira** (Google'ning SMS-asosli telefon autentifikatsiyasi pullik bo'lgani uchun ishlatilmaydi).
+- Narx *(2026-10-15: foydalanuvchi qarori)*: **yagona tarif — 99 000 so'm/oy, hammasi narxga kiradi** (18 modul, 1 virtual kassa, AI oylik limiti, Telegram bot); qo'shimcha kassa +39 000 so'm/oy (taxmin); eski Start/Biznes/Pro (49k/129k/249k) uchburchagi bekor qilindi, faqat tarixiy ma'lumot sifatida saqlanadi (`spec/kod-uchun/05-mvp-chegarasi.md`, 3.3-bo'lim).
 - Obuna to'lovi kechikkanda: 24 soatlik imtiyozdan keyin tenant uchun kirish **to'liq to'xtaydi** (barcha sessiya bekor, login rad etiladi, to'lov bilan darhol tiklanadi) *(2026-10-15: foydalanuvchi qarori)*. Tor istisno *(2026-10-15: foydalanuvchi qarori, D1)*: lokautdan oldin (imtiyoz davrida) offline yaratilgan, hali yuborilmagan cheklar fiskal 48 soat muddatini buzmasligi uchun fon rejimida (`sync.drain`) OFD'ga yuborilishda davom etadi — yangi sotuv, login va boshqa hamma narsa yopiq qoladi. Ma'lumotlarni eksport qilish lokaut paytida **faqat to'lov sahifasidan**, SMS kod bilan tasdiqlangandan keyin mumkin *(2026-10-15: foydalanuvchi qarori, D2)*.
 
 ## Manbalar (avval o'qing)
@@ -31,12 +31,13 @@ buxgalteriya va soliq hisobotigacha **bitta tizim** + o'zbek tilidagi AI yordamc
 
 ## Natija papkalari
 
-| Papka | Mazmuni | Team |
-|---|---|---|
-| `spec/01-mahsulot/` | PRD: rollar, modullar bo'yicha talablar, biznes jarayonlar, ekranlar, AI funksiyalar, MVP chegarasi | Mahsulot |
-| `spec/02-arxitektura/` | Tizim arxitekturasi, ma'lumotlar modeli, buxgalteriya provodkalari, integratsiyalar, offline sync, AI qatlami, xavfsizlik, backlog | Arxitektura |
+| Papka | Mazmuni |
+|---|---|
+| **`spec/kod-uchun/`** | **Kod uchun yagona spetsifikatsiya** — 00–28 o'qish tartibida (`00-README.md` dan boshlang) |
+| `spec/tarix/` | Tekshiruvlar, qabul agentlari qarorlari, kamchiliklar tahlili, tuzatishlar jurnali, rasmiy xatlar — kod uchun shart emas |
+| `research_notes/` | Bozor va texnik tadqiqot (manbalar) |
 
-**Jamoa: asoschi + Claude** *(2026-10-15: asoschi qarori, Q8)* — qat'iy muddat yo'q; backlog ikki kishilik jamoaga moslashtirilgan: ishlar ketma-ket, har sprint — bitta vertikal bo'lak (backend+veb birga), hafta hisobidagi muddatlar olib tashlangan (`spec/01-mahsulot/06-mvp-chegarasi.md`).
+**Jamoa: asoschi + Claude** *(2026-10-15: asoschi qarori, Q8)* — qat'iy muddat yo'q; backlog ikki kishilik jamoaga moslashtirilgan: ishlar ketma-ket, har sprint — bitta vertikal bo'lak (backend+veb birga), hafta hisobidagi muddatlar olib tashlangan (`spec/kod-uchun/27-backlog.md`).
 
 ## Qoidalar (barcha agentlar uchun)
 

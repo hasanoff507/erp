@@ -66,4 +66,4 @@ Research **ishonchli asosga ega, lekin ~25 ta aniq xato bor**, ulardan 4 tasi ma
 - my.soliq.uz'dan davlat tuzgan hisobotni dasturiy o'qish (API yo'q).
 - ЗРУ-764 sertifikatlash xususiy SaaS'ga tegishlimi.
 - Tariflar: dastlab 149k/349k/699k so'm edi, spec'da izohsiz 69k–999k oralig'iga almashgan — foydalanuvchi qarori kerak.
-- `spec/02-arxitektura/` hali yozilmagan.
+- `spec/kod-uchun/` hali yozilmagan.

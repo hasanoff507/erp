@@ -82,4 +82,4 @@
 - [umbrex.com/resources/company-analysis/customer-service-support/support-cost-as-percentage-of-revenue](https://umbrex.com/resources/company-analysis/customer-service-support/support-cost-as-percentage-of-revenue/)
 - hh.uz vakansiyalar: [tashkent.hh.uz/vacancy/131728502](https://tashkent.hh.uz/vacancy/131728502), [tashkent.hh.uz/vacancy/132651756](https://tashkent.hh.uz/vacancy/132651756), [hh.uz/vacancies/operator_call_center](https://hh.uz/vacancies/operator_call_center)
 - olx.uz vakansiyalar: [olx.uz/oz/rabota/tashkent/q-operator](https://www.olx.uz/oz/rabota/tashkent/q-operator/)
-- Ichki manba (taqqoslash uchun): `research_notes/texnik/11-raqobatchilar-kamchiliklari.md`, `spec/tekshiruv/kamchiliklar-yakuniy.md` (9.3-band)
+- Ichki manba (taqqoslash uchun): `research_notes/texnik/11-raqobatchilar-kamchiliklari.md`, `spec/tarix/tekshiruv/kamchiliklar-yakuniy.md` (9.3-band)

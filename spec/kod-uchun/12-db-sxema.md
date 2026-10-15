@@ -1,0 +1,2590 @@
+# DB sxemasi (PostgreSQL 16) — amalga oshirishga tayyor spetsifikatsiya
+
+*2026-10-15 · Asos: `11-malumotlar-modeli.md` (barcha jadval/ustun/holatlar), `13-provodka-qoidalari.md` (registrlar, hisob raqamlari), `14-autentifikatsiya-oauth2.md` §19 (auth jadvallari), `15-xavfsizlik-va-audit.md` §3 (RLS qoidalari, istisnolar, SECURITY DEFINER), §2.1–2.2 (huquqlar/limitlar), §6.2 (audit_log o'zgarmasligi), `16-offline-sync.md` (`sync_receipts`, `devices`, `client_event_id`), `23-backend-arxitekturasi.md` (`tenant_transaction`, `idempotency_keys`, posting naqshi), `22-ai-qatlami.md` (`ai_requests` maydonlari), `spec/kod-uchun/01-qarorlar.md`. Loyiha ildizi: `E:/Project/erp`.*
+
+Bu hujjat — `11-malumotlar-modeli.md`da tasvirlangan kontseptual modelni **ishga tushirish mumkin bo'lgan PostgreSQL 16 DDL**ga aylantiradi. 01-hujjatdagi jadval/ustun nomlari **o'zgarishsiz** saqlanadi; qayerda 01 noaniq/ziddiyatli bo'lsa — aniq qaror qabul qilinadi va oxirgi bo'limda ("01 bilan farqlar / aniqlashtirishlar") ro'yxatga olinadi, 01-hujjatning o'zi tahrirlanmaydi.
+
+**Sxema tashkiloti**: uch PostgreSQL sxemasi — `app` (tenant-scoped biznes jadvallari + `tenants`/`users`/`memberships` kabi "yarim-global" jadvallar maxsus RLS siyosati bilan), `auth` (login/token jadvallari — ilova roliga to'g'ridan-to'g'ri kirish yo'q, faqat `SECURITY DEFINER` funksiyalar orqali), `platform` (tenant'siz, haqiqiy global ma'lumotnomalar: tariflar, qo'shimchalar, birliklar, OAuth mijozlari, imzolash kalitlari, platforma adminlari).
+
+---
+
+## 0. Rollar (oldindan)
+
+Barcha quyidagi DDL'dan oldin uch DB rol mavjud bo'lishi kerak (parollar — muhit sirlari, bu yerda ko'rsatilmaydi):
+
+```sql
+-- Alembic migratsiyalarini ishga tushiruvchi, barcha ob'ektlarning egasi
+CREATE ROLE erp_migrator LOGIN NOSUPERUSER CREATEDB NOCREATEROLE;
+
+-- FastAPI/worker/scheduler/bot ulanadigan rol — BYPASSRLS YO'Q (05-xavfsizlik §3.2)
+CREATE ROLE erp_app LOGIN NOSUPERUSER NOBYPASSRLS;
+
+-- SECURITY DEFINER funksiyalarning egasi — BYPASSRLS, lekin LOGIN emas
+-- (hech kim to'g'ridan-to'g'ri shu rol bilan ulanmaydi, faqat funksiya ichida "ishlaydi")
+CREATE ROLE erp_system NOLOGIN BYPASSRLS;
+```
+
+`erp_app` RLS siyosatlariga **to'liq bo'ysunadi** (bu — tenant izolyatsiyasining asosiy DB darajasidagi mexanizmi, `15-xavfsizlik-va-audit.md` Asosiy xulosa 3). `erp_system` — faqat quyida 4-bo'limda ro'yxatlangan `SECURITY DEFINER` funksiyalarning egasi; bu funksiyalar ichida ishlayotgan SQL `erp_system`ning `BYPASSRLS` huquqidan vaqtincha foydalanadi (login/billing kabi tenant-kontekstisiz amallar uchun yagona qonuniy yo'l).
+
+---
+
+## 1. Konventsiyalar
+
+### 1.1 Sxemalar va kengaytmalar
+
+```sql
+CREATE SCHEMA IF NOT EXISTS app;
+CREATE SCHEMA IF NOT EXISTS auth;
+CREATE SCHEMA IF NOT EXISTS platform;
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;   -- gen_random_bytes/gen_random_uuid — uuidv7() va parol-siz tasodifiy qiymatlar uchun
+CREATE EXTENSION IF NOT EXISTS pg_trgm;    -- mahsulot/kontragent nomi bo'yicha qidiruv indeksi (01-model §1)
+
+ALTER SCHEMA app OWNER TO erp_migrator;
+ALTER SCHEMA auth OWNER TO erp_migrator;
+ALTER SCHEMA platform OWNER TO erp_migrator;
+
+GRANT USAGE ON SCHEMA app TO erp_app, erp_system;
+GRANT USAGE ON SCHEMA platform TO erp_app, erp_system;
+-- auth sxemasiga erp_app'ga USAGE HECH QACHON berilmaydi (05-xavfsizlik §3.3, 12-auth §19)
+GRANT USAGE ON SCHEMA auth TO erp_system;
+
+ALTER ROLE erp_app SET search_path = app, platform, public;
+ALTER ROLE erp_system SET search_path = app, auth, platform, public;
+```
+
+`search_path`da `auth` yo'q — `erp_app` ulanishida `auth.*` nomlari hatto tasodifan ham ko'rinmaydi; faqat `SECURITY DEFINER` funksiyalar o'z `SET search_path` bilan ichkarida `auth`ga kiradi (4-bo'lim).
+
+### 1.2 Kalitlar — UUIDv7 (qaror va asos)
+
+**Qaror**: ID'lar **ilova tomonida** generatsiya qilinadi (backend — `uuid-utils`, veb-kassa/Android — JS/Kotlin UUIDv7 polyfill), DB ustun `DEFAULT`i esa **zaxira (fallback)** sifatida saqlanadi. Sabab — `11-malumotlar-modeli.md` Asosiy xulosa 2: *"offline qurilmada ham yaratiladi — kassa serverni kutmasdan ID beradi"*. Agar ID faqat DB tomonida berilsa, offline qurilma hujjatni serverga yetkazmasdan hech qanday ID bilan ishlay olmaydi — bu butun offline-first me'morchilikka zid (`16-offline-sync.md`). Shuning uchun: (a) ilova har doim ID'ni **oldindan** generatsiya qiladi va INSERT'da aniq yuboradi; (b) DB ustunida baribir `DEFAULT app.uuidv7()` turadi — to'g'ridan-to'g'ri `psql`/seed/migratsiya skriptlari uchun xavfsizlik to'ri, ID unutilsa ham jadval buzilmaydi.
+
+PostgreSQL 16'da native `uuidv7()` yo'q (PG18'da qo'shiladi) — shuning uchun o'z funksiyamiz:
+
+```sql
+CREATE OR REPLACE FUNCTION app.uuidv7() RETURNS uuid
+LANGUAGE plpgsql VOLATILE AS $$
+DECLARE
+  unix_ts_ms bytea;
+  uuid_bytes bytea;
+BEGIN
+  unix_ts_ms := substring(int8send(floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint) FROM 3 FOR 6);
+  uuid_bytes := unix_ts_ms || gen_random_bytes(10);
+  -- versiya = 0111 (7), 7-baytning yuqori nibble'i
+  uuid_bytes := set_byte(uuid_bytes, 6, (x'70'::int | (get_byte(uuid_bytes, 6) & x'0F'::int)));
+  -- variant = 10, 9-baytning yuqori ikki biti
+  uuid_bytes := set_byte(uuid_bytes, 8, (x'80'::int | (get_byte(uuid_bytes, 8) & x'3F'::int)));
+  RETURN encode(uuid_bytes, 'hex')::uuid;
+END;
+$$;
+
+COMMENT ON FUNCTION app.uuidv7() IS
+  'Vaqt bo''yicha tartiblangan UUIDv7 — faqat DB-darajasidagi zaxira DEFAULT; ilova ID''ni odatda oldindan o''zi beradi (offline-first talabi).';
+```
+
+### 1.3 Son/vaqt turlari
+
+| Ma'no | Tip | Qaysi ustunlarda |
+|---|---|---|
+| Pul summasi (so'm, tiyingacha) | `NUMERIC(18,2)` | `amount`, `*_total`, `cost_amount`, `vat_amount`, `balance`, `price_month`, hisob-kitob yig'indilari |
+| Miqdor (dona/kg/l) | `NUMERIC(18,3)` | `qty`, `qty_in`, `qty_left`, `qty_sent`, `qty_received` |
+| Birlik narx/tannarx | `NUMERIC(18,4)` | `price`, `unit_cost`, `avg_cost`, `old_price`/`new_price` |
+| Foiz | `NUMERIC(5,2)` | `vat_rate`, `standing_discount_pct` |
+| Vaqt | `TIMESTAMPTZ` | barcha `*_at` ustunlar (UTC saqlanadi) |
+| Sana (hisob kuni) | `DATE` | `doc_date`, `valid_from`, `period`, `expiry_date` |
+
+Float/double hech qachon ishlatilmaydi (`11-malumotlar-modeli.md` band 3).
+
+### 1.4 Umumiy ustunlar va trigger'lar
+
+```sql
+CREATE OR REPLACE FUNCTION app.set_updated_at() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;
+```
+
+Har bir `updated_at` ustuniga ega jadvalga shu trigger avtomatik qo'llanadi — 2-bo'lim oxirida bitta `DO $$ ... $$` bloki orqali (barcha jadvallar yaratilgandan keyin, qo'lda 90 marta yozish o'rniga). `version INT NOT NULL DEFAULT 1` — faqat ma'lumotnomalarda (optimistik qulflash, `01-model` band 27); hujjatlarda shart emas (`posted`dan keyin umuman o'zgarmaydi).
+
+### 1.5 Enum strategiyasi — CHECK, PG ENUM emas, lookup jadval emas
+
+**Qaror**: holat/tur ustunlari uchun `TEXT + CHECK (col IN (...))`, PostgreSQL native `ENUM` tipi **ishlatilmaydi**, alohida lookup-jadval ham yaratilmaydi (faqat haqiqiy ma'lumotnoma bo'lgan hollar — `units`, `expense_categories`, `roles` — bundan mustasno, ular allaqachon jadval).
+
+Asos:
+1. **Migratsiya qulayligi** (`23-backend-arxitekturasi.md` §10, expand-contract siyosati): `ALTER TYPE ... ADD VALUE` tranzaksiya ichida boshqa DDL bilan birga bajarilmaydi va eski qiymatni olib tashlash umuman mumkin emas — `CHECK` cheklovini esa oddiy `DROP CONSTRAINT` + `ADD CONSTRAINT` bilan bitta Alembic revizionda, boshqa jadvallarga ta'sir qilmasdan almashtirish mumkin.
+2. **Qayta ishlatish**: bir xil qiymatlar to'plami (`draft/posted/cancelled` kabi) bir nechta jadvalda ishlatiladi, lekin har birining o'z evolyutsiyasi bo'lishi mumkin — umumiy `ENUM` tipi ularni sun'iy bog'lab qo'yadi.
+3. **Tezlik**: hot-path (chek postingi) uchun qo'shimcha JOIN (lookup jadval) kerak emas, `CHECK` cheklovi insert/update vaqtida bepul tekshiriladi.
+
+---
+
+## 2. To'liq DDL
+
+> Quyidagi jadvallar **11-malumotlar-modeli.md bo'lim tartibida** (o'qish qulayligi uchun) berilgan. Haqiqiy ijro (Alembic revizion) tartibi FK bog'liqligini hisobga oladi — 6-bo'lim.
+
+### 2.1 Platforma — global jadvallar (`platform` sxemasi)
+
+```sql
+CREATE TABLE platform.units (
+  code          TEXT PRIMARY KEY,
+  is_fractional BOOLEAN NOT NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE platform.plans (
+  id          UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  code        TEXT NOT NULL UNIQUE,
+  price_month NUMERIC(18,2) NOT NULL CHECK (price_month >= 0),
+  price_year  NUMERIC(18,2) NOT NULL CHECK (price_year >= 0),
+  limits      JSONB NOT NULL DEFAULT '{}',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE platform.addons (
+  id          UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  code        TEXT NOT NULL UNIQUE,
+  name        TEXT NOT NULL,
+  price_month NUMERIC(18,2) NOT NULL CHECK (price_month >= 0),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE platform.oauth_clients (
+  id                  UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  client_id           TEXT NOT NULL UNIQUE,
+  client_type         TEXT NOT NULL CHECK (client_type IN ('confidential','public')),
+  name                TEXT NOT NULL,
+  client_secret_encrypted TEXT NULL,   -- public mijozda NULL
+  redirect_uris       TEXT[] NOT NULL DEFAULT '{}',
+  allowed_grant_types TEXT[] NOT NULL DEFAULT '{}',
+  allowed_scopes      TEXT[] NOT NULL DEFAULT '{}',
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (client_type = 'public' OR client_secret_encrypted IS NOT NULL)
+);
+
+CREATE TABLE platform.signing_keys (
+  kid                     UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  algorithm               TEXT NOT NULL CHECK (algorithm IN ('EdDSA','ES256')),
+  purpose                 TEXT NOT NULL CHECK (purpose IN ('access','license')),
+  public_key              TEXT NOT NULL,
+  private_key_encrypted   TEXT NOT NULL,
+  status                  TEXT NOT NULL CHECK (status IN ('next','active','retired')),
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+  activated_at            TIMESTAMPTZ NULL,
+  retired_at              TIMESTAMPTZ NULL
+);
+-- har (purpose) uchun bir vaqtda faqat bitta 'active' kalit
+CREATE UNIQUE INDEX uq_signing_keys_active ON platform.signing_keys (purpose) WHERE status = 'active';
+
+-- *(2026-10-15: qabul-6 — DB-27)* standart yorliq shablonlari (US-M09-04), tenant o'zgartirmaydi, RLS istisnosi
+CREATE TABLE platform.label_templates (
+  id         UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  code       TEXT NOT NULL UNIQUE,         -- '58x40_price', '40x30_barcode'
+  name       TEXT NOT NULL,
+  width_mm   NUMERIC(6,2) NOT NULL CHECK (width_mm > 0),
+  height_mm  NUMERIC(6,2) NOT NULL CHECK (height_mm > 0),
+  fields     JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+`platform_admins` — `app.users`ga FK bergani uchun 2.3-bo'limdan keyin (`users` yaratilgandan so'ng) joylashtiriladi.
+
+### 2.2 `auth` sxemasi — login/token jadvallari
+
+`15-xavfsizlik-va-audit.md` §3.3 va `14-autentifikatsiya-oauth2.md` §19: bu jadvallarga `erp_app`ning **hech qanday** to'g'ridan-to'g'ri ruxsati yo'q (na RLS, na GRANT) — faqat 4-bo'limdagi `SECURITY DEFINER` funksiyalar orqali.
+
+```sql
+CREATE TABLE auth.user_credentials (
+  user_id              UUID PRIMARY KEY,             -- FK app.users(id), pastda ALTER bilan qo'shiladi
+  password_hash        TEXT NULL,
+  password_algo        TEXT NOT NULL DEFAULT 'argon2id',
+  password_updated_at  TIMESTAMPTZ NULL,
+  pin_hash             TEXT NULL,
+  pin_updated_at       TIMESTAMPTZ NULL,
+  failed_login_count   INT NOT NULL DEFAULT 0,
+  locked_until         TIMESTAMPTZ NULL,
+  must_change_password BOOLEAN NOT NULL DEFAULT false,
+  must_change_pin      BOOLEAN NOT NULL DEFAULT false,
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE auth.otp_challenges (
+  id           UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  phone        TEXT NOT NULL,
+  purpose      TEXT NOT NULL CHECK (purpose IN ('signup','recovery','invite','admin_reset','pin_reset','data_export')),
+  channel      TEXT NOT NULL CHECK (channel IN ('telegram','sms')) DEFAULT 'telegram',  -- *(2026-10-15: asoschi qarori, Q7)* qaysi kanal orqali yuborilgani
+  code_hash    TEXT NOT NULL,
+  attempts     INT NOT NULL DEFAULT 0,
+  max_attempts INT NOT NULL DEFAULT 5,
+  expires_at   TIMESTAMPTZ NOT NULL,
+  verified_at  TIMESTAMPTZ NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_otp_challenges_phone ON auth.otp_challenges (phone, purpose, created_at DESC);
+
+CREATE TABLE auth.login_attempts (
+  id             UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  phone          TEXT NOT NULL,
+  ip             INET NULL,
+  success        BOOLEAN NOT NULL,
+  failure_reason TEXT NULL,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_login_attempts_phone ON auth.login_attempts (phone, created_at DESC);
+CREATE INDEX idx_login_attempts_ip ON auth.login_attempts (ip, created_at DESC);
+
+CREATE TABLE auth.authorization_codes (
+  code_hash             TEXT PRIMARY KEY,
+  client_id             UUID NOT NULL REFERENCES platform.oauth_clients(id),
+  user_id               UUID NOT NULL,                -- FK app.users(id), pastda
+  tenant_id             UUID NULL,                     -- FK app.tenants(id), pastda; tenant tanlanmagan bo'lsa NULL
+  code_challenge        TEXT NOT NULL,
+  code_challenge_method TEXT NOT NULL DEFAULT 'S256' CHECK (code_challenge_method = 'S256'),
+  redirect_uri          TEXT NOT NULL,
+  scope                 TEXT NOT NULL,
+  expires_at            TIMESTAMPTZ NOT NULL,
+  used_at               TIMESTAMPTZ NULL,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE auth.refresh_tokens (
+  id                   UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  token_hash           TEXT NOT NULL UNIQUE,
+  family_id            UUID NOT NULL,
+  client_id            UUID NOT NULL REFERENCES platform.oauth_clients(id),
+  user_id              UUID NOT NULL,                  -- FK app.users(id)
+  tenant_id            UUID NULL,                       -- FK app.tenants(id)
+  device_id            UUID NULL,                       -- FK app.devices(id)
+  scope                TEXT NOT NULL,
+  issued_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at           TIMESTAMPTZ NOT NULL,
+  used_at              TIMESTAMPTZ NULL,
+  replaced_by_id       UUID NULL REFERENCES auth.refresh_tokens(id),
+  revoked_at           TIMESTAMPTZ NULL,
+  revoked_reason       TEXT NULL,
+  suspended_at         TIMESTAMPTZ NULL
+);
+CREATE INDEX idx_refresh_tokens_family ON auth.refresh_tokens (family_id);
+CREATE INDEX idx_refresh_tokens_device ON auth.refresh_tokens (device_id) WHERE device_id IS NOT NULL;
+
+CREATE TABLE auth.sessions (
+  id                      UUID PRIMARY KEY DEFAULT app.uuidv7(),  -- = sid
+  user_id                 UUID NOT NULL,                           -- FK app.users(id)
+  tenant_id               UUID NULL,                                -- FK app.tenants(id)
+  client_id               UUID NOT NULL REFERENCES platform.oauth_clients(id),
+  device_id               UUID NULL,                                -- FK app.devices(id)
+  current_refresh_token_id UUID NULL REFERENCES auth.refresh_tokens(id),
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_seen_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  idle_expires_at         TIMESTAMPTZ NOT NULL,
+  absolute_expires_at     TIMESTAMPTZ NOT NULL,
+  revoked_at              TIMESTAMPTZ NULL,
+  revoked_reason          TEXT NULL,
+  ip                      INET NULL,
+  user_agent              TEXT NULL
+);
+CREATE INDEX idx_sessions_user ON auth.sessions (user_id);
+```
+
+Barcha `auth.*` jadvallarda RLS **o'chirilgan holatda qoladi** (yoqilmaydi) — bu jadvallar DB darajasida tenant kontekstidan tashqarida qidiriladi; himoya DB-GRANT yo'qligi + `SECURITY DEFINER` funksiya qamrovi bilan ta'minlanadi (4-bo'lim, CI tekshiruvi 6-bo'lim).
+
+### 2.3 Tashkilot, foydalanuvchilar, huquqlar (`app` sxemasi)
+
+```sql
+CREATE TABLE app.tenants (
+  id            UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  name          TEXT NOT NULL,
+  activity_type TEXT NULL,
+  stir          TEXT NULL,
+  phone         TEXT NOT NULL,
+  settings      JSONB NOT NULL DEFAULT '{}',   -- *(2026-10-15: qabul-6 — M-03)* kalitlar: ai_training_consent, negative_stock_policy
+                                                 -- (allow/forbid), scale_barcode_prefix, scale_barcode_version, low_stock_check_enabled,
+                                                 -- expiry_warning_days (standart 7), vat_diff_tolerance_amount (standart "1000.00", taxmin),
+                                                 -- supplier_payment_strict (bool). Baholash usuli BU YERDA EMAS — valuation_method_history (DB-26)
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  version       INT NOT NULL DEFAULT 1
+);
+-- *(2026-10-15: asoschi qarori, Q4)* Bitta tenant = bitta yuridik shaxs (STIR), ko'p filial/kassa/faoliyat turi
+-- (branches.activity_type) bitta tenant ichida; ko'p yuridik shaxsli egalar har bir shaxs uchun alohida tenant
+-- ochadi va memberships orqali ular o'rtasida almashadi (tasdiqlandi — 13-provodka-qoidalari.md §5.4).
+
+CREATE TABLE app.users (
+  id         UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  phone      TEXT NOT NULL UNIQUE,
+  name       TEXT NOT NULL,
+  locale     TEXT NOT NULL DEFAULT 'uz',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  version    INT NOT NULL DEFAULT 1
+);
+
+-- *(2026-10-15: asoschi qarori, Q7)* Google bilan kirish — tashqi OIDC identity provider bog'lash
+-- (`14-autentifikatsiya-oauth2.md` §2.2). `users` kabi tenant-mustaqil (global), RLS yo'q — auth.* jadvallar
+-- qatorida emas, lekin shu sababli ham ilova darajasida faqat user_id orqali filtrlanadi.
+CREATE TABLE app.user_identities (
+  id                UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  user_id           UUID NOT NULL REFERENCES app.users(id),
+  provider          TEXT NOT NULL CHECK (provider IN ('google')),
+  provider_user_id  TEXT NOT NULL,              -- Google `sub`
+  email             TEXT NULL,
+  email_verified    BOOLEAN NOT NULL DEFAULT false,
+  linked_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (provider, provider_user_id)
+);
+CREATE INDEX idx_user_identities_user ON app.user_identities (user_id);
+
+-- endi auth.* va platform.* jadvallardagi "pastda qo'shiladi" deb belgilangan FK'lar:
+ALTER TABLE auth.user_credentials      ADD CONSTRAINT fk_uc_user      FOREIGN KEY (user_id) REFERENCES app.users(id);
+ALTER TABLE auth.authorization_codes   ADD CONSTRAINT fk_ac_user      FOREIGN KEY (user_id) REFERENCES app.users(id);
+ALTER TABLE auth.authorization_codes   ADD CONSTRAINT fk_ac_tenant    FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
+ALTER TABLE auth.refresh_tokens        ADD CONSTRAINT fk_rt_user      FOREIGN KEY (user_id) REFERENCES app.users(id);
+ALTER TABLE auth.refresh_tokens        ADD CONSTRAINT fk_rt_tenant    FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
+ALTER TABLE auth.sessions              ADD CONSTRAINT fk_se_user      FOREIGN KEY (user_id) REFERENCES app.users(id);
+ALTER TABLE auth.sessions              ADD CONSTRAINT fk_se_tenant    FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
+
+CREATE TABLE app.branches (
+  id                   UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id            UUID NOT NULL REFERENCES app.tenants(id),
+  code                 TEXT NOT NULL CHECK (code ~ '^[0-9A-Z]{1,4}$'),  -- *(2026-10-15: qabul-6 — DB-02)* hujjat raqamidagi filial kodi, signup'da '01'
+  name                 TEXT NOT NULL,
+  address              TEXT NULL,
+  is_default           BOOLEAN NOT NULL DEFAULT false,
+  settlement_category  TEXT NOT NULL CHECK (settlement_category IN ('city_100k_plus','other','remote_mountain')),
+  activity_type        TEXT NOT NULL CHECK (activity_type IN ('retail','other')),
+  archived_at          TIMESTAMPTZ NULL,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  version              INT NOT NULL DEFAULT 1,
+  UNIQUE (tenant_id, code)
+);
+CREATE UNIQUE INDEX uq_branches_one_default ON app.branches (tenant_id) WHERE is_default AND archived_at IS NULL;
+
+CREATE TABLE app.branch_tax_settings (
+  id                  UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id           UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id           UUID NOT NULL REFERENCES app.branches(id),
+  valid_from          DATE NOT NULL,
+  settlement_category TEXT NOT NULL CHECK (settlement_category IN ('city_100k_plus','other','remote_mountain')),
+  activity_type       TEXT NOT NULL CHECK (activity_type IN ('retail','other')),
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by          UUID NOT NULL REFERENCES app.users(id),
+  UNIQUE (branch_id, valid_from)
+);
+
+CREATE TABLE app.warehouses (
+  id          UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id   UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id   UUID NOT NULL REFERENCES app.branches(id),
+  name        TEXT NOT NULL,
+  type        TEXT NOT NULL CHECK (type IN ('store','stock')),
+  archived_at TIMESTAMPTZ NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  version     INT NOT NULL DEFAULT 1
+);
+
+CREATE TABLE app.cash_registers (
+  id               UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id        UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id        UUID NOT NULL REFERENCES app.branches(id),
+  name             TEXT NOT NULL,
+  kind             TEXT NOT NULL CHECK (kind IN ('web','android')),
+  fiscal_module_id TEXT NULL,
+  ofd_status       TEXT NOT NULL DEFAULT 'pending' CHECK (ofd_status IN ('pending','registered','active','suspended','deregistered')),  -- *(2026-10-15: qabul-6 — DB-33)* qiymatlar taxmin, OFD reyestr hujjati bilan tasdiqlanadi
+  archived_at      TIMESTAMPTZ NULL,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  version          INT NOT NULL DEFAULT 1
+);
+
+CREATE TABLE app.devices (
+  id               UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id        UUID NOT NULL REFERENCES app.tenants(id),
+  cash_register_id UUID NULL REFERENCES app.cash_registers(id),
+  kind             TEXT NOT NULL CHECK (kind IN ('web','android')),
+  app_version      TEXT NULL,
+  revoked_at       TIMESTAMPTZ NULL,
+  revoked_by       UUID NULL REFERENCES app.users(id),
+  last_seen_at     TIMESTAMPTZ NULL,
+  last_sync_at     TIMESTAMPTZ NULL,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE auth.refresh_tokens ADD CONSTRAINT fk_rt_device FOREIGN KEY (device_id) REFERENCES app.devices(id);
+ALTER TABLE auth.sessions       ADD CONSTRAINT fk_se_device FOREIGN KEY (device_id) REFERENCES app.devices(id);
+
+CREATE TABLE app.memberships (
+  id         UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id  UUID NOT NULL REFERENCES app.tenants(id),
+  user_id    UUID NOT NULL REFERENCES app.users(id),
+  role_ids   UUID[] NOT NULL DEFAULT '{}',
+  branch_ids UUID[] NOT NULL DEFAULT '{}',   -- bo'sh = barcha filial
+  status     TEXT NOT NULL CHECK (status IN ('active','blocked')) DEFAULT 'active',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  version    INT NOT NULL DEFAULT 1,
+  UNIQUE (tenant_id, user_id)
+);
+
+CREATE TABLE app.roles (
+  id          UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id   UUID NOT NULL REFERENCES app.tenants(id),
+  name        TEXT NOT NULL,
+  is_system   BOOLEAN NOT NULL DEFAULT false,
+  system_code TEXT NULL CHECK (system_code IN ('owner','manager','cashier','storekeeper','accountant')),
+  archived_at TIMESTAMPTZ NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  version     INT NOT NULL DEFAULT 1,
+  UNIQUE (tenant_id, name)
+);
+
+CREATE TABLE app.role_permissions (
+  id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
+  role_id         UUID NOT NULL REFERENCES app.roles(id),
+  permission_code TEXT NOT NULL,
+  limit_value     NUMERIC(18,4) NULL,   -- ma'nosi permission_code'ga bog'liq: foiz YOKI summa (3-bo'lim, aniqlashtirish #11);
+                                          -- API'da 4 xonali satr ("5.0000"), UI foiz/so'mni permission_code'ga qarab formatlaydi *(2026-10-15: qabul-6 — DB-33)*
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (role_id, permission_code)
+);
+
+CREATE TABLE app.license_tokens (
+  id          UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id   UUID NOT NULL REFERENCES app.tenants(id),
+  device_id   UUID NOT NULL REFERENCES app.devices(id),
+  issued_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  valid_until TIMESTAMPTZ NOT NULL,
+  jti         UUID NOT NULL UNIQUE,
+  server_time TIMESTAMPTZ NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE platform.platform_admins (
+  id                  UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  user_id             UUID NOT NULL UNIQUE REFERENCES app.users(id),
+  role                TEXT NOT NULL,
+  mfa_secret_encrypted TEXT NOT NULL,
+  allowed_ips         CIDR[] NULL,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE app.subscriptions (
+  id                 UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id          UUID NOT NULL UNIQUE REFERENCES app.tenants(id),
+  plan_id            UUID NOT NULL REFERENCES platform.plans(id),
+  period             TEXT NOT NULL CHECK (period IN ('month','year')),
+  current_period_end TIMESTAMPTZ NOT NULL,
+  grace_ends_at      TIMESTAMPTZ NULL,
+  status             TEXT NOT NULL CHECK (status IN ('trial','active','grace','restricted','closed')) DEFAULT 'trial',
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  version            INT NOT NULL DEFAULT 1
+);
+
+CREATE TABLE app.tenant_addons (
+  id                   UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id            UUID NOT NULL REFERENCES app.tenants(id),
+  addon_code           TEXT NOT NULL REFERENCES platform.addons(code),
+  quantity             INT NOT NULL DEFAULT 1 CHECK (quantity > 0),
+  price_month_snapshot NUMERIC(18,2) NOT NULL,
+  added_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
+  removed_at           TIMESTAMPTZ NULL
+);
+CREATE INDEX idx_tenant_addons_active ON app.tenant_addons (tenant_id) WHERE removed_at IS NULL;
+
+-- *(2026-10-15: qabul-6 — DB-18)* Payme CreateTransaction'da provider_tx_id checkout paytida noma'lum → NULL ruxsat;
+-- davr/kvitansiya/checkout-oldi yozuv ustunlari qo'shildi. Alohida billing_invoices jadvali — RAD (ustun yetarli).
+CREATE TABLE app.billing_payments (
+  id                    UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id             UUID NOT NULL REFERENCES app.tenants(id),
+  amount                NUMERIC(18,2) NOT NULL CHECK (amount > 0),
+  provider              TEXT NOT NULL CHECK (provider IN ('click','payme')),
+  provider_tx_id        TEXT NULL,                  -- NOT NULL olib tashlandi; UNIQUE (provider, provider_tx_id) qoladi
+  status                TEXT NOT NULL CHECK (status IN ('pending','success','failed','cancelled')),
+  period                TEXT NOT NULL CHECK (period IN ('month','year')),
+  covers_from           DATE NULL,                  -- success'da to'ldiriladi
+  covers_to             DATE NULL,
+  amount_breakdown      JSONB NOT NULL DEFAULT '{}', -- {plan:"99000.00", addons:[{code,qty,price}]} snapshot
+  invoice_number        TEXT NULL,
+  invoice_attachment_id UUID NULL,                  -- FK pastda (attachments yaratilgandan keyin) → app.attachments(id)
+  created_by            UUID NULL REFERENCES app.users(id),
+  paid_at               TIMESTAMPTZ NULL,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (provider, provider_tx_id)
+);
+CREATE UNIQUE INDEX uq_billing_invoice_number ON app.billing_payments (invoice_number) WHERE invoice_number IS NOT NULL;
+
+CREATE TABLE app.tenant_tax_regimes (
+  id         UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id  UUID NOT NULL REFERENCES app.tenants(id),
+  valid_from DATE NOT NULL,       -- har doim oyning 1-sanasi
+  regime     TEXT NOT NULL CHECK (regime IN ('vat','turnover')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by UUID NOT NULL REFERENCES app.users(id),
+  UNIQUE (tenant_id, valid_from)
+);
+
+-- *(2026-10-15: qabul-6 — DB-26)* baholash usuli (FIFO/AVECO) tarixi — faqat yil boshidan o'zgaradi;
+-- tenants.settings.valuation_method kaliti OLIB TASHLANADI, manba shu jadval. Signup: valid_from = joriy yil
+-- 1-yanvar, method='aveco' (yoki tanlangan).
+CREATE TABLE app.valuation_method_history (
+  id         UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id  UUID NOT NULL REFERENCES app.tenants(id),
+  valid_from DATE NOT NULL CHECK (extract(month FROM valid_from) = 1 AND extract(day FROM valid_from) = 1),
+  method     TEXT NOT NULL CHECK (method IN ('fifo','aveco')),
+  created_by UUID NOT NULL REFERENCES app.users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, valid_from)
+);
+```
+
+### 2.4 Katalog va narxlar
+
+```sql
+CREATE TABLE app.product_categories (
+  id          UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id   UUID NOT NULL REFERENCES app.tenants(id),
+  parent_id   UUID NULL REFERENCES app.product_categories(id),
+  name        TEXT NOT NULL,
+  archived_at TIMESTAMPTZ NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  version     INT NOT NULL DEFAULT 1
+);
+
+CREATE TABLE app.products (
+  id               UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id        UUID NOT NULL REFERENCES app.tenants(id),
+  name             TEXT NOT NULL,
+  name_ru          TEXT NULL,                  -- *(2026-10-15: asoschi qarori, Q2)* ixtiyoriy, chek/UI ikkinchi til qatori ("name / name_ru")
+  category_id      UUID NULL REFERENCES app.product_categories(id),
+  unit_code        TEXT NOT NULL REFERENCES platform.units(code),
+  mxik_code        TEXT NULL CHECK (mxik_code IS NULL OR mxik_code ~ '^[0-9]{17}$'),  -- *(2026-10-15: qabul-6 — DB-23)* yaratishda bloklamaydi, sotuvdan oldin shart
+  package_code     TEXT NULL,
+  vat_rate         NUMERIC(5,2) NULL,          -- 12.00 / 0.00 (aniqlashtirish #10: vat_exemption_code bilan birga)
+  vat_exemption_code TEXT NULL,                -- imtiyoz kodi, vat_rate o'rniga/bilan
+  is_marked        BOOLEAN NOT NULL DEFAULT false,
+  is_weighed       BOOLEAN NOT NULL DEFAULT false,
+  min_stock        NUMERIC(18,3) NULL,
+  archived_at      TIMESTAMPTZ NULL,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  version          INT NOT NULL DEFAULT 1,
+  CHECK (vat_rate IS NOT NULL OR vat_exemption_code IS NOT NULL)
+);
+CREATE INDEX idx_products_name_trgm ON app.products USING gin (name gin_trgm_ops);
+CREATE INDEX idx_products_tenant_archived ON app.products (tenant_id) WHERE archived_at IS NULL;
+
+CREATE TABLE app.product_barcodes (
+  id                UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id         UUID NOT NULL REFERENCES app.tenants(id),
+  product_id        UUID NOT NULL REFERENCES app.products(id),
+  barcode           TEXT NOT NULL,
+  kind              TEXT NOT NULL CHECK (kind IN ('ean','internal','weighed_prefix')),
+  units_per_barcode NUMERIC(18,3) NOT NULL DEFAULT 1 CHECK (units_per_barcode > 0),
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, barcode)
+);
+
+CREATE TABLE app.product_prices (
+  id                  UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id           UUID NOT NULL REFERENCES app.tenants(id),
+  product_id          UUID NOT NULL REFERENCES app.products(id),
+  branch_id           UUID NULL REFERENCES app.branches(id),   -- null = hamma filial
+  price               NUMERIC(18,4) NOT NULL CHECK (price >= 0),
+  valid_from          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  set_by              UUID NULL REFERENCES app.users(id),
+  price_change_doc_id UUID NULL,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_product_prices_current ON app.product_prices (tenant_id, product_id, branch_id, valid_from DESC);
+
+CREATE TABLE app.label_print_queue (
+  id         UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id  UUID NOT NULL REFERENCES app.tenants(id),
+  product_id UUID NOT NULL REFERENCES app.products(id),
+  reason     TEXT NOT NULL CHECK (reason IN ('price_changed','new')),
+  printed_at TIMESTAMPTZ NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_label_queue_pending ON app.label_print_queue (tenant_id) WHERE printed_at IS NULL;
+
+CREATE TABLE app.internal_barcode_seq (
+  tenant_id  UUID PRIMARY KEY REFERENCES app.tenants(id),
+  next_value BIGINT NOT NULL DEFAULT 2000000000
+);
+
+CREATE TABLE app.discount_rules (
+  id          UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id   UUID NOT NULL REFERENCES app.tenants(id),
+  name        TEXT NOT NULL,
+  scope       TEXT NOT NULL CHECK (scope IN ('product','category','all')),
+  target_ids  UUID[] NOT NULL DEFAULT '{}',
+  kind        TEXT NOT NULL CHECK (kind IN ('percent','amount','n_plus_m')),
+  value       NUMERIC(18,4) NOT NULL,   -- kind='percent' bo'lsa foiz, aks holda summa (aniqlashtirish #12)
+  branch_ids  UUID[] NOT NULL DEFAULT '{}',  -- bo'sh = hammasi
+  valid_from  DATE NOT NULL,
+  valid_to    DATE NULL,
+  priority    INT NOT NULL DEFAULT 0,
+  archived_at TIMESTAMPTZ NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  version     INT NOT NULL DEFAULT 1
+);
+CREATE INDEX idx_discount_rules_active ON app.discount_rules (tenant_id, priority DESC) WHERE archived_at IS NULL;
+```
+
+### 2.5 Kontragentlar
+
+```sql
+CREATE TABLE app.counterparties (
+  id                    UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id             UUID NOT NULL REFERENCES app.tenants(id),
+  kind                  TEXT NOT NULL CHECK (kind IN ('person','company')),
+  name                  TEXT NOT NULL,
+  phone                 TEXT NULL,
+  stir                  TEXT NULL,
+  legal_address         TEXT NULL,
+  bank_account          TEXT NULL,
+  bank_mfo              TEXT NULL,
+  vat_payer             BOOLEAN NULL,
+  vat_payer_checked_at  TIMESTAMPTZ NULL,
+  is_customer           BOOLEAN NOT NULL DEFAULT false,
+  is_supplier           BOOLEAN NOT NULL DEFAULT false,
+  credit_limit          NUMERIC(18,2) NULL,   -- null = limitsiz
+  standing_discount_pct NUMERIC(5,2) NULL CHECK (standing_discount_pct BETWEEN 0 AND 100),
+  notify_consent        BOOLEAN NOT NULL DEFAULT false,
+  notify_consent_at     TIMESTAMPTZ NULL,
+  debt_due_date         DATE NULL,   -- *(2026-10-15: qabul-7 — B-01)* yagona joriy va'da sanasi (o'zgaruvchan; debt_moves append-only, bu yerda yangilanadi)
+  telegram_chat_id      TEXT NULL,
+  note                  TEXT NULL,
+  archived_at           TIMESTAMPTZ NULL,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  version               INT NOT NULL DEFAULT 1
+);
+CREATE INDEX idx_counterparties_name_trgm ON app.counterparties USING gin (name gin_trgm_ops);
+
+CREATE TABLE app.debt_doubtful_flags (
+  id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
+  counterparty_id UUID NOT NULL REFERENCES app.counterparties(id),
+  flagged_by      UUID NOT NULL REFERENCES app.users(id),  -- faqat Egasi (ilova darajasida tekshiriladi)
+  reason          TEXT NOT NULL,
+  flagged_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  unflagged_at    TIMESTAMPTZ NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_debt_doubtful_active ON app.debt_doubtful_flags (tenant_id, counterparty_id) WHERE unflagged_at IS NULL;
+
+-- *(2026-10-15: qabul-6 — DB-28)* mijozning ochiq qarz hisob-varag'i havolasi (US-M08-08); token o'zi saqlanmaydi
+CREATE TABLE app.counterparty_statement_links (
+  id               UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id        UUID NOT NULL REFERENCES app.tenants(id),
+  counterparty_id  UUID NOT NULL REFERENCES app.counterparties(id),
+  token_hash       TEXT NOT NULL UNIQUE,    -- token o'zi saqlanmaydi (SHA-256)
+  expires_at       TIMESTAMPTZ NOT NULL,    -- +30 kun (taxmin)
+  revoked_at       TIMESTAMPTZ NULL,
+  last_accessed_at TIMESTAMPTZ NULL,
+  created_by       UUID NOT NULL REFERENCES app.users(id),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+### 2.5a Tasdiqlash va to'lov seanslari *(2026-10-15: qabul-6 — DB-09/DB-10/DB-11, M-20)*
+
+```sql
+-- DB-09: masofaviy tasdiq navbati (BO-16)
+CREATE TABLE app.approval_requests (
+  id                   UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id            UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id            UUID NOT NULL REFERENCES app.branches(id),
+  kind                 TEXT NOT NULL CHECK (kind IN ('discount_over_limit','return_over_limit','return_no_receipt',
+                         'debt_over_limit','cash_withdrawal_over_limit','price_change','expense_over_limit',
+                         'write_off_over_limit')),
+  permission_code      TEXT NOT NULL,           -- tasdiqlovchida bo'lishi shart kod (05 §2.3 xaritasi)
+  requested_value      NUMERIC(18,4) NULL,      -- summa yoki foiz (role_permissions.limit_value bilan bir xil birlik)
+  context              JSONB NOT NULL DEFAULT '{}',
+  linked_doc_type      TEXT NULL,               -- Q7: jadval nomi ('price_changes','expenses',...)
+  linked_doc_id        UUID NULL,
+  device_id            UUID NULL REFERENCES app.devices(id),
+  status               TEXT NOT NULL DEFAULT 'pending'
+                         CHECK (status IN ('pending','approved','rejected','expired','consumed')),
+  requested_by         UUID NOT NULL REFERENCES app.users(id),
+  requested_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at           TIMESTAMPTZ NOT NULL,    -- requested_at + 15 daqiqa (taxmin)
+  resolved_by          UUID NULL REFERENCES app.users(id),
+  resolved_at          TIMESTAMPTZ NULL,
+  reject_reason        TEXT NULL,
+  consumed_at          TIMESTAMPTZ NULL,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (status <> 'rejected' OR reject_reason IS NOT NULL),
+  CHECK (status NOT IN ('approved','rejected','consumed') OR (resolved_by IS NOT NULL AND resolved_at IS NOT NULL)),
+  CHECK (resolved_by IS NULL OR resolved_by <> requested_by)   -- o'zini o'zi tasdiqlay olmaydi
+);
+CREATE INDEX idx_approval_requests_pending ON app.approval_requests (tenant_id, branch_id, requested_at)
+  WHERE status = 'pending';
+CREATE INDEX idx_approval_requests_linked ON app.approval_requests (tenant_id, linked_doc_type, linked_doc_id)
+  WHERE linked_doc_id IS NOT NULL;
+-- price_changes.approval_request_id QO'SHILMAYDI — bog'lanish linked_doc_type='price_changes' orqali (DB-09)
+
+-- DB-10: qo'llangan har tasdiqning append-only izi (13-1 #4/#5/#6 o'rniga)
+CREATE TABLE app.doc_approvals (
+  id                   UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id            UUID NOT NULL REFERENCES app.tenants(id),
+  doc_type             TEXT NOT NULL,           -- 'sales','returns','cash_movements','expenses','write_offs','price_changes'
+  doc_id               UUID NOT NULL,
+  line_id              UUID NULL,               -- chegirma — sale_lines.id
+  kind                 TEXT NOT NULL CHECK (kind IN ('discount_over_limit','return_over_limit','return_no_receipt',
+                         'debt_over_limit','cash_withdrawal_over_limit','price_change','expense_over_limit',
+                         'write_off_over_limit')),
+  mode                 TEXT NOT NULL CHECK (mode IN ('local_pin','remote_request')),
+  approved_by          UUID NOT NULL REFERENCES app.users(id),
+  approval_request_id  UUID NULL REFERENCES app.approval_requests(id),
+  pin_verified_locally BOOLEAN NOT NULL DEFAULT false,
+  requested_value      NUMERIC(18,4) NULL,
+  approved_at          TIMESTAMPTZ NOT NULL,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (mode <> 'remote_request' OR approval_request_id IS NOT NULL),
+  CHECK (mode <> 'local_pin' OR pin_verified_locally)
+);
+CREATE UNIQUE INDEX uq_doc_approvals_request ON app.doc_approvals (approval_request_id) WHERE approval_request_id IS NOT NULL;
+CREATE INDEX idx_doc_approvals_doc ON app.doc_approvals (tenant_id, doc_type, doc_id);
+-- Mavjud returns.approved_by/approved_at, price_changes.approved_by, debt_writeoffs.approved_by —
+-- hujjat sarlavhasidagi "yakuniy tasdiqlovchi" sifatida qoladi; batafsil iz — doc_approvals (DB-10).
+
+-- DB-11: UzQR/Click/Payme/Uzum to'lov seansi (faqat do'kon to'lovi; billing checkout — billing_payments, DB-18)
+CREATE TABLE app.payment_checkouts (
+  checkout_ref     UUID PRIMARY KEY,           -- qurilma beradi (UUIDv7)
+  tenant_id        UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id        UUID NOT NULL REFERENCES app.branches(id),
+  cash_register_id UUID NOT NULL REFERENCES app.cash_registers(id),
+  device_id        UUID NULL REFERENCES app.devices(id),
+  provider         TEXT NOT NULL CHECK (provider IN ('uzqr','click','payme','uzum')),
+  qr_type          TEXT NULL CHECK (qr_type IN ('static','dynamic')),
+  amount           NUMERIC(18,2) NOT NULL CHECK (amount > 0),
+  provider_tx_id   TEXT NULL,
+  status           TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','confirmed','failed','expired','consumed')),
+  confirmed_at     TIMESTAMPTZ NULL,
+  expires_at       TIMESTAMPTZ NOT NULL,
+  created_by       UUID NOT NULL REFERENCES app.users(id),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (provider = 'uzqr' OR qr_type IS NULL),
+  UNIQUE (provider, provider_tx_id)
+);
+CREATE INDEX idx_payment_checkouts_expiry ON app.payment_checkouts (expires_at) WHERE status = 'pending';
+-- Webhook tenant kontekstisiz keladi → 4.5-bo'limdagi SECURITY DEFINER funksiyalar (DB-30).
+```
+
+### 2.6 Hujjatlar
+
+**Umumiy sarlavha** (`11-malumotlar-modeli.md` §6, yagona ro'yxat) — har bir hujjat jadvalida takrorlanadi: `id, tenant_id, branch_id, number, temp_number, doc_date, status, created_by, created_at, updated_at, posted_at, cancelled_at, cancelled_by, cancel_reason, client_event_id, device_id, comment`, `UNIQUE (tenant_id, device_id, temp_number)`, `UNIQUE (tenant_id, client_event_id)`. `shifts` bundan mustasno — raqamlanmaydi (11-bo'lim), o'z maxsus sarlavhasiga ega.
+
+```sql
+-- *(2026-10-15: qabul-6 — DB-07)* shift_no (qurilma beradi, OFD smena raqami), variance generated ustun
+-- (eski diff_amount o'rniga), counted_card_total, comment qo'shildi.
+CREATE TABLE app.shifts (
+  id                 UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id          UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id          UUID NOT NULL REFERENCES app.branches(id),
+  cash_register_id   UUID NOT NULL REFERENCES app.cash_registers(id),
+  device_id          UUID NOT NULL REFERENCES app.devices(id),   -- bitta smena — bitta qurilma
+  shift_no           INT  NOT NULL CHECK (shift_no > 0),     -- qurilma beradi, kassa ichida ketma-ket (Q11)
+  status             TEXT NOT NULL CHECK (status IN ('open','closing','closed')) DEFAULT 'open',
+  opened_by          UUID NOT NULL REFERENCES app.users(id),
+  opened_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  closing_started_at TIMESTAMPTZ NULL,
+  closed_by          UUID NULL REFERENCES app.users(id),
+  closed_at          TIMESTAMPTZ NULL,
+  opening_cash       NUMERIC(18,2) NOT NULL DEFAULT 0 CHECK (opening_cash >= 0),
+  expected_cash      NUMERIC(18,2) NULL,                     -- server hisoblaydi: opening_cash + Σcash_moves(shift)
+  counted_cash       NUMERIC(18,2) NULL,
+  variance           NUMERIC(18,2) GENERATED ALWAYS AS (counted_cash - expected_cash) STORED,  -- eski diff_amount
+  variance_note      TEXT NULL,
+  counted_card_total NUMERIC(18,2) NULL,                     -- qo'lda belgilangan "karta" jami (POS-15)
+  comment            TEXT NULL,
+  client_event_id    UUID NULL,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, client_event_id),
+  UNIQUE (tenant_id, cash_register_id, shift_no),
+  CHECK (status <> 'closed' OR (counted_cash IS NOT NULL AND expected_cash IS NOT NULL)),
+  CHECK (counted_cash IS NULL OR expected_cash IS NULL OR counted_cash = expected_cash OR variance_note IS NOT NULL)
+);
+-- bitta kassada bir vaqtda faqat bitta ochiq/yopilayotgan smena
+CREATE UNIQUE INDEX uq_shifts_one_open ON app.shifts (cash_register_id) WHERE status IN ('open','closing');
+
+CREATE TABLE app.sales (
+  id               UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id        UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id        UUID NOT NULL REFERENCES app.branches(id),
+  number           TEXT NULL,
+  temp_number      TEXT NULL,
+  doc_date         DATE NOT NULL,
+  status           TEXT NOT NULL CHECK (status IN ('draft','posted','cancelled')) DEFAULT 'draft',
+  shift_id         UUID NOT NULL REFERENCES app.shifts(id),
+  cash_register_id UUID NOT NULL REFERENCES app.cash_registers(id),
+  counterparty_id  UUID NULL REFERENCES app.counterparties(id),   -- nasiya/qarzga sotuvda
+  total_amount     NUMERIC(18,2) NULL,         -- hisoblangan jami (aniqlashtirish #13 — tezkor o'qish uchun qo'shimcha)
+  is_offline          BOOLEAN NOT NULL DEFAULT false,              -- *(2026-10-15: qabul-6 — DB-08)*
+  debt_limit_exceeded BOOLEAN NOT NULL DEFAULT false,               -- *(qabul-6 — DB-08)* offline nasiya limitdan oshgan (tavsiya #7) — xato emas, bayroq
+  created_by       UUID NOT NULL REFERENCES app.users(id),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  posted_at        TIMESTAMPTZ NULL,
+  cancelled_at     TIMESTAMPTZ NULL,
+  cancelled_by     UUID NULL REFERENCES app.users(id),
+  cancel_reason    TEXT NULL,
+  client_event_id  UUID NULL,
+  device_id        UUID NULL REFERENCES app.devices(id),
+  comment          TEXT NULL,
+  UNIQUE (tenant_id, device_id, temp_number),
+  UNIQUE (tenant_id, client_event_id)
+);
+CREATE INDEX idx_sales_branch_date ON app.sales (tenant_id, branch_id, doc_date);
+CREATE INDEX idx_sales_shift ON app.sales (shift_id);
+CREATE INDEX idx_sales_debt_limit_exceeded ON app.sales (tenant_id) WHERE debt_limit_exceeded;  -- *(qabul-6 — DB-08)*
+
+CREATE TABLE app.sale_lines (
+  id                 UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id          UUID NOT NULL REFERENCES app.tenants(id),
+  sale_id            UUID NOT NULL REFERENCES app.sales(id),
+  line_no            INT NOT NULL,
+  product_id         UUID NOT NULL REFERENCES app.products(id),
+  qty                NUMERIC(18,3) NOT NULL CHECK (qty > 0),
+  price              NUMERIC(18,4) NOT NULL CHECK (price >= 0),
+  discount_amount    NUMERIC(18,2) NOT NULL DEFAULT 0 CHECK (discount_amount >= 0),
+  vat_rate           NUMERIC(5,2) NOT NULL,
+  vat_exemption_code TEXT NULL,       -- *(2026-10-15: qabul-6 — DB-08)*
+  discount_pct       NUMERIC(5,2) NULL CHECK (discount_pct BETWEEN 0 AND 100),   -- *(qabul-6 — DB-08)* ma'lumot uchun; manba — discount_amount
+  discount_source    TEXT NULL CHECK (discount_source IN ('manual','standing_customer','rule')),  -- *(qabul-6 — DB-08)*
+  discount_rule_id   UUID NULL REFERENCES app.discount_rules(id),   -- *(qabul-6 — DB-08)*
+  vat_amount         NUMERIC(18,2) NOT NULL DEFAULT 0,
+  line_total         NUMERIC(18,2) NOT NULL,
+  cost_amount        NUMERIC(18,2) NOT NULL DEFAULT 0,
+  marking_code       TEXT NULL,
+  lot_allocations    JSONB NOT NULL DEFAULT '[]',
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (sale_id, line_no),
+  CHECK (marking_code IS NULL OR qty = 1),   -- markirovkalangan tovarda qty=1 majburiy
+  CHECK ((discount_amount = 0) = (discount_source IS NULL)),                          -- *(qabul-6 — DB-08)*
+  CHECK (discount_source IS DISTINCT FROM 'rule' OR discount_rule_id IS NOT NULL)      -- *(qabul-6 — DB-08)*
+);
+CREATE INDEX idx_sale_lines_product ON app.sale_lines (tenant_id, product_id);
+
+CREATE TABLE app.sale_payments (
+  id             UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id      UUID NOT NULL REFERENCES app.tenants(id),
+  sale_id        UUID NOT NULL REFERENCES app.sales(id),
+  method         TEXT NOT NULL CHECK (method IN ('cash','card','uzqr','click','payme','uzum','debt')),
+  amount         NUMERIC(18,2) NOT NULL CHECK (amount > 0),
+  provider_tx_id TEXT NULL,
+  terminal_ref   TEXT NULL,
+  qr_type        TEXT NULL CHECK (qr_type IN ('static','dynamic')),
+  due_date       DATE NULL,   -- *(2026-10-15: qabul-6 — DB-08)* method='debt': va'da sanasi → debt_moves.due_date manbasi
+  checkout_ref   UUID NULL REFERENCES app.payment_checkouts(checkout_ref),   -- *(qabul-6 — DB-08)*
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (method = 'debt' OR due_date IS NULL),                                        -- *(qabul-6 — DB-08)*
+  CHECK (method NOT IN ('uzqr','click','payme','uzum') OR provider_tx_id IS NOT NULL)  -- *(qabul-6 — DB-08)*
+);
+CREATE INDEX idx_sale_payments_sale ON app.sale_payments (sale_id);
+
+CREATE TABLE app.returns (
+  id               UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id        UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id        UUID NOT NULL REFERENCES app.branches(id),
+  number           TEXT NULL,
+  temp_number      TEXT NULL,
+  doc_date         DATE NOT NULL,
+  status           TEXT NOT NULL CHECK (status IN ('draft','posted','cancelled')) DEFAULT 'draft',
+  sale_id          UUID NULL REFERENCES app.sales(id),   -- null = chek topilmagan qaytarish
+  shift_id         UUID NOT NULL REFERENCES app.shifts(id),           -- *(2026-10-15: qabul-6 — DB-03)*
+  cash_register_id UUID NOT NULL REFERENCES app.cash_registers(id),   -- *(qabul-6 — DB-03)*
+  counterparty_id  UUID NULL REFERENCES app.counterparties(id),   -- *(qabul-6 — DB-03)* refund_method='debt_adjustment' uchun
+  reason           TEXT NOT NULL CHECK (reason IN ('defective','wrong_item','customer_changed_mind','other')),  -- *(qabul-6 — DB-03)*
+  refund_method    TEXT NOT NULL CHECK (refund_method IN ('cash','card','debt_adjustment')),  -- *(qabul-6 — DB-03)*
+  is_offline       BOOLEAN NOT NULL DEFAULT false,   -- *(qabul-6 — DB-03)*
+  approved_by      UUID NULL REFERENCES app.users(id),
+  approved_at      TIMESTAMPTZ NULL,
+  created_by       UUID NOT NULL REFERENCES app.users(id),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  posted_at        TIMESTAMPTZ NULL,
+  cancelled_at     TIMESTAMPTZ NULL,
+  cancelled_by     UUID NULL REFERENCES app.users(id),
+  cancel_reason    TEXT NULL,
+  client_event_id  UUID NULL,
+  device_id        UUID NULL REFERENCES app.devices(id),
+  comment          TEXT NULL,
+  UNIQUE (tenant_id, device_id, temp_number),
+  UNIQUE (tenant_id, client_event_id),
+  CHECK (refund_method <> 'debt_adjustment' OR counterparty_id IS NOT NULL),       -- *(qabul-6 — DB-03)*
+  CHECK (sale_id IS NOT NULL OR approved_by IS NOT NULL)                           -- *(qabul-6 — DB-03)* chek topilmagan qaytarish — har doim tasdiq bilan
+);
+
+CREATE TABLE app.return_lines (
+  id                 UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id          UUID NOT NULL REFERENCES app.tenants(id),
+  return_id          UUID NOT NULL REFERENCES app.returns(id),
+  line_no            INT NOT NULL,
+  sale_line_id       UUID NULL REFERENCES app.sale_lines(id),   -- null = chek topilmagan
+  product_id         UUID NOT NULL REFERENCES app.products(id),
+  qty                NUMERIC(18,3) NOT NULL CHECK (qty > 0),
+  price              NUMERIC(18,4) NOT NULL,
+  vat_rate           NUMERIC(5,2) NOT NULL,         -- *(2026-10-15: qabul-6 — DB-03)*
+  vat_exemption_code TEXT NULL,                      -- *(qabul-6 — DB-03)*
+  marking_code       TEXT NULL,                      -- *(qabul-6 — DB-03)*
+  vat_amount         NUMERIC(18,2) NOT NULL DEFAULT 0,
+  cost_amount        NUMERIC(18,2) NOT NULL DEFAULT 0,
+  line_total         NUMERIC(18,2) NOT NULL,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (return_id, line_no),
+  CHECK (marking_code IS NULL OR qty = 1)            -- *(qabul-6 — DB-03)*
+);
+CREATE INDEX idx_return_lines_sale_line ON app.return_lines (sale_line_id) WHERE sale_line_id IS NOT NULL;
+
+CREATE TABLE app.purchase_orders (
+  id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id       UUID NOT NULL REFERENCES app.branches(id),
+  number          TEXT NULL,
+  temp_number     TEXT NULL,
+  doc_date        DATE NOT NULL,
+  status          TEXT NOT NULL CHECK (status IN ('draft','sent','partially_received','closed','cancelled')) DEFAULT 'draft',
+  supplier_id     UUID NOT NULL REFERENCES app.counterparties(id),
+  warehouse_id    UUID NOT NULL,   -- *(2026-10-15: qabul-6 — DB-15)* FK app.warehouses(id), ALTER bilan pastda
+  created_by      UUID NOT NULL REFERENCES app.users(id),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  posted_at       TIMESTAMPTZ NULL,
+  cancelled_at    TIMESTAMPTZ NULL,
+  cancelled_by    UUID NULL REFERENCES app.users(id),
+  cancel_reason   TEXT NULL,
+  client_event_id UUID NULL,
+  device_id       UUID NULL REFERENCES app.devices(id),
+  comment         TEXT NULL,
+  UNIQUE (tenant_id, device_id, temp_number),
+  UNIQUE (tenant_id, client_event_id)
+);
+ALTER TABLE app.purchase_orders ADD CONSTRAINT fk_po_warehouse FOREIGN KEY (warehouse_id) REFERENCES app.warehouses(id);  -- *(2026-10-15: qabul-6 — DB-15)*
+
+CREATE TABLE app.po_lines (
+  id         UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id  UUID NOT NULL REFERENCES app.tenants(id),
+  po_id      UUID NOT NULL REFERENCES app.purchase_orders(id),
+  line_no    INT NOT NULL,
+  product_id UUID NOT NULL REFERENCES app.products(id),
+  qty        NUMERIC(18,3) NOT NULL CHECK (qty > 0),
+  price      NUMERIC(18,4) NULL CHECK (price IS NULL OR price >= 0),  -- *(2026-10-15: qabul-6 — DB-15)* ixtiyoriy
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (po_id, line_no)
+);
+
+CREATE TABLE app.goods_receipts (
+  id               UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id        UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id        UUID NOT NULL REFERENCES app.branches(id),
+  number           TEXT NULL,
+  temp_number      TEXT NULL,
+  doc_date         DATE NOT NULL,
+  status           TEXT NOT NULL CHECK (status IN ('draft','posted','cancelled')) DEFAULT 'draft',
+  supplier_id      UUID NOT NULL REFERENCES app.counterparties(id),
+  po_id            UUID NULL REFERENCES app.purchase_orders(id),
+  warehouse_id     UUID NOT NULL,   -- FK app.warehouses(id)
+  paid_immediately BOOLEAN NOT NULL DEFAULT false,  -- aniqlashtirish #14: 2.6/2.8-provodka yo'lini tanlaydi
+  source           TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual','purchase_order','einvoice','ocr')),  -- *(2026-10-15: qabul-6 — DB-06)*
+  einvoice_id      UUID NULL,        -- *(qabul-6 — DB-06)* FK pastda; "qizil" faktura QQS kechiktirish shu orqali aniqlanadi
+  ai_ocr_job_id    UUID NULL,        -- *(qabul-6 — DB-06, DB-13)* FK pastda → app.ai_ocr_jobs(id)
+  ettn_ref         TEXT NULL,        -- *(qabul-6 — DB-06)* qo'lda e-TTN belgisi
+  poa_number       TEXT NULL,        -- *(qabul-6 — DB-06)* qo'lda ishonchnoma raqami
+  created_by       UUID NOT NULL REFERENCES app.users(id),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  posted_at        TIMESTAMPTZ NULL,
+  cancelled_at     TIMESTAMPTZ NULL,
+  cancelled_by     UUID NULL REFERENCES app.users(id),
+  cancel_reason    TEXT NULL,
+  client_event_id  UUID NULL,
+  device_id        UUID NULL REFERENCES app.devices(id),
+  comment          TEXT NULL,
+  UNIQUE (tenant_id, device_id, temp_number),
+  UNIQUE (tenant_id, client_event_id),
+  CHECK (source <> 'einvoice' OR einvoice_id IS NOT NULL)   -- *(qabul-6 — DB-06)*
+);
+ALTER TABLE app.goods_receipts ADD CONSTRAINT fk_gr_warehouse FOREIGN KEY (warehouse_id) REFERENCES app.warehouses(id);
+-- fk_gr_einvoice / uq_gr_einvoice_active — einvoices yaratilgandan keyin, 2.8-bo'limda (DB-06, 0020-revizion)
+
+CREATE TABLE app.receipt_lines (
+  id                 UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id          UUID NOT NULL REFERENCES app.tenants(id),
+  receipt_id         UUID NOT NULL REFERENCES app.goods_receipts(id),
+  line_no            INT NOT NULL,
+  product_id         UUID NOT NULL REFERENCES app.products(id),
+  qty                NUMERIC(18,3) NOT NULL CHECK (qty > 0),
+  cost               NUMERIC(18,4) NOT NULL CHECK (cost >= 0),
+  vat_rate           NUMERIC(5,2) NOT NULL,
+  vat_exemption_code TEXT NULL,   -- *(2026-10-15: qabul-6 — DB-06)* imtiyoz kodi, products bo'linishi bilan izchil
+  vat_amount         NUMERIC(18,2) NOT NULL DEFAULT 0,
+  expiry_date        DATE NULL,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (receipt_id, line_no)
+);
+
+CREATE TABLE app.supplier_returns (
+  id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id       UUID NOT NULL REFERENCES app.branches(id),
+  number          TEXT NULL,
+  temp_number     TEXT NULL,
+  doc_date        DATE NOT NULL,
+  status          TEXT NOT NULL CHECK (status IN ('draft','posted','cancelled')) DEFAULT 'draft',
+  supplier_id     UUID NOT NULL REFERENCES app.counterparties(id),
+  receipt_id      UUID NULL REFERENCES app.goods_receipts(id),
+  reason          TEXT NOT NULL CHECK (reason IN ('expired','damaged','excess','other')),  -- *(2026-10-15: qabul-6 — DB-25)* sarlavhada (13-2 §12)
+  created_by      UUID NOT NULL REFERENCES app.users(id),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  posted_at       TIMESTAMPTZ NULL,
+  cancelled_at    TIMESTAMPTZ NULL,
+  cancelled_by    UUID NULL REFERENCES app.users(id),
+  cancel_reason   TEXT NULL,
+  client_event_id UUID NULL,
+  device_id       UUID NULL REFERENCES app.devices(id),
+  comment         TEXT NULL,
+  UNIQUE (tenant_id, device_id, temp_number),
+  UNIQUE (tenant_id, client_event_id)
+);
+
+CREATE TABLE app.supplier_return_lines (
+  id               UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id        UUID NOT NULL REFERENCES app.tenants(id),
+  supplier_return_id UUID NOT NULL REFERENCES app.supplier_returns(id),
+  line_no          INT NOT NULL,
+  receipt_line_id  UUID NOT NULL REFERENCES app.receipt_lines(id),
+  lot_id           UUID NOT NULL,   -- FK app.stock_lots(id) — 2.7-bo'limda ALTER bilan qo'shiladi
+  qty              NUMERIC(18,3) NOT NULL CHECK (qty > 0),
+  cost             NUMERIC(18,4) NOT NULL,
+  vat_amount       NUMERIC(18,2) NOT NULL DEFAULT 0,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (supplier_return_id, line_no)
+);
+
+CREATE TABLE app.transfers (
+  id               UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id        UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id        UUID NOT NULL REFERENCES app.branches(id),   -- aniqlashtirish: jo'natuvchi filial sifatida ishlatiladi
+  number           TEXT NULL,
+  temp_number      TEXT NULL,
+  doc_date         DATE NOT NULL,
+  status           TEXT NOT NULL CHECK (status IN ('draft','sent','received','discrepancy','cancelled')) DEFAULT 'draft',
+  from_branch_id   UUID NOT NULL REFERENCES app.branches(id),
+  to_branch_id     UUID NOT NULL REFERENCES app.branches(id),
+  from_warehouse_id UUID NOT NULL,   -- FK app.warehouses(id)
+  to_warehouse_id   UUID NOT NULL,   -- FK app.warehouses(id)
+  sent_at          TIMESTAMPTZ NULL,     -- *(2026-10-15: qabul-6 — DB-16)*
+  sent_by          UUID NULL REFERENCES app.users(id),
+  received_at      TIMESTAMPTZ NULL,
+  received_by      UUID NULL REFERENCES app.users(id),
+  created_by       UUID NOT NULL REFERENCES app.users(id),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  posted_at        TIMESTAMPTZ NULL,
+  cancelled_at     TIMESTAMPTZ NULL,
+  cancelled_by     UUID NULL REFERENCES app.users(id),
+  cancel_reason    TEXT NULL,
+  client_event_id  UUID NULL,
+  device_id        UUID NULL REFERENCES app.devices(id),
+  comment          TEXT NULL,
+  UNIQUE (tenant_id, device_id, temp_number),
+  UNIQUE (tenant_id, client_event_id),
+  CHECK (from_branch_id <> to_branch_id),
+  CHECK (branch_id = from_branch_id)   -- *(qabul-6 — DB-16)*
+);
+ALTER TABLE app.transfers ADD CONSTRAINT fk_tr_from_wh FOREIGN KEY (from_warehouse_id) REFERENCES app.warehouses(id);
+ALTER TABLE app.transfers ADD CONSTRAINT fk_tr_to_wh   FOREIGN KEY (to_warehouse_id)   REFERENCES app.warehouses(id);
+
+-- *(2026-10-15: qabul-6 — DB-16)* bitta qator FIFO bo'yicha bir nechta partiyadan chiqishi mumkin —
+-- bitta lot_id yetarli emas; lot_id/fk_tl_lot OLIB TASHLANDI, o'rniga lot_allocations JSONB (sale_lines bilan bir xil shakl).
+CREATE TABLE app.transfer_lines (
+  id          UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id   UUID NOT NULL REFERENCES app.tenants(id),
+  transfer_id UUID NOT NULL REFERENCES app.transfers(id),
+  line_no     INT NOT NULL,
+  product_id  UUID NOT NULL REFERENCES app.products(id),
+  qty_sent    NUMERIC(18,3) NOT NULL CHECK (qty_sent > 0),
+  qty_received NUMERIC(18,3) NULL CHECK (qty_received IS NULL OR qty_received >= 0),
+  unit_cost       NUMERIC(18,4) NULL,                 -- send'da to'ldiriladi (allokatsiyalarning o'rtachasi)
+  lot_allocations JSONB NOT NULL DEFAULT '[]',        -- [{lot_id, qty, unit_cost}] — sale_lines bilan bir xil shakl
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (transfer_id, line_no)
+);
+
+CREATE TABLE app.stock_counts (
+  id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id       UUID NOT NULL REFERENCES app.branches(id),
+  number          TEXT NULL,
+  temp_number     TEXT NULL,
+  doc_date        DATE NOT NULL,
+  status          TEXT NOT NULL CHECK (status IN ('counting','review','posted','cancelled')) DEFAULT 'counting',
+  warehouse_id    UUID NOT NULL,   -- FK app.warehouses(id)
+  created_by      UUID NOT NULL REFERENCES app.users(id),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  posted_at       TIMESTAMPTZ NULL,
+  cancelled_at    TIMESTAMPTZ NULL,
+  cancelled_by    UUID NULL REFERENCES app.users(id),
+  cancel_reason   TEXT NULL,
+  client_event_id UUID NULL,
+  device_id       UUID NULL REFERENCES app.devices(id),
+  comment         TEXT NULL,
+  UNIQUE (tenant_id, device_id, temp_number),
+  UNIQUE (tenant_id, client_event_id)
+);
+ALTER TABLE app.stock_counts ADD CONSTRAINT fk_sc_warehouse FOREIGN KEY (warehouse_id) REFERENCES app.warehouses(id);
+
+CREATE TABLE app.count_lines (
+  id         UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id  UUID NOT NULL REFERENCES app.tenants(id),
+  count_id   UUID NOT NULL REFERENCES app.stock_counts(id),
+  line_no    INT NOT NULL,
+  product_id UUID NOT NULL REFERENCES app.products(id),
+  expected   NUMERIC(18,3) NOT NULL,
+  counted    NUMERIC(18,3) NULL,   -- *(2026-10-15: qabul-6 — DB-25)* sanash tugamaguncha NULL (13-2 `counted:null`)
+  diff       NUMERIC(18,3) GENERATED ALWAYS AS (counted - expected) STORED,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (count_id, line_no)
+);
+
+CREATE TABLE app.write_offs (
+  id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id       UUID NOT NULL REFERENCES app.branches(id),
+  number          TEXT NULL,
+  temp_number     TEXT NULL,
+  doc_date        DATE NOT NULL,
+  status          TEXT NOT NULL CHECK (status IN ('draft','posted','cancelled')) DEFAULT 'draft',
+  warehouse_id    UUID NOT NULL,   -- FK app.warehouses(id)
+  responsible_user_id UUID NULL REFERENCES app.users(id),   -- *(2026-10-15: qabul-6 — DB-25)* belgilansa 4730 (02 §2.12)
+  created_by      UUID NOT NULL REFERENCES app.users(id),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  posted_at       TIMESTAMPTZ NULL,
+  cancelled_at    TIMESTAMPTZ NULL,
+  cancelled_by    UUID NULL REFERENCES app.users(id),
+  cancel_reason   TEXT NULL,
+  client_event_id UUID NULL,
+  device_id       UUID NULL REFERENCES app.devices(id),
+  comment         TEXT NULL,
+  UNIQUE (tenant_id, device_id, temp_number),
+  UNIQUE (tenant_id, client_event_id)
+);
+ALTER TABLE app.write_offs ADD CONSTRAINT fk_wo_warehouse FOREIGN KEY (warehouse_id) REFERENCES app.warehouses(id);
+
+CREATE TABLE app.write_off_lines (
+  id          UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id   UUID NOT NULL REFERENCES app.tenants(id),
+  write_off_id UUID NOT NULL REFERENCES app.write_offs(id),
+  line_no     INT NOT NULL,
+  product_id  UUID NOT NULL REFERENCES app.products(id),
+  lot_id      UUID NULL,   -- FK app.stock_lots(id) — 2.7-bo'limda qo'shiladi
+  qty         NUMERIC(18,3) NOT NULL CHECK (qty > 0),
+  reason      TEXT NOT NULL CHECK (reason IN ('expired','damaged','gift','other')),
+  cost_amount NUMERIC(18,2) NOT NULL DEFAULT 0,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (write_off_id, line_no)
+);
+
+CREATE TABLE app.price_changes (
+  id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id       UUID NOT NULL REFERENCES app.branches(id),
+  number          TEXT NULL,
+  temp_number     TEXT NULL,
+  doc_date        DATE NOT NULL,
+  status          TEXT NOT NULL CHECK (status IN ('draft','pending_approval','posted','rejected','cancelled')) DEFAULT 'draft',
+  approved_by     UUID NULL REFERENCES app.users(id),
+  created_by      UUID NOT NULL REFERENCES app.users(id),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  posted_at       TIMESTAMPTZ NULL,
+  cancelled_at    TIMESTAMPTZ NULL,
+  cancelled_by    UUID NULL REFERENCES app.users(id),
+  cancel_reason   TEXT NULL,
+  client_event_id UUID NULL,
+  device_id       UUID NULL REFERENCES app.devices(id),
+  comment         TEXT NULL,
+  UNIQUE (tenant_id, device_id, temp_number),
+  UNIQUE (tenant_id, client_event_id)
+);
+
+CREATE TABLE app.price_change_lines (
+  id             UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id      UUID NOT NULL REFERENCES app.tenants(id),
+  price_change_id UUID NOT NULL REFERENCES app.price_changes(id),
+  line_no        INT NOT NULL,
+  product_id     UUID NOT NULL REFERENCES app.products(id),
+  branch_id      UUID NULL REFERENCES app.branches(id),
+  old_price      NUMERIC(18,4) NOT NULL,
+  new_price      NUMERIC(18,4) NOT NULL,
+  valid_from     TIMESTAMPTZ NULL,   -- *(2026-10-15: qabul-6 — DB-25)* NULL = post paytidan
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (price_change_id, line_no)
+);
+
+CREATE TABLE app.stock_openings (
+  id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id       UUID NOT NULL REFERENCES app.branches(id),
+  number          TEXT NULL,
+  temp_number     TEXT NULL,
+  doc_date        DATE NOT NULL,
+  status          TEXT NOT NULL CHECK (status IN ('draft','posted','cancelled')) DEFAULT 'draft',
+  warehouse_id    UUID NOT NULL,   -- FK app.warehouses(id)
+  created_by      UUID NOT NULL REFERENCES app.users(id),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  posted_at       TIMESTAMPTZ NULL,
+  cancelled_at    TIMESTAMPTZ NULL,
+  cancelled_by    UUID NULL REFERENCES app.users(id),
+  cancel_reason   TEXT NULL,
+  client_event_id UUID NULL,
+  device_id       UUID NULL REFERENCES app.devices(id),
+  comment         TEXT NULL,
+  UNIQUE (tenant_id, device_id, temp_number),
+  UNIQUE (tenant_id, client_event_id)
+);
+ALTER TABLE app.stock_openings ADD CONSTRAINT fk_so_warehouse FOREIGN KEY (warehouse_id) REFERENCES app.warehouses(id);
+
+CREATE TABLE app.opening_lines (
+  id          UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id   UUID NOT NULL REFERENCES app.tenants(id),
+  opening_id  UUID NOT NULL REFERENCES app.stock_openings(id),
+  line_no     INT NOT NULL,
+  product_id  UUID NOT NULL REFERENCES app.products(id),
+  qty         NUMERIC(18,3) NOT NULL CHECK (qty > 0),
+  unit_cost   NUMERIC(18,4) NOT NULL CHECK (unit_cost >= 0),
+  expiry_date DATE NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (opening_id, line_no)
+);
+
+CREATE TABLE app.debt_openings (
+  id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id       UUID NOT NULL REFERENCES app.branches(id),
+  number          TEXT NULL,
+  temp_number     TEXT NULL,
+  doc_date        DATE NOT NULL,
+  status          TEXT NOT NULL CHECK (status IN ('draft','posted','cancelled')) DEFAULT 'draft',
+  counterparty_id UUID NOT NULL REFERENCES app.counterparties(id),
+  amount          NUMERIC(18,2) NOT NULL CHECK (amount > 0),
+  direction       TEXT NOT NULL CHECK (direction IN ('receivable','payable')),
+  due_date        DATE NULL,   -- *(2026-10-15: qabul-6 — DB-24)*
+  created_by      UUID NOT NULL REFERENCES app.users(id),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  posted_at       TIMESTAMPTZ NULL,
+  cancelled_at    TIMESTAMPTZ NULL,
+  cancelled_by    UUID NULL REFERENCES app.users(id),
+  cancel_reason   TEXT NULL,
+  client_event_id UUID NULL,
+  device_id       UUID NULL REFERENCES app.devices(id),
+  comment         TEXT NULL,
+  UNIQUE (tenant_id, device_id, temp_number),
+  UNIQUE (tenant_id, client_event_id)
+);
+
+CREATE TABLE app.debt_payments (
+  id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id       UUID NOT NULL REFERENCES app.branches(id),
+  number          TEXT NULL,
+  temp_number     TEXT NULL,
+  doc_date        DATE NOT NULL,
+  status          TEXT NOT NULL CHECK (status IN ('draft','posted','cancelled')) DEFAULT 'draft',
+  counterparty_id UUID NOT NULL REFERENCES app.counterparties(id),
+  method          TEXT NOT NULL CHECK (method IN ('cash','card','uzqr','click','payme','uzum','bank')),  -- *(2026-10-15: qabul-6 — DB-04)*
+  amount          NUMERIC(18,2) NOT NULL CHECK (amount > 0),
+  cash_register_id UUID NULL REFERENCES app.cash_registers(id),
+  shift_id        UUID NULL REFERENCES app.shifts(id),
+  terminal_ref    TEXT NULL,                                     -- *(qabul-6 — DB-04)*
+  provider_tx_id  TEXT NULL,                                     -- *(qabul-6 — DB-04)*
+  checkout_ref    UUID NULL REFERENCES app.payment_checkouts(checkout_ref),  -- *(qabul-6 — DB-04)*
+  promise_date    DATE NULL,   -- *(qabul-6 — DB-04)* qoldiq uchun yangi va'da sanasi (qarz daftari ko'rinishi oxirgisini oladi)
+  created_by      UUID NOT NULL REFERENCES app.users(id),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  posted_at       TIMESTAMPTZ NULL,
+  cancelled_at    TIMESTAMPTZ NULL,
+  cancelled_by    UUID NULL REFERENCES app.users(id),
+  cancel_reason   TEXT NULL,
+  client_event_id UUID NULL,
+  device_id       UUID NULL REFERENCES app.devices(id),
+  comment         TEXT NULL,
+  UNIQUE (tenant_id, device_id, temp_number),
+  UNIQUE (tenant_id, client_event_id),
+  CHECK (method <> 'cash' OR (cash_register_id IS NOT NULL AND shift_id IS NOT NULL)),
+  CHECK (method NOT IN ('uzqr','click','payme','uzum') OR provider_tx_id IS NOT NULL)  -- *(qabul-6 — DB-04)*
+);
+
+CREATE TABLE app.debt_payment_allocations (
+  id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
+  debt_payment_id UUID NOT NULL REFERENCES app.debt_payments(id),
+  target_doc_type TEXT NOT NULL,   -- polimorfik: 'sales' | 'debt_openings' *(2026-10-15: qabul-6 — DB-33, Q7: jadval nomi)*
+  target_doc_id   UUID NOT NULL,
+  amount          NUMERIC(18,2) NOT NULL CHECK (amount > 0),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE app.debt_writeoffs (
+  id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id       UUID NOT NULL REFERENCES app.branches(id),
+  number          TEXT NULL,
+  temp_number     TEXT NULL,
+  doc_date        DATE NOT NULL,
+  status          TEXT NOT NULL CHECK (status IN ('draft','posted','cancelled')) DEFAULT 'draft',
+  counterparty_id UUID NOT NULL REFERENCES app.counterparties(id),
+  amount          NUMERIC(18,2) NOT NULL CHECK (amount > 0),
+  reason          TEXT NOT NULL,   -- *(2026-10-15: qabul-6 — DB-24)* majburiy (13-1 §12.5)
+  account_choice  TEXT NOT NULL DEFAULT '9430' CHECK (account_choice IN ('9430','4910')),  -- *(qabul-6 — DB-24)* 02 §2.15 "9430 standart"
+  approved_by     UUID NULL REFERENCES app.users(id),   -- *(qabul-6 — DB-24)* faqat Egasi; qoralama tasdiqsiz yaratiladi
+  created_by      UUID NOT NULL REFERENCES app.users(id),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  posted_at       TIMESTAMPTZ NULL,
+  cancelled_at    TIMESTAMPTZ NULL,
+  cancelled_by    UUID NULL REFERENCES app.users(id),
+  cancel_reason   TEXT NULL,
+  client_event_id UUID NULL,
+  device_id       UUID NULL REFERENCES app.devices(id),
+  comment         TEXT NULL,
+  UNIQUE (tenant_id, device_id, temp_number),
+  UNIQUE (tenant_id, client_event_id),
+  CHECK (status <> 'posted' OR approved_by IS NOT NULL)   -- *(qabul-6 — DB-24)*
+);
+
+CREATE TABLE app.supplier_payments (
+  id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id       UUID NOT NULL REFERENCES app.branches(id),
+  number          TEXT NULL,
+  temp_number     TEXT NULL,
+  doc_date        DATE NOT NULL,
+  status          TEXT NOT NULL CHECK (status IN ('draft','posted','cancelled')) DEFAULT 'draft',
+  supplier_id     UUID NOT NULL REFERENCES app.counterparties(id),
+  method          TEXT NOT NULL CHECK (method IN ('cash','bank')),
+  amount          NUMERIC(18,2) NOT NULL CHECK (amount > 0),
+  cash_register_id UUID NULL REFERENCES app.cash_registers(id),   -- *(2026-10-15: qabul-6 — DB-14)*
+  shift_id        UUID NULL REFERENCES app.shifts(id),             -- *(qabul-6 — DB-14)*
+  created_by      UUID NOT NULL REFERENCES app.users(id),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  posted_at       TIMESTAMPTZ NULL,
+  cancelled_at    TIMESTAMPTZ NULL,
+  cancelled_by    UUID NULL REFERENCES app.users(id),
+  cancel_reason   TEXT NULL,
+  client_event_id UUID NULL,
+  device_id       UUID NULL REFERENCES app.devices(id),
+  comment         TEXT NULL,
+  UNIQUE (tenant_id, device_id, temp_number),
+  UNIQUE (tenant_id, client_event_id),
+  CHECK (method <> 'cash' OR (cash_register_id IS NOT NULL AND shift_id IS NOT NULL))  -- *(qabul-6 — DB-14)*
+);
+
+CREATE TABLE app.supplier_payment_allocations (
+  id                 UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id          UUID NOT NULL REFERENCES app.tenants(id),
+  supplier_payment_id UUID NOT NULL REFERENCES app.supplier_payments(id),
+  target_doc_type    TEXT NOT NULL,
+  target_doc_id      UUID NOT NULL,
+  amount             NUMERIC(18,2) NOT NULL CHECK (amount > 0),
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE app.expense_categories (
+  id          UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id   UUID NOT NULL REFERENCES app.tenants(id),
+  name        TEXT NOT NULL,
+  is_system   BOOLEAN NOT NULL DEFAULT false,
+  archived_at TIMESTAMPTZ NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  version     INT NOT NULL DEFAULT 1,   -- *(2026-10-15: qabul-6 — DB-33)* 13-3 #47 PATCH version talab qiladi
+  UNIQUE (tenant_id, name)
+);
+
+-- *(2026-10-15: qabul-6 — DB-17)* to'liq qayta yozish: period 'monthly' CHECK'i 13-3 month|quarter|year bilan zid edi;
+-- source, cash_register_id, next_due_date, created_by, version yo'q edi.
+CREATE TABLE app.recurring_expenses (
+  id                UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id         UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id         UUID NOT NULL REFERENCES app.branches(id),
+  category_id       UUID NOT NULL REFERENCES app.expense_categories(id),
+  name              TEXT NULL,                  -- bo'sh bo'lsa UI toifa nomini ko'rsatadi
+  amount            NUMERIC(18,2) NOT NULL CHECK (amount > 0),
+  period            TEXT NOT NULL CHECK (period IN ('month','quarter','year')),
+  day_of_month      INT  NOT NULL CHECK (day_of_month BETWEEN 1 AND 28),
+  source            TEXT NOT NULL CHECK (source IN ('cash','bank','card')),
+  cash_register_id  UUID NULL REFERENCES app.cash_registers(id),
+  next_due_date     DATE NOT NULL,
+  last_triggered_at TIMESTAMPTZ NULL,
+  is_active         BOOLEAN NOT NULL DEFAULT true,
+  created_by        UUID NOT NULL REFERENCES app.users(id),
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  version           INT NOT NULL DEFAULT 1,
+  CHECK (source <> 'cash' OR cash_register_id IS NOT NULL)
+);
+CREATE INDEX idx_recurring_expenses_due ON app.recurring_expenses (tenant_id, next_due_date) WHERE is_active;
+
+CREATE TABLE app.attachments (
+  id            UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id     UUID NOT NULL REFERENCES app.tenants(id),
+  s3_key        TEXT NOT NULL,
+  content_type  TEXT NOT NULL,   -- *(2026-10-15: qabul-6 — DB-22)* 13-0 §12 tur tekshiruvi (415) va signed URL Content-Type uchun
+  original_name TEXT NULL,
+  sha256        TEXT NULL,
+  kind          TEXT NOT NULL CHECK (kind IN ('expense_receipt','ocr_source','state_report','import','export',
+                  'label_pdf','billing_invoice','einvoice','other')),
+  size_bytes    BIGINT NOT NULL CHECK (size_bytes >= 0),
+  uploaded_by   UUID NOT NULL REFERENCES app.users(id),
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- *(2026-10-15: qabul-6 — DB-18)* billing_payments.invoice_attachment_id endi bog'lanadi (attachments shu yerda yaratildi):
+ALTER TABLE app.billing_payments ADD CONSTRAINT fk_bp_invoice_attachment FOREIGN KEY (invoice_attachment_id) REFERENCES app.attachments(id);
+
+CREATE TABLE app.expenses (
+  id                UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id         UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id         UUID NOT NULL REFERENCES app.branches(id),
+  number            TEXT NULL,
+  temp_number       TEXT NULL,
+  doc_date          DATE NOT NULL,
+  status            TEXT NOT NULL CHECK (status IN ('draft','posted','cancelled')) DEFAULT 'draft',
+  category_id       UUID NOT NULL REFERENCES app.expense_categories(id),
+  amount            NUMERIC(18,2) NOT NULL CHECK (amount > 0),
+  source            TEXT NOT NULL CHECK (source IN ('cash','bank','card')),
+  cash_register_id  UUID NULL REFERENCES app.cash_registers(id),
+  shift_id          UUID NULL REFERENCES app.shifts(id),
+  attachment_id     UUID NULL REFERENCES app.attachments(id),
+  recurring_rule_id UUID NULL REFERENCES app.recurring_expenses(id),
+  created_by        UUID NOT NULL REFERENCES app.users(id),
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  posted_at         TIMESTAMPTZ NULL,
+  cancelled_at      TIMESTAMPTZ NULL,
+  cancelled_by      UUID NULL REFERENCES app.users(id),
+  cancel_reason     TEXT NULL,
+  client_event_id   UUID NULL,
+  device_id         UUID NULL REFERENCES app.devices(id),
+  comment           TEXT NULL,
+  UNIQUE (tenant_id, device_id, temp_number),
+  UNIQUE (tenant_id, client_event_id),
+  CHECK (source <> 'cash' OR (cash_register_id IS NOT NULL AND shift_id IS NOT NULL))
+);
+
+CREATE TABLE app.cash_movements (
+  id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id       UUID NOT NULL REFERENCES app.branches(id),
+  number          TEXT NULL,
+  temp_number     TEXT NULL,
+  doc_date        DATE NOT NULL,
+  status          TEXT NOT NULL CHECK (status IN ('draft','posted','cancelled')) DEFAULT 'draft',
+  cash_register_id UUID NOT NULL REFERENCES app.cash_registers(id),
+  shift_id        UUID NOT NULL REFERENCES app.shifts(id),
+  direction       TEXT NOT NULL CHECK (direction IN ('in','out')),
+  amount          NUMERIC(18,2) NOT NULL CHECK (amount > 0),
+  reason          TEXT NOT NULL CHECK (reason IN ('collection','deposit','owner_withdrawal','other')),
+  created_by      UUID NOT NULL REFERENCES app.users(id),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  posted_at       TIMESTAMPTZ NULL,
+  cancelled_at    TIMESTAMPTZ NULL,
+  cancelled_by    UUID NULL REFERENCES app.users(id),
+  cancel_reason   TEXT NULL,
+  client_event_id UUID NULL,
+  device_id       UUID NULL REFERENCES app.devices(id),
+  comment         TEXT NULL,
+  UNIQUE (tenant_id, device_id, temp_number),
+  UNIQUE (tenant_id, client_event_id)
+);
+
+-- *(2026-10-15: qabul-6 — DB-12)* qo'lda buxgalteriya tuzatishi uchun hujjat; bir bosqichli (A0-03: post darhol
+-- status=posted, draft bosqichi yo'q), doc_sequences kodi 'BX'.
+CREATE TABLE app.ledger_adjustments (
+  id                   UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id            UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id            UUID NOT NULL REFERENCES app.branches(id),
+  number               TEXT NULL,
+  temp_number          TEXT NULL,
+  doc_date             DATE NOT NULL,           -- = ledger_entries.entry_date, joriy ochiq davr
+  status               TEXT NOT NULL CHECK (status IN ('draft','posted','cancelled')) DEFAULT 'draft',
+  account_dt           TEXT NOT NULL,
+  account_kt           TEXT NOT NULL,
+  amount               NUMERIC(18,2) NOT NULL CHECK (amount > 0),
+  correction_of_period DATE NULL CHECK (correction_of_period IS NULL OR extract(day FROM correction_of_period) = 1),
+  created_by           UUID NOT NULL REFERENCES app.users(id),
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  posted_at            TIMESTAMPTZ NULL,
+  cancelled_at         TIMESTAMPTZ NULL,
+  cancelled_by         UUID NULL REFERENCES app.users(id),
+  cancel_reason        TEXT NULL,
+  client_event_id      UUID NULL,
+  device_id            UUID NULL REFERENCES app.devices(id),
+  comment              TEXT NOT NULL,           -- majburiy (13-3 #10)
+  UNIQUE (tenant_id, device_id, temp_number),
+  UNIQUE (tenant_id, client_event_id),
+  CHECK (account_dt <> account_kt)
+);
+```
+
+### 2.7 Registrlar
+
+`stock_moves`, `debt_moves`, `cash_moves`, `ledger_entries`, `vat_moves` — **haqiqiy append-only** (3-bo'limda `REVOKE`+trigger bilan mahkamlanadi). `stock_lots`, `avg_costs`, `stock_balances`, `debt_balances` — "balans/ishchi" jadvallar: qiymatlari shu registrlardan hisoblanadi, lekin qatorlari FIFO/AVECO qulfi ostida **UPDATE** qilinadi (aniqlashtirish #1 — 01-model bu jadvallarni "Registrlar" sarlavhasi ostida bersa ham, `stock_lots.qty_left` jismonan mutatsiya qilinadi, `23-backend-arxitekturasi.md` §2.1).
+
+```sql
+CREATE TABLE app.stock_moves (
+  id            UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id     UUID NOT NULL REFERENCES app.tenants(id),
+  warehouse_id  UUID NOT NULL REFERENCES app.warehouses(id),
+  product_id    UUID NOT NULL REFERENCES app.products(id),
+  lot_id        UUID NULL,     -- FK pastda (stock_lots yaratilgandan keyin)
+  qty           NUMERIC(18,3) NOT NULL,     -- ishorali: kirim +, chiqim -
+  cost_amount   NUMERIC(18,2) NOT NULL DEFAULT 0,
+  doc_type      TEXT NOT NULL,
+  doc_id        UUID NOT NULL,
+  line_id       UUID NULL,
+  reversal_of_id UUID NULL REFERENCES app.stock_moves(id),
+  moved_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_stock_moves_wh_prod ON app.stock_moves (tenant_id, warehouse_id, product_id, moved_at);
+CREATE INDEX idx_stock_moves_doc ON app.stock_moves (tenant_id, doc_type, doc_id);
+
+CREATE TABLE app.stock_lots (
+  id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
+  warehouse_id    UUID NOT NULL REFERENCES app.warehouses(id),
+  product_id      UUID NOT NULL REFERENCES app.products(id),
+  receipt_line_id UUID NULL REFERENCES app.receipt_lines(id),   -- faqat source_doc_type='goods_receipt'
+  source_doc_type TEXT NOT NULL CHECK (source_doc_type IN ('goods_receipts','stock_openings','transfers')),  -- aniqlashtirish #2 *(2026-10-15: qabul-6 — DB-33, Q7: jadval nomi)*
+  source_doc_id   UUID NOT NULL,
+  source_line_id  UUID NOT NULL,
+  received_at     TIMESTAMPTZ NOT NULL,
+  qty_in          NUMERIC(18,3) NOT NULL CHECK (qty_in >= 0),
+  qty_left        NUMERIC(18,3) NOT NULL CHECK (qty_left >= 0),
+  unit_cost       NUMERIC(18,4) NOT NULL CHECK (unit_cost >= 0),
+  expiry_date     DATE NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- FIFO: eng eski faol partiya birinchi — qisman indeks faqat qty_left>0 qatorlarni qamraydi
+CREATE INDEX idx_stock_lots_fifo ON app.stock_lots (tenant_id, warehouse_id, product_id, received_at)
+  WHERE qty_left > 0;
+
+ALTER TABLE app.stock_moves ADD CONSTRAINT fk_sm_lot FOREIGN KEY (lot_id) REFERENCES app.stock_lots(id);
+ALTER TABLE app.supplier_return_lines ADD CONSTRAINT fk_srl_lot FOREIGN KEY (lot_id) REFERENCES app.stock_lots(id);
+-- fk_tl_lot (transfer_lines.lot_id) OLIB TASHLANDI *(2026-10-15: qabul-6 — DB-16)* — lot_id ustuni endi yo'q, lot_allocations JSONB ishlatiladi
+ALTER TABLE app.write_off_lines       ADD CONSTRAINT fk_wol_lot FOREIGN KEY (lot_id) REFERENCES app.stock_lots(id);
+
+CREATE TABLE app.avg_costs (
+  tenant_id    UUID NOT NULL REFERENCES app.tenants(id),
+  warehouse_id UUID NOT NULL REFERENCES app.warehouses(id),
+  product_id   UUID NOT NULL REFERENCES app.products(id),
+  avg_cost     NUMERIC(18,4) NOT NULL DEFAULT 0,
+  qty          NUMERIC(18,3) NOT NULL DEFAULT 0,
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (tenant_id, warehouse_id, product_id)
+);
+
+CREATE TABLE app.stock_balances (
+  tenant_id    UUID NOT NULL REFERENCES app.tenants(id),
+  warehouse_id UUID NOT NULL REFERENCES app.warehouses(id),
+  product_id   UUID NOT NULL REFERENCES app.products(id),
+  qty          NUMERIC(18,3) NOT NULL DEFAULT 0,
+  value        NUMERIC(18,2) NOT NULL DEFAULT 0,
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (tenant_id, warehouse_id, product_id)
+);
+-- manfiy qoldiqlarni tezkor topish (offline overselling, 04-offline-sync §5)
+CREATE INDEX idx_stock_balances_negative ON app.stock_balances (tenant_id, warehouse_id, product_id) WHERE qty < 0;
+
+CREATE TABLE app.debt_moves (
+  id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
+  counterparty_id UUID NOT NULL REFERENCES app.counterparties(id),
+  direction       TEXT NOT NULL CHECK (direction IN ('receivable','payable')),
+  amount          NUMERIC(18,2) NOT NULL,   -- ishorali
+  due_date        DATE NULL,
+  limit_exceeded  BOOLEAN NOT NULL DEFAULT false,   -- *(2026-10-15: qabul-7 — B-01)* offline nasiya limitdan oshgan qator
+  doc_type        TEXT NOT NULL,
+  doc_id          UUID NOT NULL,
+  reversal_of_id  UUID NULL REFERENCES app.debt_moves(id),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_debt_moves_cp ON app.debt_moves (tenant_id, counterparty_id, direction, created_at);
+CREATE INDEX idx_debt_moves_due ON app.debt_moves (tenant_id, due_date) WHERE direction = 'receivable';
+CREATE INDEX idx_debt_moves_limit_exceeded ON app.debt_moves (tenant_id) WHERE limit_exceeded;  -- *(qabul-7 — B-01)*
+
+CREATE TABLE app.debt_balances (
+  tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
+  counterparty_id UUID NOT NULL REFERENCES app.counterparties(id),
+  direction       TEXT NOT NULL CHECK (direction IN ('receivable','payable')),
+  balance         NUMERIC(18,2) NOT NULL DEFAULT 0,
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (tenant_id, counterparty_id, direction)
+);
+
+CREATE TABLE app.cash_moves (
+  id               UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id        UUID NOT NULL REFERENCES app.tenants(id),
+  cash_register_id UUID NULL REFERENCES app.cash_registers(id),
+  bank_account_id  UUID NULL,   -- *(2026-10-15: qabul-6 — DB-05)* MVP: doim NULL — yagona yashirin bank hisobi 5110; ko'p bank hisobi (jadval) — backlog
+  shift_id         UUID NULL REFERENCES app.shifts(id),
+  amount           NUMERIC(18,2) NOT NULL,   -- ishorali
+  method           TEXT NOT NULL CHECK (method IN ('cash','card','uzqr','click','payme','uzum','bank')),  -- *(qabul-6 — DB-05)*
+  doc_type         TEXT NOT NULL,
+  doc_id           UUID NOT NULL,
+  reversal_of_id   UUID NULL REFERENCES app.cash_moves(id),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (method <> 'cash' OR (cash_register_id IS NOT NULL AND shift_id IS NOT NULL))   -- *(qabul-6 — DB-05, o'rniga)*
+);
+CREATE INDEX idx_cash_moves_shift ON app.cash_moves (shift_id) WHERE shift_id IS NOT NULL;
+
+CREATE TABLE app.ledger_entries (
+  id             UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id      UUID NOT NULL REFERENCES app.tenants(id),
+  entry_date     DATE NOT NULL,
+  branch_id      UUID NULL REFERENCES app.branches(id),   -- *(2026-10-15: qabul-6 — DB-12)* filial bo'yicha hisobot uchun indeksli ustun
+  account_dt     TEXT NOT NULL,
+  account_kt     TEXT NOT NULL,
+  amount         NUMERIC(18,2) NOT NULL CHECK (amount > 0),
+  doc_type       TEXT NOT NULL,
+  doc_id         UUID NOT NULL,
+  analytics      JSONB NOT NULL DEFAULT '{}',
+  reversal_of_id UUID NULL REFERENCES app.ledger_entries(id),
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_ledger_entries_period ON app.ledger_entries (tenant_id, entry_date);
+CREATE INDEX idx_ledger_entries_doc ON app.ledger_entries (tenant_id, doc_type, doc_id);
+CREATE INDEX idx_ledger_entries_accounts ON app.ledger_entries (tenant_id, account_dt, account_kt, entry_date);
+CREATE INDEX idx_ledger_entries_branch ON app.ledger_entries (tenant_id, branch_id, entry_date);  -- *(qabul-6 — DB-12)*
+
+CREATE TABLE app.vat_moves (
+  id             UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id      UUID NOT NULL REFERENCES app.tenants(id),
+  period         DATE NOT NULL,   -- oyning 1-sanasi
+  kind           TEXT NOT NULL CHECK (kind IN ('output','input')),
+  base_amount    NUMERIC(18,2) NOT NULL,
+  vat_amount     NUMERIC(18,2) NOT NULL,
+  doc_type       TEXT NOT NULL,
+  doc_id         UUID NOT NULL,
+  einvoice_id    UUID NULL,   -- FK pastda (einvoices yaratilgandan keyin)
+  reversal_of_id UUID NULL REFERENCES app.vat_moves(id),
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_vat_moves_period ON app.vat_moves (tenant_id, period, kind);
+```
+
+**Balans jadvallarining upsert naqshi** (posting xizmati ichida, `23-backend-arxitekturasi.md` §2.1 qulfi ostida):
+
+```sql
+INSERT INTO app.stock_balances (tenant_id, warehouse_id, product_id, qty, value, updated_at)
+VALUES (:tenant_id, :warehouse_id, :product_id, :delta_qty, :delta_value, now())
+ON CONFLICT (tenant_id, warehouse_id, product_id)
+DO UPDATE SET
+  qty        = app.stock_balances.qty + EXCLUDED.qty,
+  value      = app.stock_balances.value + EXCLUDED.value,
+  updated_at = now();
+
+INSERT INTO app.debt_balances (tenant_id, counterparty_id, direction, balance, updated_at)
+VALUES (:tenant_id, :counterparty_id, :direction, :delta_amount, now())
+ON CONFLICT (tenant_id, counterparty_id, direction)
+DO UPDATE SET balance = app.debt_balances.balance + EXCLUDED.balance, updated_at = now();
+```
+
+### 2.8 Fiskal, markirovka, e-hujjatlar, davlat hisoboti
+
+```sql
+-- *(2026-10-15: qabul-6/7 — DB-01; 2026-10-15: asoschi qarori Q2/Q3)* kind='z_report' — smena yopilganda Z-hisobot
+-- shu jadvalga yoziladi (sale_id/return_id/receipt_seq hammasi NULL, raqami = shifts.shift_no). kind='debt_settlement'
+-- qo'shildi (Q3) — qarz to'lovida chiqariladigan chek, debt_payment_id orqali bog'lanadi, cash_register_id/shift_id
+-- ixtiyoriy (bank/karta orqali to'lovda kassasiz). Chek matni/payload **ikki tilda** chiqariladi (Q2, o'zbek +
+-- ixtiyoriy rus — `products.name_ru`); eski "doim o'zbek lotin, R-05" taklifi Q2 bilan almashtirildi.
+CREATE TABLE app.fiscal_receipts (
+  id               UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id        UUID NOT NULL REFERENCES app.tenants(id),
+  kind             TEXT NOT NULL CHECK (kind IN ('sale','return','z_report','debt_settlement')),  -- *(Q3: debt_settlement qo'shildi)*
+  sale_id          UUID NULL REFERENCES app.sales(id),
+  return_id        UUID NULL REFERENCES app.returns(id),
+  debt_payment_id  UUID NULL REFERENCES app.debt_payments(id),  -- *(2026-10-15: asoschi qarori, Q3)* kind='debt_settlement'da majburiy
+  cash_register_id UUID NULL REFERENCES app.cash_registers(id),  -- *(Q3)* debt_settlement + bank/karta to'lovda NULL mumkin
+  shift_id         UUID NULL REFERENCES app.shifts(id),          -- *(Q3)* xuddi shunday
+  receipt_seq      INT  NULL,            -- qurilma beradi; z_report/debt_settlement'da NULL mumkin
+  payload          JSONB NOT NULL,
+  fiscal_sign      TEXT NULL,
+  qr_url           TEXT NULL,
+  sent_at          TIMESTAMPTZ NULL,
+  offline_since    TIMESTAMPTZ NULL,
+  status           TEXT NOT NULL CHECK (status IN ('pending','sent','fiscalized','failed')) DEFAULT 'pending',
+  attempts         INT NOT NULL DEFAULT 0,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (
+       (kind = 'sale'            AND sale_id IS NOT NULL AND return_id IS NULL AND debt_payment_id IS NULL AND receipt_seq IS NOT NULL AND cash_register_id IS NOT NULL AND shift_id IS NOT NULL)
+    OR (kind = 'return'          AND return_id IS NOT NULL AND sale_id IS NULL AND debt_payment_id IS NULL AND receipt_seq IS NOT NULL AND cash_register_id IS NOT NULL AND shift_id IS NOT NULL)
+    OR (kind = 'z_report'        AND sale_id IS NULL AND return_id IS NULL AND debt_payment_id IS NULL AND receipt_seq IS NULL AND cash_register_id IS NOT NULL AND shift_id IS NOT NULL)
+    OR (kind = 'debt_settlement' AND debt_payment_id IS NOT NULL AND sale_id IS NULL AND return_id IS NULL)
+  ),
+  UNIQUE (tenant_id, cash_register_id, shift_id, receipt_seq)
+);
+CREATE UNIQUE INDEX uq_fiscal_z_per_shift ON app.fiscal_receipts (shift_id) WHERE kind = 'z_report';
+CREATE INDEX idx_fiscal_receipts_pending ON app.fiscal_receipts (tenant_id) WHERE status IN ('pending','failed');
+
+CREATE TABLE app.marking_codes (
+  id          UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id   UUID NOT NULL REFERENCES app.tenants(id),
+  code        TEXT NOT NULL,     -- DataMatrix
+  product_id  UUID NOT NULL REFERENCES app.products(id),
+  status      TEXT NOT NULL CHECK (status IN ('in_stock','sold','returned','written_off','returned_to_supplier','pending_verification')),
+  last_doc_id UUID NULL,
+  verified_at TIMESTAMPTZ NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, code)
+);
+CREATE INDEX idx_marking_codes_pending_verif ON app.marking_codes (tenant_id) WHERE status = 'pending_verification';
+
+ALTER TABLE app.sale_lines ADD CONSTRAINT fk_sl_marking
+  FOREIGN KEY (tenant_id, marking_code) REFERENCES app.marking_codes(tenant_id, code) DEFERRABLE INITIALLY DEFERRED;
+-- *(2026-10-15: qabul-6 — DB-31)* SalePostingService sale_lines'dan OLDIN, shu tranzaksiyada
+-- INSERT INTO marking_codes ... ON CONFLICT (tenant_id, code) DO UPDATE SET status=..., last_doc_id=... bajaradi
+-- (online — 'sold', offline — 'pending_verification'); FK DEFERRABLE shu tartibni kafolatlaydi.
+-- *(qabul-6 — DB-33)* CREATE UNIQUE INDEX uq_marking_codes_tenant_code OLIB TASHLANDI — jadval ichidagi
+-- UNIQUE (tenant_id, code) cheklovi bilan TAKROR edi.
+
+CREATE TABLE app.einvoices (
+  id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
+  direction       TEXT NOT NULL CHECK (direction IN ('in','out')),
+  operator        TEXT NOT NULL CHECK (operator IN ('didox','faktura')),
+  operator_doc_id TEXT NULL,
+  counterparty_id UUID NOT NULL REFERENCES app.counterparties(id),
+  related_doc_type TEXT NULL,
+  related_doc_id  UUID NULL,
+  status          TEXT NOT NULL CHECK (status IN ('draft','received','signed','sent','accepted','rejected','cancelled')),  -- *(2026-10-15: qabul-6 — DB-21)*
+  number          TEXT NULL,                 -- *(qabul-6 — DB-21)* operator/faktura raqami
+  doc_date        DATE NULL,
+  total_amount    NUMERIC(18,2) NULL,
+  vat_amount      NUMERIC(18,2) NULL,
+  signed_by       UUID NULL REFERENCES app.users(id),
+  risk_flag       TEXT NULL CHECK (risk_flag IN ('green','red')),
+  signed_at       TIMESTAMPTZ NULL,
+  payload         JSONB NOT NULL DEFAULT '{}',
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (related_doc_type IS NULL OR related_doc_type IN ('sales','goods_receipts','supplier_returns'))  -- *(qabul-6 — DB-21)*
+);
+-- *(2026-10-15: qabul-6 — DB-21)* 02 §2.22 cheklovi: bitta chekka bitta faol chiquvchi faktura
+CREATE UNIQUE INDEX uq_einvoice_out_per_doc ON app.einvoices (tenant_id, related_doc_type, related_doc_id)
+  WHERE direction = 'out' AND related_doc_id IS NOT NULL AND status <> 'cancelled';
+CREATE UNIQUE INDEX uq_einvoice_operator_doc ON app.einvoices (tenant_id, operator, operator_doc_id)
+  WHERE operator_doc_id IS NOT NULL;
+
+ALTER TABLE app.vat_moves ADD CONSTRAINT fk_vm_einvoice FOREIGN KEY (einvoice_id) REFERENCES app.einvoices(id);
+-- *(2026-10-15: qabul-6 — DB-06)* goods_receipts.einvoice_id endi bog'lanadi (einvoices shu yerda yaratildi):
+ALTER TABLE app.goods_receipts ADD CONSTRAINT fk_gr_einvoice FOREIGN KEY (einvoice_id) REFERENCES app.einvoices(id);
+CREATE UNIQUE INDEX uq_gr_einvoice_active ON app.goods_receipts (tenant_id, einvoice_id)
+  WHERE einvoice_id IS NOT NULL AND status <> 'cancelled';
+
+CREATE TABLE app.ettn_documents (
+  id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
+  einvoice_id     UUID NOT NULL REFERENCES app.einvoices(id),
+  status          TEXT NOT NULL,
+  operator_doc_id TEXT NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE app.state_reports (
+  id                 UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id          UUID NOT NULL REFERENCES app.tenants(id),
+  tax_type           TEXT NOT NULL CHECK (tax_type IN ('vat','turnover','property','land','pit','social')),
+  period             DATE NOT NULL,
+  published_at       TIMESTAMPTZ NULL,
+  deadline_at        TIMESTAMPTZ NULL,
+  file_attachment_id UUID NULL REFERENCES app.attachments(id),
+  status             TEXT NOT NULL CHECK (status IN ('uploaded','compared','match','diff_found','correction_sent','auto_accepted')),
+  state_amount         NUMERIC(18,2) NULL,    -- *(2026-10-15: qabul-6 — DB-20)*
+  our_amount           NUMERIC(18,2) NULL,
+  diff_amount          NUMERIC(18,2) NULL,
+  compared_at          TIMESTAMPTZ NULL,
+  correction_sent_at   TIMESTAMPTZ NULL,
+  correction_signature TEXT NULL,          -- E-IMZO PKCS#7 (base64)
+  uploaded_by          UUID NOT NULL REFERENCES app.users(id),
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Tolerantlik — tenants.settings.vat_diff_tolerance_amount (13-3 #6, M-03) *(qabul-6 — DB-20)*
+
+CREATE TABLE app.state_report_diffs (
+  id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
+  state_report_id UUID NOT NULL REFERENCES app.state_reports(id),
+  indicator       TEXT NOT NULL,
+  state_value     NUMERIC(18,2) NULL,
+  our_value       NUMERIC(18,2) NULL,
+  diff            NUMERIC(18,2) NULL,
+  explanation     TEXT NULL,
+  resolved        BOOLEAN NOT NULL DEFAULT false,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+### 2.9 Integratsiya navbati, sync, bildirishnoma, AI, audit, raqamlash
+
+```sql
+CREATE TABLE app.outbox_jobs (
+  id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
+  kind            TEXT NOT NULL CHECK (kind IN ('ofd_send','einvoice_send','einvoice_accept','ettn_send',
+                     'marking_verify','marking_sell','state_report_reminder','sms','telegram','ai',
+                     'report_export','label_pdf')),   -- *(2026-10-15: qabul-6 — DB-19, Q8)*
+  payload         JSONB NOT NULL,
+  status          TEXT NOT NULL CHECK (status IN ('queued','running','done','retry','failed')) DEFAULT 'queued',
+  attempts        INT NOT NULL DEFAULT 0,
+  next_run_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_error      TEXT NULL,
+  idempotency_key TEXT NOT NULL,
+  created_by           UUID NULL REFERENCES app.users(id),     -- *(qabul-6 — DB-19)* eksport job'ini faqat yaratuvchi/Egasi ko'radi
+  progress_pct         SMALLINT NULL CHECK (progress_pct BETWEEN 0 AND 100),   -- *(qabul-6 — DB-19)*
+  result_attachment_id UUID NULL REFERENCES app.attachments(id),   -- *(qabul-6 — DB-19)*
+  error_code           TEXT NULL,                                 -- *(qabul-6 — DB-19)* 13-0 katalogidan (masalan EXPORT_JOB_FAILED)
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, idempotency_key)
+);
+-- API holati xaritasi: 'retry' → API'da 'running' sifatida ko'rsatiladi *(qabul-6 — DB-19)*
+CREATE INDEX idx_outbox_jobs_due ON app.outbox_jobs (next_run_at) WHERE status IN ('queued','retry');
+
+CREATE TABLE app.sync_receipts (
+  id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
+  device_id       UUID NOT NULL REFERENCES app.devices(id),
+  client_event_id UUID NOT NULL,
+  received_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  result          JSONB NOT NULL,
+  UNIQUE (tenant_id, client_event_id)
+);
+
+CREATE TABLE app.idempotency_keys (
+  tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
+  key             TEXT NOT NULL,
+  request_hash    TEXT NOT NULL,
+  response_status INT NOT NULL,
+  response_body   JSONB NOT NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (tenant_id, key)
+);
+CREATE INDEX idx_idempotency_keys_cleanup ON app.idempotency_keys (created_at);
+
+CREATE TABLE app.recost_jobs (
+  id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
+  warehouse_id    UUID NOT NULL REFERENCES app.warehouses(id),
+  product_id      UUID NOT NULL REFERENCES app.products(id),
+  from_date       DATE NOT NULL,
+  status          TEXT NOT NULL CHECK (status IN ('queued','running','done','failed','rejected_period_closed')) DEFAULT 'queued',
+  reason_doc_type TEXT NOT NULL,
+  reason_doc_id   UUID NOT NULL,
+  attempts        INT NOT NULL DEFAULT 0,
+  last_error      TEXT NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  finished_at     TIMESTAMPTZ NULL
+);
+-- bitta (tenant, warehouse, product) uchun bir vaqtda faqat bitta "queued" job
+CREATE UNIQUE INDEX uq_recost_jobs_queued ON app.recost_jobs (tenant_id, warehouse_id, product_id) WHERE status = 'queued';
+
+CREATE TABLE app.import_jobs (
+  id         UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id  UUID NOT NULL REFERENCES app.tenants(id),
+  kind       TEXT NOT NULL CHECK (kind IN ('products','opening_stock','opening_debts')),
+  attachment_id UUID NOT NULL REFERENCES app.attachments(id),
+  status     TEXT NOT NULL CHECK (status IN ('uploaded','validating','validated','committing','committed','failed')) DEFAULT 'uploaded',  -- *(2026-10-15: qabul-6 — DB-29)*
+  total_rows INT NOT NULL DEFAULT 0,
+  ok_rows    INT NOT NULL DEFAULT 0,
+  errors     JSONB NOT NULL DEFAULT '[]',
+  result     JSONB NOT NULL DEFAULT '{}',   -- *(qabul-6 — DB-29)* {"created_doc_ids":[...], "created_product_count":n}
+  created_by UUID NOT NULL REFERENCES app.users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE app.telegram_links (
+  id         UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id  UUID NOT NULL REFERENCES app.tenants(id),
+  user_id    UUID NOT NULL REFERENCES app.users(id),
+  chat_id    TEXT NOT NULL,
+  linked_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  revoked_at TIMESTAMPTZ NULL,
+  UNIQUE (tenant_id, user_id)
+);
+
+CREATE TABLE app.notification_settings (
+  id         UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id  UUID NOT NULL REFERENCES app.tenants(id),
+  user_id    UUID NOT NULL REFERENCES app.users(id),
+  kind       TEXT NOT NULL,
+  enabled    BOOLEAN NOT NULL DEFAULT true,
+  time       TIME NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, user_id, kind)
+);
+
+CREATE TABLE app.notifications_log (
+  id         UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id  UUID NOT NULL REFERENCES app.tenants(id),
+  channel    TEXT NOT NULL CHECK (channel IN ('telegram','sms')),
+  recipient  TEXT NOT NULL,
+  template   TEXT NOT NULL,
+  status     TEXT NOT NULL,
+  cost       NUMERIC(18,2) NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE app.ai_requests (
+  id                UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id         UUID NOT NULL REFERENCES app.tenants(id),
+  user_id           UUID NULL REFERENCES app.users(id),
+  feature           TEXT NOT NULL,
+  model             TEXT NOT NULL,
+  prompt_version    TEXT NULL,
+  input_tokens      INT NOT NULL DEFAULT 0,
+  output_tokens     INT NOT NULL DEFAULT 0,
+  cache_read_tokens INT NOT NULL DEFAULT 0,
+  cost_usd          NUMERIC(12,6) NOT NULL DEFAULT 0,
+  fx_rate_used      NUMERIC(12,4) NULL,
+  cost_uzs          NUMERIC(18,2) NULL,
+  latency_ms        INT NULL,
+  guard_result      TEXT NULL,
+  status            TEXT NOT NULL,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_ai_requests_tenant_month ON app.ai_requests (tenant_id, created_at);
+
+-- *(2026-10-15: qabul-6 — DB-13, Q4)* 13-2 purchase_ocr_drafts + 13-3 ai_ocr_jobs birlashmasi; purchase_ocr_drafts
+-- nomi ISHLATILMAYDI. AI hujjat yozmaydi — tasdiqdan keyin goods_receipts qoralamasi yaratiladi.
+CREATE TABLE app.ai_ocr_jobs (
+  id                    UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id             UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id             UUID NULL REFERENCES app.branches(id),
+  created_by            UUID NOT NULL REFERENCES app.users(id),
+  attachment_id         UUID NOT NULL REFERENCES app.attachments(id),
+  doc_type_hint         TEXT NOT NULL DEFAULT 'purchase' CHECK (doc_type_hint IN ('purchase')),
+  status                TEXT NOT NULL DEFAULT 'processing'
+                          CHECK (status IN ('processing','done','failed','confirmed','expired')),
+  fields                JSONB NULL,             -- {header:{supplier_name:{value,confidence},...}, lines:[{...}]}
+  low_confidence_fields TEXT[] NOT NULL DEFAULT '{}',   -- masalan 'lines[0].product_name'
+  error_code            TEXT NULL,              -- 'OCR_IMAGE_UNREADABLE', 'AI_PROVIDER_UNAVAILABLE'
+  ai_request_id         UUID NULL REFERENCES app.ai_requests(id),
+  created_doc_type      TEXT NULL,              -- 'goods_receipts'
+  created_doc_id        UUID NULL,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  finished_at           TIMESTAMPTZ NULL,
+  confirmed_at          TIMESTAMPTZ NULL,
+  expires_at            TIMESTAMPTZ NOT NULL,   -- created_at + 7 kun (taxmin), keyin 'expired' va fields tozalanadi
+  CHECK (status <> 'confirmed' OR (created_doc_id IS NOT NULL AND confirmed_at IS NOT NULL))
+);
+CREATE INDEX idx_ai_ocr_jobs_expiry ON app.ai_ocr_jobs (expires_at) WHERE status IN ('processing','done');
+ALTER TABLE app.goods_receipts ADD CONSTRAINT fk_gr_ocr_job FOREIGN KEY (ai_ocr_job_id) REFERENCES app.ai_ocr_jobs(id);
+
+CREATE TABLE app.ai_training_samples (
+  id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id       UUID NULL,   -- anonimlashtirilgandan keyin olib tashlanadi
+  feature         TEXT NOT NULL,
+  input_redacted  JSONB NOT NULL,
+  output_corrected JSONB NULL,
+  consent_ref     UUID NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE app.ai_feedback (
+  id                   UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id            UUID NOT NULL REFERENCES app.tenants(id),
+  ai_request_id        UUID NOT NULL REFERENCES app.ai_requests(id),
+  rating               SMALLINT NULL CHECK (rating IN (-1, 1)),
+  correction           TEXT NULL,
+  consent_for_training BOOLEAN NOT NULL DEFAULT false,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE app.tenant_glossary (
+  id         UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id  UUID NOT NULL REFERENCES app.tenants(id),
+  term       TEXT NOT NULL,
+  meaning    TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, term)
+);
+
+CREATE TABLE app.audit_log (
+  id         UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id  UUID NOT NULL REFERENCES app.tenants(id),
+  user_id    UUID NULL REFERENCES app.users(id),
+  action     TEXT NOT NULL,
+  entity     TEXT NOT NULL,
+  entity_id  UUID NULL,
+  before     JSONB NULL,
+  after      JSONB NULL,
+  ip         INET NULL,
+  device_id  UUID NULL,
+  at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_audit_log_tenant_time ON app.audit_log (tenant_id, at DESC);
+CREATE INDEX idx_audit_log_entity ON app.audit_log (tenant_id, entity, entity_id);
+
+CREATE TABLE app.period_closings (
+  id         UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id  UUID NOT NULL REFERENCES app.tenants(id),
+  period     DATE NOT NULL,
+  closed_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  closed_by  UUID NOT NULL REFERENCES app.users(id),
+  UNIQUE (tenant_id, period)
+);
+
+CREATE TABLE app.doc_sequences (
+  tenant_id  UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id  UUID NOT NULL REFERENCES app.branches(id),
+  doc_type   TEXT NOT NULL,
+  year       INT NOT NULL,
+  next_value BIGINT NOT NULL DEFAULT 1,
+  PRIMARY KEY (tenant_id, branch_id, doc_type, year)
+);
+```
+
+**Hujjat raqami generatori** (aniqlashtirish #15 — 01-model faqat `K-01-2026-000154` namunasini beradi, to'liq `doc_type` kod jadvali ro'yxatlanmagan):
+
+```sql
+CREATE OR REPLACE FUNCTION app.next_doc_number(
+  p_tenant_id uuid, p_branch_id uuid, p_branch_code text, p_doc_type text, p_year int
+) RETURNS text
+LANGUAGE plpgsql AS $$
+DECLARE v_next bigint;
+BEGIN
+  INSERT INTO app.doc_sequences (tenant_id, branch_id, doc_type, year, next_value)
+  VALUES (p_tenant_id, p_branch_id, p_doc_type, p_year, 2)
+  ON CONFLICT (tenant_id, branch_id, doc_type, year)
+  DO UPDATE SET next_value = app.doc_sequences.next_value + 1
+  RETURNING next_value - 1 INTO v_next;
+  RETURN format('%s-%s-%s-%s', p_doc_type, p_branch_code, p_year, lpad(v_next::text, 6, '0'));
+END;
+$$;
+```
+
+Taklif qilingan `doc_type` kodlari (aniqlashtirish #15): `K`=sales, `V`=returns, `Z`=purchase_orders, `M`=goods_receipts, `MV`=supplier_returns, `P`=transfers, `I`=stock_counts, `L`=write_offs, `C`=price_changes, `OO`=stock_openings, `OD`=debt_openings, `DP`=debt_payments, `DW`=debt_writeoffs, `SP`=supplier_payments, `E`=expenses, `CM`=cash_movements, **`BX`=ledger_adjustments** *(2026-10-15: qabul-6 — DB-12)*.
+
+### 2.10 `updated_at` trigger'larini ommaviy ulash
+
+Barcha jadvallar yaratilgandan so'ng, bitta martalik migratsiya qadami:
+
+```sql
+DO $$
+DECLARE r RECORD;
+BEGIN
+  FOR r IN
+    SELECT DISTINCT c.relname, n.nspname
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    JOIN pg_attribute a ON a.attrelid = c.oid AND a.attname = 'updated_at' AND NOT a.attisdropped
+    WHERE n.nspname IN ('app', 'platform') AND c.relkind = 'r'
+  LOOP
+    EXECUTE format(
+      'CREATE TRIGGER trg_set_updated_at BEFORE UPDATE ON %I.%I FOR EACH ROW EXECUTE FUNCTION app.set_updated_at()',
+      r.nspname, r.relname
+    );
+  END LOOP;
+END $$;
+```
+
+---
+
+## 3. Registrlar: append-only mahkamlash
+
+Haqiqiy append-only registrlar — **faqat** `stock_moves`, `debt_moves`, `cash_moves`, `ledger_entries`, `vat_moves`, `audit_log`, `sync_receipts`, `auth.login_attempts`. Ikki qatlamli himoya: (a) `erp_app`dan `UPDATE`/`DELETE` huquqi **olib tashlanadi**, (b) trigger — kod xatosi yoki boshqa (masalan `erp_migrator`) rol bilan ulanish ham qatorni o'zgartira olmasligi uchun.
+
+```sql
+CREATE OR REPLACE FUNCTION app.forbid_mutation() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION 'append-only jadval: % operatsiyasi taqiqlangan (jadval: %)', TG_OP, TG_TABLE_NAME
+    USING ERRCODE = 'integrity_constraint_violation';
+END;
+$$;
+
+DO $$
+DECLARE
+  t TEXT;
+  append_only_tables TEXT[] := ARRAY[
+    'app.stock_moves', 'app.debt_moves', 'app.cash_moves',
+    'app.ledger_entries', 'app.vat_moves', 'app.audit_log', 'app.sync_receipts',
+    'app.doc_approvals'   -- *(2026-10-15: qabul-6 — DB-10)*
+  ];
+BEGIN
+  FOREACH t IN ARRAY append_only_tables LOOP
+    EXECUTE format('REVOKE UPDATE, DELETE ON %s FROM erp_app', t);
+    EXECUTE format(
+      'CREATE TRIGGER trg_no_update_delete BEFORE UPDATE OR DELETE ON %s FOR EACH ROW EXECUTE FUNCTION app.forbid_mutation()',
+      t
+    );
+  END LOOP;
+END $$;
+
+REVOKE UPDATE, DELETE ON auth.login_attempts FROM erp_system;
+CREATE TRIGGER trg_no_update_delete BEFORE UPDATE OR DELETE ON auth.login_attempts
+  FOR EACH ROW EXECUTE FUNCTION app.forbid_mutation();
+```
+
+`stock_lots`/`avg_costs`/`stock_balances`/`debt_balances` — **UPDATE ruxsat etilgan** (balans-keshi, 2.7-bo'limdagi upsert naqshi); ularning yaxlitligi FK + `CHECK (qty_left >= 0)` kabi cheklovlar va posting xizmatining `FOR UPDATE` qulfi bilan ta'minlanadi, DB darajasidagi `REVOKE` emas. `fiscal_receipts`, `marking_codes`, `outbox_jobs`, `recost_jobs`, `import_jobs`, `einvoices`, `ettn_documents`, `state_reports`, `state_report_diffs`, `refresh_tokens`, `sessions`, `otp_challenges`, `approval_requests`, `payment_checkouts`, `ai_ocr_jobs`, `ledger_adjustments` *(2026-10-15: qabul-6)* — holat-mashinasi jadvallari, `UPDATE` tabiiy ravishda kerak (status o'tishlari), append-only emas.
+
+---
+
+## 4. Row-Level Security
+
+### 4.1 Tenant kontekst funksiyalari
+
+```sql
+CREATE OR REPLACE FUNCTION app.current_tenant_id() RETURNS uuid
+LANGUAGE sql STABLE AS $$
+  SELECT NULLIF(current_setting('app.tenant_id', true), '')::uuid
+$$;
+
+CREATE OR REPLACE FUNCTION app.current_user_id() RETURNS uuid
+LANGUAGE sql STABLE AS $$
+  SELECT NULLIF(current_setting('app.user_id', true), '')::uuid
+$$;
+```
+
+`current_setting(..., true)` parametr o'rnatilmagan bo'lsa xato tashlamay `NULL` qaytaradi; `NULLIF(...,'')` bo'sh satrni ham `NULL`ga aylantiradi — natijada kontekstsiz so'rov **hech qanday qator qaytarmaydi** (fail-closed, `15-xavfsizlik-va-audit.md` §3.2).
+
+### 4.2 Siyosat shabloni — barcha oddiy tenant jadvallari
+
+```sql
+DO $$
+DECLARE
+  r RECORD;
+  excluded_tables TEXT[] := ARRAY['tenants', 'users', 'memberships'];  -- maxsus siyosat, pastda
+BEGIN
+  FOR r IN
+    SELECT DISTINCT c.relname
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    JOIN pg_attribute a ON a.attrelid = c.oid AND a.attname = 'tenant_id' AND NOT a.attisdropped
+    WHERE n.nspname = 'app' AND c.relkind = 'r' AND c.relname <> ALL (excluded_tables)
+  LOOP
+    EXECUTE format('ALTER TABLE app.%I ENABLE ROW LEVEL SECURITY', r.relname);
+    EXECUTE format('ALTER TABLE app.%I FORCE ROW LEVEL SECURITY', r.relname);
+    EXECUTE format(
+      'CREATE POLICY tenant_isolation ON app.%I USING (tenant_id = app.current_tenant_id()) WITH CHECK (tenant_id = app.current_tenant_id())',
+      r.relname
+    );
+  END LOOP;
+END $$;
+```
+
+Bu blok — **bitta martalik** ijro (boshlang'ich migratsiyada, barcha jadvallar yaratilgandan keyin). Keyingi migratsiyalarda qo'shilgan har bir yangi `tenant_id`li jadval uchun **aniq** `ENABLE`/`FORCE`/`CREATE POLICY` uchligi o'z revizionida yozilishi shart — CI tekshiruvi (6-bo'lim) buni tasdiqlaydi.
+
+### 4.3 Maxsus siyosatlar
+
+```sql
+-- tenants: faqat o'z yozuvi (id = joriy tenant)
+ALTER TABLE app.tenants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE app.tenants FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_self ON app.tenants
+  USING (id = app.current_tenant_id())
+  WITH CHECK (id = app.current_tenant_id());
+
+-- users: o'z yozuvi (ro'yxatdan o'tish/tenant tanlashda ham ishlashi uchun) YOKI joriy tenant'da membership bor
+ALTER TABLE app.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE app.users FORCE ROW LEVEL SECURITY;
+CREATE POLICY users_self_or_membership ON app.users
+  USING (
+    id = app.current_user_id()
+    OR EXISTS (
+      SELECT 1 FROM app.memberships m
+      WHERE m.user_id = app.users.id AND m.tenant_id = app.current_tenant_id()
+    )
+  )
+  WITH CHECK (id = app.current_user_id());
+  -- INSERT: ilova yangi foydalanuvchi id'sini oldindan generatsiya qilib `app.user_id`ni
+  -- shu qiymatga o'rnatadi (1.2-bo'lim), shundan keyin INSERT qiladi — WITH CHECK shu yo'l bilan qanoatlanadi.
+
+-- memberships: joriy tenant doirasidagi barcha a'zolik (Egasi/BO-11 uchun) YOKI o'zining istalgan tenantdagi a'zoligi
+-- (tenant-almashtirish ekrani uchun, auth_list_memberships SECURITY DEFINER'siz oddiy o'qish yo'li)
+ALTER TABLE app.memberships ENABLE ROW LEVEL SECURITY;
+ALTER TABLE app.memberships FORCE ROW LEVEL SECURITY;
+CREATE POLICY memberships_scope ON app.memberships
+  USING (
+    tenant_id = app.current_tenant_id()
+    OR user_id = app.current_user_id()
+  )
+  WITH CHECK (tenant_id = app.current_tenant_id());
+```
+
+### 4.4 Global/platforma jadvallari — RLS o'rniga GRANT cheklovi
+
+`plans`, `addons`, `units`, `oauth_clients`, `signing_keys`, `label_templates` *(2026-10-15: qabul-6 — DB-27)* — `tenant_id`siz, RLS **yoqilmaydi**; o'rniga faqat `SELECT` beriladi (yozish — faqat `erp_migrator`/admin yo'li orqali). `platform_admins` — `erp_app`ga **umuman** grant yo'q (platforma admin BFF alohida, yuqori ishonchli yo'l orqali ishlaydi, `15-xavfsizlik-va-audit.md` §3.4).
+
+```sql
+GRANT SELECT ON platform.plans, platform.addons, platform.units,
+                platform.oauth_clients, platform.signing_keys, platform.label_templates
+  TO erp_app;   -- *(2026-10-15: qabul-6 — DB-27)*
+-- platform.platform_admins — erp_app'ga HECH QANDAY grant yo'q
+REVOKE ALL ON platform.platform_admins FROM erp_app;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA app TO erp_app;
+-- 3-bo'limdagi REVOKE UPDATE/DELETE append-only jadvallar uchun yuqorida alohida qo'llanadi (tartib muhim: shundan keyin ishga tushiriladi)
+
+REVOKE ALL ON SCHEMA auth FROM PUBLIC, erp_app;
+GRANT ALL ON ALL TABLES IN SCHEMA auth TO erp_system;
+```
+
+### 4.5 `SECURITY DEFINER` funksiyalar
+
+Faqat shu to'rt funksiya tenant-kontekstidan **oldin** ishlaydigan amallarni qamrab oladi (login, scheduler fan-out, billing webhook). Barchasi `erp_system` egaligida, `SET search_path` bilan (search_path hijack'dan himoya — chaqiruvchi sessiyaning `search_path`i e'tiborga olinmaydi).
+
+```sql
+CREATE OR REPLACE FUNCTION app.auth_find_user_by_phone(p_phone text)
+RETURNS TABLE (
+  user_id uuid, password_hash text, password_algo text,
+  failed_login_count int, locked_until timestamptz
+)
+LANGUAGE sql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+  SELECT u.id, c.password_hash, c.password_algo, c.failed_login_count, c.locked_until
+  FROM app.users u
+  JOIN auth.user_credentials c ON c.user_id = u.id
+  WHERE u.phone = p_phone;
+$$;
+
+CREATE OR REPLACE FUNCTION app.auth_list_memberships(p_user_id uuid)
+RETURNS TABLE (
+  tenant_id uuid, tenant_name text, role_ids uuid[], branch_ids uuid[], status text
+)
+LANGUAGE sql SECURITY DEFINER
+SET search_path = app, pg_temp
+AS $$
+  SELECT m.tenant_id, t.name, m.role_ids, m.branch_ids, m.status
+  FROM app.memberships m
+  JOIN app.tenants t ON t.id = m.tenant_id
+  WHERE m.user_id = p_user_id AND m.status = 'active';
+$$;
+
+CREATE OR REPLACE FUNCTION app.list_active_tenant_ids()
+RETURNS SETOF uuid
+LANGUAGE sql SECURITY DEFINER
+SET search_path = app, pg_temp
+AS $$
+  SELECT tenant_id FROM app.subscriptions WHERE status IN ('trial','active','grace','restricted');
+$$;
+
+CREATE OR REPLACE FUNCTION app.billing_tenant_by_payment(p_provider text, p_provider_tx_id text)
+RETURNS TABLE (tenant_id uuid, payment_id uuid, status text)
+LANGUAGE sql SECURITY DEFINER
+SET search_path = app, pg_temp
+AS $$
+  SELECT tenant_id, id, status
+  FROM app.billing_payments
+  WHERE provider = p_provider AND provider_tx_id = p_provider_tx_id;
+$$;
+
+-- *(2026-10-15: qabul-6 — DB-30)* tenant kontekstisiz kiruvchi so'rovlar uchun (do'kon to'lov webhook'lari, billing
+-- javob yo'li, ochiq hisob-varaq havolasi) — xuddi billing_tenant_by_payment naqshi bilan.
+CREATE OR REPLACE FUNCTION app.payments_checkout_by_provider_tx(p_provider text, p_provider_tx_id text)
+RETURNS TABLE (tenant_id uuid, checkout_ref uuid, status text) LANGUAGE sql SECURITY DEFINER
+SET search_path = app, pg_temp AS $$
+  SELECT tenant_id, checkout_ref, status FROM app.payment_checkouts
+  WHERE provider = p_provider AND provider_tx_id = p_provider_tx_id;
+$$;
+
+CREATE OR REPLACE FUNCTION app.payments_checkout_by_ref(p_checkout_ref uuid)
+RETURNS TABLE (tenant_id uuid, provider text, status text, amount numeric) LANGUAGE sql SECURITY DEFINER
+SET search_path = app, pg_temp AS $$
+  SELECT tenant_id, provider, status, amount FROM app.payment_checkouts WHERE checkout_ref = p_checkout_ref;
+$$;
+
+CREATE OR REPLACE FUNCTION app.billing_payment_by_id(p_payment_id uuid)
+RETURNS TABLE (tenant_id uuid, status text, amount numeric) LANGUAGE sql SECURITY DEFINER
+SET search_path = app, pg_temp AS $$
+  SELECT tenant_id, status, amount FROM app.billing_payments WHERE id = p_payment_id;
+$$;
+
+CREATE OR REPLACE FUNCTION app.public_statement_by_token(p_token_hash text)
+RETURNS TABLE (tenant_id uuid, counterparty_id uuid, expires_at timestamptz) LANGUAGE sql SECURITY DEFINER
+SET search_path = app, pg_temp AS $$
+  SELECT tenant_id, counterparty_id, expires_at FROM app.counterparty_statement_links
+  WHERE token_hash = p_token_hash AND revoked_at IS NULL AND expires_at > now();
+$$;
+
+ALTER FUNCTION app.auth_find_user_by_phone(text) OWNER TO erp_system;
+ALTER FUNCTION app.auth_list_memberships(uuid) OWNER TO erp_system;
+ALTER FUNCTION app.list_active_tenant_ids() OWNER TO erp_system;
+ALTER FUNCTION app.billing_tenant_by_payment(text, text) OWNER TO erp_system;
+ALTER FUNCTION app.payments_checkout_by_provider_tx(text, text) OWNER TO erp_system;
+ALTER FUNCTION app.payments_checkout_by_ref(uuid) OWNER TO erp_system;
+ALTER FUNCTION app.billing_payment_by_id(uuid) OWNER TO erp_system;
+ALTER FUNCTION app.public_statement_by_token(text) OWNER TO erp_system;
+
+REVOKE ALL ON FUNCTION app.auth_find_user_by_phone(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_list_memberships(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.list_active_tenant_ids() FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.billing_tenant_by_payment(text, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.payments_checkout_by_provider_tx(text, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.payments_checkout_by_ref(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.billing_payment_by_id(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.public_statement_by_token(text) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION app.auth_find_user_by_phone(text) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_list_memberships(uuid) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.list_active_tenant_ids() TO erp_app;
+GRANT EXECUTE ON FUNCTION app.billing_tenant_by_payment(text, text) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.payments_checkout_by_provider_tx(text, text) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.payments_checkout_by_ref(uuid) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.billing_payment_by_id(uuid) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.public_statement_by_token(text) TO erp_app;
+```
+Telegram ulash kodi (13-3 #66) — DB emas, Redis `tg_link:{code}` (TTL 10 daqiqa) *(2026-10-15: qabul-6 — DB-30)*.
+
+`14-autentifikatsiya-oauth2.md` §19'da nomlangan qo'shimcha `SECURITY DEFINER` funksiyalar (`auth_consume_code`, `auth_rotate_refresh`, `auth_revoke_tenant`, `auth_suspend_tenant`) — xuddi shu naqsh bilan (`erp_system` egaligida, `SET search_path = app, auth, pg_temp`), `auth.*` jadvallarni yozadi/o'qiydi; imzolari:
+
+```sql
+-- CREATE FUNCTION app.auth_consume_code(p_code_hash text) RETURNS TABLE (...);
+-- CREATE FUNCTION app.auth_rotate_refresh(p_token_hash text) RETURNS TABLE (...);
+-- CREATE FUNCTION app.auth_revoke_tenant(p_tenant_id uuid) RETURNS void;
+-- CREATE FUNCTION app.auth_suspend_tenant(p_tenant_id uuid) RETURNS void;
+```
+
+To'liq tanasi `auth` modulining ishga tushirish bosqichida yoziladi (bu — DB-sxema hujjati, auth-oqim logikasi `14-autentifikatsiya-oauth2.md`da).
+
+---
+
+## 5. Seed data
+
+### 5.1 Global (bir martalik, barcha tenantlar uchun umumiy)
+
+```sql
+INSERT INTO platform.units (code, is_fractional) VALUES
+  ('pcs', false), ('kg', true), ('l', true), ('m', true), ('box', false);
+
+INSERT INTO platform.plans (code, price_month, price_year, limits) VALUES
+  ('standard', 99000.00, 950400.00,   -- 950 400 = 99 000 × 12 × 0,8 (−20% yillik chegirma)
+   '{"included_cash_registers": 1, "ai_monthly_tokens": 200000}'::jsonb);
+   -- ai_monthly_tokens — taxmin, 05-mvp-chegarasi.md'da yakunlanadi (01-model §2 izohi)
+
+INSERT INTO platform.addons (code, name, price_month) VALUES
+  ('extra_register', 'Qo''shimcha virtual kassa', 39000.00);
+
+-- *(2026-10-15: qabul-6 — DB-27)* kamida bitta standart yorliq shabloni
+INSERT INTO platform.label_templates (code, name, width_mm, height_mm, fields) VALUES
+  ('58x40_price', '58×40 narx yorlig''i', 58.00, 40.00,
+   '{"fields": ["product_name", "price", "barcode"]}'::jsonb);
+
+INSERT INTO platform.oauth_clients (client_id, client_type, name, allowed_grant_types, allowed_scopes) VALUES
+  ('web-bff',      'confidential', 'Veb BFF (back-office + veb-kassa)', ARRAY['authorization_code','refresh_token'], ARRAY['*']),
+  ('admin-bff',    'confidential', 'Platforma admin BFF',               ARRAY['authorization_code','refresh_token'], ARRAY['platform.admin']),
+  ('android-pos',  'public',       'Android POS',                       ARRAY['authorization_code','refresh_token'], ARRAY['*','sync','pos']),
+  ('telegram-bot', 'confidential', 'Telegram bot',                      ARRAY['client_credentials'],                 ARRAY['bot.internal']);
+-- client_secret_encrypted — deploy vaqtida KEK orqali to'ldiriladi (05-xavfsizlik §4.2), bu yerda bo'sh qoldiriladi
+
+-- signing_keys — haqiqiy kalit juftligi deploy skriptida (joserfc) generatsiya qilinadi, DB'ga faqat natija yoziladi:
+-- INSERT INTO platform.signing_keys (algorithm, purpose, public_key, private_key_encrypted, status, activated_at)
+--   VALUES ('EdDSA', 'access', :pub, :enc_priv, 'active', now());
+-- INSERT INTO platform.signing_keys (algorithm, purpose, public_key, private_key_encrypted, status, activated_at)
+--   VALUES ('EdDSA', 'license', :pub2, :enc_priv2, 'active', now());
+```
+
+### 5.2 Tenant-provisioning shabloni (har ro'yxatdan o'tishda qo'llaniladi, global emas)
+
+`15-xavfsizlik-va-audit.md` §1.5: `roles`/`role_permissions`/`expense_categories`/`doc_sequences` **tenant-scoped** jadvallar — bular bir martalik global seed emas, balki **har signup tranzaksiyasida** ilova kodi tomonidan quyidagi shablon bo'yicha yaratiladi (aniqlashtirish #16). **Standart filial** — `branches.code='01'`; keyingi filiallar — keyingi bo'sh ikki xonali raqam (API'da ixtiyoriy kiritiladi) *(2026-10-15: qabul-6 — DB-02)*.
+
+```sql
+-- 5 standart rol (parametr :tenant_id)
+INSERT INTO app.roles (tenant_id, name, is_system, system_code) VALUES
+  (:tenant_id, 'Egasi',      true, 'owner'),
+  (:tenant_id, 'Menejer',    true, 'manager'),
+  (:tenant_id, 'Kassir',     true, 'cashier'),
+  (:tenant_id, 'Omborchi',   true, 'storekeeper'),
+  (:tenant_id, 'Buxgalter',  true, 'accountant');
+
+-- standart limitlar (05-xavfsizlik §2.3) — faqat Kassir rolига namuna; to'liq matritsa §2.2'dan ilova kodida yuklanadi
+INSERT INTO app.role_permissions (tenant_id, role_id, permission_code, limit_value) VALUES
+  (:tenant_id, :cashier_role_id, 'discount.give',    5.00),       -- foiz
+  (:tenant_id, :cashier_role_id, 'returns.approve',  100000.00),  -- so'm
+  (:tenant_id, :cashier_role_id, 'cash.withdraw',    50000.00),   -- so'm
+  (:tenant_id, :cashier_role_id, 'sales.void',       NULL);       -- limitsiz, audit bilan
+-- *(2026-10-15: asoschi qarori, Q1)* Egasi roli — barcha tenant ruxsatlarining supersetiga ega (sotuv/smena/
+-- qaytarish/buxgalteriya ko'rish ham kiradi), limitlar cheksiz; seed yuqoridagi namuna kabi har bir
+-- permission_code uchun (:tenant_id, :owner_role_id, <kod>, NULL) qatorlarini `15-xavfsizlik-va-audit.md` §2.1
+-- to'liq katalogidan generatsiya qiladi (ilova kodida, `platform.admin`dan tashqari) — to'liq matritsa §2.2'da.
+
+-- standart xarajat toifalari (09-backend §11, 27-backlog.md ro'yxati)
+INSERT INTO app.expense_categories (tenant_id, name, is_system) VALUES
+  (:tenant_id, 'Ijara', true), (:tenant_id, 'Kommunal', true), (:tenant_id, 'Ish haqi', true),
+  (:tenant_id, 'Transport', true), (:tenant_id, 'Soliq va yig''imlar', true),
+  (:tenant_id, 'Ta''mirlash', true), (:tenant_id, 'Boshqa', true);
+
+-- doc_sequences — birinchi hujjat yaratilganda ON CONFLICT bilan o'zi paydo bo'ladi (next_doc_number, 2.9-bo'lim),
+-- oldindan INSERT shart emas (ixtiyoriy, hisobot uchun 0-qatorlar kerak bo'lsa):
+-- INSERT INTO app.doc_sequences (tenant_id, branch_id, doc_type, year, next_value) VALUES (:tenant_id, :branch_id, 'K', :year, 1)
+--   ON CONFLICT DO NOTHING;
+```
+
+---
+
+## 6. Migratsiya tartibi va CI tekshiruvi
+
+### 6.1 Alembic revizion rejasi
+
+*(2026-10-15: qabul-6 — DB-32: to'liq qayta raqamlangan — yangi jadvallar/ustunlar uchun 0004–0006, 0010, 0016, 0021 qo'shildi, qolganlari shunga mos siljidi.)*
+
+| № | Revizion | Mazmuni |
+|---|---|---|
+| 0001 | `extensions_roles_schemas` | Sxemalar, kengaytmalar, rollar, `app.uuidv7()`, `app.set_updated_at()`, `app.forbid_mutation()` |
+| 0002 | `core_tenant_user` | `tenants`, `users`, `branches` (**+`code`**, DB-02), `branch_tax_settings`, `warehouses`, `cash_registers` (**+`ofd_status` CHECK**, DB-33), `devices`, `memberships`, `roles`, `role_permissions` |
+| 0003 | `auth_schema` | `auth.*` (6 jadval, **+`otp_challenges.channel`** — asoschi qarori Q7) + ularning `app.users`/`tenants`/`devices`ga FK'lari, `app.license_tokens`, **`app.user_identities`** (Google OIDC bog'lash, Q7) |
+| 0004 | `label_templates` | **YANGI** — `platform.label_templates` (DB-27) |
+| 0005 | `valuation_method_history` | **YANGI** — `app.valuation_method_history` (DB-26) |
+| 0006 | `counterparty_statement_links` | **YANGI** — `app.counterparty_statement_links` (DB-28) |
+| 0007 | `platform_global` | `platform.plans`, `addons`, `units`, `oauth_clients`, `signing_keys`, `platform_admins` + `app.subscriptions`, `tenant_addons`, `billing_payments` (**+ davr/kvitansiya ustunlari**, DB-18), `tenant_tax_regimes` |
+| 0008 | `catalog_pricing` | `product_categories`, `products` (**`mxik_code` endi NULL**, DB-23; **+`name_ru` nullable — asoschi qarori Q2**), `product_barcodes`, `product_prices`, `label_print_queue`, `internal_barcode_seq`, `discount_rules` |
+| 0009 | `counterparties` | `counterparties` (**+`debt_due_date`**, qabul-7 B-01), `debt_doubtful_flags` |
+| 0010 | `approval_payment_infra` | **YANGI** — `approval_requests`, `doc_approvals`, `payment_checkouts` (DB-09/DB-10/DB-11) — `docs_sales`dan **oldin**, `sale_payments.checkout_ref` FK uchun |
+| 0011 | `docs_sales` | `shifts` (**to'liq qayta yozildi — `shift_no`/`variance`**, DB-07), `sales` (**+`is_offline`/`debt_limit_exceeded`**, DB-08), `sale_lines` (**+chegirma/QQS ustunlari**, DB-08), `sale_payments` (**+`due_date`/`checkout_ref`**, DB-08) |
+| 0012 | `docs_returns` | `returns` (**+smena/kassa/qaytarish usuli**, DB-03), `return_lines` (**+QQS/marking**, DB-03) |
+| 0013 | `docs_purchasing` | `purchase_orders` (**+`warehouse_id`**, DB-15), `po_lines` (**`price` endi ixtiyoriy**, DB-15), `goods_receipts` (**+`source`/`einvoice_id`/`ai_ocr_job_id`/`ettn_ref`/`poa_number`**, DB-06), `receipt_lines` (**+`vat_exemption_code`**, DB-06) |
+| 0014 | `docs_inventory` | `transfers` (**+`sent_at/by`, `received_at/by`**, DB-16), `transfer_lines` (**`lot_id` olib tashlandi, `lot_allocations` JSONB**, DB-16), `stock_counts`, `count_lines` (**`counted` endi NULL**, DB-25), `write_offs` (**+`responsible_user_id`**, DB-25), `write_off_lines`, `stock_openings`, `opening_lines` |
+| 0015 | `registers` | `stock_moves`, `stock_lots` (**`source_doc_type` ko'plik**, DB-33) (+ `supplier_returns` (**+`reason`**, DB-25) / `supplier_return_lines` endi yaratiladi), `avg_costs`, `stock_balances`, `debt_moves` (**+`limit_exceeded`**, qabul-7 B-01), `debt_balances`, `cash_moves` (**`method` CHECK + bank_account_id izohi**, DB-05), `ledger_entries` (**+`branch_id`**, DB-12), `vat_moves`; append-only `REVOKE`+trigger (3-bo'lim, **+`app.doc_approvals`**, DB-10) |
+| 0016 | `ledger_adjustments` | **YANGI** — `app.ledger_adjustments` (DB-12, doc_sequences kodi `BX`) |
+| 0017 | `docs_pricing_debts` | `price_changes`, `price_change_lines` (**+`valid_from`**, DB-25), `debt_openings` (**+`due_date`**, DB-24), `debt_payments` (**`method` to'liq ro'yxat + checkout/promise_date**, DB-04), `debt_payment_allocations`, `debt_writeoffs` (**+`reason`, `account_choice` default**, DB-24), `supplier_payments` (**+`cash_register_id`/`shift_id`**, DB-14), `supplier_payment_allocations` |
+| 0018 | `docs_expenses_cash` | `expense_categories` (**+`version`**, DB-33), `recurring_expenses` (**to'liq qayta yozildi**, DB-17), `attachments` (**+`content_type`/`original_name`/`sha256`/`kind` CHECK**, DB-22), `expenses`, `cash_movements`; shu revizionda `attachments` mavjud bo'lgach `ALTER TABLE billing_payments ADD CONSTRAINT fk_bp_invoice_attachment ...` (DB-18) |
+| 0019 | `doc_sequences` | `doc_sequences`, `app.next_doc_number()`; kod ro'yxatiga **`BX`=ledger_adjustments** (DB-12) |
+| 0020 | `fiscal_marking_edocs` | `fiscal_receipts` (**to'liq qayta yozildi — `kind`, z_report**, DB-01; **+`debt_settlement`, `debt_payment_id`, `cash_register_id`/`shift_id` nullable — asoschi qarori Q3**), `marking_codes` (**takror unique indeks olib tashlandi**, DB-33), `einvoices` (**status CHECK + summalar + `uq_einvoice_out_per_doc`**, DB-21), `ettn_documents`, `state_reports` (**+solishtirish ustunlari**, DB-20), `state_report_diffs`; shu revizionda `einvoices` mavjud bo'lgach `fk_gr_einvoice` (DB-06) |
+| 0021 | `ai_ocr_jobs` | **YANGI** — `app.ai_ocr_jobs` (DB-13, Q4) + `fk_gr_ocr_job` (`goods_receipts.ai_ocr_job_id` → `ai_ocr_jobs.id`) |
+| 0022 | `integration_sync` | `outbox_jobs` (**+`report_export`/`label_pdf` kind, job-progress ustunlari**, DB-19), `sync_receipts`, `idempotency_keys`, `recost_jobs`, `import_jobs` (**holatlar + `result`**, DB-29) |
+| 0023 | `notifications_ai` | `telegram_links`, `notification_settings`, `notifications_log`, `ai_requests`, `ai_training_samples`, `ai_feedback`, `tenant_glossary` |
+| 0024 | `audit_periods` | `audit_log`, `period_closings` |
+| 0025 | `updated_at_triggers` | 2.10-bo'limdagi `DO` bloki |
+| 0026 | `rls_policies` | 4.2–4.4-bo'limlardagi `DO` bloki + maxsus siyosatlar + GRANT/REVOKE (**+`platform.label_templates` GRANT**, DB-27) |
+| 0027 | `security_definer_functions` | 4.5-bo'limdagi 4 funksiya + `auth_consume_code`/`auth_rotate_refresh`/`auth_revoke_tenant`/`auth_suspend_tenant` + **4 yangi** (`payments_checkout_by_provider_tx`, `payments_checkout_by_ref`, `billing_payment_by_id`, `public_statement_by_token`, DB-30) — jami 12 |
+
+Seed (5-bo'lim) — **Alembic revizion emas** (`23-backend-arxitekturasi.md` §11: "bazani versiyalash bilan aralashtirmaslik uchun"), `migrate` konteyneridan keyin alohida `scripts/seed.py` bosqichi, faqat 5.1 (global) qismini bir marta ishga tushiradi; 5.2 (tenant-provisioning) — har signup'da ilova kodi tomonidan.
+
+> Diqqat: yuqoridagi tartib 2-bo'limning **o'qish tartibidan** farq qiladi (masalan `supplier_returns`/`supplier_return_lines` 2-bo'limda purchasing ostida ko'rsatilgan, lekin `stock_lots`ga FK'i borligi sababli 0015-revizionda, registrlardan keyin yaratiladi). Bu — FK bog'liqligini hal qilish uchun zarur qayta tartiblash, 01-model mazmuniga ta'sir qilmaydi.
+
+### 6.2 CI tekshiruvi — RLS'siz jadvallar
+
+```sql
+WITH exempt AS (
+  SELECT unnest(ARRAY[
+    'platform.plans', 'platform.addons', 'platform.units',
+    'platform.oauth_clients', 'platform.signing_keys', 'platform.platform_admins',
+    'platform.label_templates',   -- *(2026-10-15: qabul-6 — DB-27)*
+    'auth.user_credentials', 'auth.otp_challenges', 'auth.login_attempts',
+    'auth.authorization_codes', 'auth.refresh_tokens', 'auth.sessions'
+  ]) AS qualified_name
+)
+SELECT
+  n.nspname || '.' || c.relname AS table_name,
+  c.relrowsecurity   AS rls_enabled,
+  c.relforcerowsecurity AS rls_forced,
+  COALESCE(p.policy_count, 0) AS policy_count
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+LEFT JOIN (
+  SELECT polrelid, COUNT(*) AS policy_count FROM pg_policy GROUP BY polrelid
+) p ON p.polrelid = c.oid
+WHERE n.nspname IN ('app', 'auth', 'platform')
+  AND c.relkind = 'r'
+  AND (n.nspname || '.' || c.relname) NOT IN (SELECT qualified_name FROM exempt)
+  AND (NOT c.relrowsecurity OR NOT c.relforcerowsecurity OR COALESCE(p.policy_count, 0) = 0);
+-- bo'sh natija = yashil. Har bir qaytgan qator — CI'ni qizil qiladi.
+```
+
+Qo'shimcha, `auth`-sxema istisnosini tasdiqlovchi tekshiruv (`15-xavfsizlik-va-audit.md` §3.3):
+
+```sql
+-- erp_app auth.*ga hech qanday GRANT'ga ega bo'lmasligi shart (bo'sh natija kutiladi)
+SELECT table_schema, table_name, privilege_type
+FROM information_schema.table_privileges
+WHERE grantee = 'erp_app' AND table_schema = 'auth';
+
+-- talab qilinadigan SECURITY DEFINER funksiyalar mavjudligi
+SELECT p.proname
+FROM pg_proc p
+JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = 'app' AND p.prosecdef
+  AND p.proname IN ('auth_find_user_by_phone','auth_list_memberships',
+                     'list_active_tenant_ids','billing_tenant_by_payment',
+                     'auth_consume_code','auth_rotate_refresh',
+                     'auth_revoke_tenant','auth_suspend_tenant',
+                     'payments_checkout_by_provider_tx','payments_checkout_by_ref',
+                     'billing_payment_by_id','public_statement_by_token');
+-- *(2026-10-15: qabul-6 — DB-30)* 12 qator qaytishi shart; kamroq bo'lsa CI qizil.
+```
+
+---
+
+## 7. 01 bilan farqlar / aniqlashtirishlar
+
+11-malumotlar-modeli.md jadval/ustun nomlarini o'zgartirmagan holda, DDL yozish uchun quyidagi aniq qarorlar qabul qilindi (01 tahrirlanmadi):
+
+1. **UUID generatsiyasi**: ilova tomonida (offline-first talabi, §1.2), DB `DEFAULT app.uuidv7()` — faqat zaxira.
+2. **`stock_lots`/`avg_costs`/`stock_balances`/`debt_balances`ning append-only emasligi**: 01 §7 ularni "Registrlar (append-only)" sarlavhasi ostida bersa ham, bular jismoniy mutatsiya qilinadigan balans-keshlari; haqiqiy append-only — `stock_moves`/`debt_moves`/`cash_moves`/`ledger_entries`/`vat_moves` (3-bo'lim).
+3. **`stock_lots.receipt_line_id`ning umumlashtirilishi**: 01 faqat `receipt_line_id`ni ko'rsatadi, lekin `stock_openings`/`transfers` ham yangi partiya yaratadi (goods_receipt'siz). Shuning uchun `receipt_line_id` (faqat kirim uchun, nullable) ustiga `source_doc_type`/`source_doc_id`/`source_line_id` polimorfik ustunlari qo'shildi.
+4. **Sxema taqsimoti** (`app`/`auth`/`platform`): 01'da umuman yo'q — bu hujjat tomonidan kiritildi, `15-xavfsizlik-va-audit.md` §3.3/§19'dagi RLS istisnolari mantiqiga mos ravishda.
+5. **Hisob-kitob ustunlarining aniq `NUMERIC` kategoriyasi**: 01 faqat uchta umumiy kategoriya beradi (pul/miqdor/narx-tannarx); har bir aniq ustun (masalan `sale_lines.price` → narx 18,4; `sale_lines.line_total` → pul 18,2; `sale_lines.cost_amount` → pul 18,2, chunki bu qatorning **jami** tannarxi, birlik tannarxi emas) shu uchta toifaga ushbu hujjat tomonidan taqsimlangan.
+6. **`role_permissions.limit_value` birligi**: 01 aniqlashtirmaydi (foiz yoki summa) — bu hujjat yagona `NUMERIC(18,4)` ustunni tanladi, ma'no `permission_code` konvensiyasi orqali aniqlanadi (masalan `discount.give` = foiz, `cash.withdraw` = so'm); alohida `limit_unit` ustuni **qo'shilmadi** (ilova darajasida kod-konstanta sifatida saqlanadi).
+7. **`discount_rules.value`**: xuddi shunday, `kind='percent'` bo'lsa foiz, aks holda summa — bitta `NUMERIC(18,4)` ustun.
+8. **`products.vat_rate`**: 01 "12/0/imtiyoz kodi" deydi — bitta ustunda son va kod aralashishi mumkin emas, shuning uchun `vat_rate NUMERIC(5,2) NULL` + `vat_exemption_code TEXT NULL` ikkiga ajratildi (`CHECK` — kamida bittasi to'ldirilgan bo'lishi shart).
+9. **`goods_receipts.paid_immediately`**: 01'da yo'q, lekin `13-provodka-qoidalari.md` §2.6/§2.8 ikki xil provodka yo'li (nasiyaga / darhol to'langan) borligini aytadi — bu bayroq shu tanlovni saqlash uchun qo'shildi.
+10. **`sales.total_amount`**: 01'da yo'q, tezkor o'qish/hisobot uchun hisoblangan ustun sifatida qo'shildi (qatorlar yig'indisidan posting vaqtida to'ldiriladi, manba emas).
+11. **`debt_payment_allocations`/`supplier_payment_allocations`**: 01 faqat "`allocations` (qaysi qarzni yopdi)" deydi, alohida jadval nomini bermaydi — polimorfik `target_doc_type`/`target_doc_id` naqshi bilan modellashtirildi (registrlardagi `doc_type`/`doc_id` naqshiga mos).
+12. **`doc_sequences.doc_type` kodlari**: 01 faqat `K-01-2026-000154` namunasini beradi, to'liq kod jadvalini bermaydi — 2.9-bo'limda taklif qilingan ro'yxat shu hujjat tomonidan qo'shildi (buxgalter/mahsulot jamoasi bilan tasdiqlanishi tavsiya etiladi).
+13. **Global seed vs tenant-provisioning**: 01 `roles`/`role_permissions`/`expense_categories`/`doc_sequences`ni "seed" sifatida tilga oladi, lekin bu jadvallar `tenant_id NOT NULL` — demak **global** bir martalik seed emas, balki `15-xavfsizlik-va-audit.md` §1.5'dagi tenant-provisioning tranzaksiyasining bir qismi (5.2-bo'lim shu farqni aniq ajratadi).
+14. **`marking_codes` ↔ `sale_lines.marking_code` FK**: 01'da bu bog'lanish aniq FK sifatida ko'rsatilmagan — `(tenant_id, code)` composite UNIQUE + `DEFERRABLE` FK qo'shildi (chek va kod bir xil tranzaksiyada, lekin ikkisining yozilish tartibi ilova mantiqiga bog'liq bo'lishi mumkin, shuning uchun kechiktirilgan tekshiruv).
+15. **`shifts`ning umumiy hujjat sarlavhasidan mustasnoligi**: 01 §11 (raqamlash) shiftlarga `number` berilishini aytmaydi — shuning uchun `shifts` boshqa hujjatlardan farqli, `number`/`temp_number`siz maxsus sarlavha oldi.
+16. **`branch_tax_settings`/`tenant_tax_regimes.created_by`**: 01'da yo'q, audit izlanishi uchun qo'shildi (boshqa barcha hujjat/ma'lumotnoma yozuvlarida bor konvensiyaga moslashtirildi).
+17. **Qabul-6/7 aniqlashtirishlari (2026-10-15)**: `tarix/tekshiruv/qabul-6-api-db.md` DB-01…DB-33 va `tarix/tekshiruv/qabul-7-ekran-api.md` B-01 bo'yicha barcha jadval/ustun o'zgarishlari yuqorida inline `*(2026-10-15: qabul-6)*`/`*(qabul-7)*` belgisi bilan kiritildi (Z-hisobot, `branches.code`, `returns`/`debt_payments`/`shifts` ustunlari, 9 yangi jadval, 4 yangi `SECURITY DEFINER` funksiya va boshqalar — qisqacha ro'yxat qabul-6 "Asosiy xulosalar" 4-bandida). 11-malumotlar-modeli.md shu ro'yxat bilan **izchil** yangilandi (bir xil teg bilan).
+
+---
+
+## Yakuniy eslatma
+
+Bu hujjat — `11-malumotlar-modeli.md`ning DDL proyeksiyasi; 01 o'zi o'zgarmadi. Buxgalteriya hisob raqamlari (`account_dt`/`account_kt` qiymatlari) `13-provodka-qoidalari.md` boshidagi ogohlantirishga ko'ra **buxgalter tomonidan rasmiy manba bilan tasdiqlanishi shart** — bu hujjat ularni `TEXT` ustun sifatida saqlaydi, raqamlarning to'g'riligini tekshirmaydi (ilova darajasidagi konstanta ro'yxati orqali).
+

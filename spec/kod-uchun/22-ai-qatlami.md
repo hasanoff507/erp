@@ -9,8 +9,8 @@
 
 1. **AI — chekka qatlam, ajratilgan interfeys orqali**: butun backend `AiProvider` porti (Python `Protocol`: `complete`, `complete_structured`, `vision_extract`) bilan ishlaydi; adapter — `fake` (test), `cli` (faqat dev/demo, Anthropic qoidasi bo'yicha obuna mahsulot ichida ishlatilmaydi), `api` (production, rasmiy `anthropic` Python SDK) — `10-umumiy-arxitektura.md`, `09-ai-funksiyalar.md` 5-bo'lim.
 2. **Model routing**: oddiy tushuntirish/matn (AI-01 standart, AI-06) — **Claude Haiku 5.5** ($0,10–0,50 kirish / $0,50–2,50 chiqish, 1M tok); murakkab ko'p hujjatli tahlil (AI-05, AI-01'ning ko'p-modulli holati) — **Claude Sonnet 5.5** ($2/$10, Sonnet 5 bilan bir xil narx) — narxlar `research_notes/texnik/05-ozbek-tilidagi-ai.md` 2.2-bo'limidan, claude.com/pricing (2026-10-14 holati).
-3. **"Kod hisoblaydi, AI tushuntiradi" kod darajasida majburlanadi**, prompt qoidasi bilan emas: AI-01 faqat oldindan ro'yxatlangan (whitelisted) o'qish-uchun-tool'larni chaqiradi (hech qachon erkin SQL yozmaydi), tool natijasi kod tomonidan SQL orqali hisoblanadi; javob matni chiqqandan keyin **raqamli nazorat (numeric guard)** har bir raqamni tool natijasi bilan solishtiradi — `universal_ai_platform`dagi `narration_guard.py`ning moslashtirilgan versiyasi.
-4. **universal_ai_platform'dan ko'chiriladi**: port naqshi (`claude_port.py`/`text_completion_port.py` → `AiProvider`), CLI adapterining himoyalari (timeout, retry+backoff, circuit breaker — `cli_claude.py`), token/xarajat hisob-kitob modeli (`usage.py`), DI'dagi rejim almashtirish naqshi (`di_builders.py`), readiness tekshiruvi naqshi (`health_service.py`). Transport ERP'da **API kalit** orqali bo'ladi (CLI faqat dev/demo), lekin bu qatlamlarning tuzilishi saqlanadi.
+3. **"Kod hisoblaydi, AI tushuntiradi" kod darajasida majburlanadi**, prompt qoidasi bilan emas: AI-01 faqat oldindan ro'yxatlangan (whitelisted) o'qish-uchun-tool'larni chaqiradi (hech qachon erkin SQL yozmaydi), tool natijasi kod tomonidan SQL orqali hisoblanadi; javob matni chiqqandan keyin **raqamli nazorat (`numeric_guard`)** har bir raqamni tool natijasi bilan solishtiradi.
+4. **Qatlam standartlari**: port naqshi (`AiProvider`), CLI/API adapterining himoyalari (timeout, retry+backoff, circuit breaker), token/xarajat hisob-kitob modeli, DI'dagi rejim almashtirish naqshi (`fake | cli | api`), readiness tekshiruvi naqshi (gating vs reported). Transport ERP'da **API kalit** orqali bo'ladi (CLI faqat dev/demo).
 5. **Xarajat — tarif narxining kichik ulushi** (yagona 99 000 so'm/oy tarifga nisbatan): taxminiy hisob-kitobga ko'ra (13-bo'lim) yengil tenant uchun ~700–800 so'm/oy (~0,7%), og'ir tenant uchun ~15–16 ming so'm/oy (~15,7%) — yagona tarif narxining (99 000 so'm) ~0,7–15,7%i oralig'ida, foydalanish darajasiga qarab; aniq raqam pilotda tasdiqlanishi shart (barcha hajm/token taxminlari **taxmin**, manbada yo'q).
 6. **Maxfiylik**: biometrik/genetik/telekom ma'lumotdan tashqari hamma narsa (mijoz ismi, tranzaksiya matni) xavfsizlik talablariga rioya qilgan holda chet el API'ga (Claude) yuborilishi mumkin (`research_notes/texnik/05-ozbek-tilidagi-ai.md`, 1.3-bo'lim); shunga qaramay, minimal ma'lumot yuborish, PII mask qilish imkoniyati va **o'qitish uchun mijoz ma'lumotidan aniq rozilik (consent) siz foydalanilmasligi** majburiy qoida sifatida belgilanadi.
 7. **Baholash o'zbek tili uchun rasmiy benchmark yo'qligi sababli to'liq ichki**: har funksiya uchun 50–100 taxminiy holatli eval to'plam (lotin/kirill/rus aralash), CI'da regression gate, pilot davrida haqiqiy o'lchov — bu hujjatning markaziy yangiligi, chunki `09-ai-funksiyalar.md`da faqat "pilot kerak" deyilgan, usul ko'rsatilmagan.
@@ -20,7 +20,7 @@
 
 ## 1. `AiProvider` interfeysi
 
-Butun tizim AI bilan **bitta** portga murojaat qiladi — `AiProvider` (Python `Protocol`, `aios`dagi `ClaudePort`/`TextCompletionPort` naqshiga asoslangan, lekin ERP ehtiyojiga moslashtirilgan: raqamli tushuntirish, tuzilgan chiqish, vision). To'rt metod:
+Butun tizim AI bilan **bitta** portga murojaat qiladi — `AiProvider` (Python `Protocol`, ERP ehtiyojiga moslashtirilgan: raqamli tushuntirish, tuzilgan chiqish, vision). To'rt metod:
 
 | Metod | Imzo (konseptual) | Vazifa | Kim chaqiradi |
 |---|---|---|---|
@@ -29,7 +29,7 @@ Butun tizim AI bilan **bitta** portga murojaat qiladi — `AiProvider` (Python `
 | `vision_extract` | `vision_extract(image: bytes, schema: BaseModel, instructions, *, model=None) -> BaseModel` | Rasmdan tuzilgan maydon chiqarish, har maydon uchun ishonch (confidence) darajasi bilan | AI-03 (OCR) |
 | `submit_batch` | `submit_batch(items: list[AiBatchItem]) -> batch_id`; natija `get_batch_results(batch_id)` | Shoshilinch bo'lmagan so'rovlarni Batch API orqali (−50% narx); `FakeProvider`/`CliProvider`da oddiy `complete`ga tushadi | AI-05, AI-06 (MVP'dan keyin, ixtiyoriy) |
 
-Qo'shimcha: har metod `AiRequestContext` (tenant_id, user_id, feature kodi `AI-01`…, til) qabul qiladi — bu `ai_requests` yozuviga va budjet/rate-limit tekshiruviga ishlatiladi (8-bo'lim). Xato holatlari bitta umumiy `AiProviderUnavailable` (yoki `aios`dagi `SourceUnavailable` naqshiga o'xshash) istisno orqali ko'tariladi — chaqiruvchi tomon (worker) buni "AI vaqtincha ishlamaydi" holatiga aylantiradi, foydalanuvchiga xato chiqmaydi, faqat AI javobi kutilmoqda/mavjud emas ko'rinadi.
+Qo'shimcha: har metod `AiRequestContext` (tenant_id, user_id, feature kodi `AI-01`…, til) qabul qiladi — bu `ai_requests` yozuviga va budjet/rate-limit tekshiruviga ishlatiladi (8-bo'lim). Xato holatlari bitta umumiy `AiProviderUnavailable` istisno orqali ko'tariladi — chaqiruvchi tomon (worker) buni "AI vaqtincha ishlamaydi" holatiga aylantiradi, foydalanuvchiga xato chiqmaydi, faqat AI javobi kutilmoqda/mavjud emas ko'rinadi.
 
 ### 1.1 Adapterlar
 
@@ -37,25 +37,21 @@ Qo'shimcha: har metod `AiRequestContext` (tenant_id, user_id, feature kodi `AI-0
 |---|---|---|
 | `FakeProvider` | test, CI | Deterministik, oldindan belgilangan javoblar; token/xarajat 0; eval suite va unit testlar shu bilan ishlaydi |
 | `CliProvider` | **faqat local/dev/demo** | `claude -p --output-format json` subprocess, dasturchi/demo operatorining shaxsiy obunasi orqali (`CLAUDE_CODE_OAUTH_TOKEN`). Hech qachon production tenant trafigini ko'tarmaydi (Anthropic shartlari, `09-ai-funksiyalar.md` 5-bo'lim) |
-| `AnthropicApiProvider` | **staging, production** | Rasmiy `anthropic` Python SDK, API kalit orqali. Streaming (`complete(stream=True)` uchun), prompt caching (takrorlanuvchi system prompt/tenant glossary qismini keshlab kirish narxini ~10x kamaytiradi — `usage.py`dagi `_CACHE_READ_MULT`/`_CACHE_WRITE_MULT` naqshiga mos), structured outputs (`complete_structured`), **Batch API** (−50% narx, shoshilinch bo'lmagan AI-05/AI-06 uchun, 9-bo'lim) |
+| `AnthropicApiProvider` | **staging, production** | Rasmiy `anthropic` Python SDK, API kalit orqali. Streaming (`complete(stream=True)` uchun), prompt caching (takrorlanuvchi system prompt/tenant glossary qismini keshlab kirish narxini ~10x kamaytiradi — kesh o'qish/yozish koeffitsientlariga mos), structured outputs (`complete_structured`), **Batch API** (−50% narx, shoshilinch bo'lmagan AI-05/AI-06 uchun, 9-bo'lim) |
 | `LocalModelProvider` | **kelajak** | Markaziy GPU serverda o'zimiz o'qitgan/moslashtirgan model; faqat sinov to'plamida sifat Claude'ga yaqinlashganda yoqiladi (`09-ai-funksiyalar.md` 5-bo'lim, "Lokal modelni o'zimiz o'qitish" qatori) |
 
 Muhit → rejim xaritasi (`10-umumiy-arxitektura.md`, 3-bo'lim bilan bir xil): local → `fake`/`cli`; staging → `api` (alohida kalit, past limit); production → faqat `api`.
 
-### 1.2 universal_ai_platform'dan ko'chiriladigan narsalar (nima va qanday)
+### 1.2 Qatlam naqshlari
 
-`E:/Project/universal_ai_platform/src/backend/aios` — boshqa B2B mahsulot, obuna+CLI orqali ishlaydi, u yerdan **kontseptual naqsh** ko'chiriladi, kod emas nusxalanadi (transport boshqa — API kalit):
+AI qatlamining standart naqshlari — ushbu loyihaning o'z arxitektura qarorlari:
 
-| Manba fayl | Nima ko'chiriladi | ERP'dagi joyi |
-|---|---|---|
-| `domain/ports/claude_port.py`, `domain/ports/text_completion_port.py` | Port-sifatida "AI aniq nima qila oladi" ni toraytirish (bu yerda: ikki emas, uch metod) — ilovaning qolgan qismi konkret provayderni bilmaydi | `AiProvider` (1-bo'lim) |
-| `infrastructure/claude/cli_claude.py` | (a) **isolyatsiya flaglari** naqshi — chaqiruv konteksti har doim minimal/tozalangan bo'lishi kerak (bu yerda: tenant ma'lumoti faqat kerakli qismi yuboriladi, 9-bo'lim); (b) **bounded retry + exponential backoff**; (c) **circuit breaker** (N marta ketma-ket xato → vaqtincha to'xtash, keyin bitta sinov) — ikkisi ham `AnthropicApiProvider` ichida saqlanadi | `AnthropicApiProvider`ning ichki xatolikka chidamlilik qatlami |
-| `domain/usage.py` | Token/xarajat modeli (`AiCallUsage`: input/output/cache token, `cli_cost_usd` vs `est_cost_usd`), narx jadvalidan USD hisoblash, **USD→UZS** konvertatsiya konfiguratsiyalanadigan kurs bilan, per-turn akkumulyator (`TurnUsage`, bir nechta AI chaqiruvi — masalan AI-01'da tool-chaqiruv + yakuniy javob — bitta so'rov sifatida yig'iladi) | `ai_requests` yozish mantiqi (8-bo'lim) |
-| `application/companion/narration_guard.py` | Deterministik tekshiruv naqshi: matndagi har bir raqamni ruxsat etilgan qiymatlar ro'yxati (fakt, foiz, davr sanasi, kichik son) bilan solishtirish, "boshqa bo'limga tegishli raqam" / "faktlarda yo'q raqam" turlariga ajratish, texnik token (identifikator, kalit nomi) sizib chiqishini aniqlash | Raqamli nazorat / `numeric_guard` (3-bo'lim) — bitta ko'p-bo'limli hisobotdan bitta savol-javobga soddalashtirilgan holatda |
-| `interface/di_builders.py` | `settings.claude_mode`ga qarab provayder tanlash (`_build_claude`), xizmatlarni (titler, extractor va h.k.) rejimga qarab moslashtirish naqshi | DI konteynerida `AiProvider` tanlovi (1.1-bo'lim jadvali) |
-| `infrastructure/observability/health_service.py` | **Gating vs reported** tekshiruv ajratish: asosiy xizmat (bu yerda — DB) tayyor bo'lmasa `/health/ready` 200 bermaydi, lekin tashqi/ixtiyoriy xizmat (bu yerda — AI, O'zbekistondagi `Redis`/manbaga o'xshab) faqat **hisobot** qilinadi, tayyorlikni bloklamaydi; CLI holatini tekshirish (credential bor-yo'qligi, versiya) — hech qachon pul to'lanadigan chaqiruv qilmasdan, keshlangan (60 soniya) | `GET /health/ready`'da `ai: ok/degraded/down` — 14-bo'lim |
-
-**Ko'chirilmaydigan narsa**: `aios`ning intent-JSON/semantic-intent protokoli, tool-chaqirmasdan "reason→respond" ikki bosqichli AI arxitekturasi va o'sha loyihaning tashqi ma'lumot manbasiga xos qatlami — bular ERP'ning "whitelisted tool + kod hisoblaydi" arxitekturasiga (3-bo'lim) to'g'ridan-to'g'ri mos kelmaydi, faqat yuqoridagi umumiy naqshlar foydali.
+- **Port naqshi**: "AI aniq nima qila oladi"ni toraytiruvchi yagona interfeys (uch metod: `complete`, `complete_structured`, `vision_extract`) — ilovaning qolgan qismi konkret provayderni bilmaydi (`AiProvider`, 1-bo'lim).
+- **CLI/API adapterining himoyalari**: (a) **isolyatsiya** — chaqiruv konteksti har doim minimal/tozalangan bo'ladi (tenant ma'lumoti faqat kerakli qismi yuboriladi, 9-bo'lim); (b) **bounded retry + exponential backoff**; (c) **circuit breaker** (N marta ketma-ket xato → vaqtincha to'xtash, keyin bitta sinov) — ikkisi ham `AnthropicApiProvider` ichida saqlanadi.
+- **Token/xarajat modeli**: `AiCallUsage` (input/output/cache token), narx jadvalidan USD hisoblash, **USD→UZS** konvertatsiya konfiguratsiyalanadigan kurs bilan, per-turn akkumulyator (`TurnUsage`, bir nechta AI chaqiruvi — masalan AI-01'da tool-chaqiruv + yakuniy javob — bitta so'rov sifatida yig'iladi) → `ai_requests` yozish mantiqi (8-bo'lim).
+- **DI rejim almashtirish**: muhitga qarab provayder tanlash (`fake | cli | api`), xizmatlarni (titler, extractor va h.k.) rejimga qarab moslashtirish naqshi — DI konteynerida `AiProvider` tanlovi (1.1-bo'lim jadvali).
+- **Readiness: gating vs reported**: asosiy xizmat (DB) tayyor bo'lmasa `/health/ready` 200 bermaydi, lekin tashqi/ixtiyoriy xizmat (AI, Redis) faqat **hisobot** qilinadi, tayyorlikni bloklamaydi; CLI holatini tekshirish (credential bor-yo'qligi, versiya) — hech qachon pul to'lanadigan chaqiruv qilmasdan, keshlangan (60 soniya) → `GET /health/ready`'da `ai: ok/degraded/down` — 14-bo'lim.
+- **Raqamli nazorat (`numeric_guard`)**: deterministik tekshiruv — matndagi har bir raqamni ruxsat etilgan qiymatlar ro'yxati (fakt, foiz, davr sanasi, kichik son) bilan solishtirish, "boshqa bo'limga tegishli raqam" / "faktlarda yo'q raqam" turlariga ajratish, texnik token (identifikator, kalit nomi) sizib chiqishini aniqlash (3-bo'lim).
 
 ---
 
@@ -100,7 +96,7 @@ Qoidalar:
 
 ### 3.2 Raqamli nazorat (numeric guard)
 
-Ikkinchi chaqiruv natijasi chiqqandan keyin, foydalanuvchiga ko'rsatilishidan **oldin**, deterministik tekshiruv (`narration_guard.py`dan moslashtirilgan, 1.2-bo'lim) ishga tushadi:
+Ikkinchi chaqiruv natijasi chiqqandan keyin, foydalanuvchiga ko'rsatilishidan **oldin**, deterministik tekshiruv (`numeric_guard`, 1.2-bo'lim) ishga tushadi:
 1. Javob matnidagi har bir sonni ajratib oladi (turli yozilish: bo'sh joy/nuqta/vergul bilan guruhlangan, o'nlik vergul, "ming"/"mln" kabi so'z bilan masshtablangan).
 2. Har sonni tool natijasidagi qiymatlar, davr sanasi qismlari va kichik sanoq sonlar (0..N) ro'yxati bilan solishtiradi (yaqinlashtirish — ko'rsatilgan o'nlik aniqlikka yaxlitlab).
 3. Mos kelmagan son topilsa: so'rov **bir marta** tuzatish ko'rsatmasi bilan qayta yuboriladi ("faqat quyidagi raqamlardan foydalan: …"); ikkinchi marta ham mos kelmasa, AI matni bostiriladi va foydalanuvchiga faqat kod hisoblagan raqam/jadval (AI izohisiz) ko'rsatiladi — `ai_requests.status = 'guard_failed'` deb belgilanadi, monitoring uchun hisoblanadi (14-bo'lim).
@@ -130,19 +126,19 @@ Aniq raqam — **taxmin**, 10-bo'limdagi xarajat hisob-kitobiga asoslangan va un
 
 - Hisoblash: har `ai_requests` yozuvidagi `input_tokens + output_tokens` joriy oy bo'yicha tenant kesimida yig'iladi (Redis'da tez sanoq — kunlik/oylik kalit, davr oxirida 0'ga tushadi, PostgreSQL `ai_requests`'dan tasdiqlanadi).
 - **Limit tugaganda — qattiq to'xtatish, overage yo'q**: AI so'rovlari **hard-stop** qilinadi — foydalanuvchiga "bu oy uchun AI limiti tugadi, keyingi oyda tiklanadi" ko'rsatiladi, kassa/ombor/buxgalteriya **to'liq ishlayveradi** (`10-umumiy-arxitektura.md`, Asosiy xulosa #8). Qo'shimcha avtomatik to'lov (overage) **yo'q** — mayda summalarni Click/Payme orqali yechish komissiya, support savollari va murakkablik keltiradi, AI xarajati esa tarifning atigi ~1,5–6%i (13-bo'lim). Yagona tarif modelida "tarifni oshirish" taklifi yo'q (bir xil tarif hammaga). **Oldindan to'lanadigan AI paket** — faqat **pilotdan keyin**, agar tenantlarning **≥10%i** oylik limitga urilsa, qo'shimcha xizmat (`addons` katalogi, `11-malumotlar-modeli.md` §2) sifatida qo'shiladi. Limit qiymatlari (5-bo'lim) shu sababli biroz kengroq qo'yiladi, oshirib yuborish ehtimolini kamaytirish uchun.
-- **Rate limit**: Redis asosidagi tenant-kesimidagi daqiqalik chegara (`aios`dagi `RedisRateLimiter` naqshiga mos) — bitta tenant barcha boshqalarning navbatini band qilib qo'ymasligi uchun (worker navbat orqali ishlaganidan tashqari qo'shimcha himoya).
-- **Graceful degradation** (Claude API ishlamay qolganda — timeout, 5xx, circuit breaker ochiq): worker `outbox_jobs` (`kind='ai'`) qayta urinadi (backoff bilan, `cli_claude.py`dagi retry naqshiga mos); bir necha urinishdan keyin ham muvaffaqiyatsiz bo'lsa — AI-01 so'rovi uchun foydalanuvchiga "AI hozir javob bera olmayapti, keyinroq urinib ko'ring" xabari, AI-05/AI-06 uchun ko'rsatma/eslatma **AI matnisiz, faqat kod raqami** bilan ko'rsatiladi (masalan AI-06: eslatma shabloni + summa, tayyor matn o'rniga). Bu holatlar `ai_requests.status='failed'` bilan loglanadi.
+- **Rate limit**: Redis asosidagi tenant-kesimidagi daqiqalik chegara — bitta tenant barcha boshqalarning navbatini band qilib qo'ymasligi uchun (worker navbat orqali ishlaganidan tashqari qo'shimcha himoya).
+- **Graceful degradation** (Claude API ishlamay qolganda — timeout, 5xx, circuit breaker ochiq): worker `outbox_jobs` (`kind='ai'`) qayta urinadi (backoff bilan); bir necha urinishdan keyin ham muvaffaqiyatsiz bo'lsa — AI-01 so'rovi uchun foydalanuvchiga "AI hozir javob bera olmayapti, keyinroq urinib ko'ring" xabari, AI-05/AI-06 uchun ko'rsatma/eslatma **AI matnisiz, faqat kod raqami** bilan ko'rsatiladi (masalan AI-06: eslatma shabloni + summa, tayyor matn o'rniga). Bu holatlar `ai_requests.status='failed'` bilan loglanadi.
 
 ---
 
 ## 6. Xarajat hisobi (`ai_requests`, USD→UZS)
 
-Har AI chaqiruvi (`usage.py`dagi `AiCallUsage` naqshiga mos) quyidagicha `ai_requests`ga yoziladi (maydonlar `11-malumotlar-modeli.md` 10-bo'limda: `tenant_id, user_id, feature, model, prompt_version, input_tokens, output_tokens, cache_read_tokens, cost_usd, fx_rate_used, cost_uzs, latency_ms, guard_result, status`):
+Har AI chaqiruvi (`AiCallUsage` modeliga mos) quyidagicha `ai_requests`ga yoziladi (maydonlar `11-malumotlar-modeli.md` 10-bo'limda: `tenant_id, user_id, feature, model, prompt_version, input_tokens, output_tokens, cache_read_tokens, cost_usd, fx_rate_used, cost_uzs, latency_ms, guard_result, status`):
 
 1. Claude API javobi `usage.input_tokens`, `usage.output_tokens` (va kesh bo'lsa `cache_read_input_tokens`/`cache_creation_input_tokens`) qaytaradi.
-2. `cost_usd = (input_tokens × price_in + output_tokens × price_out) / 1_000_000` — narx jadvali model nomiga qarab (2-bo'lim narxlari), kesh o'qish ~0,1×, kesh yozish ~1,25× kirish narxida hisoblanadi (`usage.py`dagi `_CACHE_READ_MULT`/`_CACHE_WRITE_MULT` konstantalariga mos nisbat).
+2. `cost_usd = (input_tokens × price_in + output_tokens × price_out) / 1_000_000` — narx jadvali model nomiga qarab (2-bo'lim narxlari), kesh o'qish ~0,1×, kesh yozish ~1,25× kirish narxida hisoblanadi (kesh o'qish/yozish koeffitsientlari konstanta sifatida belgilanadi).
 3. So'mga ko'rsatish uchun: `cost_uzs = cost_usd × FX_USD_UZS` (`FX_USD_UZS = 12 500`, **taxmin**, sozlanadigan konfiguratsiya — real vaqtda kursi o'zgarishi mumkin). Yozuv vaqtidagi kurs `fx_rate_used`, natija `cost_uzs` ustunida saqlanadi (tarixiy aniqlik).
-4. Bir foydalanuvchi so'rovida bir nechta AI chaqiruvi bo'lsa (masalan AI-01'ning tool-tanlash + yakuniy javob, ikki chaqiruv) — `usage.py`dagi `TurnUsage` naqshiga mos, bitta "turn" ichida yig'iladi, lekin **har chaqiruv** alohida `ai_requests` qatori sifatida ham saqlanishi mumkin (audit uchun to'liqlik) — aniq granularlik backend arxitekturasi bosqichida (`23-backend-arxitekturasi.md`) belgilanadi.
+4. Bir foydalanuvchi so'rovida bir nechta AI chaqiruvi bo'lsa (masalan AI-01'ning tool-tanlash + yakuniy javob, ikki chaqiruv) — `TurnUsage` modeliga mos, bitta "turn" ichida yig'iladi, lekin **har chaqiruv** alohida `ai_requests` qatori sifatida ham saqlanishi mumkin (audit uchun to'liqlik) — aniq granularlik backend arxitekturasi bosqichida (`23-backend-arxitekturasi.md`) belgilanadi.
 5. Platform admin paneli va tenant hisobotida (M12 ichida yoki alohida AI-xarajat widget) oylik AI xarajati (USD va so'm) ko'rinadi — bu bir vaqtning o'zida budjet sarfini kuzatish vositasi (5-bo'lim).
 
 ---
@@ -150,7 +146,7 @@ Har AI chaqiruvi (`usage.py`dagi `AiCallUsage` naqshiga mos) quyidagicha `ai_req
 ## 7. Maxfiylik
 
 - **Minimal ma'lumot**: AI chaqiruviga faqat zarur maydonlar yuboriladi (masalan AI-01'da — tool natijasidagi agregatsiya qilingan raqamlar, mijozning to'liq profili emas); xom hujjat matni/butun jadval hech qachon promptga tashlanmaydi.
-- **Ma'lumot lokalizatsiyasi**: faqat biometrik/genetik/telekom ma'lumot O'zbekistonda saqlanishi majburiy; mijoz ismi, telefon, tranzaksiya matni kabi ma'lumotlar xavfsizlik talablariga rioya qilgan holda Claude API'ga (chet elga) yuborilishi mumkin (`research_notes/texnik/05-ozbek-tilidagi-ai.md`, 1.3-bo'lim) — AIOS hech qachon pasport/biometrik ma'lumotni AI'ga yubormaydi.
+- **Ma'lumot lokalizatsiyasi**: faqat biometrik/genetik/telekom ma'lumot O'zbekistonda saqlanishi majburiy; mijoz ismi, telefon, tranzaksiya matni kabi ma'lumotlar xavfsizlik talablariga rioya qilgan holda Claude API'ga (chet elga) yuborilishi mumkin (`research_notes/texnik/05-ozbek-tilidagi-ai.md`, 1.3-bo'lim) — tizim hech qachon pasport/biometrik ma'lumotni AI'ga yubormaydi.
 - **PII masking (ixtiyoriy himoya qatlami)**: tenant sozlamasida (`tenants.settings`) yoqilganda, promptga yuborilishidan oldin mijoz F.I.Sh./telefon/STIR kabi maydonlar token bilan almashtiriladi (masalan "mijoz A"), AI javobi qaytganda kod tomonidan asl qiymatga almashtiriladi — bu qatlam standart yoqilmagan (chunki lokalizatsiya qonuni ruxsat beradi), lekin ehtiyotkor tenant/majburiy sektor uchun yoqilishi mumkin.
 - **O'qitish uchun rozilik (training consent)**: Claude/boshqa provayder tomonidan mijoz ma'lumotidan modelni o'qitish uchun **standart holatda foydalanilmaydi** (API shartlariga ko'ra Anthropic API orqali yuborilgan ma'lumot default modelni o'qitishga ishlatilmaydi — bu amaldagi tijorat shart, alohida tasdiqlanishi kerak bo'lsa ham); o'zimizning kelajakdagi fine-tuning (11-bo'lim) uchun esa **aniq, tenant darajasidagi rozilik** talab qilinadi.
 - **Rozilikni saqlash**: `tenants.settings.ai_training_consent` (bool + sana) — tenant darajasidagi umumiy rozilik; `ai_feedback.consent_for_training` (`11-malumotlar-modeli.md`, 10-bo'lim, allaqachon mavjud) — har bir alohida fikr-mulohaza/tuzatish yozuvi darajasidagi rozilik. Ikkisi ham **ixtiyoriy va rad etilsa funksiya ishlashini to'xtatmaydi**.
@@ -237,7 +233,7 @@ flowchart TD
 
 ## 12. Observability
 
-- **Readiness** (`GET /health/ready`, `health_service.py` naqshiga mos): AI holati — **faqat hisobot (reported), hech qachon gating** (chunki "AI — chekka qatlam" qoidasi, 10-umumiy-arxitektura.md #8): `ai: ok` / `ai: degraded (circuit open)` / `ai: down`. Tekshiruv — kreditsial/konfiguratsiya mavjudligi va (ixtiyoriy) bitta arzon, pulsiz "ping"ga yaqin chaqiruv, 60 soniya keshlanadi — hech qachon haqiqiy tenant so'rovini sarflamaydi.
+- **Readiness** (`GET /health/ready`, gating vs reported naqshiga mos): AI holati — **faqat hisobot (reported), hech qachon gating** (chunki "AI — chekka qatlam" qoidasi, 10-umumiy-arxitektura.md #8): `ai: ok` / `ai: degraded (circuit open)` / `ai: down`. Tekshiruv — kreditsial/konfiguratsiya mavjudligi va (ixtiyoriy) bitta arzon, pulsiz "ping"ga yaqin chaqiruv, 60 soniya keshlanadi — hech qachon haqiqiy tenant so'rovini sarflamaydi.
 - **Metrikalar**: har chaqiruv uchun model, token, xarajat, latency (`ai_requests`dan); circuit breaker holati (ochiq/yopiq, oxirgi ochilgan vaqt); raqamli nazorat o'tish/muvaffaqiyatsizlik darajasi (3-bo'lim) — bularning barchasi kunlik agregatsiya qilinib platform admin panelida ko'rinadi.
 - **Ogohlantirish**: oylik budjetning 80%iga yetganda tenant Egasiga M18 (Telegram) orqali xabar; circuit breaker ochilganda yoki `guard_failed` darajasi anomal oshganda platform admin'ga ichki ogohlantirish.
 - **Audit**: har AI javobi (xususan AI-05, moliyaviy/soliq tushuntirish) `ai_requests`ga bog'langan holda saqlanadi — kelajakda nizoli vaziyatda "AI nima deganini va qaysi raqamlar asosida" tekshirish imkoni beradi (`audit_log` bilan bir xil ruhda, `11-malumotlar-modeli.md`).
@@ -276,7 +272,7 @@ Oylik so'rovlar soni (taxmin) — yagona tarifda barcha tenant barcha AI funksiy
 | Og'ir | $0,660 | $0,047 | $0,160 | $0,380 | **$1,247** | **~15 580 so'm** |
 
 - Taqqoslash (yagona 99 000 so'm/oy tarifga nisbatan): yengil/o'rta/og'ir foydalanish yagona tarif narxining mos ravishda **~0,7% / ~5,2% / ~15,7%**ini tashkil qiladi — `25-nofunksional-talablar.md` §11dagi jami xarajat jadvalida AI komponenti ~2 000–5 000 so'm sifatida kiritilgan (o'rta foydalanish darajasiga yaqin).
-- **Qo'shimcha tejash (jadvalga kiritilmagan)**: AI-05 va AI-06 real-vaqt talab qilmaydi (hisobot tayyor bo'lgandan keyin yoki rejalashtirilgan eslatma sifatida generatsiya qilinadi) — Batch API orqali −50% qo'llanilsa, bu ikki funksiya xarajati yarmiga tushadi; prompt caching (tizim prompti + tenant glossary takroriy qismi) AI-01'ning kirish narxini yanada kamaytiradi (kesh o'qish ~0,1× narxda, `usage.py` naqshi).
+- **Qo'shimcha tejash (jadvalga kiritilmagan)**: AI-05 va AI-06 real-vaqt talab qilmaydi (hisobot tayyor bo'lgandan keyin yoki rejalashtirilgan eslatma sifatida generatsiya qilinadi) — Batch API orqali −50% qo'llanilsa, bu ikki funksiya xarajati yarmiga tushadi; prompt caching (tizim prompti + tenant glossary takroriy qismi) AI-01'ning kirish narxini yanada kamaytiradi (kesh o'qish ~0,1× narxda).
 - **Taxmin ekanligi ta'kidi**: yuqoridagi barcha so'rovlar soni va token/chaqiruv raqamlari hech qanday manbada tasdiqlanmagan — bular MVP pilotida haqiqiy `ai_requests` ma'lumoti bilan almashtirilishi SHART (shu jadvalning o'zi — unit-iqtisod hisobini tasdiqlash vazifasining bir qismi, `05-mvp-chegarasi.md`, 3.3-bo'lim shartiga mos).
 
 ---
@@ -297,9 +293,3 @@ Oylik so'rovlar soni (taxmin) — yagona tarifda barcha tenant barcha AI funksiy
 - `spec/kod-uchun/10-umumiy-arxitektura.md` — AI chekka qatlam qoidasi, muhit/rejim jadvali.
 - `spec/kod-uchun/11-malumotlar-modeli.md` — `ai_requests`, `ai_feedback`, `tenant_glossary`, `plans.limits` maydonlari.
 - `research_notes/texnik/05-ozbek-tilidagi-ai.md` — narx jadvali (2.2-bo'lim), OCR/STT benchmarklar, lokalizatsiya qonuni (1.3-bo'lim).
-- `E:/Project/universal_ai_platform/src/backend/aios/domain/ports/claude_port.py`, `text_completion_port.py` — port naqshi.
-- `E:/Project/universal_ai_platform/src/backend/aios/infrastructure/claude/cli_claude.py` — isolyatsiya, retry, circuit breaker naqshi.
-- `E:/Project/universal_ai_platform/src/backend/aios/domain/usage.py` — token/xarajat modeli, USD→UZS.
-- `E:/Project/universal_ai_platform/src/backend/aios/application/companion/narration_guard.py` — deterministik raqamli nazorat naqshi.
-- `E:/Project/universal_ai_platform/src/backend/aios/interface/di_builders.py` — rejim almashtirish naqshi (DI).
-- `E:/Project/universal_ai_platform/src/backend/aios/infrastructure/observability/health_service.py` — gating vs reported readiness naqshi.

@@ -1,4 +1,4 @@
-# Dizayn tizimi — AIOS (brand-neutral, shadcn/ui asosida)
+# Dizayn tizimi (brand-neutral, shadcn/ui asosida)
 
 **Maqsad:** Brand-neutral dizayn tizimi — token, komponent, layout, formatlash va chop etish qoidalari, shadcn/ui asosida.
 **Kim uchun:** Frontend dasturchilar, UX dizaynerlar.
@@ -49,7 +49,7 @@ shadcn standart nomlashiga qo'shimcha semantik tokenlar qo'shiladi: `success`, `
   --ring: 221 70% 45%;
   --radius: 0.5rem;
 
-  /* AIOS semantik qo'shimchalar */
+  /* Loyiha semantik qo'shimchalari */
   --success: 142 71% 35%;
   --success-foreground: 0 0% 100%;
   --warning: 38 92% 45%;
@@ -284,7 +284,7 @@ Bitta ustun, pastki tab-bar (`Bosh sahifa / Hisobotlar / Qarzlar / AI / Sozlamal
 
 `Button`, `Input`, `Textarea`, `Select`, `Combobox` (cmdk asosida), `Checkbox`, `RadioGroup`, `Switch`, `Dialog`, `Sheet`, `AlertDialog`, `Popover`, `Tooltip`, `Tabs`, `Card`, `Badge`, `Avatar`, `Table` (TanStack bilan birga), `Calendar` (react-day-picker ^9.14), `Form` (react-hook-form + zod wrapper), `Toast`/`Sonner`, `Command` (cmdk), `DropdownMenu`, `NavigationMenu`/`Sidebar` (shadcn `sidebar` bloki), `Skeleton`, `Progress`, `Separator`, `ScrollArea`, `HoverCard`.
 
-### 7.2 Maxsus (AIOS) komponentlar — `packages/shared/ui/`
+### 7.2 Maxsus (loyiha) komponentlar — `packages/shared/ui/`
 
 | Komponent | Vazifa | Asosiy proplar |
 |---|---|---|

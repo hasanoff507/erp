@@ -1,6 +1,6 @@
 # Qarorlar reestri
 
-**Maqsad:** AIOS loyihasi bo'yicha barcha joriy mahsulot/texnik/jarayon qarorlarini mavzu bo'yicha qayd etish — boshqa fayllar bu yerga "(qaror #N)" shaklida havola qiladi. · **Kim uchun:** hammasi. · **Bog'liq fayllar:** 02, 03, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24, 25, 26, 27. · **Holat:** joriy, 2026-10-15.
+**Maqsad:** ERP loyihasi bo'yicha barcha joriy mahsulot/texnik/jarayon qarorlarini mavzu bo'yicha qayd etish — boshqa fayllar bu yerga "(qaror #N)" shaklida havola qiladi. · **Kim uchun:** hammasi. · **Bog'liq fayllar:** 02, 03, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24, 25, 26, 27. · **Holat:** joriy, 2026-10-15.
 
 Qaror raqamlari o'zgarmas — boshqa fayllardagi "(qaror #N)" havolalari shu raqamlarga tayanadi. Bekor qilingan qarorlar o'chirilgan; faqat boshqa joyda havola qilingan raqamlar "o'rniga #M" ko'rsatkichi bilan saqlanadi.
 

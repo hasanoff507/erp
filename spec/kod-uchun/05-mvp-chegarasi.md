@@ -70,7 +70,7 @@ Barcha 18 modul MVP ichida (MVP qarori, `spec/README.md`); har birida kamida bit
 | Kadrlar/ish haqi moduli | MVP 18 modul ro'yxatida yo'q (`spec/README.md`; M15 faqat "ish haqi to'landi" summasini xarajat sifatida yozadi, ish haqi hisoblanmaydi); JShDS/ijtimoiy soliq hisobotini solishtirish shu sababli ham MVP'dan tashqari (`03-modullar-talablari.md`, M10 qamrov eslatmasi) |
 | CRM/sodiqlik (mijozlar bazasi, loyallik/bonus karta dasturi) | `00-xulosa-va-ochiq-savollar.md`, Asosiy xulosa #2; M03'dagi loyallik bonusi ham shu sababli olib tashlangan (`03-modullar-talablari.md`, M03) |
 | Ishlab chiqarish (retsept, ishlab chiqarish buyurtmasi) | `00-xulosa-va-ochiq-savollar.md`, Asosiy xulosa #2 |
-| Boshqa tizimlardan ma'lumot ko'chirish konnektorlari | MVP'dan tashqarida — AIOS noldan (from-scratch) qurilgan, mustaqil mahsulot; hech qanday tashqi buxgalteriya/ERP tizimi bilan integratsiya, migratsiya, import, eksport yoki sinxronizatsiya qilinmaydi va ular hech qachon ma'lumot manbai bo'lmaydi; mavjud tizimlar faqat ma'lumotlar modelini loyihalashda **struktura namunasi/benchmark** sifatida ishlatilgan (`01-erp-modullar-va-malumot-modeli.md`, 7-band; `spec/README.md`). Boshlang'ich ma'lumot kiritish (onboarding) faqat uch yo'l bilan: (1) qo'lda kiritish, (2) Excel/CSV shablon orqali import, (3) AI-03 yordamida qog'oz hujjat/fotosidan kiritish (qaror #16) |
+| Boshqa tizimlardan ma'lumot ko'chirish konnektorlari | MVP'dan tashqarida — tizim noldan (from-scratch) qurilgan, mustaqil mahsulot; yadro tashqi buxgalteriya/ERP tizimlariga bog'liq emas. 1C bilan bog'lanish — faqat alohida **1C integratsiya moduli** orqali (qaror #36; qamrovi — o'qish/yozish/ko'chirish — va bosqichi ochiq). Boshlang'ich ma'lumot kiritish (onboarding) faqat uch yo'l bilan: (1) qo'lda kiritish, (2) Excel/CSV shablon orqali import, (3) AI-03 yordamida qog'oz hujjat/fotosidan kiritish (qaror #16) |
 | Mol-mulk va yer solig'i hisobotini solishtirish | Asosiy vositalar hisobi MVP'da yo'q, shu sababli bu hisobotlarni solishtirish mazmunsiz (`03-modullar-talablari.md`, M10 qamrov eslatmasi) |
 | AI-02, 04, 07, 08, 09, 10, 11 (yuqoridagi 1.2-jadval) | `09-ai-funksiyalar.md` |
 
@@ -88,7 +88,7 @@ Barcha 18 modul MVP ichida (MVP qarori, `spec/README.md`); har birida kamida bit
 
 *Eslatma (oxirgi qator uchun taxmin belgisi): bu talab 2026-01-01'dan boshlangan juda yangi davlat talabi; raqobatchilarning bu funksiyani hali reklama qilmagani ularda **umuman yo'qligini** mustaqil tasdiqlamaydi — faqat `06-raqobatchilar-texnik-va-uskunalar.md` va `11-raqobatchilar-kamchiliklari.md` tekshirilgan sahifalarida bu haqida hech qanday matn topilmaganini bildiradi.*
 
-**Pozitsiyalashni aniqlashtirish**: MoySklad o'z rasmiy saytida "Регистрация продаж в налоговой Узбекистана через один клик" (OFD) va AslBelgisi (markirovka) integratsiyasini ochiq da'vo qiladi, Didox orqali e-faktura ham bor; REGOS ham Didox bilan integratsiyalangan — ya'ni raqobatchilar bu davlat tizimlari bilan umuman integratsiya qilmagan, degan tezis noto'g'ri. To'g'ri farqlanish: (1) AIOS'da bu integratsiyalar **bitta tizim ichida**, uchinchi tomon kassa/EDO dasturisiz; (2) **davlat tuzgan soliq hisobotini ichki hisob bilan solishtirish** (yuqoridagi jadval qatori) — bu haqiqatan hech bir raqobatchida yo'q, chunki bu 2026-01-01'dan boshlangan butunlay yangi talab; (3) offline-first + markirovka maxsus holatlari; (4) o'zbek tilidagi AI. Batafsil: `tuzatishlar-va-yechimlar.md`.
+**Pozitsiyalashni aniqlashtirish**: MoySklad o'z rasmiy saytida "Регистрация продаж в налоговой Узбекистана через один клик" (OFD) va AslBelgisi (markirovka) integratsiyasini ochiq da'vo qiladi, Didox orqali e-faktura ham bor; REGOS ham Didox bilan integratsiyalangan — ya'ni raqobatchilar bu davlat tizimlari bilan umuman integratsiya qilmagan, degan tezis noto'g'ri. To'g'ri farqlanish: (1) tizimda bu integratsiyalar **bitta tizim ichida**, uchinchi tomon kassa/EDO dasturisiz; (2) **davlat tuzgan soliq hisobotini ichki hisob bilan solishtirish** (yuqoridagi jadval qatori) — bu haqiqatan hech bir raqobatchida yo'q, chunki bu 2026-01-01'dan boshlangan butunlay yangi talab; (3) offline-first + markirovka maxsus holatlari; (4) o'zbek tilidagi AI. Batafsil: `tuzatishlar-va-yechimlar.md`.
 
 ---
 
@@ -131,7 +131,7 @@ Barcha 18 modul MVP ichida (MVP qarori, `spec/README.md`); har birida kamida bit
 
   | Raqobatchi | Narx (so'm/oy) | Izoh |
   |---|---|---|
-  | **AIOS (bizning yagona tarif)** | **99 000** (+39 000/qo'shimcha kassa) | Hammasi bitta narxda — virtual kassa, e-faktura, markirovka, davlat hisobotini solishtirish, AI, Telegram bot |
+  | **Bizning yagona tarif** | **99 000** (+39 000/qo'shimcha kassa) | Hammasi bitta narxda — virtual kassa, e-faktura, markirovka, davlat hisobotini solishtirish, AI, Telegram bot |
   | REGOS Start | 69 000 + virtual kassa 75 000 = **144 000** | Virtual kassa alohida haq, bizdan ~45 000 qimmat 1-kassali tenant uchun |
   | REGOS Basic/Plus | 149 000 / 299 000 | Bizning yagona tarifdan 50 000–200 000 qimmat |
   | mDokon | 199 000 dan | Bizdan 2x qimmat |

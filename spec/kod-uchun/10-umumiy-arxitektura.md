@@ -118,4 +118,3 @@ Deploy: Docker konteynerlar (api, worker, scheduler, web statik, bot) + boshqari
 - `research_notes/texnik/04-arxitektura-va-stack.md` (multi-tenant, offline-first, event-log, Android, PostgreSQL).
 - `research_notes/texnik/07-hosting-lokalizatsiya-xavfsizlik.md` (UzCloud, lokalizatsiya).
 - `spec/kod-uchun/03-modullar-talablari.md` (M01–M18), `09-ai-funksiyalar.md` (5-bo'lim).
-- `E:/Project/universal_ai_platform` — Python/FastAPI qatlamli tuzilma va AI porti namunasi.

@@ -148,7 +148,7 @@ sequenceDiagram
 **API holati**:
 - **Faktura.uz** — rasmiy, ochiq API hujjati **topildi va o'qildi** ([api.faktura.uz/help/](https://api.faktura.uz/help/)): token autentifikatsiya (`POST account.faktura.uz/token`), asosiy endpointlar `Document/SendDocument`, `Document/SignDocument`, `Document/GetDocumentStatus`, `CheckCompanyExist/:inn` va boshqalar. Sandbox/narx **topilmadi**.
 - **Didox** — API hujjat portali (`api-docs.didox.uz`) **login talab qiladi**, ochiq o'qib bo'lmadi. Faqat norasmiy (jamoatchilik) npm SDK (`didox`) bor. Sandbox **topilmadi**.
-- Ikkisida ham QQS **AI xavf-baholash** (yashil/qizil) natijasi AIOS'ga qaysi kanal orqali kelishi (operator orqali maydon sifatida, yoki alohida so'rov bilan) **ochiq savol** (`spec/kod-uchun/04-biznes-jarayonlar.md`, Ochiq savol 11).
+- Ikkisida ham QQS **AI xavf-baholash** (yashil/qizil) natijasi tizimga qaysi kanal orqali kelishi (operator orqali maydon sifatida, yoki alohida so'rov bilan) **ochiq savol** (`spec/kod-uchun/04-biznes-jarayonlar.md`, Ochiq savol 11).
 - **VM 830 xavfi**: yuqori xavfli ("qizil") fakturalar ulushi davr uchun ≤10% bilan cheklangan, bunday fakturaning QQS krediti faqat to'lovdan keyin ochiladi (VM Qarori №830-son, 2025-12-26, 6- va 8-moddalar).
 
 **Adapter interfeysi**:
@@ -485,7 +485,7 @@ class StateReportAdapter(Protocol):
 - **Payme**: rasmiy hujjat (`developer.help.paycom.uz`), protokol JSON-RPC uslubida (rasmiy hujjat "2.0" deb atamaydi), metodlar `CheckPerformTransaction/CreateTransaction/PerformTransaction/CancelTransaction/CheckTransaction/GetStatement/SetFiscalData`. **Sandbox bor**: `test.paycom.uz`. Komissiya: 1–2% (kanalga qarab).
 - **Click**: REST + MD5 imzo, ikki bosqichli Prepare/Complete ("Shop API"). Rasmiy sandbox hujjati **topilmadi**. Komissiya: 1–5% (kanal/karta turiga qarab, `business.click.uz`).
 - **Uzum**: dasturchi portali bor (`developer.uzumbank.uz`), protokol aralash (OpenAPI + ba'zi qismda JSON-RPC), to'liq aniqlanmagan. Test muhiti: **Uzum Checkout** uchun rasmiy test muhiti va test kartalari bor (HUMO/UzCard, 3-DS 777777; API kalit Uzum tomonidan beriladi — developer.uzumbank.uz/checkout, "Тестирование"); **Merchant API** (ilova orqali, vebxuk) hujjatida sandbox ko'rsatilmagan — Uzum menejeridan so'raladi. Komissiya: Uzum karta 0%, boshqa karta 0,4%.
-- Uchtasida ham **fiskal chekni kim chiqarishi** (to'lov tizimi "komissioner" sifatida, yoki merchant o'zi) huquqiy jihatdan ziddiyatli — ikki talqin bor (`03-efaktura-va-tolov.md`, 2.5-bo'lim). AIOS bu ikkisini ham zahira sifatida qo'llab-quvvatlashi kerak (konfiguratsiya bilan).
+- Uchtasida ham **fiskal chekni kim chiqarishi** (to'lov tizimi "komissioner" sifatida, yoki merchant o'zi) huquqiy jihatdan ziddiyatli — ikki talqin bor (`03-efaktura-va-tolov.md`, 2.5-bo'lim). Tizim bu ikkisini ham zahira sifatida qo'llab-quvvatlashi kerak (konfiguratsiya bilan).
 
 **Adapter interfeysi**:
 ```python
@@ -775,11 +775,11 @@ Tanlov mezoni: (a) ochiq/tasdiqlangan API/sandbox birinchi, (b) qonuniy SLA bosi
 4. Virtual kassa dasturini Davlat reyestriga kiritishning aniq narxi (sertifikatlash/ekspertiza xizmat haqi) — hamon topilmadi.
 5. Onlayn/QR to'lovda fiskal chekni kim chiqarishi (to'lov tizimi "komissioner" sifatida, yoki merchant o'zi) — ikki huquqiy talqin ziddiyatli, OFD operatori/Soliq qo'mitasi bilan aniqlashtirish kerak.
 6. Didox API'ga to'liq kirish (login), Click'ning rasmiy sandbox mavjudligi, Uzum Merchant API'ning aniq protokoli — uchtasi uchun ham yangi rasmiy murojaat xati hali yozilmagan.
-7. E-ishonchnoma (Vakolat.uz) AIOS'ga qanday integratsiya qilinishi (API formati) va BP-01'da aniq qachon talab qilinishi.
+7. E-ishonchnoma (Vakolat.uz) tizimga qanday integratsiya qilinishi (API formati) va BP-01'da aniq qachon talab qilinishi.
 8. ЗРУ-764 (Kiberxavfsizlik) sertifikatlash talabining oddiy xususiy SaaS ERP'ga tegishliligi — "ha" bo'lsa, butun integratsiya/MVP jadvaliga katta ta'sir (Xat 3 javobini kutish).
 9. SMS provayder — standart tanlov Eskiz.uz (reestr #45); rasmiy shartnoma va O'zbekiston ichida OTP yetkazilish tezligi hali tasdiqlanmagan.
 10. `outbox_jobs.kind` ro'yxatini bu hujjatda ko'rsatilgan qo'shimcha qiymatlar (`einvoice_accept`, `ettn_send`, `marking_verify` va h.k.) bilan kengaytirish — `11-malumotlar-modeli.md`ga tegishli, ushbu fayl faqat talabni qayd etadi.
-11. Davlat xavf-baholash natijasi (yashil/qizil belgi, VM 830) AIOS'ga qaysi kanal orqali (operator maydon sifatida, yoki alohida so'rov) yetib kelishi — aniqlashtirish kerak.
+11. Davlat xavf-baholash natijasi (yashil/qizil belgi, VM 830) tizimga qaysi kanal orqali (operator maydon sifatida, yoki alohida so'rov) yetib kelishi — aniqlashtirish kerak.
 12. Bizning billing (M17) uchun Click/Uzum sandbox topilmaguncha, test rejimi qanday simulyatsiya qilinadi (masalan qo'lda "to'landi" belgilash) — implementatsiya bosqichida hal qilinadi.
 13. UzQR'ni banklar qanday API/vebxuk orqali tasdiqlashi va Markaziy bank yagona QR standarti texnik hujjati — bu tekshiruvda topilmadi (9.1-bo'lim).
 

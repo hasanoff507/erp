@@ -47,7 +47,7 @@
 - **Shtrix-kod/markirovka skaneri**: USB HID keyboard-wedge rejimi — har qanday matn kiritish maydoni skanerlash natijasini qabul qiladi, lekin asosiy sotuv ekranida alohida "faol skaner maydoni" ajratiladi, shunda tasodifiy boshqa maydonga tushib ketmaydi (`06-fayl`, 3-bo'lim).
 - **Chek printeri (ESC/POS)**: "Chekni qayta chop etish" tugmasi har doim mavjud (printer qog'oz tugashi/bog'lanish uzilishi odatiy holat); printer ulanmagan bo'lsa, ekranda aniq xato va "QR orqali elektron chek" muqobili taklif etiladi (muqobil — **taxmin**, manbada yo'q).
 - **Tarozi**: avtomatik protokol integratsiyasi tasdiqlanmagan (`06-fayl`, 3-bo'lim: "aniq protokol nomi topilmadi") — shu sabab UX darajasida **har doim** "og'irlikni qo'lda kiriting" maydoni zahira sifatida ko'rsatiladi, avtomatik qiymat kelganda bu maydon oldindan to'ldiriladi.
-- **iPhone/iPad (iOS)** (qaror #21): AIOS kassa/back-office iOS'da **o'rnatilgan PWA** sifatida (Home Screen'ga qo'shilgan) ishlaydi. Chek chop etish faqat **bulut-print (cloud-print) printer** (masalan Star CloudPRNT, Epson Server Direct Print — **taxmin**, aniq model tasdiqlanmagan) orqali yoki **elektron chek** (QR-kod/Telegram orqali yuborish) bilan mumkin — iOS Safari/PWA USB/Bluetooth printer ulanishini qo'llab-quvvatlamaydi. **Chrome/Edge (Windows, Android)** — USB, Bluetooth, tarmoq (LAN/Wi-Fi) va bulut printerlarning barchasini qo'llab-quvvatlaydi. Bulut-print printerlarining O'zbekistonda mavjudligi/narxi va faqat-elektron-chek bilan cheklanishning fiskal/huquqiy ruxsati — **ochiq savol** (pastda).
+- **iPhone/iPad (iOS)** (qaror #21): kassa/back-office iOS'da **o'rnatilgan PWA** sifatida (Home Screen'ga qo'shilgan) ishlaydi. Chek chop etish faqat **bulut-print (cloud-print) printer** (masalan Star CloudPRNT, Epson Server Direct Print — **taxmin**, aniq model tasdiqlanmagan) orqali yoki **elektron chek** (QR-kod/Telegram orqali yuborish) bilan mumkin — iOS Safari/PWA USB/Bluetooth printer ulanishini qo'llab-quvvatlamaydi. **Chrome/Edge (Windows, Android)** — USB, Bluetooth, tarmoq (LAN/Wi-Fi) va bulut printerlarning barchasini qo'llab-quvvatlaydi. Bulut-print printerlarining O'zbekistonda mavjudligi/narxi va faqat-elektron-chek bilan cheklanishning fiskal/huquqiy ruxsati — **ochiq savol** (pastda).
 
 ### 1.7 Markirovka (Asl belgisi) maxsus holati
 - Manbada keltirilgan 80–90% xato ko'rsatkichi **yetkazib berish zanjiridagi yuklar darajasida** (`00-xulosa-va-ochiq-savollar.md`, 6-band), har bir alohida skanerlash urinishining xato ehtimoli sifatida emas (Asosiy xulosalar #5). Shunga qaramay, markirovka skanerlashning umuman nosog'lom ekanligini ko'rsatadi, shuning uchun har bir markirovka skaneri ekranida (POS-02, POS-08, POS-09, POS-10): (a) birinchi urinish muvaffaqiyatsiz bo'lsa avtomatik qayta urinish, (b) 2-3 muvaffaqiyatsiz urinishdan keyin "qo'lda MXIK kodini kiriting" maydoni ochiladi — **MXIK (IKPU)** 17 raqamli tovar klassifikator kodi (`research_notes/texnik/02-kassa-ofd-markirovka.md`, chek rekvizitlari bo'limi), **markirovka (DataMatrix) kodi emas** — qo'lda kiritilsa tovar tanib olinadi, lekin Asl belgisi "chiqarish" operatsiyasi bajarilmaydi, (c) **DataMatrix (markirovka) kodini qo'lda kiritish — faqat online, va faqat `POST /marking/verify` muvaffaqiyatli tasdiqlasa**: shundan keyingina tovar markirovkasi haqiqiy deb qabul qilinadi va sotuvga qo'shiladi; **offline rejimda qo'lda kiritilgan kod bilan sotish taqiqlanadi** (aks holda bu 2026-07-01'dagi avtomatik tekshirish talabini chetlab o'tish yo'li bo'lib qolardi — `spec/tarix/tekshiruv/qabul-7-ekran-api.md`, R-02), (d) kod butunlay o'qilmasa, menejerga eskalatsiya tugmasi ko'rsatiladi.
@@ -145,7 +145,7 @@
 
 ```
 ┌───────────────────────────────────────┐
-│  AIOS Kassa              [UZ/RU]  🔴   │
+│  ERP Kassa               [UZ/RU]  🔴   │
 ├───────────────────────────────────────┤
 │                                         │
 │        Filial: "Chilonzor-3"  ▾        │
@@ -336,7 +336,7 @@ muvaffaqiyatsiz, 2 daqiqadan keyin qayta urinadi" | Offline — asosiy holat
 
 ```
 ┌──────────────────────────────────────────────────┐
-│ AIOS            Bugun ▾   Chilonzor-3 ▾   [UZ/RU] │
+│ ERP             Bugun ▾   Chilonzor-3 ▾   [UZ/RU] │
 ├──────────────────────────────────────────────────┤
 │  Bugungi savdo: 4 250 000 so'm   (↑ 12% kecha)    │
 │  ┌──────────────┐ ┌──────────────┐ ┌────────────┐│

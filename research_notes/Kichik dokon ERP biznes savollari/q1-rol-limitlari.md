@@ -25,14 +25,14 @@
 
 ### Tavsiya (+ ishonch darajasi)
 
-**Hech bir ko'rilgan asosiy POS tizimi (Loyverse, Square, Poster, iiko) standart raqamli limitni (% yoki summa) ochiq hujjatlashtirmagan va ship qilmagan** — bu o'z-o'zidan muhim topilma: ular bu qarorni to'liq do'kon egasiga qoldiradi, faqat ON/OFF + PIN mexanizmini taqdim etadi (**yuqori ishonch** — bu bir nechta mustaqil manbada: Loyverse, Square, Toast, Restera'da takrorlanadi). Shuning uchun quyidagi raqamlar **bevosita manbadan olingan emas, balki AIOS uchun mustaqil taxmin — "tasdiqlanmagan"** deb belgilanadi:
+**Hech bir ko'rilgan asosiy POS tizimi (Loyverse, Square, Poster, iiko) standart raqamli limitni (% yoki summa) ochiq hujjatlashtirmagan va ship qilmagan** — bu o'z-o'zidan muhim topilma: ular bu qarorni to'liq do'kon egasiga qoldiradi, faqat ON/OFF + PIN mexanizmini taqdim etadi (**yuqori ishonch** — bu bir nechta mustaqil manbada: Loyverse, Square, Toast, Restera'da takrorlanadi). Shuning uchun quyidagi raqamlar **bevosita manbadan olingan emas, balki tizim uchun mustaqil taxmin — "tasdiqlanmagan"** deb belgilanadi:
 
 - **Kassir chegirma limiti:** standart bo'yicha **5%** (yoki belgilangan narx chizig'idan past bo'lgan mahsulotlar uchun amalda 5 000–10 000 so'mgacha), undan yuqorisi — `discount.approve` orqali menejer/egasi PIN. *(tasdiqlanmagan, past-o'rta ishonch — sanoat standartidan emas, umumiy chakana amaliyotdan kelib chiqilgan taxmin)*
 - **Kvitansiyali qaytarish, PIN'siz:** standart bo'yicha **100 000 so'mgacha** (o'rtacha kichik do'kon cheki qiymatidan kelib chiqib), undan yuqori yoki kvitansiyasiz qaytarish — majburiy menejer PIN. *(tasdiqlanmagan, o'rta ishonch — Walmart/Target kabi yirik tarmoqlarning kvitansiyasiz-qaytarish amaliyoti umumiy yo'nalishni tasdiqlaydi, lekin ular B2C siyosat, bizning holat — ichki nazorat)*
 - **Kassadan PIN'siz pul olish (cash.withdraw):** standart bo'yicha **50 000 so'mgacha**, undan yuqori — majburiy PIN. *(tasdiqlanmagan, past ishonch — hech bir ko'rilgan manbada aniq raqam yo'q, faqat "limit bor, lekin administrator sozlaydi" degan umumiy pattern tasdiqlangan)*
 - **Bekor qilish (sales.void — tugallanmagan chek):** kassirga **standart bo'yicha ruxsat beriladi, limit qo'yilmaydi, lekin har doim majburiy audit-log bilan** — bu Loyverse, Square va Toast'ning barchasida tasdiqlangan umumiy pattern (void — kassir darajasidagi oddiy amal, audit orqali nazorat qilinadi; **refund/qaytarish** va **chegirma** aksincha, odatda yuqoriroq cheklovga ega bo'ladi). *(yuqori ishonch — bu qoida uchta mustaqil manbada mos keladi: Loyverse "Void saved items", Square "Comps/Voids" + Activity Log, Toast "Void Items/Orders" alohida huquq)*. Bizning joriy spec qarorimiz ("Kassirda sales.void bor, majburiy audit bilan, limitsiz") sanoat amaliyotiga mos keladi — **o'zgartirish shart emas**.
 
-Umumiy xulosa: AIOS standart raqamlarni **taxminiy qiymat** sifatida belgilab, "ega keyinroq o'zgartira oladi" degan UI xabari bilan birga chiqarishi kerak — bu aynan sanoatning o'zi qilayotgan narsa (raqamni hujjatlashtirmaslik, lekin mexanizmni taqdim etish).
+Umumiy xulosa: Tizim standart raqamlarni **taxminiy qiymat** sifatida belgilab, "ega keyinroq o'zgartira oladi" degan UI xabari bilan birga chiqarishi kerak — bu aynan sanoatning o'zi qilayotgan narsa (raqamni hujjatlashtirmaslik, lekin mexanizmni taqdim etish).
 
 ### Manbalar
 

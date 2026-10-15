@@ -19,7 +19,7 @@
 
 ## 1. Multi-tenant model
 
-| Model | Afzalligi | Kamchiligi | AIOS uchun moslik |
+| Model | Afzalligi | Kamchiligi | Tizim uchun moslik |
 |---|---|---|---|
 | **Umumiy baza + tenant_id** (row-level) | Eng past operatsion xarajat; bitta schema migratsiyasi hammaga tarqaladi; UzCloud'dagi kichik VM/DBaaS tarifida (116 000–1 136 000 so'm/oy, `07-fayl`) ko'p tenant joylashadi | Noto'g'ri yozilgan so'rov boshqa tenant ma'lumotini ko'rsatishi xavfi (row-level security majburiy); "qo'shni shovqini" (bir tenant ko'p resurs yeganda boshqasiga ta'sir) | **MVP uchun tavsiya etiladi** — kichik-o'rta do'konlar segmenti narxga sezgir, tez ishga tushirish kerak |
 | **Schema-per-tenant** | Kuchliroq izolatsiya, bitta baza ichida; backup/restore tenant darajasida mumkin | Schema soni o'sgani sayin migratsiya va ulanish pool boshqaruvi murakkablashadi | O'rta bosqich — yirik ulgurjichi/buxgalteriya auditi talab qiladigan mijozlar uchun |
@@ -73,7 +73,7 @@
 
 (To'liq tafsilot: `07-hosting-lokalizatsiya-xavfsizlik.md`.)
 
-- **Qonuniy talab**: faqat biometrik, genetik va telekom-foydalanuvchi ma'lumotlari O'zbekistonda saqlanishi shart (ZRU-547, 27-1-modda). AIOS'ning odatiy savdo/ombor/buxgalteriya ma'lumoti bu toifaga kirmaydi — chet el buluti **qonunan taqiqlanmagan**.
+- **Qonuniy talab**: faqat biometrik, genetik va telekom-foydalanuvchi ma'lumotlari O'zbekistonda saqlanishi shart (ZRU-547, 27-1-modda). Tizimning odatiy savdo/ombor/buxgalteriya ma'lumoti bu toifaga kirmaydi — chet el buluti **qonunan taqiqlanmagan**.
 - **Biznes tanlovi sifatida tavsiya**: **UzCloud** (Uztelecom bilan bir xil milliy platforma) — 5 ta Tier III-loyiha data-markaz, to'liq ochiq narx jadvali: VM (vCPU 85 000 so'm/oy, RAM 12 000 so'm/oy/GB), Managed Kubernetes (HA boshqaruv paneli 1 500 000 so'm/oy), DBaaS (PostgreSQL, HA+PITR), S3-mos obyekt xotira (450 so'm/GB/oy). Sabab — soliq/OFD/bank API'lariga past kechikish, va kelajakda lokalizatsiya doirasi kengaytirilsa (yangi qonun) qayta ko'chirish xavfi bo'lmaydi.
 - **Yandex Cloud ishlatilmasligi tavsiya etiladi** — O'zbekistonda jismoniy data-markazi yo'q (faqat Rossiya/Qozog'iston), bu yuqoridagi lokalizatsiya toifalari (agar kelajakda AI-OCR/biometrik funksiya qo'shilsa) uchun muhim bo'lib qolishi mumkin.
 
@@ -87,12 +87,12 @@ Bu — arxitektor tomonidan belgilangan eng muhim yangi yo'nalish, shuning uchun
 2026-01-01 dan Soliq qo'mitasi quyidagi hisobotlarni **o'zi, cheklar va e-fakturalardan avtomatik tuzadi**: mol-mulk solig'i, yer solig'i, JShDS, ijtimoiy soliq, QQS, aylanmadan olinadigan soliq (**foyda solig'i bu ro'yxatga kirmaydi**) ([uz.kursiv.media, 2025-12-30](https://uz.kursiv.media/uz/2025-12-30/1-yanvardan-ayrim-soliq-hisobotlari-avtomatik-shakllantiriladi/)). Korxonaga tafovutni tuzatish uchun **5 kalendar kun** beriladi — "besh kun ichida", lekin hisobot topshirish muddatidan kechiktirmay; shu muddatda tuzatish kiritish mumkin, aks holda hisobot davlat tuzgan holida **topshirilgan** hisoblanadi. **Qonun/qaror asosi aniqlandi: O'RQ-1108-son Qonun (2025-12-25, 2026-01-01 dan kuchda), Soliq kodeksi 81-moddasiga kiritilgan o'zgartirish** ([lex.uz/docs/-7944527](https://lex.uz/docs/-7944527)). *(2026-10-14 tekshiruvida tuzatildi: avval "5 ish kuni" va "qonun/qaror raqami ochiq manbada topilmadi" deyilgan edi — to'g'risi 5 **kalendar** kun, qonun — O'RQ-1108 (SK 81-modda); foyda solig'i ro'yxatda yo'q.)*
 
 ### 6.2 Nega bu arxitektura uchun markaziy
-Agar davlat hisobotni o'zi tuzsa va javobsizlik avtomatik qabul deb hisoblansa, korxona uchun eng katta xavf — **davlat hisobga olgan raqam korxonaning o'z hisobidan farq qilishi, lekin 5 kalendar kun ichida bu farq payqalmasligi**. AIOS'ning qiymat taklifi shu yerda: deklaratsiya yozish emas, balki **(a) chek/faktura/ombor ma'lumotining to'g'ri va to'liq ketishini ta'minlash, (b) davlat tuzgan hisobotni ichki hisob bilan avtomatik solishtirish, (c) farqni 5 kalendar kunlik oyna yopilishidan oldin ko'rsatish.**
+Agar davlat hisobotni o'zi tuzsa va javobsizlik avtomatik qabul deb hisoblansa, korxona uchun eng katta xavf — **davlat hisobga olgan raqam korxonaning o'z hisobidan farq qilishi, lekin 5 kalendar kun ichida bu farq payqalmasligi**. Tizimning qiymat taklifi shu yerda: deklaratsiya yozish emas, balki **(a) chek/faktura/ombor ma'lumotining to'g'ri va to'liq ketishini ta'minlash, (b) davlat tuzgan hisobotni ichki hisob bilan avtomatik solishtirish, (c) farqni 5 kalendar kunlik oyna yopilishidan oldin ko'rsatish.**
 
 ### 6.3 Taklif qilinadigan oqim (arxitektura darajasida)
 ```mermaid
 sequenceDiagram
-    participant Kassa as Kassa/Ombor (AIOS)
+    participant Kassa as Kassa/Ombor (ERP)
     participant Ledger as Ichki QQS/soliq hisoblovchi
     participant MySoliq as my.soliq.uz (davlat)
     participant Diff as Solishtirish motori
@@ -122,9 +122,9 @@ sequenceDiagram
 ## 7. Xavfsizlik va zaxira nusxa
 
 - **Sertifikatlash/ekspertiza noaniqligi** (`07-fayl`, ЗРУ-764 18/19-moddalar) — davlat organi/KAI bo'lmagan oddiy SaaS'ning holati ochiq manbada aniqlanmagan. **Tavsiya**: MVP rejasining birinchi 2–4 haftasida csec.uz'ga yozma so'rov yuborish — agar majburiy ekspertiza kerak bo'lsa, bu loyiha jadvaliga katta ta'sir qiladi (narx/muddat noma'lum).
-- **Kriptografiya** — faqat fiskal modul (FM) uchun milliy standart (O'zDST 1106/1092, 3DES/AES/RSA/SHA — `02-fayl`) aniq; AIOS'ning o'z backend/frontend aloqasi uchun standart sanoat amaliyoti (TLS 1.2+, parolni bcrypt/argon2 bilan heshlash) yetarli — buning uchun qonun darajasida qo'shimcha talab topilmadi.
+- **Kriptografiya** — faqat fiskal modul (FM) uchun milliy standart (O'zDST 1106/1092, 3DES/AES/RSA/SHA — `02-fayl`) aniq; tizimning o'z backend/frontend aloqasi uchun standart sanoat amaliyoti (TLS 1.2+, parolni bcrypt/argon2 bilan heshlash) yetarli — buning uchun qonun darajasida qo'shimcha talab topilmadi.
 - **Zaxira nusxa**: UzCloud Backup-as-a-Service xizmati mavjud (`07-fayl`); kunlik avtomatik backup + DBaaS'ning PITR (nuqta-vaqt tiklash) imkoniyati. Buxgalteriya hujjatlari saqlash muddati — kamida 3 yil (Buxgalteriya hisobi to'g'risidagi qonun, 23-modda) — backup siklini shu muddatdan kam qilib bo'lmaydi; amalda tavsiya — operatsion backup 30 kun, arxiv backup kamida 3 yil (soliq hujjatlari uchun kengaytirilgan holatlarda 13 yilgacha, `07-fayl`).
-- **Audit log** — umumiy qonuniy saqlash muddati topilmadi (`07-fayl`da KAI uchun "3 oy" past ishonchli raqam sifatida belgilangan); AIOS o'zining tizim jurnalini kamida buxgalteriya hujjatlari bilan bir xil muddat (3 yil) saqlashi — ichki siyosat sifatida, qonuniy majburiyat sifatida emas — tavsiya etiladi.
+- **Audit log** — umumiy qonuniy saqlash muddati topilmadi (`07-fayl`da KAI uchun "3 oy" past ishonchli raqam sifatida belgilangan); Tizim o'zining tizim jurnalini kamida buxgalteriya hujjatlari bilan bir xil muddat (3 yil) saqlashi — ichki siyosat sifatida, qonuniy majburiyat sifatida emas — tavsiya etiladi.
 
 ---
 

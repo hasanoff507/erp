@@ -15,7 +15,7 @@
 6. **Audit jurnali — o'zgarmas (append-only)**, hech qachon UPDATE/DELETE qilinmaydi; saqlash muddati uchun qonuniy minimum **topilmadi** — ichki siyosat sifatida buxgalteriya hujjatlari muddati (kamida 5 yil, hisobot yilidan keyin, "Buxgalteriya hisobi to'g'risida"gi qonun O'RQ-404, 29-modda) bilan tenglashtiriladi (`07-hosting-lokalizatsiya-xavfsizlik.md`, 3.3-bo'lim; `04-arxitektura-va-stack.md`, 7-bo'lim).
 7. **Backup — UzCloud Backup-as-a-Service + DBaaS PITR**; aniq chastota/RPO/RTO raqami manbada yo'q — **taxmin** sifatida tavsiya beriladi, buxgalteriya hujjat muddatidan (3+ yil) kam bo'lmasligi shart (`07-fayl`, 2.1-bo'lim; `04-fayl`, 7-bo'lim).
 8. **Fiskal modul uchun kripto milliy standart aniq, umumiy dastur uchun majburiy kripto-algoritm standarti qonun darajasida topilmadi** — standart sanoat amaliyoti (TLS 1.2+, argon2) yetarli deb baholanadi (`07-fayl`, 3.2-bo'lim).
-9. **Kompleks muvofiqlik ikki ochiq savol bilan boshlanadi**: (a) ЗРУ-764 (Kiberxavfsizlik to'g'risida) sertifikatlash/ekspertiza talabining oddiy xususiy SaaS'ga tegishliligi aniqlanmagan — csec.uz'ga yozma so'rov tavsiya etiladi; (b) shaxsiy ma'lumotlar qonuni (ZRU-547/ЗРУ-666/ЗРУ-1125) bo'yicha lokalizatsiya faqat biometrik/genetik/telekom ma'lumotga tegishli, AIOS'ning odatiy ma'lumoti bu toifaga **kirmaydi** (`07-fayl`, 1.1 va 3.1-bo'lim).
+9. **Kompleks muvofiqlik ikki ochiq savol bilan boshlanadi**: (a) ЗРУ-764 (Kiberxavfsizlik to'g'risida) sertifikatlash/ekspertiza talabining oddiy xususiy SaaS'ga tegishliligi aniqlanmagan — csec.uz'ga yozma so'rov tavsiya etiladi; (b) shaxsiy ma'lumotlar qonuni (ZRU-547/ЗРУ-666/ЗРУ-1125) bo'yicha lokalizatsiya faqat biometrik/genetik/telekom ma'lumotga tegishli, tizimning odatiy ma'lumoti bu toifaga **kirmaydi** (`07-fayl`, 1.1 va 3.1-bo'lim).
 10. **PCI DSS qamrovi minimal**: karta ma'lumoti hech qachon bizning tizimimizda saqlanmaydi/qayta ishlanmaydi — to'lovlar Click/Payme/bank terminali orqali, ular o'z PCI-sertifikatlangan muhitida ishlaydi (`research_notes/texnik/03-efaktura-va-tolov.md`, 2.1–2.3-bo'lim izidan, mantiqiy xulosa — manbada PCI so'zi yo'q, **taxmin**).
 11. **Obuna muddati — qattiq to'xtatish**: 24 soatlik imtiyoz tugagach tenantning barcha sessiya/tokenlari bekor qilinadi, login rad etiladi (to'lov havolasi bundan mustasno); offline qurilma imzolangan litsenziya tokeni (`valid_until = min(grace_ends_at, issued_at + 7 kun)`) bilan serversiz ham mahalliy bloklanadi — to'liq mexanizm va fiskal oqibat izohi `14-autentifikatsiya-oauth2.md` §16–17'da.
 
@@ -396,18 +396,18 @@ Manbada aniq "OWASP ASVS L2" talabi tilga olinmagan — quyidagilar sanoat stand
 ### 9.1 ZRU-764 (Kiberxavfsizlik to'g'risida)
 
 - 18-modda (ekspertiza) va 19-modda (sertifikatlash) **faqat davlat organlari va KAI (kritik axborot infratuzilmasi) obyektlariga** tegishli (`07-fayl`, 3.1-bo'lim, lex.uz/ru/docs/5960609 bilan tasdiqlangan).
-- **Ochiq savol (muhim, hal qilinmagan)**: AIOS kabi oddiy xususiy SaaS ERP soliq.uz/OFD kabi davlat API'lariga faqat **mijoz** sifatida ulanganda shu majburiy ekspertiza/sertifikatlashga tushadimi — ochiq manbada aniq tasdiqlanmagan.
+- **Ochiq savol (muhim, hal qilinmagan)**: Bizniki kabi oddiy xususiy SaaS ERP soliq.uz/OFD kabi davlat API'lariga faqat **mijoz** sifatida ulanganda shu majburiy ekspertiza/sertifikatlashga tushadimi — ochiq manbada aniq tasdiqlanmagan.
 - **Tavsiya**: MVP rejasining birinchi 2-4 haftasida **csec.uz (Davlat kiberxavfsizlik xizmati markazi)**ga yozma so'rov yuborilsin (`07-fayl`, 3.1-bo'lim tavsiyasi; `04-arxitektura-va-stack.md`, 7 va 10-bo'lim). Agar javob "ha" bo'lsa — bu loyiha jadvali va byudjetiga katta ta'sir qiladi (narx/muddat noma'lum).
 
 ### 9.2 Shaxsiy ma'lumotlar qonuni
 
-- **Lokalizatsiya**: faqat fizik shaxslarning **biometrik ma'lumotlari, genetik ma'lumotlari va O'zbekiston telekom operatorlari foydalanuvchilarining ma'lumotlari** O'zbekiston hududida saqlanishi shart (ZRU-547, 27-1-modda; ЗРУ-666 bilan kiritilgan, ЗРУ-1125 (2026-03-26/27) bilan tasdiqlangan/liberallashtirilgan — `07-fayl`, 1.1-bo'lim). **AIOS'ning odatiy ma'lumoti (mijoz ismi/telefon, savdo, ombor, buxgalteriya) bu uchta toifaga kirmaydi.**
+- **Lokalizatsiya**: faqat fizik shaxslarning **biometrik ma'lumotlari, genetik ma'lumotlari va O'zbekiston telekom operatorlari foydalanuvchilarining ma'lumotlari** O'zbekiston hududida saqlanishi shart (ZRU-547, 27-1-modda; ЗРУ-666 bilan kiritilgan, ЗРУ-1125 (2026-03-26/27) bilan tasdiqlangan/liberallashtirilgan — `07-fayl`, 1.1-bo'lim). **tizimning odatiy ma'lumoti (mijoz ismi/telefon, savdo, ombor, buxgalteriya) bu uchta toifaga kirmaydi.**
 - Agar kelajakda tizim biometrik funksiya (masalan yuz tanish bilan kirish) qo'shsa — shu qism uchun **Shaxsiy ma'lumotlar bazasini Davlat reyestrida ro'yxatdan o'tkazish** (pd.gov.uz, bildirishnoma tartibida) zarur bo'ladi (`07-fayl`, 1.2-bo'lim). Hozircha MVP'da bunday funksiya yo'q.
 - Chet elga uzatish (Claude API, 5.2-bo'lim) — ZRU-547 15/27-1-moddalar asosida qonuniy, lekin uch shartdan (yetarli himoya davlati / standart shartnoma shartlari / xalqaro standart muvofiqligi) qaysi birini tanlash huquqiy ishlov talab qiladi (**ochiq savol**).
 
 ### 9.3 PCI DSS
 
-- AIOS **hech qachon** to'liq karta raqami/CVV saqlamaydi yoki qayta ishlamaydi — to'lovlar Click/Payme (JSON-RPC/REST API, merchant tokenlashtirilgan oqim) yoki bank POS-terminali orqali amalga oshadi (`research_notes/texnik/tekshiruv-2026-10-14/2-efaktura-tolov-hosting.md`, Payme/Click protokollari).
+- Tizim **hech qachon** to'liq karta raqami/CVV saqlamaydi yoki qayta ishlamaydi — to'lovlar Click/Payme (JSON-RPC/REST API, merchant tokenlashtirilgan oqim) yoki bank POS-terminali orqali amalga oshadi (`research_notes/texnik/tekshiruv-2026-10-14/2-efaktura-tolov-hosting.md`, Payme/Click protokollari).
 - Bu amaliyotda PCI DSS qamrovini **minimal** (odatda SAQ A darajasiga yaqin) qiladi — lekin manbada "PCI" so'zi to'g'ridan-to'g'ri tilga olinmagan, bu xulosa **mantiqiy natija, taxmin** sifatida belgilanadi.
 
 ---

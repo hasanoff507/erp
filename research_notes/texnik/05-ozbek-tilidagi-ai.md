@@ -19,7 +19,7 @@
 - Akademik tadqiqot (2026) ochiq modellarni (Llama-3.2-1B-Instruct, Qwen3-0.6B) tarjima, matn tushunish va generatsiya bo'yicha o'zbek tilida "past-resurs til" sifatida sinab ko'rdi — o'zbek tili 60 million+ so'zlovchiga ega bo'lsa ham, NLP resurslari kam ([zenodo.org](https://zenodo.org/records/17223973)).
 - TUMLU (turkiy tillar uchun unified benchmark, qozoq/qirg'iz/o'zbek/qoraqalpoq va h.k.) natijalariga ko'ra ochiq modellar orasida **Qwen2.5 72B Instruct** eng yaxshi natija ko'rsatdi; Llama 3.1 70B o'zining 8B versiyasidan sezilarli ustun ([aclanthology.org — TUMLU](https://aclanthology.org/2025.acl-long.1112.pdf)).
 - Mahalliy loyihalar: **Salom AI** (salom-ai.uz) — o'zbekcha (lotin+kirill) tushunadigan birinchi AI, ochiq modellar (Llama, Mistral) asosida moslashtirilgan ([salom-ai.uz blog](https://salom-ai.uz/blog/llama-uzbek/)); **Tilmoch** — turkiy tillar uchun AI-tarjimon, $1,5 mln baholashga **2025-yil sentyabrida** (150 ming dollarlik investitsiya raundida) chiqqan ([digitalbusiness.kz, 2026-10-08](https://digitalbusiness.kz/en/2026-10-08/uzbekistanets-sozdal-ii-perevodchik-dlya-tyurkskih-yazikov-startap-otsenili-v-15-mln/) — maqola e'lon sanasi 2026-oktyabr, lekin matn va boshqa manbalar voqea sanasini 2025-sentyabr deb ko'rsatadi). *(2026-10-14 tekshiruvida tuzatildi: avval "2026-yil oktyabrda... chiqdi" deyilgan edi — bu maqola e'lon sanasini voqea sanasi bilan aralashtirgan; baholash aslida 2025-sentyabrda bo'lgan.)*; **TilLab** — o'zbek tili uchun ochiq-kodli "raqamli laboratoriya" (GitHub loyihasi, hobbi/tadqiqot darajasida) ([github.com/AbrorMusulmonov/tillab](https://github.com/AbrorMusulmonov/tillab)).
-- Xulosa: mahalliy-maxsus LLM hali yetuk emas (asosan tarjima/chatbot darajasida); AIOS uchun eng amaliy yo'l — umumiy ko'p tilli flagman modellardan (Claude/GPT/Gemini) foydalanish, chunki ular sifat jihatidan sinalgan va "code computes, AI explains" me'morchiligida raqamni emas, tilni generatsiya qiladi (xato darajasi past).
+- Xulosa: mahalliy-maxsus LLM hali yetuk emas (asosan tarjima/chatbot darajasida); tizim uchun eng amaliy yo'l — umumiy ko'p tilli flagman modellardan (Claude/GPT/Gemini) foydalanish, chunki ular sifat jihatidan sinalgan va "code computes, AI explains" me'morchiligida raqamni emas, tilni generatsiya qiladi (xato darajasi past).
 
 ### 2.2 Narxlar (1M token uchun, **faqat rasmiy narx sahifalari**, 2026-10 holatiga)
 
@@ -55,7 +55,7 @@ Eslatma: OpenAI'ning rasmiy narx sahifasida yuqoridagilardan tashqari ko'plab qo
 - Avval: FUQAROLARNING BARCHA shaxsiy ma'lumoti O'zbekiston hududida saqlanishi majburiy edi.
 - Endi: faqat **biometrik ma'lumot, genetik ma'lumot va mahalliy telekom-operator foydalanuvchisi ma'lumoti** majburiy lokalizatsiyaga tushadi.
 - Boshqa shaxsiy ma'lumotlar (mijoz ismi, telefon raqami, xarid tarixi) xavfsizlik talablari (axborot xavfsizligi, xalqaro standartlarga muvofiqlik yoki davlat organi nazorati) bajarilgan holda **chet elda** (demak — Claude/GPT/Gemini API serverlarida) qayta ishlanishi mumkin.
-- Amaliy natija: AIOS Claude/GPT/Gemini API'dan foydalanishi mumkin, lekin mijozning pasport/biometrik ma'lumotini (agar kelajakda to'plansa) chet el API'ga yubormasligi kerak.
+- Amaliy natija: Tizim Claude/GPT/Gemini API'dan foydalanishi mumkin, lekin mijozning pasport/biometrik ma'lumotini (agar kelajakda to'plansa) chet el API'ga yubormasligi kerak.
 
 ## 2. STT (ovozdan matn)
 

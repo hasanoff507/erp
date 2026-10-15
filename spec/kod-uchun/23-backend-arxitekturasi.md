@@ -5,8 +5,6 @@
 **Bog'liq fayllar:** `10-umumiy-arxitektura.md`, `11-malumotlar-modeli.md`, `24-frontend-arxitekturasi.md`, `03-modullar-talablari.md`, `14-autentifikatsiya-oauth2.md`.
 **Holat:** joriy, 2026-10-15.
 
-*Namuna loyiha (tuzilma va konventsiya uchun, kod emas): `E:/Project/universal_ai_platform/src/backend`.*
-
 ## Asosiy xulosalar
 
 1. **Modulli monolit**: `backend/app/modules/<modul>/` — 19 modul papkasi (18 mahsulot moduliga + kesishuvchi `integrations`/`sync`/`ai` ga mos), har biri bir xil ichki qatlam: `domain/` → `application/` → `infrastructure/` → `api/`. Umumiy infratuzilma — `app/core` (DB sessiya + tenant kontekst, auth, huquq dependency, idempotentlik, xatolar, sozlamalar, logging) va `app/workers` (navbat ishlari, cron).
@@ -14,9 +12,9 @@
 3. **Navbat kutubxonasi — `SAQ`** (4-bo'lim): asyncio, Redis broker (stack'da bor), ichki `CronJob`, o'rnatilgan monitoring UI. `arq` 2025-10 dan beri faqat texnik xizmat rejimida (python-arq/arq#510) — yangi loyiha uchun tanlanmaydi.
 4. **Tenant izolyatsiyasi kod darajasida ikki marta**: (a) ilova qatlami — `TenantMixin` modellariga SQLAlchemy `with_loader_criteria` orqali global `tenant_id` filtri; (b) PostgreSQL RLS (`set_config('app.tenant_id', …, true)` + siyosat, `15-xavfsizlik-va-audit.md`) — (b) (a) buzilsa ham himoya qiladi va aksincha (09 §6 RLS-o'chirilgan testi shu (a)ni tekshiradi).
 5. **Kutubxona birinchi, qo'lda kod oxirgi**: pagination — `fastapi-pagination`, filtrlash — `fastapi-filter`, retry — `tenacity`, UUIDv7 — `uuid-utils`, muddat arifmetikasi (5 kalendar kun, 48/72 soat, qarz eskirish guruhlari) — `pendulum`, Excel — `openpyxl`, shtrix-kod/yorliq — `python-barcode` + `zxing-cpp` (Ghostscript/AGPL'siz). To'liq jadval 5-bo'limda.
-6. **AI — port naqshi** (`AiProvider`, README qarori): `fake` (test) | `cli` (lokal dev, Claude Code CLI) | `api` (staging/prod, `anthropic` SDK) — namuna loyihadagi `ClaudePort`/`CliClaudeClient`/`FakeClaudeClient` naqshining aynan takrorlanishi, faqat `cli` o'rniga prodda `api`.
-7. **Namuna loyihadan nusxa olinadi**: qatlamli papka tuzilmasi, `pydantic-settings` + `lru_cache get_settings()` + prod-da xavfsizlik guard (`model_validator` — auth yoqilmagan/standart sir/sqlite bo'lsa ishga tushmaydi), composition-root'dagi `_build_*` factory funksiyalar, Alembic'ning asinxron `env.py`'si, `ReadinessProbe`'ning "gating vs reported" bo'linishi, ko'p bosqichli Dockerfile (non-root user, `HEALTHCHECK`).
-8. **Namuna loyihadan farqlanadi**: u — har mijoz uchun alohida stack (bitta tenant); bu loyiha — **bitta umumiy stack, ko'p tenant, RLS bilan**: `api`/`worker` gorizontal ko'payadi, `scheduler` yagona nusxa bo'lishi kerak (Postgres advisory lock bilan) (adapterlar: OFD/e-faktura/Asl belgisi/Click-Payme adapterlari).
+6. **AI — port naqshi** (`AiProvider`, README qarori): `fake` (test) | `cli` (lokal dev, Claude Code CLI) | `api` (staging/prod, `anthropic` SDK) — bitta portga qarab rejim almashtiriladi, faqat `cli` o'rniga prodda `api`.
+7. **Standart naqshlar**: qatlamli papka tuzilmasi, `pydantic-settings` + `lru_cache get_settings()` + prod-da xavfsizlik guard (`model_validator` — auth yoqilmagan/standart sir/sqlite bo'lsa ishga tushmaydi), composition-root'dagi `_build_*` factory funksiyalar, Alembic'ning asinxron `env.py`'si, `ReadinessProbe`'ning "gating vs reported" bo'linishi, ko'p bosqichli Dockerfile (non-root user, `HEALTHCHECK`).
+8. **Deploy modeli**: bitta umumiy stack, ko'p tenant, RLS bilan: `api`/`worker` gorizontal ko'payadi, `scheduler` yagona nusxa bo'lishi kerak (Postgres advisory lock bilan) (adapterlar: OFD/e-faktura/Asl belgisi/Click-Payme adapterlari).
 9. API — `/api/v1`, URL yo'li kebab-case ko'plik, JSON/query/enum/`operation_id` — snake_case (3-bo'lim, `01-qarorlar.md` #24); xato formati `{"error": {code, message_key, params, details[], request_id}}` (frontenddagi zod/i18next bilan bir xil shakl, `details` har doim massiv), `Idempotency-Key` Redis tezkor qulf + Postgres doimiy jurnal bilan, optimistik qulflash `version` maydoni orqali (faqat ma'lumotnomalarda — hujjatlarda yo'q).
 10. Test strategiyasi — bitlik testlar provodka qoidalari uchun sonli misollar bilan, `testcontainers` orqali haqiqiy Postgres'da integratsiya va RLS izolyatsiya testlari, `schemathesis` OpenAPI'dan kontrakt testlari.
 11. **Autentifikatsiya — o'z OAuth 2.0 AS+RS implementatsiyasi** (`app/modules/auth/`): protokol skeleti **Authlib** (RFC 6749/7636/7009/7662/8414/9068), JWT/JWKS — **joserfc**, parol/PIN — **argon2-cffi (argon2id)**; barcha storage/rotatsiya/obuna-tekshiruv mantiqi bizning kod. To'liq dizayn — `14-autentifikatsiya-oauth2.md`.
@@ -67,7 +65,7 @@ backend/
 │       ├── cron.py                    # SAQ CronJob ro'yxati (davlat hisoboti eslatmasi, qarz eslatmasi, recost, kam qoldiq, yaroqlilik muddati, obuna eslatmasi, kunlik Telegram hisobot)
 │       └── worker_settings.py         # SAQ worker sozlamalari (navbatlar, concurrency, Sentry/OTel init)
 ├── alembic/
-│   ├── env.py                         # asinxron, namuna loyihadagidek
+│   ├── env.py                         # asinxron
 │   └── versions/
 ├── tests/
 ├── scripts/                           # seed.py (typer CLI), wait_for_db.py va h.k.
@@ -97,7 +95,7 @@ sales/
     └── deps.py             # modulga xos dependency (masalan faol smenani talab qilish)
 ```
 
-**Qatlamlar orasidagi qoida** (namunadagi `aios/domain|application|infrastructure|interface` bo'linishidan olingan, FSD'dagi "faqat pastga import" qoidasiga o'xshash): `api → application → domain`; `infrastructure` faqat `domain`dagi portlarni amalga oshiradi, `application` uni interfeys orqali ko'radi (dependency inversion — DI composition root `app/main.py` + modul-ichidagi kichik `wiring.py` bog'laydi). Modullar bir-birining `infrastructure`/`api` qatlamini **import qilmaydi** — faqat boshqa modulning `application`/`domain` portini (masalan `sales` moduli `inventory.application.ports.StockPort`ni chaqiradi, `inventory.infrastructure`ni emas). Bu modulli monolitni keyin mikroservisga ajratishni osonlashtiradi (`10-umumiy-arxitektura.md`, 1-xulosa).
+**Qatlamlar orasidagi qoida** (`domain|application|infrastructure|interface` bo'linishi, FSD'dagi "faqat pastga import" qoidasiga o'xshash): `api → application → domain`; `infrastructure` faqat `domain`dagi portlarni amalga oshiradi, `application` uni interfeys orqali ko'radi (dependency inversion — DI composition root `app/main.py` + modul-ichidagi kichik `wiring.py` bog'laydi). Modullar bir-birining `infrastructure`/`api` qatlamini **import qilmaydi** — faqat boshqa modulning `application`/`domain` portini (masalan `sales` moduli `inventory.application.ports.StockPort`ni chaqiradi, `inventory.infrastructure`ni emas). Bu modulli monolitni keyin mikroservisga ajratishni osonlashtiradi (`10-umumiy-arxitektura.md`, 1-xulosa).
 
 ### `app/core/db` — tenant kontekst
 
@@ -255,9 +253,9 @@ Cron (`workers/cron.py`) ro'yxati: davlat hisobotini kunlik tekshirish, qarz esl
 |---|---|---|
 | Web freymvork | **FastAPI** | Qaror qilingan stack; OpenAPI avtomatik, Pydantic bilan tabiiy integratsiya |
 | Validatsiya/sxema | **Pydantic v2** | FastAPI bilan birga keladi, tez (Rust core), orval uchun to'g'ri OpenAPI sxema chiqaradi |
-| Sozlamalar | **pydantic-settings** | Namuna loyihadagi naqsh — `.env` + real env, `env_prefix="ERP_"`, prod-xavfsizlik guard (`model_validator`) |
-| ORM | **SQLAlchemy 2 (async) + asyncpg** | Namuna loyihada sinalgan; 2.0 stili (`Mapped[...]`) tip xavfsizligini beradi |
-| Migratsiya | **Alembic** (asinxron `env.py`, namunadagidek) | Zero-downtime siyosati (13-bo'lim) uchun standart vosita |
+| Sozlamalar | **pydantic-settings** | `.env` + real env, `env_prefix="ERP_"`, prod-xavfsizlik guard (`model_validator`) |
+| ORM | **SQLAlchemy 2 (async) + asyncpg** | 2.0 stili (`Mapped[...]`) tip xavfsizligini beradi |
+| Migratsiya | **Alembic** (asinxron `env.py`) | Zero-downtime siyosati (13-bo'lim) uchun standart vosita |
 | UUID | **uuid-utils** (Rust bog'lovchi, UUIDv7) | `11-malumotlar-modeli.md` UUIDv7 qarorini qo'lda implementatsiya qilmasdan tez generatsiya qiladi |
 | Navbat/worker | **SAQ** | 4-bo'lim — asinxron stack bilan tabiiy mos, o'rnatilgan monitoring UI |
 | Kesh/navbat broker | **redis** (`redis-py` asinxron klient) | SAQ broker + sessiya/kesh/rate-limit (`10-umumiy-arxitektura.md`) |
@@ -265,7 +263,7 @@ Cron (`workers/cron.py`) ro'yxati: davlat hisobotini kunlik tekshirish, qarz esl
 | Qayta urinish | **tenacity** | Har integratsiya adapterida exponential backoff + jitter — qo'lda `for`/`sleep` yozilmaydi |
 | Pagination | **fastapi-pagination** | Cursor va page/size — qo'lda offset/limit hisoblanmaydi (3-bo'lim) |
 | Filtrlash | **fastapi-filter** | Deklarativ query filtr, SQLAlchemy modeliga bog'langan. `filter.sort(filter.filter(select(Model)))` → `await session.execute(...)` yoki `fastapi_pagination.ext.sqlalchemy.paginate(session, stmt)` (AsyncSession qo'llab-quvvatlanadi). Versiya: ≥3.0 (SQLAlchemy 2.0). |
-| Logging | **structlog** | JSON struktura log, tenant/so'rov ID context — namuna loyihadagi JSONL log yondashuvi |
+| Logging | **structlog** | JSON struktura log, tenant/so'rov ID context — JSONL log yondashuvi |
 | Trace | **OpenTelemetry** (FastAPI + SQLAlchemy instrumentatsiyasi) | So'rov → posting → worker zanjirini kuzatish |
 | Metrika | **prometheus-client** | `/metrics`; posting latensiyasi, navbat chuqurligi, AI xarajati |
 | Xato kuzatish | **sentry-sdk** | FastAPI/Starlette integratsiyasi tayyor |
@@ -284,9 +282,9 @@ Cron (`workers/cron.py`) ro'yxati: davlat hisobotini kunlik tekshirish, qarz esl
 | Son/pul formatlash, i18n | **babel** | Eksport qilinadigan hisobot/PDF'da son formatlash (uz_Latn); UI formatlash frontendda (`Intl.NumberFormat`) |
 | CLI (seed, ops skript) | **typer** | `scripts/seed.py` va h.k. — `argparse` o'rniga deklarativ CLI |
 | Testlar | **pytest, pytest-asyncio, factory-boy, testcontainers, schemathesis** | 6-bo'lim |
-| Kod sifati | **ruff, mypy, pre-commit** | Namuna loyihada allaqachon ishlatiladi (`.ruff_cache`, `mypy` venv'da ko'rindi) |
+| Kod sifati | **ruff, mypy, pre-commit** | Standart Python sifat vositalari, CI gate sifatida ishlatiladi |
 
-**Ataylab kiritilmagan**: `dependency-injector` paketi — namuna loyihada `venv`da mavjud, lekin haqiqiy composition-root (`di_builders.py`) uni ishlatmaydi, oddiy factory funksiyalar + FastAPI `Depends` bilan yetarli; shu konventsiya takrorlanadi (ortiqcha abstraksiya qo'shilmaydi). Agar jamoa deklarativ konteyner xohlasa, bu — tasdiqlanishi kerak bo'lgan qaror (Ochiq savollar).
+**Ataylab kiritilmagan**: `dependency-injector` paketi — composition-root oddiy factory funksiyalar + FastAPI `Depends` bilan yetarli, ortiqcha abstraksiya qo'shilmaydi. Agar jamoa deklarativ konteyner xohlasa, bu — tasdiqlanishi kerak bo'lgan qaror (Ochiq savollar).
 
 ---
 
@@ -316,7 +314,7 @@ Cron (`workers/cron.py`) ro'yxati: davlat hisobotini kunlik tekshirish, qarz esl
 
 ### 7.2. Lokal dev — docker compose
 
-Namuna loyihadagi `deploy/compose.yml` tuzilmasidan, lekin **bitta tenant stack emas** — lokal muhit ham ko'p-tenant rejimida ishlaydi:
+Standart docker compose tuzilmasi, **bitta tenant stack emas** — lokal muhit ham ko'p-tenant rejimida ishlaydi:
 
 ```yaml
 services:
@@ -330,11 +328,11 @@ services:
   bot:        # aiogram polling (dev'da webhook shart emas)
 ```
 
-`AIOS`dagi kabi non-root user, ko'p bosqichli Dockerfile, `/health/ready` orqali `HEALTHCHECK` — aynan shu naqsh ko'chiriladi (faqat `claude` CLI bosqichi `api` rejimida ixtiyoriy bo'lib qoladi, lokal `cli` tanlanganda saqlanadi).
+Non-root user, ko'p bosqichli Dockerfile, `/health/ready` orqali `HEALTHCHECK` — standart naqsh (faqat `claude` CLI bosqichi `api` rejimida ixtiyoriy bo'lib qoladi, lokal `cli` tanlanganda saqlanadi).
 
 ### 7.3. Konfiguratsiya va sirlar
 
-`app/core/config.py`: `pydantic-settings`, `env_prefix="ERP_"`, `.env` (lokal) / real environment (prod). Namuna loyihadagi guard naqshi takrorlanadi:
+`app/core/config.py`: `pydantic-settings`, `env_prefix="ERP_"`, `.env` (lokal) / real environment (prod). Prod-xavfsizlik guard naqshi:
 
 ```python
 @model_validator(mode="after")
@@ -353,8 +351,8 @@ Sirlar (DB parol, Redis parol, Click/Payme kalitlari, Claude API kaliti, SMS/Tel
 
 ## 8. Observability
 
-- **Logging**: `structlog`, JSON format, har yozuvda `tenant_id`, `request_id`, `user_id`; shaxsiy ma'lumot (telefon, STIR) log'ga tushmasligi uchun redaction filtri (namuna loyihadagi `RedactingFilter` naqshi).
-- **Readiness/liveness**: `/health/live` (jarayon ishlayaptimi) va `/health/ready` — namuna loyihadagi **gating vs reported** bo'linishi: *gating* (API 200 bermasa stack buziladi) = Postgres round-trip + Alembic sxema versiyasi (`db_create_all=false` muhitlarda) + Redis; *reported* (faqat ma'lumot, bloklamaydi) = OFD/e-faktura/Claude API/S3 reachability — mijoz tomondagi tashqi tizim uzilishi deploy/health'ni bloklamasligi kerak.
+- **Logging**: `structlog`, JSON format, har yozuvda `tenant_id`, `request_id`, `user_id`; shaxsiy ma'lumot (telefon, STIR) log'ga tushmasligi uchun redaction filtri.
+- **Readiness/liveness**: `/health/live` (jarayon ishlayaptimi) va `/health/ready` — **gating vs reported** bo'linishi: *gating* (API 200 bermasa stack buziladi) = Postgres round-trip + Alembic sxema versiyasi (`db_create_all=false` muhitlarda) + Redis; *reported* (faqat ma'lumot, bloklamaydi) = OFD/e-faktura/Claude API/S3 reachability — mijoz tomondagi tashqi tizim uzilishi deploy/health'ni bloklamasligi kerak.
 - **Metrika**: `prometheus-client` — HTTP latensiya, posting tranzaksiya davomiyligi, `outbox_jobs` navbat chuqurligi/urinish soni, AI so'rov narxi (`ai_requests.cost_usd` yig'indisi).
 - **Trace**: OpenTelemetry, FastAPI+SQLAlchemy+httpx avtomatik instrumentatsiya; eksport nuqtasi (Grafana Tempo/Jaeger, UzCloud'da qaysi xizmat) — ochiq savol.
 - **Xato kuzatish**: `sentry-sdk`, tenant/branch context tag sifatida (lekin mijoz PII'siz).
@@ -365,18 +363,16 @@ Sirlar (DB parol, Redis parol, Click/Payme kalitlari, Claude API kaliti, SMS/Tel
 
 Konteynerlar (`10-umumiy-arxitektura.md`, 3-bo'lim bilan mos): **api**, **worker**, **scheduler**, **bot**, (frontend alohida `web` — statik, `24-frontend-arxitekturasi.md`).
 
-Namuna loyihadan **ko'chiriladi**: ko'p bosqichli `Dockerfile` (uv bilan bog'liqliklarni qulflangan holda o'rnatish, non-root `app` user, `HEALTHCHECK`), Alembic'ning bir martalik `migrate` konteyneri (api/worker undan keyin boshlanadi, `db_create_all=false` har joyda konteyner stack'da).
+Standart deploy naqshlari: ko'p bosqichli `Dockerfile` (uv bilan bog'liqliklarni qulflangan holda o'rnatish, non-root `app` user, `HEALTHCHECK`), Alembic'ning bir martalik `migrate` konteyneri (api/worker undan keyin boshlanadi, `db_create_all=false` har joyda konteyner stack'da).
 
-Namuna loyihadan **farqlanadi** (chunki u — bitta tenant/bitta stack, bu loyiha — ko'p tenant/bitta umumiy stack):
+Deploy qarorlari (chunki bu loyiha — ko'p tenant/bitta umumiy stack):
 
-| Jihat | Namuna loyiha | Bu loyiha |
-|---|---|---|
-| Stack soni | Har mijoz uchun alohida (`aios-<tenant>`) | Bitta umumiy stack, tenant — RLS bilan ma'lumotlar darajasida |
-| `api`/`worker` | Bitta nusxa | **Gorizontal ko'payadi** (holat yo'q — sessiya Redis'da, tranzaksiya DB'da) |
-| `scheduler` | Bitta nusxa, muammosiz | **Yagona nusxa bo'lishi shart** (cron ikki marta ishlamasligi uchun) — Postgres advisory lock (`pg_try_advisory_lock`) bilan yetakchi tanlanadi, bir nechta `scheduler` konteyneri ishga tushsa ham faqat biri faol bo'ladi |
-| Baza | Konteynerdagi Postgres | **UzCloud boshqariladigan DBaaS** (managed Postgres) — konteyner emas |
-| Fayl ombori | Yo'q | S3-mos ombor (UzCloud'da mavjudligi — `10-umumiy-arxitektura.md` ochiq savol 2) |
-| Ulanish pool'i | — | MVP: tashqi pooler yo'q — SQLAlchemy `AsyncAdaptedQueuePool` (asyncpg), `pool_size`/`max_overflow` × api+worker nusxalari soni DBaaS `max_connections` dan kichik. Pooler qo'shilsa (PgBouncer, **transaction** rejimi): PgBouncer ≥1.21 `max_prepared_statements` yoqiladi, yoki asyncpg `prepared_statement_cache_size=0` + `prepared_statement_name_func` (uuid nomlar). Session darajasidagi `SET` taqiqlanadi — tenant faqat `set_config(..., true)` bilan tranzaksiya ichida (1-bo'lim). UzCloud DBaaS'da o'rnatilgan pooler bor-yo'qligi — ochiq savol |
+- **Stack soni**: bitta umumiy stack, tenant — RLS bilan ma'lumotlar darajasida (har mijoz uchun alohida stack emas).
+- **`api`/`worker`**: **gorizontal ko'payadi** (holat yo'q — sessiya Redis'da, tranzaksiya DB'da).
+- **`scheduler`**: **yagona nusxa bo'lishi shart** (cron ikki marta ishlamasligi uchun) — Postgres advisory lock (`pg_try_advisory_lock`) bilan yetakchi tanlanadi, bir nechta `scheduler` konteyneri ishga tushsa ham faqat biri faol bo'ladi.
+- **Baza**: **UzCloud boshqariladigan DBaaS** (managed Postgres) — konteyner emas.
+- **Fayl ombori**: S3-mos ombor (UzCloud'da mavjudligi — `10-umumiy-arxitektura.md` ochiq savol 2).
+- **Ulanish pool'i**: MVP: tashqi pooler yo'q — SQLAlchemy `AsyncAdaptedQueuePool` (asyncpg), `pool_size`/`max_overflow` × api+worker nusxalari soni DBaaS `max_connections` dan kichik. Pooler qo'shilsa (PgBouncer, **transaction** rejimi): PgBouncer ≥1.21 `max_prepared_statements` yoqiladi, yoki asyncpg `prepared_statement_cache_size=0` + `prepared_statement_name_func` (uuid nomlar). Session darajasidagi `SET` taqiqlanadi — tenant faqat `set_config(..., true)` bilan tranzaksiya ichida (1-bo'lim). UzCloud DBaaS'da o'rnatilgan pooler bor-yo'qligi — ochiq savol.
 
 ---
 
@@ -389,7 +385,7 @@ Namuna loyihadan **farqlanadi** (chunki u — bitta tenant/bitta stack, bu loyih
 3. **Kodni ko'chirish**: yangi kod yangi ustunni ishlatadi, eski ustun hali o'qiladi (fallback).
 4. **Contract**: faqat barcha instance yangi kodga o'tgach va backfill tugagach — eski ustun/jadval `DROP` qilinadi, alohida revisiyada.
 
-Taqiqlar: bir revisiyada ustun **nomini o'zgartirish** yoki **tipini o'zgartirish** (buning o'rniga: yangi ustun qo'sh — ko'chir — eskisini o'chir); `NOT NULL`ni bitta qadamda qo'shish (avval `DEFAULT` + backfill, keyin `NOT NULL`). `migrate` konteyneri har deploy'dan oldin, pre-release `pg_dump` bilan birga ishga tushadi (namuna loyihadagi `release.sh` naqshi).
+Taqiqlar: bir revisiyada ustun **nomini o'zgartirish** yoki **tipini o'zgartirish** (buning o'rniga: yangi ustun qo'sh — ko'chir — eskisini o'chir); `NOT NULL`ni bitta qadamda qo'shish (avval `DEFAULT` + backfill, keyin `NOT NULL`). `migrate` konteyneri har deploy'dan oldin, pre-release `pg_dump` bilan birga ishga tushadi.
 
 ---
 
@@ -409,7 +405,7 @@ Seed — Alembic "data migration" emas (bazani versiyalash bilan aralashtirmasli
 
 ## Ochiq savollar
 
-1. **DI yondashuvi**: namuna loyihadagidek oddiy factory-funksiya + `Depends` (5-bo'limdagi tanlov) yetarlimi, yoki `dependency-injector` paketi (deklarativ `Container`) qo'shilsinmi — standart qaror: oddiy factory + `Depends` (`26-ochiq-savollar-reestri.md` #59); deklarativ konteyner kerak bo'lsa keyin qayta ko'riladi.
+1. **DI yondashuvi**: oddiy factory-funksiya + `Depends` (5-bo'limdagi tanlov) yetarlimi, yoki `dependency-injector` paketi (deklarativ `Container`) qo'shilsinmi — standart qaror: oddiy factory + `Depends` (`26-ochiq-savollar-reestri.md` #59); deklarativ konteyner kerak bo'lsa keyin qayta ko'riladi.
 2. **CI vositasi**: quvur bosqichlari (7.1-band) tasdiqlangan, lekin platforma — standart qaror: GitHub Actions (`26-ochiq-savollar-reestri.md` #60).
 3. **OpenTelemetry eksport nuqtasi**: UzCloud'da Grafana Tempo/Jaeger kabi xizmat bormi — tekshirish kerak (`10-umumiy-arxitektura.md` ochiq savol 2 bilan bog'liq, S3-mos ombor savoli ham hali ochiq; reestr #53 B, #27 B — interim: o'z-hosted Grafana Tempo, `StoragePort` + zaxira o'z-MinIO).
 4. **`scheduler`ning yagona nusxa kafolati**: Postgres advisory lock taklif qilindi (9-bo'lim) — Redis-based lock (`redis-py` + `SET NX` TTL bilan) muqobil variant, standart qaror: Postgres advisory lock (`26-ochiq-savollar-reestri.md` #61).
@@ -424,4 +420,3 @@ Seed — Alembic "data migration" emas (bazani versiyalash bilan aralashtirmasli
 - `spec/kod-uchun/11-malumotlar-modeli.md` — jadvallar, registrlar, holat mashinalari, raqamlash.
 - `spec/kod-uchun/24-frontend-arxitekturasi.md` — API konventsiyalari (cookie/CSRF, Idempotency-Key, X-Branch-Id, xato formati, orval).
 - `spec/kod-uchun/03-modullar-talablari.md` — M01–M18 foydalanuvchi hikoyalari va chekka holatlar.
-- `E:/Project/universal_ai_platform/src/backend` — qatlamli tuzilma, `pydantic-settings`/DI/Alembic/health/Dockerfile naqshlari (struktura namunasi, kod emas — `spec/README.md` qoidasiga mos, O'zbekiston-specific qiymat olinmagan).

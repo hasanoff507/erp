@@ -1,7 +1,7 @@
 {"verdict":"allow","rev":11,"data":{"rev":11,"xml":"
 O'zbekiston biznes avtomatlashtirish dasturlari
 2026-10-09 · 
-O'zbekistonda BILLZ'ga o'xshash 25 dan ortiq dastur bor, lekin hech biri o'zbek tilida savol-javob, brifing va debitorlik ogohlantirishini bermaydi — AIOS uchun bozor bo'sh.
+O'zbekistonda BILLZ'ga o'xshash 25 dan ortiq dastur bor, lekin hech biri o'zbek tilida savol-javob, brifing va debitorlik ogohlantirishini bermaydi — tizim uchun bozor bo'sh.
 Taqqoslash jadvali
 Tasdiqlangan AI funksiyasi faqat uchtagina: REGOS, Smartup va Linko/PosPoint. "?" = topilmadi, "⚠" = tasdiqlanmagan yoki ziddiyatli.
 [TABLE]

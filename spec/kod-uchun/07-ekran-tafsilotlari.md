@@ -28,7 +28,7 @@
 
 ```
 ┌───────────────────────────────────────┐
-│  AIOS Kassa              [UZ/RU]  🔴   │
+│  ERP Kassa               [UZ/RU]  🔴   │
 ├───────────────────────────────────────┤
 │        Filial: "Chilonzor-3" (qurilmaga bog'langan, faqat ko'rsatiladi) │
 │   PIN kod:  [ * * * * ]                │
@@ -542,7 +542,7 @@ Tovarsiz "eski qarz"ni kiritish faqat BO-06 → "Boshlang'ich qarz" (`POST /api/
 
 ```
 ┌─────────────────────────────────────────┐
-│               AIOS                        │
+│               ERP                         │
 │         [UZ/RU]                           │
 │   Telefon:  [ +998 __ ___ __ __ ]          │
 │   Parol:    [ ************ ]               │

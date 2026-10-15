@@ -169,11 +169,11 @@
 | Ollama + lokal model, oddiy kompyuterda (8–16 GB RAM, GPU yo'q) | **MVP'da yo'q** | Bunday kompyuterda faqat ~1–8B modellar sig'adi, CPU'da sekin (soniyasiga bir necha so'z). O'zbek tili uchun kichik ochiq modellar "past-resurs til" sifatida zaif baholangan; ochiq modellar ichida eng yaxshisi Qwen2.5 **72B** (TUMLU) — oddiy kompyuterga sig'maydi (`research_notes/texnik/05-ozbek-tilidagi-ai.md`, 1-bo'lim). Rasmdan o'qish (OCR) uchun vision model yanada og'ir |
 | Lokal modelni o'zimiz o'qitish (fine-tune) | **Hozir yo'q, keyin ko'rib chiqiladi** | Minglab sifatli o'zbekcha misol, GPU va doimiy qo'llab-quvvatlash kerak. Faqat tor vazifalar (masalan tovar nomini toifaga ajratish) uchun, pilotdan real ma'lumot to'plangandan keyin |
 
-**Mavjud tajriba — `E:/Project/universal_ai_platform` (o'rganilgan):** u yerda AI `claude -p --output-format json` CLI subprocess + obuna tokeni (`CLAUDE_CODE_OAUTH_TOKEN`) orqali ishlaydi; har kompaniya uchun alohida deploy, ichki B2B vosita. O'sha loyihaning o'z hujjatlari ko'rsatgan cheklovlar: har so'rovga ~8–23 soniya kechikish, streaming yo'q, obunaning 5 soatlik limiti barcha foydalanuvchilarga umumiy (`docs/AIOS.md:386-387`), shartlar egasi tomonidan tasdiqlanmagan (`deploy/README.md:38`). ERP — yuzlab tashqi mijozli SaaS, shuning uchun **transport API kaliti orqali** bo'ladi, lekin quyidagilar **qayta ishlatiladi**:
-- port interfeyslari (`domain/ports/claude_port.py`, `text_completion_port.py`) → ERP'dagi `AiProvider`;
-- CLI adapteridagi himoyalar: timeout, retry + backoff, circuit breaker (`infrastructure/claude/cli_claude.py`) — API adapteriga ko'chiriladi;
-- token/xarajat hisobi (`domain/usage.py`), readiness tekshiruvi (`health_service.py`);
-- o'zbek/rus intent prompti, "raqamni kod beradi" qoidalari, `narration_guard.py` (AI matnini deterministik tekshirish);
+**CLI+obuna transporti nega ishlatilmaydi:** `claude -p --output-format json` CLI subprocess + obuna tokeni orqali ishlash bitta-tenant/ichki vositalar uchun mos, lekin yuzlab tashqi mijozli SaaS uchun yaroqsiz: har so'rovga ~8–23 soniya kechikish, streaming yo'q, obunaning 5 soatlik limiti barcha foydalanuvchilarga umumiy bo'lib qoladi, shartlar bo'yicha ham tasdiqlanmagan. Shuning uchun ERP'da **transport API kaliti orqali** bo'ladi; quyidagilar — bizning standartimiz:
+- port interfeysi — ERP'dagi `AiProvider`;
+- CLI adapteridagi himoyalar: timeout, retry + backoff, circuit breaker — API adapterida ham qo'llaniladi;
+- token/xarajat hisobi, readiness tekshiruvi;
+- o'zbek/rus intent prompti, "raqamni kod beradi" qoidalari, `numeric_guard` (AI matnini deterministik tekshirish);
 - STT: Vosk (o'zbek lotin) — AI-02 keyingi bosqichi uchun.
 CLI+obuna adapteri faqat **ishlab chiqish/demo** muhitida ixtiyoriy qoladi (`fake | cli | api` rejimlari).
 

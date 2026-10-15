@@ -276,7 +276,7 @@ Yagona shakl (`17-api-umumiy.md` §7.1, hech qachon boshqacha qaytarilmaydi):
 ### 5.2 Logging
 
 - **`structlog`**, JSON format; har yozuvda `tenant_id`, `request_id`, `user_id` context sifatida bog'langan (`23-backend-arxitekturasi.md` §8).
-- **PII logda yo'q**: telefon, STIR, parol/PIN, to'liq karta/bank rekvizit — redaction filtri orqali chiqarib tashlanadi (namuna loyihadagi `RedactingFilter` naqshi). `sentry-sdk`ga ham tenant/branch **ID** tag sifatida boradi, mijoz PII'siz.
+- **PII logda yo'q**: telefon, STIR, parol/PIN, to'liq karta/bank rekvizit — redaction filtri orqali chiqarib tashlanadi. `sentry-sdk`ga ham tenant/branch **ID** tag sifatida boradi, mijoz PII'siz.
 - Trace — OpenTelemetry (FastAPI+SQLAlchemy+httpx avtomatik instrumentatsiya); metrika — `prometheus-client` (HTTP latensiya, posting tranzaksiya davomiyligi, `outbox_jobs` navbat chuqurligi, `ai_requests.cost_usd`).
 - Frontend: `console.log` production kodda qoldirilmaydi (ESLint `no-console`, **taklif**: CI'da majburlanadi).
 

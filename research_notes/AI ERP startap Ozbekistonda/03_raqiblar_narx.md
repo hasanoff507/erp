@@ -95,7 +95,7 @@
 
 ---
 
-### Tavsiyalangan Narx Tuzilishi: AIOS uchun 3 Sath
+### Tavsiyalangan Narx Tuzilishi: Mahsulotimiz uchun 3 sath
 
 #### **Sath 1: Starter (Kichik Do'konga)**
 - **Narx**: 149,000 so'm/oy (yillikda 20% chegirma = 1.79M)
@@ -116,7 +116,7 @@
 - **Foydalanuvchi soni**: 5–20 gacha
 - **Tovarlar**: Hammasi + kichik omborlar, ish taqsimoti, davomiy brifing (AI proaktiv tahdidlar), dedikatsiya qo'llab-quvvatlash
 - **AI**: Kuchli (qarz risk, savdo bashorati, inventory optimallik)
-- **Tadbiq**: REGOS Pro, Smartup, Bito + AIOS
+- **Tadbiq**: REGOS Pro, Smartup, Bito + bizning tizim
 
 ### Tafsif: Nima Uchun Bu Narx?
 
@@ -124,8 +124,8 @@
 |-----------|---------|
 | **BILLZ raqib** | 299k–999k; Starter 149k (begona?), Professional 299k (BILLZ Lite), Enterprise 500k (BILLZ Standart+TBC kredit) |
 | **REGOS + MoySklad** | REGOS 69k–859k; MoySklad bepul–1.1M → Professional 299k — oraliq, kuchli API + AI |
-| **TBC-BILLZ kredit** | 4k do'kon; agar AIOS kredit integratsiyasini oshiritsa (+3–5% ARPU), upsell mantiqli |
-| **Smartup per-user** | 120k/kishi; 5 kishi = 600k; **Enterprise 500k–750k** — o'xshash (Smartup cheklangan; AIOS — kuchli AI) |
+| **TBC-BILLZ kredit** | 4k do'kon; agar tizim kredit integratsiyasini oshiritsa (+3–5% ARPU), upsell mantiqli |
+| **Smartup per-user** | 120k/kishi; 5 kishi = 600k; **Enterprise 500k–750k** — o'xshash (Smartup cheklangan; bizniki — kuchli AI) |
 | **SME bozori** | 1.2M biznes; 479k kichik korxona; **real taqqsim**: Starter (50k do'kon), Professional (100k do'kon), Enterprise (5k zanjir) |
 
 ### Kichik Biznesi Analitikasibunga Asoslangan Modellar

@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Yorliqlar va shtrix-kodlar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0E7C66}a:hover{color:#0A5E4D}
+</style>
+</helmet>
+<div style="min-height: 1240px; box-sizing: border-box; display: flex; flex-wrap: wrap; background: #F4F6F8; color: #0F1B2D; font-family: 'Manrope', system-ui, sans-serif;">
+  <nav aria-label="Asosiy menyu" style="flex: 1 1 240px; max-width: 260px; background: #0F1B2D; color: #C9D2DC; padding: 20px 14px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px;">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 18px;">
+      <div style="width: 36px; height: 36px; border-radius: 10px; background: #0E7C66; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 800;">E</div>
+      <div><div style="color: #FFFFFF; font-weight: 800; font-size: 15px;">ERP</div><div style="font-size: 12px; color: #8C99A8;">[Do'kon nomi]</div></div>
+    </div>
+    <sc-for list="{{menu}}" as="g" hint-placeholder-count="5">
+      <div style="padding: 14px 10px 6px; font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #6F7E90;">{{g.title}}</div>
+      <sc-for list="{{g.items}}" as="m" hint-placeholder-count="3">
+        <a href="{{m.href}}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 14px; font-weight: 600; text-decoration: none; color: {{m.fg}}; background: {{m.bg}};">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{m.icon}}"></path></svg>
+          <span style="flex-grow: 1;">{{m.label}}</span>
+          <sc-if value="{{m.hasBadge}}" hint-placeholder-val="{{false}}"><span style="padding: 1px 8px; border-radius: 999px; background: #C8372D; color: #FFFFFF; font-size: 11px; font-weight: 800;">{{m.badge}}</span></sc-if>
+        </a>
+      </sc-for>
+    </sc-for>
+    <div style="margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; background: #1C2A3F;">
+      <div style="width: 34px; height: 34px; border-radius: 50%; background: #E3F2EE; color: #0A5E4D; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px;">AK</div>
+      <div style="flex-grow: 1;"><div style="color: #FFFFFF; font-size: 13px; font-weight: 700;">Akmal K.</div><div style="font-size: 12px; color: #8C99A8;">Egasi</div></div>
+    </div>
+  </nav>
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column;">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 28px; background: #FFFFFF; border-bottom: 1px solid #E7EAEE;">
+      <h1 style="margin: 0; font-size: 22px; font-weight: 800;">Yorliqlar va shtrix-kodlar</h1>
+      <div style="flex-grow: 1;"></div>
+      <label style="display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px; min-width: 240px; border: 1px solid #DCE1E7; border-radius: 12px; background: #F8FAFB;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7686" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        <span style="position: absolute; width: 1px; height: 1px; overflow: hidden;">Qidiruv</span>
+        <input type="search" placeholder="Tovar, mijoz, hujjat…" style="flex-grow: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 14px; color: #0F1B2D;">
+      </label>
+      <select aria-label="Filial" style="height: 42px; padding: 0 12px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; color: #0F1B2D;"><option>Barcha filiallar</option></select>
+      <button type="button" aria-label="Bildirishnomalar" style="width: 42px; height: 42px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; color: #3D4A5C; display: flex; align-items: center; justify-content: center;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0112 0v5l1.5 2h-15z"></path><path d="M10 20a2 2 0 004 0"></path></svg>
+      </button>
+    </header>
+    <main style="padding: 24px 28px; display: flex; flex-direction: column; gap: 18px;">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px;">
+        <div><div style="font-size: 13px; color: #6B7686;">Chilonzor-3 · navbat 16.10.2026 holatiga</div><div style="font-size: 26px; font-weight: 800;">Narxi o'zgargan tovarlar</div></div>
+        <div style="flex-grow: 1;"></div>
+        <button type="button" style="height: 44px; padding: 0 16px; border: 1px solid #E7EAEE; border-radius: 12px; background: #FFFFFF; color: #0F1B2D; font: inherit; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"></path><path d="M14 3v4h4M9 13h6M9 17h6"></path></svg>PLU eksport (CSV)
+        </button>
+        <button type="button" style="height: 44px; padding: 0 16px; border: 1px solid #E7EAEE; border-radius: 12px; background: #FFFFFF; color: #0F1B2D; font: inherit; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3M7 12h10"></path></svg>Ichki shtrix-kod yaratish
+        </button>
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 18px;">
+        <section style="flex: 3 1 560px; min-width: 0; background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 16px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 6px 20px rgba(15,27,45,.05); overflow: hidden;">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 16px 20px;">
+            <h2 style="margin: 0; font-size: 17px; font-weight: 800;">Chop etilmagan yorliqlar</h2>
+            <span style="padding: 4px 10px; border-radius: 999px; background: #E3F2EE; color: #0A5E4D; font-size: 12px; font-weight: 700;">{{selCount}} / {{rowCount}} tanlangan</span>
+            <div style="flex-grow: 1;"></div>
+            <select aria-label="Ro'yxat" style="height: 40px; padding: 0 12px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 13px; font-weight: 600; color: #0F1B2D;"><option>Narxi o'zgargan</option><option>Yangi tovarlar</option><option>Barcha tovarlar</option></select>
+            <label style="display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border: 1px solid #DCE1E7; border-radius: 12px; background: #F8FAFB;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B7686" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+              <span style="position: absolute; width: 1px; height: 1px; overflow: hidden;">Tovar qidirish</span>
+              <input type="search" placeholder="Nom yoki shtrix-kod" style="width: 150px; border: 0; outline: 0; background: transparent; font: inherit; font-size: 13px; color: #0F1B2D;">
+            </label>
+          </div>
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; min-width: 680px; border-collapse: collapse; font-size: 14px;">
+              <thead>
+                <tr style="background: #F8FAFB; color: #6B7686; font-size: 12px; text-align: left;">
+                  <th scope="col" style="width: 44px; padding: 10px 0 10px 20px; font-weight: 600;"><label style="display: flex;"><input type="checkbox" checked style="width: 18px; height: 18px; accent-color: #0E7C66;"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden;">Hammasini tanlash</span></label></th>
+                  <th scope="col" style="padding: 10px 12px; font-weight: 600;">Tovar</th>
+                  <th scope="col" style="padding: 10px 12px; font-weight: 600; text-align: right;">Eski narx</th>
+                  <th scope="col" style="padding: 10px 12px; font-weight: 600; text-align: right;">Yangi narx</th>
+                  <th scope="col" style="padding: 10px 12px; font-weight: 600;">O'zgargan</th>
+                  <th scope="col" style="padding: 10px 20px 10px 12px; font-weight: 600; text-align: center;">Nusxa</th>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+                  <tr style="height: 56px; border-bottom: 1px solid #F0F2F5; background: {{r.rowBg}};">
+                    <td style="padding: 0 0 0 20px;">
+                      <sc-if value="{{r.checked}}" hint-placeholder-val="{{true}}"><input type="checkbox" checked aria-label="{{r.name}}" style="width: 18px; height: 18px; accent-color: #0E7C66;"></sc-if>
+                      <sc-if value="{{r.unchecked}}" hint-placeholder-val="{{false}}"><input type="checkbox" aria-label="{{r.name}}" style="width: 18px; height: 18px; accent-color: #0E7C66;"></sc-if>
+                    </td>
+                    <td style="padding: 0 12px;">
+                      <div style="font-weight: 700;">{{r.name}}</div>
+                      <sc-if value="{{r.hasCode}}" hint-placeholder-val="{{true}}"><div style="font-size: 12px; color: #6B7686; font-variant-numeric: tabular-nums;">{{r.code}}</div></sc-if>
+                      <sc-if value="{{r.noCode}}" hint-placeholder-val="{{false}}"><div style="display: flex; align-items: center; gap: 8px; font-size: 12px;"><span style="color: #8A5A12; font-weight: 700;">Shtrix-kod yo'q</span><button type="button" style="height: 26px; padding: 0 10px; border: 1px solid #E7EAEE; border-radius: 8px; background: #FFFFFF; color: #0E7C66; font: inherit; font-size: 12px; font-weight: 700;">Ichki kod yaratish</button></div></sc-if>
+                    </td>
+                    <td style="padding: 0 12px; text-align: right; color: #6B7686; text-decoration: {{r.oldDeco}}; font-variant-numeric: tabular-nums; white-space: nowrap;">{{r.old}}</td>
+                    <td style="padding: 0 12px; text-align: right; white-space: nowrap;"><span style="font-weight: 800; font-variant-numeric: tabular-nums;">{{r.price}}</span> <span style="padding: 2px 8px; border-radius: 999px; background: {{r.dBg}}; color: {{r.dFg}}; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;">{{r.delta}}</span></td>
+                    <td style="padding: 0 12px; font-size: 13px; color: #3D4A5C; font-variant-numeric: tabular-nums; white-space: nowrap;">{{r.date}}</td>
+                    <td style="padding: 0 20px 0 12px;">
+                      <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                        <button type="button" aria-label="{{r.minusLabel}}" style="width: 32px; height: 32px; border: 1px solid #E7EAEE; border-radius: 9px; background: #FFFFFF; color: #3D4A5C; font: inherit; font-size: 16px; font-weight: 700;">−</button>
+                        <span style="width: 32px; text-align: center; font-weight: 800; font-variant-numeric: tabular-nums;">{{r.qty}}</span>
+                        <button type="button" aria-label="{{r.plusLabel}}" style="width: 32px; height: 32px; border: 1px solid #E7EAEE; border-radius: 9px; background: #FFFFFF; color: #3D4A5C; font: inherit; font-size: 16px; font-weight: 700;">+</button>
+                      </div>
+                    </td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 14px 20px; background: #FDF3E1; font-size: 13px; color: #3D4A5C;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A5A12" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3z"></path><path d="M12 10v4M12 17v.5"></path></svg>
+            <span style="flex: 1 1 300px;"><b style="color: #0F1B2D;">Choy ko'k 100 g</b> — shtrix-kodsiz chop etilmaydi. Ichki kod «2» prefiksli EAN-13 bo'ladi va kassada skanerlanadi.</span>
+          </div>
+        </section>
+
+        <div style="flex: 2 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 18px;">
+          <section style="background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 16px; padding: 20px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 6px 20px rgba(15,27,45,.05); display: flex; flex-direction: column; gap: 16px;">
+            <h2 style="margin: 0; font-size: 17px; font-weight: 800;">Shablon va printer</h2>
+            <div>
+              <div style="padding: 0 0 8px; font-size: 13px; font-weight: 600; color: #3D4A5C;">Shablon <span style="color: #C8372D;">*</span></div>
+              <div role="radiogroup" aria-label="Shablon" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px;">
+                <sc-for list="{{templates}}" as="t" hint-placeholder-count="7">
+                  <button type="button" role="radio" aria-checked="{{t.on}}" style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 12px; border: {{t.border}}; border-radius: 12px; background: {{t.bg}}; font: inherit; text-align: left; cursor: pointer;">
+                    <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 14px; height: 14px; box-sizing: border-box; border-radius: 50%; border: {{t.dot}}; background: #FFFFFF;"></span><span style="font-size: 14px; font-weight: 800; color: {{t.fg}}; font-variant-numeric: tabular-nums;">{{t.name}}</span></span>
+                    <span style="font-size: 11px; color: #6B7686;">{{t.note}}</span>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+            <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px;">
+              <legend style="padding: 0 0 8px; font-size: 13px; font-weight: 600; color: #3D4A5C;">Chop etish usuli</legend>
+              <label style="display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 2px solid #0E7C66; border-radius: 12px; background: #E3F2EE;">
+                <input type="radio" name="how" checked style="margin: 3px 0 0; accent-color: #0E7C66;">
+                <span><span style="display: block; font-size: 14px; font-weight: 700; color: #0A5E4D;">Printer drayveri orqali</span><span style="display: block; font-size: 12px; color: #3D4A5C;">Brauzer chop etish oynasi · 203 dpi uchun shtrix moduli butun nuqtaga yaxlitlanadi</span></span>
+              </label>
+              <label style="display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF;">
+                <input type="radio" name="how" style="margin: 3px 0 0; accent-color: #0E7C66;">
+                <span><span style="display: block; font-size: 14px; font-weight: 700;">PDF fayl (serverda)</span><span style="display: block; font-size: 12px; color: #6B7686;">200 dan ortiq yorliq yoki iPhone/iPad uchun</span></span>
+              </label>
+            </fieldset>
+            <label style="display: flex; flex-direction: column; gap: 6px;">
+              <span style="font-size: 13px; font-weight: 600; color: #3D4A5C;">Printer</span>
+              <select style="height: 44px; padding: 0 14px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 14px; color: #0F1B2D;"><option>[Yorliq printeri] · USB · tizim drayveri</option><option>Oddiy printer (A4)</option></select>
+              <span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #1F8A4C; font-weight: 700;"><svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true"><circle cx="4" cy="4" r="4" fill="#1F8A4C"></circle></svg>Tayyor · drayverda qog'oz 58×40 mm</span>
+            </label>
+          </section>
+
+        </div>
+      </div>
+
+      <section style="background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 16px; padding: 20px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 6px 20px rgba(15,27,45,.05); display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: flex; align-items: baseline; justify-content: space-between;">
+          <h2 style="margin: 0; font-size: 17px; font-weight: 800;">Ko'rinish</h2>
+          <span style="font-size: 12px; color: #6B7686;">haqiqiy nisbatda · 58×40 mm</span>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 12px; padding: 16px; border-radius: 12px; background: #EEF1F4;">
+          <sc-for list="{{labels}}" as="l" hint-placeholder-count="3">
+            <div style="width: 232px; height: 160px; box-sizing: border-box; padding: 8px 12px; background: #FFFFFF; border-radius: 6px; box-shadow: 0 1px 3px rgba(15,27,45,.15); display: flex; flex-direction: column; gap: 3px; color: #000000;">
+              <div style="display: flex; justify-content: space-between; font-size: 9px; font-weight: 600;"><span>[Do'kon nomi]</span><span style="font-variant-numeric: tabular-nums;">16.10.2026</span></div>
+              <div style="font-size: 12px; font-weight: 700; line-height: 1.25; height: 30px; overflow: hidden;">{{l.name}}</div>
+              <div style="display: flex; align-items: baseline; gap: 4px;"><span style="font-size: 30px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums;">{{l.price}}</span><span style="font-size: 11px; font-weight: 700;">so'm / {{l.unit}}</span></div>
+              <div style="position: relative; width: 190px; height: 32px; margin: 4px auto 0;">
+                <sc-for list="{{l.bars}}" as="b" hint-placeholder-count="30"><span style="position: absolute; top: 0; left: {{b.x}}; width: {{b.w}}; height: 32px; background: #000000;"></span></sc-for>
+              </div>
+              <div style="text-align: center; font-size: 9px; letter-spacing: 1.5px; font-variant-numeric: tabular-nums;">{{l.code}}</div>
+            </div>
+          </sc-for>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <div style="width: 172px; height: 100px; box-sizing: border-box; padding: 6px 10px; background: #FFFFFF; border-radius: 5px; box-shadow: 0 1px 3px rgba(15,27,45,.15); display: flex; flex-direction: column; gap: 2px; color: #000000;">
+              <div style="font-size: 10px; font-weight: 700; white-space: nowrap; overflow: hidden;">{{small.name}}</div>
+              <div style="display: flex; align-items: baseline; gap: 3px;"><span style="font-size: 20px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums;">{{small.price}}</span><span style="font-size: 9px; font-weight: 700;">so'm</span></div>
+              <div style="position: relative; width: 143px; height: 26px; margin: 3px auto 0;">
+                <sc-for list="{{small.bars}}" as="b" hint-placeholder-count="30"><span style="position: absolute; top: 0; left: {{b.x}}; width: {{b.w}}; height: 26px; background: #000000;"></span></sc-for>
+              </div>
+              <div style="text-align: center; font-size: 8px; letter-spacing: 1px; font-variant-numeric: tabular-nums;">{{small.code}}</div>
+            </div>
+            <span style="font-size: 11px; color: #6B7686;">43×25 mm — taqqoslash uchun</span>
+          </div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-top: 4px;">
+          <div style="flex: 1 1 160px;"><div style="font-size: 13px; color: #6B7686;">Jami</div><div style="font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums;">{{labelTotal}} yorliq · {{selCount}} tovar</div></div>
+          <button type="button" style="height: 44px; padding: 0 16px; border: 1px solid #E7EAEE; border-radius: 12px; background: #FFFFFF; color: #0F1B2D; font: inherit; font-size: 14px; font-weight: 700;">PDF yuklab olish</button>
+          <button type="button" style="height: 44px; padding: 0 20px; border: 0; border-radius: 12px; background: #0E7C66; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9V3h10v6"></path><path d="M6 18H4v-7a2 2 0 012-2h12a2 2 0 012 2v7h-2"></path><path d="M7 14h10v7H7z"></path></svg>Chop etish
+          </button>
+        </div>
+        <p style="margin: 0; font-size: 12px; color: #6B7686;">Chop etilgach tovarlar navbatdan olinadi. Oxirgi chop etish: 15.10.2026 18:40 · 22 yorliq.</p>
+      </section>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const I = {
+      home: "M3 11l9-7 9 7M5 10v10h14V10", cart: "M3 4h2l2.5 11h11L21 7H6.2", box: "M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10",
+      truck: "M3 6h11v10H3zM14 10h4l3 3v3h-7", users: "M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 010 7",
+      book: "M5 4h11a3 3 0 013 3v13H8a3 3 0 01-3-3zM5 17a3 3 0 013-3h11", receipt: "M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6",
+      chart: "M4 20V10M10 20V4M16 20v-7M22 20H2", wallet: "M3 7h16a2 2 0 012 2v9a2 2 0 01-2 2H3zM3 7V5a2 2 0 012-2h11",
+      bank: "M3 10l9-6 9 6M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18", tag: "M3 12V4h8l10 10-8 8z", doc: "M6 3h8l4 4v14H6zM14 3v4h4M9 13h6M9 17h6",
+      shield: "M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z", gear: "M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1",
+      spark: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z", link: "M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1",
+      alert: "M12 4l9 16H3zM12 10v4M12 17v.5", check: "M5 12.5l4.5 4.5L19 7", wifi: "M3 3l18 18M8.5 16.5a5 5 0 017 0M12 20h.01",
+      card: "M3 5h18v14H3zM3 10h18M7 15h4", cash: "M2.5 6h19v12h-19zM12 9.5a2.5 2.5 0 110 5 2.5 2.5 0 010-5", printer: "M7 9V3h10v6M6 18H4v-7a2 2 0 012-2h12a2 2 0 012 2v7h-2M7 14h10v7H7z", plus: "M12 5v14M5 12h14", scan: "M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3M7 12h10", x: "M6 6l12 12M18 6L6 18", sync: "M20 11a8 8 0 00-14.5-4.5L4 8M4 4v4h4M4 13a8 8 0 0014.5 4.5L20 16M20 20v-4h-4"
+    };
+    const H = {"Dashboard":"Bo02Dashboard.dc.html","AI yordamchi":"Bo13Ai.dc.html","Tasdiqlash navbati":"Bo16Tasdiqlash.dc.html","Kassa (POS)":"Main.dc.html","Qarzdorlar":"Bo06Qarzdorlar.dc.html","Tovarlar va narxlar":"Bo05Narxlar.dc.html","Qoldiq va ko'chirish":"Bo03Ombor.dc.html","Xaridlar":"Bo04Xarid.dc.html","Yorliqlar":"Bo18Yorliq.dc.html","Xarajatlar":"Bo17Xarajatlar.dc.html","Bank tushumi":"Bo24Bank.dc.html","E-faktura":"Bo15Efaktura.dc.html","QQS va davlat hisoboti":"Bo10DavlatHisobot.dc.html","Buxgalteriya":"Bo08Jurnal.dc.html","Hisobotlar":"Bo09Hisobotlar.dc.html","1C integratsiyasi":"Bo23OneC.dc.html","Sozlamalar":"Bo14Sozlamalar.dc.html"};
+    const it = (label, icon, active, badge) => ({ label, icon: I[icon], href: H[label], fg: active ? "#FFFFFF" : "#C9D2DC", bg: active ? "#1C2A3F" : "transparent", hasBadge: !!badge, badge: badge || "" });
+    const sp = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    const m2 = (n) => sp(n) + ",00";
+    const menu = [
+        { title: "ASOSIY", items: [it("Dashboard", "home"), it("AI yordamchi", "spark"), it("Tasdiqlash navbati", "check", false, "4")] },
+        { title: "SAVDO", items: [it("Kassa (POS)", "cart"), it("Qarzdorlar", "users"), it("Tovarlar va narxlar", "tag")] },
+        { title: "OMBOR", items: [it("Qoldiq va ko'chirish", "box"), it("Xaridlar", "truck"), it("Yorliqlar", "doc", true)] },
+        { title: "MOLIYA", items: [it("Xarajatlar", "wallet"), it("Bank tushumi", "bank"), it("E-faktura", "receipt"), it("QQS va davlat hisoboti", "shield", false, "1"), it("Buxgalteriya", "book")] },
+        { title: "BOSHQARUV", items: [it("Hisobotlar", "chart"), it("1C integratsiyasi", "link"), it("Sozlamalar", "gear")] }
+      ];
+    const L = ["0001101","0011001","0010011","0111101","0100011","0110001","0101111","0111011","0110111","0001011"];
+    const R = L.map(s => s.split("").map(c => c === "1" ? "0" : "1").join(""));
+    const G = R.map(s => s.split("").reverse().join(""));
+    const PAR = ["LLLLLL","LLGLGG","LLGGLG","LLGGGL","LGLLGG","LGGLLG","LGGGLL","LGLGLG","LGLGGL","LGGLGL"];
+    const ean = (d12, mod) => {
+      const ds = d12.split("").map(Number);
+      const s = ds.reduce((a, d, i) => a + d * (i % 2 ? 3 : 1), 0);
+      const all = ds.concat([(10 - s % 10) % 10]);
+      const p = PAR[all[0]];
+      let bits = "101";
+      for (let i = 1; i <= 6; i++) bits += (p[i - 1] === "L" ? L : G)[all[i]];
+      bits += "01010";
+      for (let i = 7; i <= 12; i++) bits += R[all[i]];
+      bits += "101";
+      const bars = [];
+      let i = 0;
+      while (i < bits.length) {
+        if (bits[i] === "1") { let j = i; while (j < bits.length && bits[j] === "1") j++; bars.push({ x: (i * mod) + "px", w: ((j - i) * mod) + "px" }); i = j; } else i++;
+      }
+      const code = all.join("");
+      return { code: code[0] + " " + code.slice(1, 7) + " " + code.slice(7), bars };
+    };
+    const data = [
+      ["Sut 2,5% 1 l", "478000012001", 12800, 13500, "16.10.2026 09:12", 6, "dona"],
+      ["Gazli ichimlik 1,5 l (markirovkali)", "478000012002", 8500, 9000, "16.10.2026 09:12", 12, "dona"],
+      ["Kungaboqar yog'i 1 l", "478000012003", 22500, 24000, "15.10.2026 17:40", 4, "dona"],
+      ["Makaron 500 g", "478000012004", 8000, 8500, "15.10.2026 17:40", 8, "dona"],
+      ["Pishloq 200 g", "478000012005", 26500, 28000, "15.10.2026 11:05", 5, "dona"],
+      ["Shakar", "200000000007", 13000, 12500, "14.10.2026 16:20", 2, "kg"],
+      ["Choy ko'k 100 g", "", 0, 21000, "14.10.2026 10:00", 3, "dona"],
+      ["Tuxum 10 dona", "478000012006", 15000, 16000, "14.10.2026 10:00", 0, "dona"]
+    ];
+    const rows = data.map(([name, c, o, n, date, qty]) => {
+      const up = n >= o;
+      const checked = qty > 0;
+      return {
+        name, hasCode: !!c, noCode: !c, code: c ? ean(c, 2).code : "",
+        old: o ? sp(o) : "—", oldDeco: o ? "line-through" : "none", price: sp(n),
+        delta: o ? (up ? "+" : "−") + sp(Math.abs(n - o)) : "yangi",
+        dBg: !o ? "#E8F0FC" : up ? "#FDF3E1" : "#E5F5EC", dFg: !o ? "#2F6FDB" : up ? "#8A5A12" : "#1F8A4C",
+        date, qty: String(qty), checked, unchecked: !checked, rowBg: checked ? "#FFFFFF" : "#FBFCFD",
+        minusLabel: name + ": nusxani kamaytirish", plusLabel: name + ": nusxani oshirish"
+      };
+    });
+    const sel = data.filter(r => r[5] > 0);
+    const tpl = [["58×40", "Asosiy narx", true], ["58×30", "Narx", false], ["43×25", "Kichik", false], ["40×30", "Narx", false], ["30×20", "Mini", false], ["A4 3×8", "Oddiy printer", false], ["A4 4×10", "Oddiy printer", false]];
+    const lbl = data.slice(0, 3).map(([name, c, o, n, d, q, unit]) => { const e = ean(c, 2); return { name, price: sp(n), unit, bars: e.bars, code: e.code }; });
+    const sm = ean("478000012004", 1.5);
+    return {
+      menu, rows,
+      rowCount: String(rows.length), selCount: String(sel.length),
+      labelTotal: String(sel.reduce((a, r) => a + r[5], 0)),
+      templates: tpl.map(([name, note, on]) => ({ name, note, border: on ? "2px solid #0E7C66" : "1px solid #DCE1E7", bg: on ? "#E3F2EE" : "#FFFFFF", fg: on ? "#0A5E4D" : "#0F1B2D", on: on ? "true" : "false", dot: on ? "4px solid #0E7C66" : "1.5px solid #9AA5B1" })),
+      labels: lbl,
+      small: { name: "Makaron 500 g", price: sp(8500), bars: sm.bars, code: sm.code }
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>E-faktura markazi</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0E7C66}a:hover{color:#0A5E4D}
+</style>
+</helmet>
+<div style="min-height: 1340px; box-sizing: border-box; display: flex; flex-wrap: wrap; background: #F4F6F8; color: #0F1B2D; font-family: 'Manrope', system-ui, sans-serif;">
+  <nav aria-label="Asosiy menyu" style="flex: 1 1 240px; max-width: 260px; background: #0F1B2D; color: #C9D2DC; padding: 20px 14px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px;">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 18px;">
+      <div style="width: 36px; height: 36px; border-radius: 10px; background: #0E7C66; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 800;">E</div>
+      <div><div style="color: #FFFFFF; font-weight: 800; font-size: 15px;">ERP</div><div style="font-size: 12px; color: #8C99A8;">[Do'kon nomi]</div></div>
+    </div>
+    <sc-for list="{{menu}}" as="g" hint-placeholder-count="5">
+      <div style="padding: 14px 10px 6px; font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #6F7E90;">{{g.title}}</div>
+      <sc-for list="{{g.items}}" as="m" hint-placeholder-count="3">
+        <a href="{{m.href}}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 14px; font-weight: 600; text-decoration: none; color: {{m.fg}}; background: {{m.bg}};">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{m.icon}}"></path></svg>
+          <span style="flex-grow: 1;">{{m.label}}</span>
+          <sc-if value="{{m.hasBadge}}" hint-placeholder-val="{{false}}"><span style="padding: 1px 8px; border-radius: 999px; background: #C8372D; color: #FFFFFF; font-size: 11px; font-weight: 800;">{{m.badge}}</span></sc-if>
+        </a>
+      </sc-for>
+    </sc-for>
+    <div style="margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; background: #1C2A3F;">
+      <div style="width: 34px; height: 34px; border-radius: 50%; background: #E3F2EE; color: #0A5E4D; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px;">AK</div>
+      <div style="flex-grow: 1;"><div style="color: #FFFFFF; font-size: 13px; font-weight: 700;">Akmal K.</div><div style="font-size: 12px; color: #8C99A8;">Egasi</div></div>
+    </div>
+  </nav>
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column;">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 28px; background: #FFFFFF; border-bottom: 1px solid #E7EAEE;">
+      <h1 style="margin: 0; font-size: 22px; font-weight: 800;">E-faktura markazi</h1>
+      <div style="flex-grow: 1;"></div>
+      <label style="display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px; min-width: 240px; border: 1px solid #DCE1E7; border-radius: 12px; background: #F8FAFB;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7686" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        <span style="position: absolute; width: 1px; height: 1px; overflow: hidden;">Qidiruv</span>
+        <input type="search" placeholder="Tovar, mijoz, hujjat…" style="flex-grow: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 14px; color: #0F1B2D;">
+      </label>
+      <select aria-label="Filial" style="height: 42px; padding: 0 12px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; color: #0F1B2D;"><option>Barcha filiallar</option><option>Chilonzor-3</option><option>Yunusobod-1</option></select>
+      <button type="button" aria-label="Bildirishnomalar" style="width: 42px; height: 42px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; color: #3D4A5C; display: flex; align-items: center; justify-content: center;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0112 0v5l1.5 2h-15z"></path><path d="M10 20a2 2 0 004 0"></path></svg>
+      </button>
+    </header>
+    <main style="padding: 24px 28px; display: flex; flex-direction: column; gap: 18px;">
+      <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px;">
+        <div style="flex: 1 1 380px;">
+          <div style="font-size: 26px; font-weight: 800;">E-faktura markazi</div>
+          <div style="font-size: 13px; color: #6B7686; margin-top: 4px;">Kiruvchi e-fakturalarni E-IMZO bilan qabul qilish, chiquvchi B2B fakturalar, e-TTN va e-ishonchnomalar. Operator — Faktura.uz.</div>
+        </div>
+        <button type="button" style="display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border: 1px solid #E7EAEE; border-radius: 12px; background: #FFFFFF; color: #0F1B2D; font: inherit; font-size: 14px; font-weight: 700;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"></path><path d="M9 8h6M9 12h6"></path></svg>Chek asosida e-faktura
+        </button>
+        <button type="button" style="display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px; border: 0; border-radius: 12px; background: #0E7C66; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 700;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Chiquvchi e-faktura
+        </button>
+      </div>
+
+      <div role="tablist" aria-label="Hujjat turi" style="display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid #E7EAEE;">
+        <sc-for list="{{tabs}}" as="t" hint-placeholder-count="4">
+          <button type="button" role="tab" aria-selected="{{t.sel}}" style="display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px; border: 0; border-bottom: 2px solid {{t.line}}; margin-bottom: -1px; background: transparent; color: {{t.fg}}; font: inherit; font-size: 14px; font-weight: 700;">{{t.label}}<span style="padding: 1px 8px; border-radius: 999px; background: {{t.chipBg}}; color: {{t.chipFg}}; font-size: 11px; font-weight: 800;">{{t.n}}</span></button>
+        </sc-for>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px;">
+        <sc-for list="{{kpis}}" as="k" hint-placeholder-count="4">
+          <div style="background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 16px; padding: 16px 20px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 6px 20px rgba(15,27,45,.05); display: flex; flex-direction: column; gap: 6px;">
+            <span style="font-size: 13px; font-weight: 600; color: #6B7686;">{{k.label}}</span>
+            <span style="font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; color: {{k.fg}};">{{k.value}}</span>
+            <span style="font-size: 12px; color: #6B7686;">{{k.note}}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start;">
+        <div style="flex: 2 1 600px; min-width: 0; display: flex; flex-direction: column; gap: 14px;">
+          <section style="background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 16px; padding: 20px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 6px 20px rgba(15,27,45,.05); display: flex; flex-direction: column; gap: 14px;">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px;">
+              <h2 style="margin: 0; font-size: 17px; font-weight: 700; flex-grow: 1;">Kiruvchi e-fakturalar · oktabr</h2>
+              <select aria-label="Xavf darajasi filtri" style="height: 38px; padding: 0 10px; border: 1px solid #DCE1E7; border-radius: 10px; background: #FFFFFF; font: inherit; font-size: 13px; color: #0F1B2D;"><option>Barcha xavf darajalari</option><option>Yashil</option><option>Qizil</option><option>Noma'lum</option></select>
+              <select aria-label="Holat filtri" style="height: 38px; padding: 0 10px; border: 1px solid #DCE1E7; border-radius: 10px; background: #FFFFFF; font: inherit; font-size: 13px; color: #0F1B2D;"><option>Barcha holatlar</option><option>Imzo kutmoqda</option><option>Qabul qilingan</option><option>Rad etilgan</option></select>
+            </div>
+            <div style="overflow-x: auto; border: 1px solid #E7EAEE; border-radius: 12px;">
+              <div role="table" aria-label="Kiruvchi e-fakturalar" style="min-width: 660px;">
+                <div role="row" style="display: grid; grid-template-columns: 1.45fr 0.85fr 1fr 0.85fr 0.95fr 1.15fr; gap: 12px; padding: 12px 16px; background: #F8FAFB; font-size: 12px; font-weight: 600; color: #6B7686;">
+                  <span role="columnheader">Faktura · yetkazib beruvchi</span><span role="columnheader">Sana</span><span role="columnheader" style="text-align: right;">Summa</span><span role="columnheader" style="text-align: right;">QQS 12%</span><span role="columnheader">Xavf</span><span role="columnheader">Holat</span>
+                </div>
+                <sc-for list="{{rows}}" as="r" hint-placeholder-count="6">
+                  <div role="row" aria-selected="{{r.sel}}" style="display: grid; grid-template-columns: 1.45fr 0.85fr 1fr 0.85fr 0.95fr 1.15fr; gap: 12px; align-items: center; min-height: 58px; padding: 6px 16px; border-top: 1px solid #F0F2F5; background: {{r.rowBg}}; font-size: 14px; font-variant-numeric: tabular-nums;">
+                    <span role="cell"><span style="font-weight: 700;">{{r.no}}</span><span style="display: block; font-size: 12px; color: #6B7686;">{{r.who}}</span></span>
+                    <span role="cell">{{r.date}}</span>
+                    <span role="cell" style="text-align: right; font-weight: 700;">{{r.sum}}</span>
+                    <span role="cell" style="text-align: right;">{{r.vat}}</span>
+                    <span role="cell"><span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: {{r.riskBg}}; color: {{r.riskFg}}; font-size: 12px; font-weight: 700;"><span style="width: 8px; height: 8px; border-radius: 50%; background: {{r.riskDot}};"></span>{{r.risk}}</span></span>
+                    <span role="cell"><span style="padding: 4px 10px; border-radius: 999px; background: {{r.stBg}}; color: {{r.stFg}}; font-size: 12px; font-weight: 700; white-space: nowrap;">{{r.st}}</span><span style="display: block; margin-top: 4px; font-size: 11px; color: #6B7686;">{{r.sub}}</span></span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div role="note" style="display: flex; gap: 10px; padding: 12px 14px; border-radius: 12px; background: #FDF3E1; font-size: 13px; color: #6E4A10;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="M12 4l9 16H3z"></path><path d="M12 10v4M12 17v.5"></path></svg>
+              <span>Qizil va noma'lum xavfli fakturalar bo'yicha <b style="font-variant-numeric: tabular-nums;">{{deferred}} so'm</b> QQS krediti yetkazib beruvchiga to'lovgacha kechiktiriladi (VM 830). Faktura.uz xavf belgisini bermaydi — noma'lumni kabinetdan tekshirib qo'lda belgilang.</span>
+            </div>
+          </section>
+
+          <section style="background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 16px; padding: 20px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 6px 20px rgba(15,27,45,.05); display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px;">
+              <h2 style="margin: 0; font-size: 17px; font-weight: 700;">Kiruvchi e-TTN</h2>
+              <span style="font-size: 13px; color: #6B7686;">Tasdiqlash va rad etish E-IMZO bilan</span>
+            </div>
+            <sc-for list="{{ettn}}" as="e" hint-placeholder-count="2">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; background: #F8FAFB; border: 1px solid #E7EAEE;">
+                <span style="width: 36px; height: 36px; border-radius: 10px; background: #E8F0FC; color: #2F6FDB; display: flex; align-items: center; justify-content: center;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h11v10H3z"></path><path d="M14 10h4l3 3v3h-7"></path><circle cx="7" cy="18" r="1.8"></circle><circle cx="17" cy="18" r="1.8"></circle></svg>
+                </span>
+                <span style="flex: 1 1 260px; font-size: 14px;"><b>{{e.no}}</b> · {{e.who}}<span style="display: block; font-size: 12px; color: #6B7686;">{{e.meta}}</span></span>
+                <span style="padding: 4px 10px; border-radius: 999px; background: {{e.stBg}}; color: {{e.stFg}}; font-size: 12px; font-weight: 700;">{{e.st}}</span>
+                <sc-if value="{{e.pending}}" hint-placeholder-val="{{true}}">
+                  <button type="button" style="height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: #0E7C66; color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 700;">Tasdiqlash</button>
+                  <button type="button" style="height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: #FBEAE8; color: #C8372D; font: inherit; font-size: 13px; font-weight: 700;">Rad etish</button>
+                </sc-if>
+              </div>
+            </sc-for>
+          </section>
+        </div>
+
+        <aside style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 14px;">
+          <section aria-label="Tanlangan e-faktura" style="background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 16px; padding: 20px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 6px 20px rgba(15,27,45,.05); display: flex; flex-direction: column; gap: 14px;">
+            <div style="display: flex; align-items: flex-start; gap: 10px;">
+              <div style="flex-grow: 1;">
+                <h2 style="margin: 0; font-size: 17px; font-weight: 700;">E-faktura №2047</h2>
+                <div style="font-size: 13px; color: #6B7686; margin-top: 2px;">«Baraka Non» MChJ · STIR 412 660 058 · 16.10.2026</div>
+              </div>
+              <button type="button" aria-label="Yopish" style="width: 36px; height: 36px; border: 1px solid #E7EAEE; border-radius: 10px; background: #FFFFFF; color: #3D4A5C; display: flex; align-items: center; justify-content: center;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+              </button>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; padding: 12px 14px; border-radius: 12px; background: #F8FAFB; font-size: 14px; font-variant-numeric: tabular-nums;">
+              <span style="color: #3D4A5C;">Non «Patir» · 250 dona × 3 000,00</span><span style="text-align: right;">{{sel.net}}</span>
+              <span style="color: #3D4A5C;">QQS 12%</span><span style="text-align: right;">{{sel.vat}}</span>
+              <span style="font-weight: 800; border-top: 1px solid #E7EAEE; padding-top: 6px;">Jami</span><span style="text-align: right; font-weight: 800; border-top: 1px solid #E7EAEE; padding-top: 6px;">{{sel.total}}</span>
+            </div>
+
+            <fieldset style="margin: 0; padding: 14px; border: 1px solid #E7EAEE; border-radius: 12px; display: flex; flex-direction: column; gap: 10px;">
+              <legend style="padding: 0 6px; font-size: 13px; font-weight: 700; color: #0F1B2D;">Xavf darajasini belgilash</legend>
+              <div style="display: flex; gap: 8px;">
+                <label style="flex: 1 1 0; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border: 1px solid #0E7C66; border-radius: 10px; background: #E5F5EC; font-size: 13px; font-weight: 700; color: #1F8A4C;"><input type="radio" name="risk" checked="checked" style="accent-color: #1F8A4C;">Yashil</label>
+                <label style="flex: 1 1 0; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border: 1px solid #E7EAEE; border-radius: 10px; background: #FFFFFF; font-size: 13px; font-weight: 700; color: #C8372D;"><input type="radio" name="risk" style="accent-color: #C8372D;">Qizil</label>
+              </div>
+              <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #3D4A5C;">Izoh (majburiy)
+                <textarea rows="2" style="padding: 10px 14px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 14px; color: #0F1B2D; resize: vertical;">my.soliq.uz kabinetida 16.10.2026 da tekshirildi — yashil.</textarea>
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #3D4A5C;"><input type="checkbox" checked="checked" style="width: 18px; height: 18px; accent-color: #0E7C66;">Kabinetda tekshirdim</label>
+              <button type="button" style="height: 40px; border: 1px solid #E7EAEE; border-radius: 12px; background: #FFFFFF; color: #0F1B2D; font: inherit; font-size: 13px; font-weight: 700;">Belgilashni saqlash</button>
+            </fieldset>
+
+            <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #3D4A5C;">E-IMZO kaliti
+              <select style="height: 44px; padding: 0 12px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 14px; color: #0F1B2D;"><option>Gulnora T. · Buxgalter · 14.03.2027 gacha</option></select>
+            </label>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" style="flex: 2 1 0; display: flex; align-items: center; justify-content: center; gap: 8px; height: 44px; border: 0; border-radius: 12px; background: #0E7C66; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 700;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"></path></svg>Imzolab qabul qilish
+              </button>
+              <button type="button" style="flex: 1 1 0; height: 44px; border: 0; border-radius: 12px; background: #FBEAE8; color: #C8372D; font: inherit; font-size: 14px; font-weight: 700;">Rad etish</button>
+            </div>
+            <div role="alert" style="display: flex; gap: 8px; padding: 10px 12px; border-radius: 10px; background: #FBEAE8; font-size: 12px; font-weight: 600; color: #C8372D;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="M12 4l9 16H3z"></path><path d="M12 10v4M12 17v.5"></path></svg>
+              <span>Oldingi urinish: E-IMZO kaliti paroli noto'g'ri. Qayta kiriting.</span>
+            </div>
+            <div style="font-size: 12px; color: #6B7686;">Qabul qilingach — «Kirim yaratish» (POS ombor qabuli uchun). Imzolash internet talab qiladi; offline faqat ko'rish.</div>
+          </section>
+        </aside>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1340}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const I = {
+      home: "M3 11l9-7 9 7M5 10v10h14V10", cart: "M3 4h2l2.5 11h11L21 7H6.2", box: "M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10",
+      truck: "M3 6h11v10H3zM14 10h4l3 3v3h-7", users: "M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 010 7",
+      book: "M5 4h11a3 3 0 013 3v13H8a3 3 0 01-3-3zM5 17a3 3 0 013-3h11", receipt: "M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6",
+      chart: "M4 20V10M10 20V4M16 20v-7M22 20H2", wallet: "M3 7h16a2 2 0 012 2v9a2 2 0 01-2 2H3zM3 7V5a2 2 0 012-2h11",
+      bank: "M3 10l9-6 9 6M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18", tag: "M3 12V4h8l10 10-8 8z", doc: "M6 3h8l4 4v14H6zM14 3v4h4M9 13h6M9 17h6",
+      shield: "M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z", gear: "M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1",
+      spark: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z", link: "M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1",
+      alert: "M12 4l9 16H3zM12 10v4M12 17v.5", check: "M5 12.5l4.5 4.5L19 7", wifi: "M3 3l18 18M8.5 16.5a5 5 0 017 0M12 20h.01"
+    };
+    const ACTIVE = "Bo15Efaktura";
+    const it = (label, icon, file, badge) => ({ label, icon: I[icon], href: file + ".dc.html", fg: file === ACTIVE ? "#FFFFFF" : "#C9D2DC", bg: file === ACTIVE ? "#1C2A3F" : "transparent", hasBadge: !!badge, badge: badge || "" });
+    const g = n => (n < 0 ? "−" : "") + Math.abs(Math.round(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    const g2 = n => g(n) + ",00";
+    const tabs = [["Kiruvchi", "3"], ["Chiquvchi", "1"], ["E-TTN", "1"], ["E-ishonchnomalar", "0"]].map(([label, n], i) => ({ label, n, sel: i === 0 ? "true" : "false", line: i === 0 ? "#0E7C66" : "transparent", fg: i === 0 ? "#0A5E4D" : "#3D4A5C", chipBg: n === "0" ? "#F4F6F8" : (i === 0 ? "#0E7C66" : "#E8F0FC"), chipFg: n === "0" ? "#8C99A8" : (i === 0 ? "#FFFFFF" : "#2F6FDB") }));
+    const R = { green: ["Yashil", "#E5F5EC", "#1F8A4C", "#1F8A4C"], red: ["Qizil", "#FBEAE8", "#C8372D", "#C8372D"], unknown: ["Noma'lum", "#F4F6F8", "#3D4A5C", "#9AA5B1"] };
+    const S = { wait: ["Imzo kutmoqda", "#EFEAFC", "#6D4AD8"], ok: ["Qabul qilindi", "#E5F5EC", "#1F8A4C"] };
+    const vatOf = s => s * 12 / 112;
+    // [raqam, kontragent, sana, summa (QQS bilan), xavf, holat, izoh]
+    const raw = [
+      ["№2047", "«Baraka Non» MChJ", "16.10.2026", 840000, "unknown", "wait", "Tanlangan"],
+      ["№2043", "«Agro Ta'minot» XK", "15.10.2026", 1344000, "red", "wait", "Kredit to'lovdan keyin"],
+      ["№2041", "«Toza Sut» MChJ", "15.10.2026", 8960000, "green", "wait", "e-TTN №T-55120 bilan"],
+      ["№2030", "«Sharq Savdo» MChJ", "12.10.2026", 5600000, "green", "ok", "Kirim №KR-0388"],
+      ["№2026", "«Oltin Don» MChJ", "10.10.2026", 2240000, "green", "ok", "Kirim №KR-0381"],
+      ["№2019 · qo'shimcha", "«Toza Sut» MChJ · asl №1988 ga", "09.10.2026", -224000, "green", "ok", "Qaytarish bo'yicha"]
+    ];
+    let tSum = 0, tVat = 0, deferredN = 0, waitN = 0;
+    const rows = raw.map(([no, who, date, s, r, st, sub], i) => {
+      const v = vatOf(s); tSum += s; tVat += v; if (r !== "green") deferredN += v; if (st === "wait") waitN++;
+      return { no, who, date, sum: g2(s), vat: g2(v), risk: R[r][0], riskBg: R[r][1], riskFg: R[r][2], riskDot: R[r][3], st: S[st][0], stBg: S[st][1], stFg: S[st][2], sub, sel: i === 0 ? "true" : "false", rowBg: i === 0 ? "#F3FAF8" : "transparent" };
+    });
+    const deferred = g(deferredN);
+    const kpis = [
+      { label: "Kiruvchi · oktabr", value: String(raw.length), note: "Jami " + g(tSum) + " so'm · QQS " + g(tVat), fg: "#0F1B2D" },
+      { label: "Imzo kutmoqda", value: String(waitN), note: "E-IMZO bilan qabul yoki rad", fg: "#6D4AD8" },
+      { label: "Kechiktirilgan QQS krediti", value: deferred, note: "Qizil va noma'lum fakturalar", fg: "#8A5A12" },
+      { label: "Chiquvchi · yuborilmagan", value: "1", note: "B2B nasiya · imzo kerak", fg: "#2F6FDB" }
+    ];
+    const sNet = 750000, sVat = vatOf(840000);
+    const sel = { net: g2(sNet), vat: g2(sVat), total: g2(sNet + sVat) };
+    const ettn = [
+      { no: "e-TTN №T-55120", who: "«Toza Sut» MChJ", meta: "15.10.2026 · avto 01 A 482 KB · e-faktura №2041 ga bog'langan", st: "Tasdiq kutmoqda", stBg: "#EFEAFC", stFg: "#6D4AD8", pending: true },
+      { no: "e-TTN №T-55087", who: "«Sharq Savdo» MChJ", meta: "12.10.2026 · avto 10 B 117 MA · e-faktura №2030", st: "Tasdiqlandi", stBg: "#E5F5EC", stFg: "#1F8A4C", pending: false }
+    ];
+    const EXTRA = { tabs, rows, deferred, kpis, sel, ettn };
+    return {
+      menu: [
+        { title: "ASOSIY", items: [it("Dashboard", "home", "Bo02Dashboard"), it("AI yordamchi", "spark", "Bo13Ai"), it("Tasdiqlash navbati", "check", "Bo16Tasdiqlash", "4")] },
+        { title: "SAVDO", items: [it("Kassa (POS)", "cart", "Main"), it("Qarzdorlar", "users", "Bo06Qarzdorlar"), it("Tovarlar va narxlar", "tag", "Bo05Narxlar")] },
+        { title: "OMBOR", items: [it("Qoldiq va ko'chirish", "box", "Bo03Ombor"), it("Xaridlar", "truck", "Bo04Xarid"), it("Yorliqlar", "doc", "Bo18Yorliq")] },
+        { title: "MOLIYA", items: [it("Xarajatlar", "wallet", "Bo17Xarajatlar"), it("Bank tushumi", "bank", "Bo24Bank"), it("E-faktura", "receipt", "Bo15Efaktura"), it("QQS va davlat hisoboti", "shield", "Bo10DavlatHisobot", "1"), it("Buxgalteriya", "book", "Bo08Jurnal")] },
+        { title: "BOSHQARUV", items: [it("Hisobotlar", "chart", "Bo09Hisobotlar"), it("1C integratsiyasi", "link", "Bo23OneC"), it("Sozlamalar", "gear", "Bo14Sozlamalar")] }
+      ],
+      ...EXTRA
+    };
+  }
+}
+</script>
+</body>
+</html>

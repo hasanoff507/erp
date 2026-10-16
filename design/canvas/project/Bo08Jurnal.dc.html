@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Buxgalteriya jurnali</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0E7C66}a:hover{color:#0A5E4D}
+</style>
+</helmet>
+<div style="min-height: 1540px; box-sizing: border-box; display: flex; flex-wrap: wrap; background: #F4F6F8; color: #0F1B2D; font-family: 'Manrope', system-ui, sans-serif;">
+  <nav aria-label="Asosiy menyu" style="flex: 1 1 240px; max-width: 260px; background: #0F1B2D; color: #C9D2DC; padding: 20px 14px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px;">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 18px;">
+      <div style="width: 36px; height: 36px; border-radius: 10px; background: #0E7C66; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 800;">E</div>
+      <div><div style="color: #FFFFFF; font-weight: 800; font-size: 15px;">ERP</div><div style="font-size: 12px; color: #8C99A8;">[Do'kon nomi]</div></div>
+    </div>
+    <sc-for list="{{menu}}" as="g" hint-placeholder-count="5">
+      <div style="padding: 14px 10px 6px; font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #6F7E90;">{{g.title}}</div>
+      <sc-for list="{{g.items}}" as="m" hint-placeholder-count="3">
+        <a href="{{m.href}}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 14px; font-weight: 600; text-decoration: none; color: {{m.fg}}; background: {{m.bg}};">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{m.icon}}"></path></svg>
+          <span style="flex-grow: 1;">{{m.label}}</span>
+          <sc-if value="{{m.hasBadge}}" hint-placeholder-val="{{false}}"><span style="padding: 1px 8px; border-radius: 999px; background: #C8372D; color: #FFFFFF; font-size: 11px; font-weight: 800;">{{m.badge}}</span></sc-if>
+        </a>
+      </sc-for>
+    </sc-for>
+    <div style="margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; background: #1C2A3F;">
+      <div style="width: 34px; height: 34px; border-radius: 50%; background: #E3F2EE; color: #0A5E4D; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px;">GT</div>
+      <div style="flex-grow: 1;"><div style="color: #FFFFFF; font-size: 13px; font-weight: 700;">Gulnora T.</div><div style="font-size: 12px; color: #8C99A8;">Buxgalter</div></div>
+    </div>
+  </nav>
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column;">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 28px; background: #FFFFFF; border-bottom: 1px solid #E7EAEE;">
+      <h1 style="margin: 0; font-size: 22px; font-weight: 800;">Buxgalteriya jurnali</h1>
+      <div style="flex-grow: 1;"></div>
+      <label style="display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px; min-width: 240px; border: 1px solid #DCE1E7; border-radius: 12px; background: #F8FAFB;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7686" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        <span style="position: absolute; width: 1px; height: 1px; overflow: hidden;">Qidiruv</span>
+        <input type="search" placeholder="Tovar, mijoz, hujjat…" style="flex-grow: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 14px; color: #0F1B2D;">
+      </label>
+      <select aria-label="Filial" style="height: 42px; padding: 0 12px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; color: #0F1B2D;"><option>Barcha filiallar</option><option>Chilonzor-3</option><option>Yunusobod-1</option></select>
+      <button type="button" aria-label="Bildirishnomalar" style="width: 42px; height: 42px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; color: #3D4A5C; display: flex; align-items: center; justify-content: center;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0112 0v5l1.5 2h-15z"></path><path d="M10 20a2 2 0 004 0"></path></svg>
+      </button>
+    </header>
+    <main style="padding: 24px 28px; display: flex; flex-direction: column; gap: 18px;">
+      <section style="background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 16px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 6px 20px rgba(15,27,45,.05); padding: 18px 20px; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px;">
+        <label style="display: flex; flex-direction: column; gap: 6px; flex: 0 1 136px;">
+          <span style="font-size: 13px; font-weight: 600; color: #3D4A5C;">Sana (dan)</span>
+          <input type="text" value="01.10.2026" style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 14px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 14px;">
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 6px; flex: 0 1 136px;">
+          <span style="font-size: 13px; font-weight: 600; color: #3D4A5C;">Sana (gacha)</span>
+          <input type="text" value="16.10.2026" style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 14px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 14px;">
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 6px; flex: 1 1 170px;">
+          <span style="font-size: 13px; font-weight: 600; color: #3D4A5C;">Hisob</span>
+          <select style="height: 44px; padding: 0 12px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; color: #0F1B2D;"><option>Barcha hisoblar</option><option>5010 — Kassa</option><option>5110 — Hisob-kitob schyoti</option><option>6410 — Byudjetga qarz (QQS)</option></select>
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 6px; flex: 1 1 170px;">
+          <span style="font-size: 13px; font-weight: 600; color: #3D4A5C;">Hujjat turi</span>
+          <select style="height: 44px; padding: 0 12px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; color: #0F1B2D;"><option>Barcha hujjatlar</option><option>Sotuv / Z-hisobot</option><option>Kirim</option><option>To'lov</option><option>Tuzatuvchi yozuv</option></select>
+        </label>
+        <div style="flex-grow: 1;"></div>
+        <button type="button" style="height: 44px; padding: 0 16px; border: 1px solid #E7EAEE; border-radius: 12px; background: #FFFFFF; color: #0F1B2D; font: inherit; font-size: 14px; font-weight: 700;">Eksport (XLSX)</button>
+        <button type="button" style="height: 44px; padding: 0 18px; border: 0; border-radius: 12px; background: #0E7C66; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Tuzatuvchi yozuv
+        </button>
+      </section>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start;">
+        <section style="flex: 2.4 1 620px; min-width: 0; background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 16px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 6px 20px rgba(15,27,45,.05); overflow: hidden;">
+          <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; padding: 18px 20px 12px;">
+            <h2 style="margin: 0; font-size: 17px; font-weight: 800;">Provodkalar</h2>
+            <span style="font-size: 13px; color: #6B7686;">entry_date bo'yicha · 01.10–16.10.2026 · {{count}} ta yozuv ko'rsatilgan</span>
+          </div>
+          <div style="overflow-x: auto;">
+            <div role="table" aria-label="Provodkalar" style="min-width: 700px;">
+              <div role="row" style="display: grid; grid-template-columns: minmax(0,.85fr) minmax(0,1.25fr) minmax(0,2.3fr) minmax(0,.55fr) minmax(0,.55fr) minmax(0,1.25fr); column-gap: 12px; padding: 12px 20px; background: #F8FAFB; border-top: 1px solid #E7EAEE; font-size: 12px; font-weight: 600; color: #6B7686;">
+                <span role="columnheader">Sana</span><span role="columnheader">Hujjat</span><span role="columnheader">Mazmun</span><span role="columnheader">Dt</span><span role="columnheader">Kt</span><span role="columnheader" style="text-align: right;">Summa</span>
+              </div>
+              <sc-for list="{{entries}}" as="e" hint-placeholder-count="16">
+                <div role="row" style="display: grid; grid-template-columns: minmax(0,.85fr) minmax(0,1.25fr) minmax(0,2.3fr) minmax(0,.55fr) minmax(0,.55fr) minmax(0,1.25fr); column-gap: 12px; align-items: center; min-height: 46px; padding: 0 20px; border-top: 1px solid {{e.line}}; font-size: 13px;">
+                  <span role="cell" style="color: #3D4A5C; font-variant-numeric: tabular-nums;">{{e.date}}</span>
+                  <span role="cell" style="display: flex; flex-direction: column;"><a href="{{e.href}}" style="font-weight: 700; text-decoration: none;">{{e.doc}}</a><span style="font-size: 11px; color: #6B7686;">{{e.branch}}</span></span>
+                  <span role="cell" style="color: #0F1B2D;">{{e.text}}</span>
+                  <span role="cell"><span style="padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: 800; background: #E8F0FC; color: #2F6FDB; font-variant-numeric: tabular-nums;">{{e.dt}}</span></span>
+                  <span role="cell"><span style="padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: 800; background: #E3F2EE; color: #0A5E4D; font-variant-numeric: tabular-nums;">{{e.kt}}</span></span>
+                  <span role="cell" style="text-align: right; font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums;">{{e.amount}}</span>
+                </div>
+              </sc-for>
+              <div role="row" style="display: grid; grid-template-columns: minmax(0,.85fr) minmax(0,1.25fr) minmax(0,2.3fr) minmax(0,.55fr) minmax(0,.55fr) minmax(0,1.25fr); column-gap: 12px; align-items: center; min-height: 52px; padding: 0 20px; border-top: 1px solid #E7EAEE; background: #F8FAFB; font-size: 13px;">
+                <span role="cell" style="font-weight: 700;">Jami</span><span role="cell"></span><span role="cell" style="color: #6B7686;">Dt oboroti = Kt oboroti</span><span role="cell"></span><span role="cell"></span>
+                <span role="cell" style="text-align: right; font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums;">{{sum}}</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div style="flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 14px;">
+          <section style="background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 16px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 6px 20px rgba(15,27,45,.05); padding: 20px; display: flex; flex-direction: column; gap: 4px;">
+            <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px;">
+              <h2 style="margin: 0; font-size: 17px; font-weight: 800;">Hisob qoldiqlari</h2>
+              <span style="font-size: 12px; color: #6B7686;">16.10.2026 holatiga</span>
+            </div>
+            <sc-for list="{{balances}}" as="b" hint-placeholder-count="11">
+              <div style="display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid #F0F2F5;">
+                <span style="width: 44px; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; color: #0F1B2D;">{{b.acc}}</span>
+                <span style="flex: 1 1 0; min-width: 0; font-size: 12px; color: #3D4A5C;">{{b.name}}</span>
+                <span style="display: flex; flex-direction: column; align-items: flex-end;"><span style="font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap;">{{b.value}}</span><span style="font-size: 11px; font-weight: 700; color: {{b.sideFg}};">{{b.side}}</span></span>
+              </div>
+            </sc-for>
+          </section>
+
+          <section style="background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 16px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 6px 20px rgba(15,27,45,.05); padding: 20px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              <h2 style="margin: 0; font-size: 17px; font-weight: 800;">Davrni yopish</h2>
+              <span style="font-size: 13px; color: #6B7686;">Sentyabr 2026 — eng eski ochiq oy</span>
+            </div>
+            <div style="display: flex; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #FBEAE8;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C8372D" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="M12 4l9 16H3z"></path><path d="M12 10v4M12 17v.5"></path></svg>
+              <span style="font-size: 12px; color: #3D4A5C;"><b style="color: #C8372D;">To'siq:</b> tannarx qayta hisoblash navbatida 1 ta ish (Shakar, 28.09.2026 dan).</span>
+            </div>
+            <div style="display: flex; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #FDF3E1;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A5A12" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="M12 4l9 16H3z"></path><path d="M12 10v4M12 17v.5"></path></svg>
+              <span style="font-size: 12px; color: #3D4A5C;"><b style="color: #8A5A12;">Ogohlantirish:</b> QQS hisob-kitobi ST-000009 o'tkazilmagan (<a href="Bo07Qqs.dc.html">QQS ichki hisobi</a>).</span>
+            </div>
+            <button type="button" disabled aria-disabled="true" style="height: 44px; border: 0; border-radius: 12px; background: #E7EAEE; color: #8C99A8; font: inherit; font-size: 14px; font-weight: 700;">Sentyabrni yopish</button>
+            <span style="font-size: 11px; color: #6B7686;">Yopilgan oy qayta ochilmaydi — keyingi tuzatishlar joriy ochiq oyda tuzatuvchi yozuv bilan.</span>
+          </section>
+        </div>
+      </div>
+
+      <section style="background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 16px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 6px 20px rgba(15,27,45,.05); overflow: hidden;">
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; padding: 18px 20px 12px;">
+          <h2 style="margin: 0; font-size: 17px; font-weight: 800;">Qayta hisoblash navbati</h2>
+          <span style="font-size: 13px; color: #6B7686;">Orqaga sanali hujjatlardan keyin tannarx (FIFO) qayta hisoblanadi</span>
+        </div>
+        <div style="overflow-x: auto;">
+          <div role="table" aria-label="Qayta hisoblash navbati" style="min-width: 860px;">
+            <div role="row" style="display: grid; grid-template-columns: minmax(0,1.6fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,.6fr) minmax(0,1.3fr) minmax(0,2fr) minmax(0,1fr); column-gap: 12px; padding: 12px 20px; background: #F8FAFB; border-top: 1px solid #E7EAEE; font-size: 12px; font-weight: 600; color: #6B7686;">
+              <span role="columnheader">Tovar</span><span role="columnheader">Ombor</span><span role="columnheader">Sanadan</span><span role="columnheader">Holat</span><span role="columnheader" style="text-align: right;">Urinish</span><span role="columnheader">Navbatga qo'yildi</span><span role="columnheader">Xato</span><span role="columnheader">Amal</span>
+            </div>
+            <sc-for list="{{recost}}" as="q" hint-placeholder-count="3">
+              <div role="row" style="display: grid; grid-template-columns: minmax(0,1.6fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,.6fr) minmax(0,1.3fr) minmax(0,2fr) minmax(0,1fr); column-gap: 12px; align-items: center; min-height: 52px; padding: 0 20px; border-top: 1px solid #F0F2F5; font-size: 13px;">
+                <span role="cell" style="font-weight: 700;">{{q.product}}</span>
+                <span role="cell" style="color: #3D4A5C;">{{q.wh}}</span>
+                <span role="cell" style="font-variant-numeric: tabular-nums;">{{q.from}}</span>
+                <span role="cell"><span style="padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; background: {{q.st.bg}}; color: {{q.st.fg}};">{{q.st.text}}</span></span>
+                <span role="cell" style="text-align: right; font-variant-numeric: tabular-nums;">{{q.attempts}}</span>
+                <span role="cell" style="color: #3D4A5C; font-variant-numeric: tabular-nums;">{{q.created}}</span>
+                <span role="cell" style="font-size: 12px; color: #C8372D;">{{q.err}}</span>
+                <span role="cell"><sc-if value="{{q.canRetry}}" hint-placeholder-val="{{false}}"><button type="button" style="height: 32px; padding: 0 10px; border: 1px solid #E7EAEE; border-radius: 9px; background: #FFFFFF; color: #0F1B2D; font: inherit; font-size: 12px; font-weight: 700;">Qayta urinish</button></sc-if></span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1540}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const I = {
+      home: "M3 11l9-7 9 7M5 10v10h14V10", cart: "M3 4h2l2.5 11h11L21 7H6.2", box: "M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10",
+      truck: "M3 6h11v10H3zM14 10h4l3 3v3h-7", users: "M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 010 7",
+      book: "M5 4h11a3 3 0 013 3v13H8a3 3 0 01-3-3zM5 17a3 3 0 013-3h11", receipt: "M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6",
+      chart: "M4 20V10M10 20V4M16 20v-7M22 20H2", wallet: "M3 7h16a2 2 0 012 2v9a2 2 0 01-2 2H3zM3 7V5a2 2 0 012-2h11",
+      bank: "M3 10l9-6 9 6M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18", tag: "M3 12V4h8l10 10-8 8z", doc: "M6 3h8l4 4v14H6zM14 3v4h4M9 13h6M9 17h6",
+      shield: "M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z", gear: "M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1",
+      spark: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z", link: "M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1",
+      alert: "M12 4l9 16H3zM12 10v4M12 17v.5", check: "M5 12.5l4.5 4.5L19 7", wifi: "M3 3l18 18M8.5 16.5a5 5 0 017 0M12 20h.01",
+      plus: "M12 5v14M5 12h14", x: "M6 6l12 12M18 6L6 18", sync: "M20 11a8 8 0 00-14.5-4.5L4 8M4 4v4h4M4 13a8 8 0 0014.5 4.5L20 16M20 20v-4h-4",
+      telegram: "M21 4L3 11l6 2 2 6 3-4 5 4zM9 13l8-6", printer: "M7 9V3h10v6M6 18H4v-7a2 2 0 012-2h12a2 2 0 012 2v7h-2M7 14h10v7H7z",
+      scan: "M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3M7 12h10"
+    };
+    const F = { "Dashboard": "Bo02Dashboard", "AI yordamchi": "Bo13Ai", "Tasdiqlash navbati": "Bo16Tasdiqlash", "Kassa (POS)": "Main", "Qarzdorlar": "Bo06Qarzdorlar", "Tovarlar va narxlar": "Bo05Narxlar", "Qoldiq va ko'chirish": "Bo03Ombor", "Xaridlar": "Bo04Xarid", "Yorliqlar": "Bo18Yorliq", "Xarajatlar": "Bo17Xarajatlar", "Bank tushumi": "Bo24Bank", "E-faktura": "Bo15Efaktura", "QQS va davlat hisoboti": "Bo10DavlatHisobot", "Buxgalteriya": "Bo08Jurnal", "Hisobotlar": "Bo09Hisobotlar", "1C integratsiyasi": "Bo23OneC", "Sozlamalar": "Bo14Sozlamalar" };
+    const ACTIVE = "Buxgalteriya";
+    const it = (label, icon, _a, badge) => { const active = label === ACTIVE; return { label, icon: I[icon], href: F[label] + ".dc.html", fg: active ? "#FFFFFF" : "#C9D2DC", bg: active ? "#1C2A3F" : "transparent", hasBadge: !!badge, badge: badge || "" }; };
+    const T = { success: ["#E5F5EC", "#1F8A4C"], info: ["#E8F0FC", "#2F6FDB"], amber: ["#FDF3E1", "#8A5A12"], danger: ["#FBEAE8", "#C8372D"], violet: ["#EFEAFC", "#6D4AD8"], gray: ["#EEF1F4", "#3D4A5C"], brand: ["#E3F2EE", "#0A5E4D"] };
+    const chip = (text, t) => ({ text, bg: T[t][0], fg: T[t][1] });
+    const fmt = (n, d = 2) => { const s = Math.abs(n).toFixed(d).split("."); const i = s[0].replace(/\B(?=(\d{3})+(?!\d))/g, " "); return (n < 0 ? "−" : "") + i + (d ? "," + s[1] : ""); };
+    const r2 = (x) => Math.round(x * 100) / 100;
+    const E = [];
+    const add = (date, doc, href, branch, text, dt, kt, amount) => E.push({ date, doc, href, branch, text, dt, kt, a: r2(amount) });
+    const cash = 9856000, card = 6720000;
+    add("16.10.2026", "Z-hisobot #214", "Pos07Smena.dc.html", "Chilonzor-3 · Kassa 1", "Naqd savdo tushumi", "5010", "9020", cash / 1.12);
+    add("16.10.2026", "Z-hisobot #214", "Pos07Smena.dc.html", "Chilonzor-3 · Kassa 1", "Naqd savdo — chiquvchi QQS 12%", "5010", "6410", cash - cash / 1.12);
+    add("16.10.2026", "Z-hisobot #214", "Pos07Smena.dc.html", "Chilonzor-3 · Kassa 1", "Karta savdosi (yo'ldagi pul)", "5710", "9020", card / 1.12);
+    add("16.10.2026", "Z-hisobot #214", "Pos07Smena.dc.html", "Chilonzor-3 · Kassa 1", "Karta savdo — chiquvchi QQS 12%", "5710", "6410", card - card / 1.12);
+    add("16.10.2026", "Z-hisobot #214", "Pos07Smena.dc.html", "Chilonzor-3 · Kassa 1", "Sotilgan tovar tannarxi (FIFO)", "9120", "2910", 11840000);
+    add("16.10.2026", "BT-000311", "Bo24Bank.dc.html", "Chilonzor-3", "15.10 karta tushumi bankka keldi", "5110", "5710", 6482000);
+    add("16.10.2026", "BT-000311", "Bo24Bank.dc.html", "Chilonzor-3", "Ekvayring komissiyasi", "9430", "5710", 38000);
+    const kr = 96 * 7200;
+    add("15.10.2026", "KR-000197", "Bo04Xarid.dc.html", "Chilonzor-3", "Kirim: Gazli ichimlik 1,5 l, 96 dona", "2910", "6010", kr / 1.12);
+    add("15.10.2026", "KR-000197", "Bo04Xarid.dc.html", "Chilonzor-3", "Kiruvchi QQS (e-faktura asosida)", "4410", "6010", kr - kr / 1.12);
+    add("15.10.2026", "TO-000043", "Bo04Xarid.dc.html", "Chilonzor-3", "To'lov: «Shirin Tong» XK (XN-000229)", "6010", "5110", 1260000);
+    add("15.10.2026", "HC-000012", "Bo03Ombor.dc.html", "Chilonzor-3", "Hisobdan chiqarish: Sut 2,5% 1 l, 6 dona (muddati o'tgan)", "9430", "2910", 6 * 11200);
+    const ns = 400000;
+    add("14.10.2026", "K-000131", "Bo06Qarzdorlar.dc.html", "Yunusobod-1 · Kassa 1", "Nasiya savdo: Tursunova Nigora", "4010", "9020", ns / 1.12);
+    add("14.10.2026", "K-000131", "Bo06Qarzdorlar.dc.html", "Yunusobod-1 · Kassa 1", "Nasiya savdo — chiquvchi QQS 12%", "4010", "6410", ns - ns / 1.12);
+    add("14.10.2026", "QT-000057", "Bo06Qarzdorlar.dc.html", "Yunusobod-1", "Qarz to'lovi (bank): Tursunova Nigora", "5110", "4010", 80000);
+    let sum = 0, prevDoc = "";
+    const entries = E.map((e) => { sum += e.a; const first = e.doc !== prevDoc; prevDoc = e.doc; return Object.assign({}, e, { amount: fmt(e.a), line: first ? "#E7EAEE" : "#F5F6F8", doc: first ? e.doc : "", branch: first ? e.branch : "", date: first ? e.date : "" }); });
+    const B = [
+      ["5010", "Kassa", 6840000, "Dt"], ["5110", "Hisob-kitob schyoti", 84320000, "Dt"], ["5710", "Yo'ldagi pul o'tkazmalari", 3960000, "Dt"],
+      ["2910", "Ombordagi tovarlar", 96300000, "Dt"], ["4010", "Xaridorlar qarzi", 18450000, "Dt"], ["4410", "Kiruvchi QQS", 52410000, "Dt"],
+      ["6010", "Yetkazib beruvchilarga qarz", 24680000, "Kt"], ["6410", "Byudjetga qarz (QQS)", 63280000, "Kt"],
+      ["9020", "Savdo tushumi (oy oboroti)", 241600000, "Kt"], ["9120", "Sotilgan tovar tannarxi (oy)", 188300000, "Dt"], ["9430", "Boshqa xarajatlar (oy)", 1420000, "Dt"]
+    ];
+    return {
+      menu: [
+        { title: "ASOSIY", items: [it("Dashboard", "home", false), it("AI yordamchi", "spark"), it("Tasdiqlash navbati", "check", false, "4")] },
+        { title: "SAVDO", items: [it("Kassa (POS)", "cart"), it("Qarzdorlar", "users"), it("Tovarlar va narxlar", "tag")] },
+        { title: "OMBOR", items: [it("Qoldiq va ko'chirish", "box"), it("Xaridlar", "truck"), it("Yorliqlar", "doc")] },
+        { title: "MOLIYA", items: [it("Xarajatlar", "wallet"), it("Bank tushumi", "bank"), it("E-faktura", "receipt"), it("QQS va davlat hisoboti", "shield", false, "1"), it("Buxgalteriya", "book")] },
+        { title: "BOSHQARUV", items: [it("Hisobotlar", "chart"), it("1C integratsiyasi", "link"), it("Sozlamalar", "gear")] }
+      ],
+      count: String(entries.length),
+      entries,
+      sum: fmt(sum),
+      balances: B.map(([acc, name, v, side]) => ({ acc, name, value: fmt(v), side: side === "Dt" ? "Debet" : "Kredit", sideFg: side === "Dt" ? "#2F6FDB" : "#0A5E4D" })),
+      recost: [
+        { product: "Shakar", wh: "Chilonzor-3", from: "28.09.2026", st: chip("Navbatda", "info"), attempts: "0", created: "16.10.2026 09:41", err: "", canRetry: false },
+        { product: "Guruch «Lazer»", wh: "Yunusobod-1", from: "03.10.2026", st: chip("Xato", "danger"), attempts: "3", created: "15.10.2026 18:02", err: "Partiya qoldig'i manfiy: KR-000189 orqaga sanali qaytarish", canRetry: true },
+        { product: "Pishloq 200 g", wh: "Chilonzor-3", from: "11.10.2026", st: chip("Bajarildi", "success"), attempts: "1", created: "14.10.2026 12:15", err: "", canRetry: false }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

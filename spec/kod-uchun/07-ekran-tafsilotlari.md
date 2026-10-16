@@ -685,8 +685,9 @@ Tovarsiz "eski qarz"ni kiritish faqat BO-06 → "Boshlang'ich qarz" (`POST /api/
 
 - **Maqsad**: back-office foydalanuvchilarini (Egasi/Menejer/Buxgalter) autentifikatsiya qilish.
 - **Rollar/ruxsat**: Barcha (login ekrani — ruxsat talab qilinmaydi).
-- **Route**: `/login`
-- **Maket**: (qaror #34)
+- **Route**: SPA `/login` (boshlash sahifasi) → AS `/oauth/authorize` (login formasi).
+- **Ikki qism** (`14-autentifikatsiya-oauth2.md` §2.1): (1) SPA `/login` — parol maydoni yo'q; «KIRISH» (yoki sessiyasiz himoyalangan sahifaga kirish) brauzerni `GET /auth/login/start?return_to=<so'ralgan sahifa>` ga yo'naltiradi; `?error=<sabab>` bo'lsa xato banneri, `?reason=subscription_expired` bo'lsa obuna banneri ko'rsatiladi. (2) Telefon+parol formasi — AS'ning server-render qilingan `/oauth/authorize` sahifasi: shu maketdagi BO-01 ko'rinishida (tokenlar — `08-dizayn-tizimi.md`, Manrope, teal brend), skriptsiz, qat'iy CSP bilan; parol faqat shu sahifadan AS'ga POST qilinadi. Bir nechta tenant a'zoligi bo'lsa — shu sahifada «Do'kon» tanlovi.
+- **Maket**: (qaror #34) — AS login sahifasi
 
 ```
 ┌─────────────────────────────────────────┐
@@ -706,22 +707,23 @@ Tovarsiz "eski qarz"ni kiritish faqat BO-06 → "Boshlang'ich qarz" (`POST /api/
 | Maydon | Label (uz) | Label (ru) | Tur/komponent | Majburiy | Validatsiya | Default | Max |
 |---|---|---|---|---|---|---|---|
 | `phone` | Telefon | Телефон | `Input` (mask `+998 XX XXX XX XX`) | Ha (telefon yo'li) | `+998` bilan 9 raqam | — | 17 |
-| `password` | Parol | Пароль | `Input type=password` | Ha (telefon yo'li) | ≥1 belgi (backend tekshiradi) | — | 128 |
-| `branchId` (login'dan keyin, bir nechta filial bo'lsa) | Filial | Филиал | `Select` | Ha (ko'p filial bo'lsa) | — | Birinchi filial | — |
+| `password` | Parol | Пароль | `Input type=password` | Ha (telefon yo'li) | 8–128 belgi (AS tekshiradi) | — | 128 |
+| `tenant_id` (AS sahifasida, bir nechta do'kon a'zoligi bo'lsa) | Do'kon | Магазин | `Select` | Ha (ko'p do'kon bo'lsa) | — | — | — |
+| `branchId` (SPA'da, login'dan keyin, bir nechta filial bo'lsa) | Filial | Филиал | `Select` (`GET /auth/session` → `branches[]`) | Ha (ko'p filial bo'lsa) | — | Birinchi filial | — |
 
 - **Amallar** (qaror #34):
 
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
 |---|---|---|---|
-| KIRISH | — | Yo'q | Front-channel Authorization Code+PKCE (`14-autentifikatsiya-oauth2.md` §2.1) → BFF cookie |
+| KIRISH (SPA `/login`) | — | Yo'q | `GET /auth/login/start` → AS login sahifasi (telefon+parol) → `GET /auth/callback` → `__Host-sid` cookie → `return_to` (`14-autentifikatsiya-oauth2.md` §2.1) |
 | **Google bilan kirish** | — | Yo'q | Google OIDC'ga redirect (bizning OAuth AS'da tashqi provayder) → qaytgach BFF cookie; birinchi marta kirishda hisob telefon raqami bilan bog'lanishi so'raladi (STIR/fiskal uchun) |
 | Parolni unutdim | — | Yo'q | OTP oynasi (`purpose=recovery`) — kod birinchi navbatda **Telegram bot**ga, Telegram ulanmagan bo'lsa **SMS**ga (zaxira) → yangi parol o'rnatish |
 | Ma'lumotlarimni yuklab olish (faqat `subscription-restricted`da ko'rinadi) | — | OTP (`purpose=data_export`) — Telegram bot birinchi, SMS zaxira | Bir martalik eksport havolasi (24 soat, qaror #51) |
 | To'lash (Click/Payme, faqat `subscription-restricted`da) | — | Yo'q | `pay_url`ga o'tish |
 
-- **Ma'lumot manbai**: `POST /auth/login`, `GET /auth/google/start` → `GET /auth/google/callback` (qaror #34), `POST /auth/otp/request`, `POST /auth/otp/verify`, `GET /billing/pay`, `POST /billing/export-my-data`.
+- **Ma'lumot manbai**: `GET /auth/login/start` → `GET|POST /oauth/authorize` (AS login sahifasi) → `GET /auth/callback`; keyin `GET /auth/session` (foydalanuvchi, do'kon, filiallar, ruxsatlar); `GET /auth/google/start` → `GET /auth/google/callback` (qaror #34), `POST /auth/otp/request`, `POST /auth/otp/verify`, `GET /billing/pay`, `POST /billing/export-my-data`.
 - **Holatlar**: `loading` · `empty` — yo'q · `error` ("Telefon yoki parol noto'g'ri", #18 — qaysi qism xato ekani oshkor qilinmaydi) · `offline` (PWA offline ombor/hisobot ko'rishga ruxsat beradi, lekin yangi login internetsiz ishlamaydi) · `no-permission` — yo'q · `subscription-restricted` — banner + to'lov havolasi + eksport havolasi, parol maydoni faol (identifikatsiya uchun), token berilmaydi.
-- **Klaviatura**: `Enter` kirishni yuboradi.
+- **Klaviatura**: `Enter` kirishni yuboradi (AS sahifasidagi forma).
 - **Audit/analitika**: `login_success`, `login_failed`, `account_locked`, `otp_requested`, `otp_verified`, `data_export_during_restriction`.
 - **Bog'liq US**: US-M13-06, US-M17-03.
 

@@ -55,9 +55,11 @@ backend/
 │       ├── jobs/                # SAQ task ro'yxati (modul `tasks.py`laridan import)
 │       ├── cron.py               # SAQ CronJob ro'yxati
 │       └── worker_settings.py    # SAQ worker sozlamalari
-├── alembic/{env.py, versions/}
+├── alembic/{env.py, versions/, sql/}   # sql/ — 12 DDL'idan scripts/gen_migration_sql.py generatsiya qiladi
+├── docker/postgres/initdb.sh    # DBA bootstrap (`12-db-sxema.md` §0)
 ├── tests/
-├── scripts/                     # seed.py (typer CLI), wait_for_db.py
+├── scripts/                     # seed.py (typer CLI), gen_migration_sql.py, ddl_from_spec.py, gen_error_codes.py
+├── docker-compose.yml           # lokal dev stack — backend/ ichida, repo ildizida emas (`23-backend-arxitekturasi.md` §7.2)
 ├── Dockerfile
 ├── pyproject.toml / uv.lock
 └── alembic.ini
@@ -67,7 +69,7 @@ backend/
 
 Modul papkalari (`23-backend-arxitekturasi.md` §1 — 18 mahsulot moduli + kesishuvchi `integrations`/`sync`/`ai`; OpenAPI tag ↔ papka xaritasi — `17-api-umumiy.md` §11): `sales, returns, pricing, inventory, purchasing, debts, vat, accounting, reports, access, auth, branches, expenses, cash, billing, notifications, integrations, ai, sync` + Bosqich 7 da `onec_integration` (M19; ichki tuzilma — `33-1c-integratsiya.md` §4.1, ikki router: `router_web.py` — `/onec-*`, `router_agent.py` — `/onec-agent/*`). `integrations` — tag emas, faqat ichki modul (adapterlar). `bank_settlements` — `cash` moduli ichida (`23` §1).
 
-**Fiskal kod — alohida, kam o'zgaradigan paket** (qaror #60): `FiscalPort` va uning adapterlari (`FakeFiscalAdapter`, hamkor bulut adapteri, lokal ko'prik adapterlari `multikassa_local`/`fiscaldrive_local`) `integrations/fiscal/` ichida, boshqa modullar faqat `FiscalPort` orqali murojaat qiladi; port chegarasida pul — butun son tiyinda (`int`), konvertatsiya bitta funksiyada (`01-qarorlar.md` #26). Sabab: virtual kassaning fiskal qismi o'zgarsa qayta xulosa talab qilinadi (VMQ-943 2-ilova 6-band) — fiskal paketga tegadigan PR alohida, kichik va CHANGELOG bilan. Tanlov — `FISCAL_PROVIDER` = `fake` / `partner_cloud` / `multikassa_local` / `fiscaldrive_local` (`21-integratsiyalar.md` §1) (MVP'da `fake`, real adapter Bosqich 5 da — `26-ochiq-savollar-reestri.md` #109).
+**Fiskal kod — alohida, kam o'zgaradigan paket** (qaror #60): `FiscalPort` va uning adapterlari (`FakeFiscalAdapter`, hamkor bulut adapteri, lokal ko'prik adapterlari `multikassa_local`/`fiscaldrive_local`) `integrations/fiscal/` ichida, boshqa modullar faqat `FiscalPort` orqali murojaat qiladi; port chegarasida pul — butun son tiyinda (`int`), konvertatsiya bitta funksiyada (`01-qarorlar.md` #26). Sabab: virtual kassaning fiskal qismi o'zgarsa qayta xulosa talab qilinadi (VMQ-943 2-ilova 6-band) — fiskal paketga tegadigan PR alohida, kichik va CHANGELOG bilan. Tanlov — `ERP_FISCAL_PROVIDER` = `fake` / `partner_cloud` / `multikassa_local` / `fiscaldrive_local` (`21-integratsiyalar.md` §1) (MVP'da `fake`, real adapter Bosqich 5 da — `26-ochiq-savollar-reestri.md` #109).
 
 **Karta terminali — alohida paket** (qaror #71): `CardTerminalPort` kontrakti va DTO'lari (`CardPurchaseRequest`, `CardTxResult`, `SettlementResult`, `TerminalHealth`), adapterlar (`FakeCardTerminalAdapter`, vendor bulut API bo'lsa `CloudTerminalAdapter`), `card_terminal_transactions`/`card_terminal_settlements` yozuvchisi va `card.*` agent vazifalari — `integrations/card_terminal/` ichida; `sales`/`returns`/`debts`/`cash` unga faqat port orqali murojaat qiladi. Kontrakt — bitta manba: Pydantic modellaridan JSON Schema eksport qilinadi → veb-kassa TS tiplari (orval qoidasi bilan bir xil) va agent C# DTO'lari (`tools/gen-contracts.ps1`); qo'lda ikkinchi sxema yozilmaydi. Port chegarasida pul — butun son tiyinda. Vendorga xos kod faqat adapter/drayver ichida; `adapter='fake'` prod tenant terminaliga tayinlanmaydi (`app/core/config.py` prod guard'i bilan birga tekshiriladi). Veb-kassa tomoni (POS → agent klienti, holat mashinasi) — `24-frontend-arxitekturasi.md` §6.
 
@@ -76,7 +78,7 @@ Modul papkalari (`23-backend-arxitekturasi.md` §1 — 18 mahsulot moduli + kesi
 ### 1.2 Frontend (`web/`)
 
 ```
-web/                                  # Turborepo (npm workspaces)
+web/                                  # Turborepo (pnpm workspaces)
 ├── apps/shell/src/{app,features,main.tsx}   # yagona Vite ilova: router, layout, auth-provider
 ├── packages/
 │   ├── pages/<sahifa-guruhi>/         # pos, catalog, warehouse, debts, finance, reports,
@@ -235,8 +237,8 @@ Pul hisob-kitobi **standart holatda frontendda qilinmaydi** — backend tayyor s
 
 - `Number`/`parseFloat` bilan pul hisoblash **taqiqlanadi** (lint bilan majburlanadi, qaror #57: ESLint `no-restricted-syntax` + custom rule — `Number(`, `parseFloat(`, `parseInt(` chaqiruvlari va `Money` tipidagi qiymatlarda `+ - * /` operatorlari taqiqlangan; istisno faqat `shared/lib/money` ichida, `eslint-disable` izohi bilan).
 - `decimal.js`/`big.js` — satr-satr amal, `shared/lib/money` ichida bitta joyda.
-- Yaxlitlash formulasi backend bilan **aynan bir xil** (yuqoridagi 3.2), umumiy test-vektorlar — `shared/money-vectors.json` (ikki tomon bir xil fayldan test o'qiydi).
-- `formatMoney(value: string): string` — **faqat ko'rsatish**, natijasi hech qachon API'ga qaytarilmaydi va keyingi hisoblashda ishlatilmaydi. `Intl.NumberFormat("uz-UZ")` + qo'lda `" so'm"` suffiks.
+- Yaxlitlash formulasi backend bilan **aynan bir xil** (yuqoridagi 3.2), umumiy test-vektorlar — repo ildizidagi `shared/money-vectors.json` (yagona manba: `backend/tests/unit/test_money.py` ham, `web` testlari ham shu fayldan o'qiydi; nusxa yo'q).
+- `formatMoney(value: string): string` — **faqat ko'rsatish**, natijasi hech qachon API'ga qaytarilmaydi va keyingi hisoblashda ishlatilmaydi. Guruhlash `Intl.NumberFormat` bilan, ajratgichlar esa majburan: minglik — NBSP (U+00A0, summa qatorda bo'linmaydi), kasr — vergul (`1 240 000 so'm`, `94 500,00`); brauzerning `uz-UZ` lokal ma'lumotiga tayanilmaydi (ICU'da `uz` bo'lmasa `99,000` chiqadi); `" so'm"` suffiksi qo'lda.
 
 ### 3.4 API transport
 
@@ -301,7 +303,7 @@ class DocumentPostingService(Protocol):
 
 ### 4.5 Idempotentlik
 
-Back-office yozuvchi so'rov — `Idempotency-Key` majburiy: Redis `SETNX idem:{tenant}:{key}` tezkor qulf (parallel takror → `409 IDEMPOTENCY_IN_PROGRESS`) + Postgres `idempotency_keys` doimiy jurnal (30 kun saqlanadi, qayta so'rovda saqlangan javob qaytariladi, qayta bajarilmaydi). `/sync/push` bundan mustasno — dedupe `sync_receipts.client_event_id` orqali.
+Back-office yozuvchi so'rov — `Idempotency-Key` majburiy: Redis `SETNX idem:{tenant}:{key}` tezkor qulf (parallel takror → `409 IDEMPOTENCY_IN_PROGRESS`) + Postgres `idempotency_keys` doimiy jurnal (30 kun saqlanadi, qayta so'rovda saqlangan javob qaytariladi, qayta bajarilmaydi). Middleware (`app/core/idempotency.py`) auth dependency'laridan oldin ishlaydi, tenant'ni `resolve_tenant` hook'idan oladi; sarlavha yo'q → `422 VALIDATION_ERROR` (`details[].field="Idempotency-Key"`). Faqat `2xx` javob saqlanadi va jurnal qatori biznes o'zgarishi bilan **bitta `tenant_transaction`da, COMMIT'dan oldin** yoziladi — alohida tranzaksiyada keyin yozish taqiqlanadi (`23-backend-arxitekturasi.md` §3). `/sync/push` va `/onec-agent/*` bundan mustasno — dedupe `sync_receipts.client_event_id` / `lease_id` orqali.
 
 ---
 
@@ -363,11 +365,11 @@ Manba — `23-backend-arxitekturasi.md` §6, `24-frontend-arxitekturasi.md` §4,
 | `msw` | API mock — orval generatsiya qilgan klient funksiyalarini chaqiradi, haqiqiy backend emas |
 | `playwright` | E2E — kamida POS asosiy oqimi (chek yaratish → to'lov → chop etish/elektron chek) va bitta back-office hujjat oqimi |
 
-**Majburiy har PR'da**: yangi/o'zgargan Effector model uchun kamida bitta `vitest` testi; `eslint` + `tsc --noEmit` xatosiz; `npm run api:gen --check` orqali OpenAPI↔orval drift yo'qligi tasdiqlangan.
+**Majburiy har PR'da**: yangi/o'zgargan Effector model uchun kamida bitta `vitest` testi; `eslint` + `tsc --noEmit` xatosiz; `pnpm api:check` orqali OpenAPI↔orval drift yo'qligi tasdiqlangan.
 
 ### 6.3 Umumiy
 
-- Pul hisob-kitobi test-vektorlari (`shared/money-vectors.json`) — backend va frontend **bitta fayldan** o'qiydi (3.2–3.3-bo'lim), ikki tomonda alohida qo'lda yozilmaydi.
+- Pul hisob-kitobi test-vektorlari (repo ildizidagi `shared/money-vectors.json`) — backend va frontend **bitta fayldan** o'qiydi (3.2–3.3-bo'lim), ikki tomonda alohida qo'lda yozilmaydi.
 - Qarz to'lovi allokatsiyasi va `debt_settlement` chek qatorlari (qaror #67; `18-api-kassa.md` §12.2) — TS `shared/lib/debt-allocation` (offline POS) va Python `app/shared/debt_allocation.py` (server posting) bitta formulani amalga oshiradi; test-vektorlar `shared/debt-allocation-vectors.json` — `shared/money-vectors.json` bilan bir xil qoida: ikki tomon bitta fayldan o'qiydi, CI'da ikkalasi bir xil natija beradi.
 - Yangi ruxsat kodi qo'shilsa — standart matritsa testi (`15-xavfsizlik-va-audit.md` §2.2) yangilanadi.
 - 1C integratsiyasi (Bosqich 7): server testlari 1C'siz — protokol darajasidagi soxta agent bilan (`31-qabul-testlari.md` M19); real 1C bazadagi tekshiruv — faqat pilot oldi testlari P-01…P-22 (`33` §16.1), CI'da emas.
@@ -407,9 +409,9 @@ Kichik, bitta mantiqiy o'zgarish bir PR'da (bitta modul/bitta hujjat turi oqimi)
 | 2 | `pytest` (bitlik + `testcontainers` CI runner servisi sifatida) | 23 §7.1 |
 | 3 | Alembic: `alembic upgrade head` bo'sh bazada | 23 §7.1 |
 | 4 | `schemathesis run` — ishga tushirilgan API'ga qarshi | 23 §7.1 |
-| 5 | `openapi.json` eksport + frontend `npm run api:gen --check` — sxema drift bo'lsa build qizil | 23 §7.1, 10 §3 |
+| 5 | `openapi.json` eksport + frontend `pnpm api:check` — sxema drift bo'lsa build qizil | 23 §7.1, 10 §3 |
 | 6 | Frontend: `eslint` (pul qoidasi bilan), `tsc --noEmit`, `vitest` | 24 §4, 01 #57 |
-| 6a | Xavfsizlik: `pip-audit` (backend), `npm audit --audit-level=high` (frontend), `gitleaks` (butun repo) — topilma bo'lsa build qizil | 01 #57 |
+| 6a | Xavfsizlik: `pip-audit` (backend), `pnpm audit --audit-level=high` (frontend), `gitleaks` (butun repo) — topilma bo'lsa build qizil | 01 #57 |
 | 6b | `.env.example` mavjudligi va `Settings` maydonlari bilan mosligi (har kerakli o'zgaruvchi nomi bor, qiymatlar bo'sh) | 01 #57 |
 | 7 | Docker image build + (`main`da) registry push | 23 §7.1 |
 
@@ -456,8 +458,8 @@ Manba — `15-xavfsizlik-va-audit.md` §4, `23-backend-arxitekturasi.md` §7.3.
 - Parol/PIN — **argon2id** (`passlib[argon2]`/`argon2-cffi`), boshqa hash algoritmi ishlatilmaydi.
 - JWT/JWKS — **joserfc** (EdDSA/ES256); OAuth 2.0 protokol skeleti — **Authlib**. Qo'lda JWT encode/decode yozilmaydi.
 - CSRF — sinxronizator-token (`itsdangerous`, `GET /api/v1/auth/csrf`), CSRF cookie yo'q; Bearer (Android) so'rovlar CSRF tekshiruvidan ozod.
-- Dependency audit — CI'da majburiy (qaror #57): `pip-audit` (backend), `npm audit --audit-level=high` (frontend), `gitleaks` (7.5-band 6a).
-- **CSP** — qat'iy (qaror #57): `default-src 'self'`, `frame-ancestors 'none'`, `object-src 'none'`, inline skript yo'q; tashqi manba faqat aniq ruxsat etilgan API domenlari (`connect-src`), Do'kon agenti uchun `http://127.0.0.1:<port>` (qaror #60).
+- Dependency audit — CI'da majburiy (qaror #57): `pip-audit` (backend), `pnpm audit --audit-level=high` (frontend), `gitleaks` (7.5-band 6a).
+- **CSP** — qat'iy (qaror #57), siyosat bitta joyda (`apps/shell/csp.ts`) yoziladi va deploy konfiguratsiyasidan generatsiya qilinadi: `default-src 'self'`, `script-src 'self'` (inline skript va `eval` yo'q), `object-src 'none'`, `frame-src 'none'`, `base-uri 'self'`, `form-action 'self'`, `frame-ancestors 'none'`; shriftlar self-hosted, CDN yo'q. **`style-src` — har so'rovga nonce**: Radix modal komponentlari (`Dialog`, `Sheet`, `Select`, `Popover` — `react-remove-scroll`) ish vaqtida `<style>` elementi qo'shadi, shuning uchun `style-src 'self' 'nonce-<N>'` (`'unsafe-inline'` emas). Nonce'ni `index.html`ni beradigan qatlam — nginx (`$request_id` dan, `sub_filter` bilan `index.html`dagi `__CSP_NONCE__` o'rniga `<meta property="csp-nonce" content="N">` ga qo'yadi) yoki shu faylni beradigan BFF — har javob uchun yangidan yaratadi va o'sha qiymatni CSP sarlavhasiga yozadi; `index.html` `Cache-Control: no-store` bilan beriladi (nonce keshlanmasin). SPA ishga tushganda meta'dagi nonce'ni `get-nonce` `setNonce()` ga beradi (Radix `<style>`ga shu nonce'ni qo'yadi). Statik xostda nonce imkoni bo'lmasa — zaxira: Radix yaratadigan `<style>` matnlarining `sha256-…` xeshlari ro'yxati (build vaqtida test bilan tekshiriladi). **`frame-ancestors` faqat HTTP sarlavhada** ishlaydi (`<meta http-equiv>` ichida brauzer uni e'tiborsiz qoldiradi) — clickjacking himoyasi uchun CSP sarlavha sifatida majburiy, `<meta>` faqat qo'shimcha himoya. **Do'kon agenti porti**: `connect-src`dagi `http://127.0.0.1:<port>` qo'lda yozilmaydi — deploy konfiguratsiyasidagi agent porti ro'yxatidan (standart `47110`, `21-integratsiyalar.md` §16) generatsiya qilinadi; agent sozlamasida port faqat shu ro'yxatdagi qiymatga o'zgartiriladi, aks holda CSP so'rovni bloklaydi. To'liq qoida — `24-frontend-arxitekturasi.md` §4.4.
 - **AI'ga shaxsiy ma'lumot** — Claude'ga yuboriladigan har so'rov maskalash quvuridan o'tadi (o'chirib bo'lmaydi), `ai_cross_border_enabled=false` bo'lsa rasm yuborilmaydi (qaror #61); maskalashni chetlab o'tadigan to'g'ridan-to'g'ri SDK chaqiruvi taqiqlangan.
 - PII logga tushmaydi (5.2-band); `audit_log` immutable, DB roli darajasida `UPDATE`/`DELETE` huquqisiz (5.3-band).
 - Platform admin bypass (`platform_admins`) — faqat ichki admin panel yo'li, oddiy API endpoint hech qachon `tenant_id`siz ishlamaydi (4.2-band); har platform admin amali audit'ga majburiy yoziladi.

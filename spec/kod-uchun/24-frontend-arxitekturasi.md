@@ -17,14 +17,14 @@
 6. **Veb-kassa offline ishlaydi**: PWA (vite-plugin-pwa) + IndexedDB (Dexie) + append-only outbox; tafsiloti `16-offline-sync.md` da.
 7. Namunadagi kamchiliklar takrorlanmaydi: `console.log` qoldirilmaydi, sana formatlash qo'lda yozilmaydi (dayjs), xato xabari `JSON.stringify` bilan foydalanuvchiga ko'rsatilmaydi (tarjima qilingan matn).
 8. **Chop etish va uskunalar (§6)**: printer transporti qurilmaga qarab tanlanadi — USB (Web Serial/WebUSB), HTTP LAN printer (Epson ePOS/Star WebPRNT), xom TCP 9100 LAN printer — faqat **Do'kon agenti** orqali (qaror #60), bulut printer (Star CloudPRNT/Epson SDP), tizim printeri; standart — bosma chek, elektron chek — zaxira. Lokal fiskal ko'prik rejimida kassa platformasi — Windows PK + Do'kon agenti; iOS kassa — faqat fiskal hamkorning bulut rejimida. Karta to'lovi — `CardTerminalPort` (§6.5, qaror #71): Windows veb-kassada Do'kon agenti orqali bank terminaliga, MVP'da `FakeCardTerminalAdapter`; `purchase` hech qachon avtomatik takrorlanmaydi.
-9. **Autentifikatsiya — BFF (Backend-for-Frontend) naqshi, OAuth 2.0 token hech qachon brauzer JS'iga chiqmaydi**: login `features/auth-provider` orqali backend'ning `/auth/login`iga POST qiladi, backend ichida OAuth Authorization Code+PKCE almashinuvini bajaradi va faqat `HttpOnly` sessiya cookie qaytaradi; access/refresh token faqat serverda. To'liq protokol — `14-autentifikatsiya-oauth2.md`. Login sahifasi obuna muddati tugagan holatni alohida ko'rsatadi (to'lov havolasi bilan).
+9. **Autentifikatsiya — BFF (Backend-for-Frontend) naqshi, OAuth 2.0 token hech qachon brauzer JS'iga chiqmaydi**: SPA parolni hech qachon qabul qilmaydi va yubormaydi. `/login` sahifasi (`features/auth-provider`) brauzerni `GET /auth/login/start?return_to=…` ga yo'naltiradi → BFF AS'ning `/oauth/authorize` login sahifasiga (server-render, BO-01 ko'rinishi) `302` qiladi — telefon+parol faqat shu yerda kiritiladi → AS `GET /auth/callback` ga qaytaradi → BFF Authorization Code+PKCE almashinuvini bajaradi va faqat `HttpOnly` `__Host-sid` cookie qo'yadi; access/refresh token faqat serverda. Ilova ochilganda va ~30 soniyada `GET /auth/session` (foydalanuvchi, do'kon, filiallar, ruxsatlar — `14-autentifikatsiya-oauth2.md` §20), yozuvchi so'rovlar uchun `GET /api/v1/auth/csrf`, chiqish — `POST /auth/logout`, barcha seanslar — `POST /auth/sessions/revoke-all`. `/login?error=<sabab>` — callback xatosi. To'liq protokol — `14-autentifikatsiya-oauth2.md`. Login sahifasi obuna muddati tugagan holatni alohida ko'rsatadi (to'lov havolasi bilan).
 
 ---
 
 ## 1. Papka strukturasi
 
 ```
-web/                                  # Turborepo (npm workspaces)
+web/                                  # Turborepo (pnpm workspaces, pnpm-workspace.yaml)
 ├── apps/
 │   └── shell/                        # yagona Vite ilova
 │       └── src/
@@ -49,7 +49,7 @@ web/                                  # Turborepo (npm workspaces)
 │       ├── api/                      # axios instance, interceptorlar, GENERATSIYA qilingan klient
 │       ├── models/                   # GENERATSIYA qilingan tiplar (OpenAPI) + qo'shimcha domen tiplari
 │       ├── state/                    # global Effector modellari: user, tenant, branch, shift, online-status
-│       ├── ui/                       # shadcn/ui komponentlari (components/ui) + umumiy kompozitlar
+│       ├── ui/                       # shadcn/ui komponentlari (components/ui) + umumiy kompozitlar; src/styles/theme.css (08 §1)
 │       ├── i18n/                     # i18next: uz (lotin, asosiy), ru
 │       ├── offline/                  # Dexie baza, outbox, sync (faqat pos va kerakli sahifalar ishlatadi)
 │       ├── lib/                      # formatlash, pul, shtrix-kod/og'irlik kodi parser (scanner), printer adapterlari (printer), fiskal port klienti (fiscal), karta terminali porti va adapterlari (cardTerminal, §6.5), Do'kon agenti lokal klienti (agent)
@@ -126,8 +126,8 @@ Qoidalar:
 
 ## 3. API qatlami
 
-- **Generatsiya:** FastAPI `/openapi.json` → **orval** (axios mutator bilan) → `@shared/api/generated` (funksiyalar) va `@shared/models/generated` (tiplar). `npm run api:gen` buyrug'i; CI'da sxema o'zgarsa generatsiya qayta tekshiriladi. Shu bilan backend va frontend tiplari doim mos. orval: `client: "axios-functions"`, `mode: "tags-split"`, `mutator` — umumiy axios instance; `override.operationName` `operation_id`dagi teg prefiksini olib tashlaydi (`debts_list_debtors` → `listDebtors`). `@shared/api/index.ts`: `export * as debts from "./generated/debts/debts";` — bundan `api.debts.listDebtors(...)` kelib chiqadi (qo'lda o'ram kodi yo'q, faqat ESM namespace re-export).
-- **Instance** (namunadagi `_base` kabi): `withCredentials: true` (HttpOnly sessiya cookie), interceptorlar: CSRF tokeni (`GET /auth/csrf` dan, xotirada keshlanadi — namunadagi `getCsrfToken`) (POST/PUT/PATCH/DELETE), `X-Tenant-Id` emas — tenant sessiyadan olinadi, `X-Branch-Id` (tanlangan filial), `Idempotency-Key` (barcha yozuvchi so'rovlarda — offline qayta yuborishda takror yozuvdan himoya), `Accept-Language`.
+- **Generatsiya:** FastAPI `/openapi.json` → **orval** (axios mutator bilan) → `@shared/api/generated` (funksiyalar) va `@shared/models/generated` (tiplar). `pnpm api:gen` buyrug'i; CI'da `pnpm api:check` — sxema o'zgarsa generatsiya qayta tekshiriladi. Shu bilan backend va frontend tiplari doim mos. orval: `client: "axios-functions"`, `mode: "tags-split"`, `mutator` — umumiy axios instance; `override.operationName` `operation_id`dagi teg prefiksini olib tashlaydi (`debts_list_debtors` → `listDebtors`). `@shared/api/index.ts`: `export * as debts from "./generated/debts/debts";` — bundan `api.debts.listDebtors(...)` kelib chiqadi (qo'lda o'ram kodi yo'q, faqat ESM namespace re-export).
+- **Instance** (namunadagi `_base` kabi): `withCredentials: true` (HttpOnly sessiya cookie), interceptorlar: CSRF tokeni (`GET /api/v1/auth/csrf` dan, xotirada keshlanadi — namunadagi `getCsrfToken`; `X-CSRF-Token` sarlavhasi) (POST/PUT/PATCH/DELETE), `X-Tenant-Id` emas — tenant sessiyadan olinadi, `X-Branch-Id` (tanlangan filial), `Idempotency-Key` (barcha yozuvchi so'rovlarda — offline qayta yuborishda takror yozuvdan himoya), `Accept-Language`.
 - **Xatolar:** 401 → BFF avval jim refresh qiladi (`14-autentifikatsiya-oauth2.md` §7), muvaffaqiyatsiz bo'lsa qayta autentifikatsiya oynasi (POS'da outbox/Dexie saqlanadi; to'liq logout faqat foydalanuvchi tanlovi bilan); 403 `PERMISSION_DENIED` → "huquq yo'q"; **403 `SUBSCRIPTION_RESTRICTED`** → `/login?reason=subscription_expired`ga yo'naltirish, login sahifasida "Obuna muddati tugagan" banner + Click/Payme to'lov havolasi (javobdagi `pay_url`/`amount_due` bilan, `14-autentifikatsiya-oauth2.md` §16) — to'lov o'tgach kirish darhol tiklanadi; 409/422 → forma maydonlariga xato (zod bilan bir xil format); tarmoq xatosi → `$isOnline=false` va kassa offline rejimga o'tadi. `409 IDEMPOTENCY_IN_PROGRESS` — forma xatosi emas: effekt `Retry-After`dan keyin xuddi shu kalit bilan avtomatik takrorlanadi (maks. 3 marta). `422 IDEMPOTENCY_KEY_REUSED` — dasturiy xato, Sentry'ga. Foydalanuvchiga xom JSON ko'rsatilmaydi — backend xato kodi i18n kalitiga tarjima qilinadi.
 - Runtime konfiguratsiya: `window.__ERP_CONFIG__` (namunadagi `window.metadataApiConfig` kabi) — bitta build turli muhitlarda ishlaydi.
 
@@ -135,18 +135,18 @@ Qoidalar:
 
 | Vazifa | Kutubxona | Izoh |
 |---|---|---|
-| Build / monorepo | Vite, Turborepo, npm workspaces | namunadagidek |
+| Build / monorepo | Vite, Turborepo, **pnpm** workspaces (`packageManager: pnpm@10`, versiyalar `pnpm-workspace.yaml` katalogida) | npm/yarn ishlatilmaydi |
 | Holat va API oqimi | effector, effector-react, patronum | namunadagidek |
 | HTTP | axios | namunadagidek |
 | API tip/klient generatsiyasi | orval (axios mutator bilan) | qo'lda DTO yozilmaydi (26 #58) |
-| UI komponentlar | shadcn/ui (Radix UI) + Tailwind CSS | Mantine o'rniga |
+| UI komponentlar | shadcn/ui (Radix UI) + Tailwind CSS **3.4** (`^3.4`, katalogda qadalgan; v4 ga o'tish — alohida vazifa: preset `tailwind.config` JS formatida, `tailwindcss-animate`) | Mantine o'rniga |
 | Ikonkalar | lucide-react (nomli import, tree-shaking; `strokeWidth` 1.8 — §4.2) | shadcn standarti; maketlardagi chiziqli ikon uslubiga mos |
 | Shrift | @fontsource-variable/manrope (self-hosted woff2 — §4.1) | CDN/Google Fonts yo'q, offline PWA keshida (qaror #57) |
 | Jadvallar | @tanstack/react-table + @tanstack/react-virtual | katta ro'yxatlar (tovarlar, cheklar) virtualizatsiya bilan |
 | Formalar va validatsiya | react-hook-form + zod + @hookform/resolvers | backend Pydantic xatolari bilan bir xil shakl |
 | Routing | react-router-dom | namunadagidek |
 | Sana | dayjs (+ uz/ru lokal) | qo'lda formatlash taqiqlanadi |
-| Raqam/pul formatlash | `Intl.NumberFormat("uz-UZ")` + kichik `formatMoney` | pul hisob-kitobi frontendda qilinmaydi — backend beradi |
+| Raqam/pul formatlash | `formatMoney` (`shared/lib/format`): guruhlash `Intl.NumberFormat` bilan, lekin ajratgichlar majburan — minglik NBSP (U+00A0), kasr vergul (`1 240 000`, `94 500,00`); brauzerning `uz-UZ` ICU ma'lumotiga tayanilmaydi (ba'zi brauzerlarda `uz` yo'q) | pul hisob-kitobi frontendda qilinmaydi — backend beradi |
 | Xabarlar (toast) | sonner (shadcn) | |
 | Grafiklar | recharts (shadcn charts) | dashboard, hisobotlar |
 | Sana tanlash | react-day-picker **^9.14** (shadcn calendar; v10 — `@daypicker/react`, v9 moslik API'lari olib tashlangan, alohida sinovdan keyin) | shadcn calendar `date-fns` ni tranzitiv olib keladi — UI formatlash baribir dayjs |
@@ -161,15 +161,15 @@ Qoidalar:
 | Excel eksport/import | exceljs (yoki SheetJS) | boshlang'ich tovar/qarz importi (US-M04-04, US-M08-07) |
 | Chop etish (A4, yorliq) | react-to-print | Yorliq — HTML/SVG + `bwip-js` + OS drayveri; chek printeri (ESC/POS) — `shared/lib/printer` adapterlari (Web Serial, WebUSB, HTTP ePOS/WebPRNT, Do'kon agenti orqali xom TCP 9100, bulut printer, tizim printeri) — §6 |
 | Testlar | vitest, @testing-library/react, msw, playwright | |
-| Kod sifati | eslint + @feature-sliced/eslint-config, prettier, typescript strict | ESLint `no-restricted-syntax` + custom qoida: `Number(`, `parseFloat(`, `parseInt(` va `Money` tipidagi `+ - * /` taqiqlanadi; CI'da `npm audit --audit-level=high`; qat'iy CSP (`default-src 'self'`, `frame-ancestors 'none'`; `connect-src` ga `http://127.0.0.1:<agent port>` qo'shiladi) — qaror #57 |
+| Kod sifati | eslint + @feature-sliced/eslint-config, prettier, typescript strict | ESLint `no-restricted-syntax` + custom qoida: `Number(`, `parseFloat(`, `parseInt(` va `Money` tipidagi `+ - * /` taqiqlanadi; CI'da `pnpm audit --audit-level=high`; qat'iy CSP — §4.4, qaror #57 |
 
 ### 4.1 Shrift — Manrope (ilova bilan bundle)
 
 - Paket: `@fontsource-variable/manrope` (bitta variable woff2, og'irlik o'qi 200–800; ishlatiladigani 400–800 — `08-dizayn-tizimi.md` §2). Ulash `apps/shell/src/main.tsx` da: `import "@fontsource-variable/manrope/wght.css";` — fayllar Vite build'iga (`dist/assets`, hashlangan nom) tushadi; runtime'da CDN/Google Fonts so'rovi yo'q (CSP `default-src 'self'`, qaror #57).
-- Subsetlar: **latin, latin-ext, cyrillic, cyrillic-ext** (o'zbek lotin, U+02BB, rus va o'zbek kirill `Ққ Ғғ Ҳҳ Ўў`); `@font-face` `unicode-range` bilan bo'lingan — brauzer faqat kerakli subsetni yuklaydi. Greek/vietnamese fayllari build'dan chiqariladi (Vite `build.rollupOptions` / PWA `globIgnores`).
+- Subsetlar: **latin, latin-ext, cyrillic, cyrillic-ext** (o'zbek lotin, rus kirill, `Ўў`). Manrope (`@fontsource-variable/manrope` 5.3) da **U+02BB/U+02BC (`ʻ`) va `Ққ Ғғ Ҳҳ` gliflari yo'q** — ular stekdagi tizim shriftidan chiqadi (bo'sh kvadrat emas, lekin 700/800 og'irlikda uslub farqi ko'rinadi; Bosqich 0 spike: `research_notes/ochiq-savollar/spike-font.md`, test `apps/shell/e2e/font-glyphs.spec.ts`); `@font-face` `unicode-range` bilan bo'lingan — brauzer faqat kerakli subsetni yuklaydi. Greek/vietnamese fayllari build'dan chiqariladi (Vite `build.rollupOptions` / PWA `globIgnores`).
 - `font-display: swap` (Fontsource standarti); `index.html` da latin subset fayli `<link rel="preload" as="font" type="font/woff2" crossorigin>` bilan oldindan yuklanadi (hashlangan nom Vite `transformIndexHtml` plagini orqali qo'yiladi).
 - **Offline (POS/PWA)**: vite-plugin-pwa `workbox.globPatterns` ga `**/*.woff2` qo'shiladi — to'rt subset fayli precache'da, internet yo'q holatda va birinchi offline ishga tushishda ham shrift bor.
-- Stek (Tailwind `fontFamily.sans`, §4.3): `'Manrope Variable', 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`. Bosqich 0 glif skrinshot-testi (qaror #57) yomon natija bersa — self-hosted Noto Sans subset'i (`@fontsource/noto-sans`, latin-ext + cyrillic-ext) stekka Manrope'dan keyin qo'shiladi.
+- Stek (Tailwind `fontFamily.sans`, §4.3): `'Manrope Variable', 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`. Yo'q gliflar uchun self-hosted Noto Sans subset'i (`@fontsource/noto-sans`, latin-ext + cyrillic-ext, faqat yo'q kod nuqtalari `unicode-range` bilan) stekka Manrope'dan keyin qo'shiladimi — asoschi/dizayn qarori (26 #141); Android/iOS qurilmalarida tekshiruv ochiq.
 - Chek/yorliq rastr rejimi (`@shared/lib/printer`, §6.1) canvas'da shu shriftni ishlatadi — chizishdan oldin `document.fonts.load("700 24px 'Manrope Variable'")` kutiladi.
 
 ### 4.2 Ikonkalar — lucide-react
@@ -240,6 +240,10 @@ export default {
 ```
 
 `text-display`, `text-kpi`, `text-money` klasslari bilan birga doim `tabular-nums` qo'yiladi (komponent ichida; ESLint/Stylelint emas — `MoneyDisplay`/`KpiCard` kabi komponentlar orqali). `DataTable` raqamli ustun meta'si (`meta.numeric: true`) `text-right tabular-nums` ni avtomatik qo'shadi.
+
+### 4.4 Content-Security-Policy
+
+**CSP** — qat'iy (qaror #57), siyosat bitta joyda (`apps/shell/csp.ts`) yoziladi va deploy konfiguratsiyasidan generatsiya qilinadi: `default-src 'self'`, `script-src 'self'` (inline skript va `eval` yo'q), `object-src 'none'`, `frame-src 'none'`, `base-uri 'self'`, `form-action 'self'`, `frame-ancestors 'none'`; shriftlar self-hosted, CDN yo'q. **`style-src` — har so'rovga nonce**: Radix modal komponentlari (`Dialog`, `Sheet`, `Select`, `Popover` — `react-remove-scroll`) ish vaqtida `<style>` elementi qo'shadi, shuning uchun `style-src 'self' 'nonce-<N>'` (`'unsafe-inline'` emas). Nonce'ni `index.html`ni beradigan qatlam — nginx (`$request_id` dan, `sub_filter` bilan `index.html`dagi `__CSP_NONCE__` o'rniga `<meta property="csp-nonce" content="N">` ga qo'yadi) yoki shu faylni beradigan BFF — har javob uchun yangidan yaratadi va o'sha qiymatni CSP sarlavhasiga yozadi; `index.html` `Cache-Control: no-store` bilan beriladi (nonce keshlanmasin). SPA ishga tushganda meta'dagi nonce'ni `get-nonce` `setNonce()` ga beradi (Radix `<style>`ga shu nonce'ni qo'yadi). Nonce faqat `index.html` javobida: boshqa statik fayllar nonce'siz CSP bilan beriladi. nginx: generatsiya qilingan `deploy/nginx-security-headers.conf` o'z `location /` va `location = /index.html` bloklariga ega, shuning uchun **`server` darajasida** `include` qilinadi (ichki `location`dagi o'z `add_header` yuqoridagi sarlavhalarni meros qilmaydi). Lokal `vite preview` ham har javobga yangi nonce beradi (e2e shu rejimda). **Offline (PWA)**: service worker navigatsiyada keshlangan `index.html`ni beradi — uning nonce'i SW yangilanguncha o'zgarmaydi; sarlavha va meta bir xil keshlangan javobdan kelgani uchun mos keladi, `script-src` nonce'ga bog'liq emas, nonce faqat Radix `<style>` uchun. Statik xostda nonce imkoni bo'lmasa — zaxira: Radix yaratadigan `<style>` matnlarining `sha256-…` xeshlari ro'yxati (build vaqtida test bilan tekshiriladi). **`frame-ancestors` faqat HTTP sarlavhada** ishlaydi (`<meta http-equiv>` ichida brauzer uni e'tiborsiz qoldiradi) — clickjacking himoyasi uchun CSP sarlavha sifatida majburiy, `<meta>` faqat qo'shimcha himoya. **Do'kon agenti porti**: `connect-src`dagi `http://127.0.0.1:<port>` qo'lda yozilmaydi — deploy konfiguratsiyasidagi agent porti ro'yxatidan (standart `47110`, `21-integratsiyalar.md` §16) generatsiya qilinadi; agent sozlamasida port faqat shu ro'yxatdagi qiymatga o'zgartiriladi, aks holda CSP so'rovni bloklaydi.
 
 ## 5. Veb-kassa (POS) maxsus talablari
 

@@ -1,0 +1,45 @@
+{
+  "name": "@pages/reports",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Hisobotlar, dashboard (M12)",
+  "imports": {
+    "#*": "./src/*"
+  },
+  "exports": {
+    ".": "./src/app/index.tsx"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@shared/i18n": "workspace:*",
+    "@shared/lib": "workspace:*",
+    "@shared/models": "workspace:*",
+    "@shared/state": "workspace:*",
+    "@shared/ui": "workspace:*",
+    "effector": "catalog:",
+    "effector-react": "catalog:",
+    "patronum": "catalog:",
+    "lucide-react": "catalog:",
+    "react-router-dom": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@shared/eslint-config": "workspace:*",
+    "@shared/typescript-config": "workspace:*",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "eslint": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

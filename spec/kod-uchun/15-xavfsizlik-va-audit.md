@@ -143,7 +143,7 @@ Har bir kod `role_permissions.permission_code` sifatida saqlanadi, zarur bo'lsa 
 
 ### 2.2 Standart matritsa (5 tizim roli)
 
-Quyidagi jadval `02-rollar-va-ssenariylar.md` (6-bo'lim) dagi K/Y/T matritsasi bilan **izchil**: K→faqat `*.view`/ko'rish huquqlari, Y→yaratish kodlari, T→tasdiqlash/`*.approve`/`*.post` kodlari. "✓(limit)" — `role_permissions.limit_value` bilan cheklangan huquq.
+Quyidagi jadval `02-rollar-va-ssenariylar.md` (6-bo'lim) dagi K/Y/T matritsasi bilan **izchil**: K→faqat `*.view`/ko'rish huquqlari, Y→yaratish kodlari, T→tasdiqlash/`*.approve`/`*.post` kodlari. "✓(limit, N)" — `role_permissions.limit_value` bilan cheklangan huquq, standart qiymati N (2.3-bo'lim). "✓(limit²)" — tenant sozlaydigan limit: huquq limit bilan ishlaydi, lekin standart qiymat hali belgilanmagan — seed'da `limit_value = NULL` (limitsiz), Egasi BO-11'da raqam qo'yadi; standart raqamlar asoschi qarorini kutadi (26 #179).
 
 **Egasi ustuni — "barcha ruxsat" (superset)** (qaror #28): **Egasi — `platform.admin`dan tashqari barcha tenant ruxsatlarining supersetiga ega**, limitlar cheksiz (1–3 xodimli do'konda Egasi ko'pincha o'zi kassada/omborda turadi). Quyidagi jadvalning Egasi ustuni shunga mos.
 
@@ -152,8 +152,8 @@ Quyidagi jadval `02-rollar-va-ssenariylar.md` (6-bo'lim) dagi K/Y/T matritsasi b
 | `sales.create` | ✓ | ✓ | ✓ | – | – |
 | `shift.open/close` | ✓ | ✓ | ✓ | – | – |
 | `returns.create` | ✓ | ✓ | ✓ | – | – |
-| `returns.approve` | ✓ | ✓ | ✓(limit, 100 000) | – | – |
-| `discount.give` | ✓ | ✓(limit) | ✓(limit, past) | – | – |
+| `returns.approve` | ✓ | ✓ | ✓(limit, 100 000 so'm) | – | – |
+| `discount.give` | ✓ | ✓(limit²) | ✓(limit, 5%) | – | – |
 | `discount.approve` | ✓ | ✓ | – | – | – |
 | `stock.count.create` | ✓ | ✓ | – | ✓ | – |
 | `stock.count.post` | ✓ | ✓ | – | – | – |
@@ -163,7 +163,7 @@ Quyidagi jadval `02-rollar-va-ssenariylar.md` (6-bo'lim) dagi K/Y/T matritsasi b
 | `purchases.post` | ✓ | – | – | –¹ | ✓ |
 | `purchases.pay` | ✓ | – | – | – | ✓ |
 | `einvoice.sign` | ✓ | – | – | – | ✓ |
-| `debts.create` | ✓ | ✓ | ✓(limit) | – | – |
+| `debts.create` | ✓ | ✓ | ✓(limit²) | – | – |
 | `debts.approve` | ✓ | ✓ | – | – | – |
 | `debts.forgive` | ✓ | – | – | – | – |
 | `debts.limit.manage` | ✓ | ✓ | – | – | – |
@@ -186,7 +186,7 @@ Quyidagi jadval `02-rollar-va-ssenariylar.md` (6-bo'lim) dagi K/Y/T matritsasi b
 | `einvoice.create` | ✓ | ✓ | – | – | ✓ |
 | `expenses.create` | ✓ | ✓ | – | – | ✓ (kiritish) |
 | `expenses.approve` | ✓ | – | – | – | – |
-| `cash.withdraw` | ✓ | ✓(limit) | ✓(limit, past) | – | – |
+| `cash.withdraw` | ✓ | ✓(limit²) | ✓(limit, 50 000 so'm) | – | – |
 | `cash.deposit` | ✓ | ✓ | ✓ | – | – |
 | `cash.count.shift` | ✓ | ✓ | ✓ | – | – |
 | `card.manual_entry.approve` | ✓ | ✓ | – | – | – |
@@ -198,7 +198,7 @@ Quyidagi jadval `02-rollar-va-ssenariylar.md` (6-bo'lim) dagi K/Y/T matritsasi b
 | `cash_register.manage` | ✓ | ✓ | – | – | – |
 | `discount.rule.manage` | ✓ | ✓ | – | – | – |
 | `stock.view` | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `stock.writeoff` | ✓ | ✓(limit) | – | ✓(limit) | – |
+| `stock.writeoff` | ✓ | ✓(limit²) | – | ✓(limit²) | – |
 | `purchases.return` | ✓ | ✓ | – | ✓ | ✓ |
 | `labels.print` | ✓ | ✓ | – | ✓ | – |
 | `reports.sales.view` | ✓ | ✓ | – | – | ✓ |
@@ -215,6 +215,8 @@ Quyidagi jadval `02-rollar-va-ssenariylar.md` (6-bo'lim) dagi K/Y/T matritsasi b
 | `onec.export.correct` | ✓ | – | – | – | ✓ |
 
 *Izoh (1C, `33-1c-integratsiya.md` §11.2): Egasi Buxgalterga `onec.settings.manage` ni BO-11 orqali qo'shishi mumkin, lekin `onec_settings.auto_approve` (avto-tasdiq) ni yoqish/o'chirish baribir **faqat Egasi** (`OWNER_ONLY`, qaror #40).*
+
+*² Tenant sozlaydigan limit, standart `limit_value = NULL` (limitsiz) — asoschi standart raqamni belgilaguncha (26 #179); limitdan oshganda 2.3-bo'limdagi tasdiq oqimi (`discount_over_limit`, `debt_over_limit`, `cash_withdrawal_over_limit`, `write_off_over_limit`).*
 
 *¹ Omborchi kirimni faqat `draft` qiladi (`purchases.receive`); `purchases.post` ni Egasi BO-11'da Omborchi roliga qo'shishi mumkin (≤3 FTE do'konlar, qaror #49).*
 
@@ -347,9 +349,9 @@ Har bir sir yozuvida: `tenant_id`, `kind` (masalan `click_secret`, `didox_token`
 
 ### 5.2 Claude API'ga nima boradi, nima bormaydi
 
-- **Boradi (minimallashtirilgan va maskalangan holda)**: AI-01 so'rovlari uchun kerakli kontekst — masalan "bugun qancha foyda" so'roviga javob uchun kod hisoblagan **agregat raqamlar** (SQL natijasi), mahsulot nomi kabi matn maydonlari (AI-05, AI-06). Jismoniy shaxsga oid maydonlar (mijoz/kontragent F.I.Sh., telefon, JSHSHIR, yakka tadbirkor STIR'i, manzil) promptdan oldin `tenant_glossary` tokeniga almashtiriladi ("mijoz A"), javob qaytgach kod tokenni asl qiymatga qaytaradi (`22-ai-qatlami.md` §7).
+- **Boradi (minimallashtirilgan va maskalangan holda)**: AI-01 so'rovlari uchun kerakli kontekst — masalan "bugun qancha foyda" so'roviga javob uchun kod hisoblagan **agregat raqamlar** (SQL natijasi), mahsulot nomi kabi matn maydonlari (AI-05, AI-06). Jismoniy shaxsga oid maydonlar (mijoz/kontragent F.I.Sh., telefon, JSHSHIR, yakka tadbirkor STIR'i, manzil) promptdan oldin tokenga almashtiriladi ("mijoz A"; token xaritasi faqat shu so'rov davomida xotirada, saqlanmaydi), javob qaytgach kod tokenni asl qiymatga qaytaradi (`22-ai-qatlami.md` §7).
 - **Maskalash majburiy, tenant o'chira olmaydi** (qaror #61): Anthropic (AQSh) VMQ-415 ro'yxatida faqat EU-US DPF ishtirokchisi bo'lsa qamraladi, Anthropic esa DPF ishtirokchisi emas — maskalanmagan shaxsga doir ma'lumotni uzatish faqat subyekt roziligi bilan mumkin (ZRU-547 15-m.). AI orqali qonunga xilof ishlov berish — MJtK 46-2-m. 2-qism (BHMning 50–100 baravari).
-- **Maskalab bo'lmaydigan istisno — AI-03 OCR rasmi** (faktura/yuk xati fotosida shaxs ismi bo'lishi mumkin): tenant chegaradan tashqari uzatishga rozilik bermaguncha (`tenants.settings.ai_cross_border_enabled=false`, `consents` yozuvi yo'q) rasm yuborilmaydi — `403 AI_CONSENT_REQUIRED`. Muqobil — VMQ-415 ro'yxatidagi davlatda ishlov beradigan endpoint (`AI_PII_ROUTE`, masalan AWS Bedrock EU) — asoschi tanlovi; standart: rozilik + Anthropic API.
+- **Maskalab bo'lmaydigan istisno — AI-03 OCR rasmi** (faktura/yuk xati fotosida shaxs ismi bo'lishi mumkin): tenant chegaradan tashqari uzatishga rozilik bermaguncha (`tenants.settings.ai_cross_border_enabled=false`, `consents` yozuvi yo'q) rasm yuborilmaydi — `403 AI_CONSENT_REQUIRED`. Muqobil — VMQ-415 ro'yxatidagi davlatda ishlov beradigan endpoint (`ERP_AI_PII_ROUTE`, masalan AWS Bedrock EU) — asoschi tanlovi; standart: rozilik + Anthropic API.
 - **Hech qachon bormaydi**: parollar/PIN hash, to'liq karta/to'lov ma'lumoti (biz saqlamaymiz ham), E-IMZO xususiy kaliti, biometrik/genetik ma'lumot (bizda umuman yo'q).
 - **Minimallashtirish qoidasi**: prompt faqat vazifaga kerakli maydonlarni o'z ichiga oladi (masalan nasiya eslatma matni uchun — mijoz ismi, summa, kun soni; butun mijoz profili emas); "kod hisoblaydi, AI tushuntiradi" tamoyili shu bilan birga xavfsizlik chegarasi ham hisoblanadi — AI hech qachon xom DB jadvalini to'liq ko'rmaydi (`09-ai-funksiyalar.md`, Arxitektura qoidalari).
 - Har bir AI so'rovi `ai_requests` jadvalida loglanadi (tenant_id, user_id, feature, model, token, cost, status) — audit va xarajat nazorati uchun (`11-malumotlar-modeli.md`, 10-bo'lim).
@@ -371,10 +373,10 @@ Har bir sir yozuvida: `tenant_id`, `kind` (masalan `click_secret`, `didox_token`
 - Davlat hisoboti tuzatish/tasdiqlash amallari (`tax.correction.submit`).
 - Platform admin kirishi va amallari (3.4-bo'lim).
 - Kirish/chiqish (login success/fail), parol/PIN o'zgarishi, qurilma ro'yxatdan o'tishi.
-- Sir/kalit rotatsiyasi (4.2-bo'lim).
+- Sir/kalit rotatsiyasi (4.2-bo'lim). Tenant'ga tegishli sir (`tenant_secrets`) — `audit_log`ga. **Platforma darajasidagi** voqealar (imzolash kaliti rotatsiyasi `signing_key_rotated`, OAuth mijoz siri rotatsiyasi) — `audit_log`ga emas: `audit_log.tenant_id NOT NULL` va RLS bilan tenantga bog'langan, shuning uchun ular strukturali JSON logga yoziladi (`event`, `purpose`, `kid`, bajaruvchi; maxfiy qiymat yo'q) va log saqlash siyosati bo'yicha saqlanadi.
 - Ma'lumot eksporti (`reports.export`, tenant bo'yicha to'liq eksport, 7.3-bo'lim).
 - To'lovdan oldin chek qatori/chekni bekor qilish (`sale.draft_voided`), chekni qayta chop etish (`receipt.reprinted`), qurilmani bekor qilish va PIN majburiy almashtirish.
-- **OAuth/autentifikatsiya voqealari** (to'liq ro'yxat `14-autentifikatsiya-oauth2.md` §14'da): `login_success`/`login_failed`/`account_locked`, `otp_requested`/`otp_verified`/`otp_failed`, `password_changed`/`password_reset`, `pin_changed`/`pin_reset_forced`, `refresh_token_reuse_detected`, `session_revoked`/`all_sessions_revoked`, `tenant_switched`, `subscription_lockout_triggered`/`subscription_restored`, `signing_key_rotated`.
+- **OAuth/autentifikatsiya voqealari** (to'liq ro'yxat `14-autentifikatsiya-oauth2.md` §14'da): `login_success`/`login_failed`/`account_locked`, `otp_requested`/`otp_verified`/`otp_failed`, `password_changed`/`password_reset`, `pin_changed`/`pin_reset_forced`, `refresh_token_reuse_detected`, `session_revoked`/`all_sessions_revoked`, `tenant_switched`, `subscription_lockout_triggered`/`subscription_restored`; `signing_key_rotated` — strukturali log (yuqoridagi band).
 - **Qo'shimcha voqealar**: `sync_drain_started`/`sync_drain_completed` (lokautdan oldingi offline cheklarni drenaj qilish, `14-autentifikatsiya-oauth2.md` §16.4), `data_export_during_restriction` (lokaut paytida to'lov-sahifa orqali eksport, `14` §16.5), `platform_admin_mfa_failed` (`14` §18.1).
 - **1C integratsiyasi voqealari** (`33-1c-integratsiya.md` §11.3, `entity` — tegishli `onec_*` jadvali): `onec.agent.paired`, `onec.agent.revoked`, `onec.agent.unpaired`, `onec.agent.machine_changed`, `onec.agent.updated`; `onec.base.registered`, `onec.base.updated`, `onec.base.write_enabled_changed`, `onec.base.reassigned`, `onec.base.archived`; `onec.binding.changed`; `onec.settings.changed`, `onec.auto_approve.changed`; `onec.mapping.confirmed`, `onec.mapping.removed`, `onec.value_mapping.changed`; `onec.ref_create.approved`, `onec.ref_create.rejected`, `onec.ref_create.created`; `onec.export.prepared`, `onec.export.approved`, `onec.export.auto_approved`, `onec.export.cancelled`, `onec.export.resent`, `onec.export.item_skipped`, `onec.export.accepted`, `onec.export.revision_created`, `onec.export.correction_created`, `onec.export.devices_excluded`; `onec.item.written`, `onec.item.failed`, `onec.item.unposted_marked`; `onec.verify.mismatch`, `onec.drift.detected`; `onec.task.rejected` (xavfsizlik signali — alert, `33-1c-integratsiya.md` §15.4); `onec.diagnostics.requested`. Agent amallari `user_id`siz, `device_id` (agent qurilmasi) bilan yoziladi.
 - **Karta terminali voqealari** (qaror #71, `entity` — `card_terminal_transactions` / `card_terminals` / `card_terminal_settlements`; `after`da integratsiyalangan natija uchun faqat niqob, RRN, avtorizatsiya kodi, sxema, summa — PAN yo'q): `card.purchase.approved`, `card.purchase.declined`, `card.purchase.unknown` (taymaut/aloqa uzildi), `card.void.auto` (faqat ikki holat: kassir fiskal chek chiqmagan sotuvni bekor qildi yoki `CARD_AMOUNT_MISMATCH` — avtomatik `void`; bog'lanmagan `approved` urinish avtomatik `void` qilinmaydi — `sync_exceptions(kind='card_orphan_transaction')`), `card.void.failed` (`CARD_VOID_FAILED`, sotuv bekor qilinmaydi, Egasiga M18), `card.refund`, `card.manual_entry` (terminalsiz (rekvizitsiz) karta to'lovi/qaytarishi: summa, `manual_reason`, `card_manual_fallback` qiymati, tasdiqlovchi — bo'lsa; karta rekvizitlari yo'q), `card.outcome.resolved_manual` (`unknown` tranzaksiya menejer tomonidan terminal chekiga qarab yopildi: natija `approved`/`declined`, summa, tasdiqlovchi; `rrn`/niqob yo'q), `card.settlement.mismatch` (terminal settlement jami integratsiyalangan tranzaksiyalar jami bilan mos emas), `card_terminal.created` / `card_terminal.updated` / `card_terminal.archived` (BO-12, `cash_register.manage`). Agent vazifasi (`card.settlement`, `card.status`) natijalari `user_id`siz, `device_id` (agent qurilmasi) bilan yoziladi.
@@ -426,9 +428,9 @@ Bazaviy daraja — OWASP ASVS L2 (qonuniy talab emas, ichki standart; TLS, argon
 | Parol/PIN | **argon2id** heshlash (`14-autentifikatsiya-oauth2.md` §4.1) | `04-arxitektura-va-stack.md`, 7-bo'lim |
 | Sessiya | HttpOnly, Secure, SameSite cookie + CSRF token | `24-frontend-arxitekturasi.md`, 3-bo'lim |
 | Kirish cheklovi (rate limiting) | Redis orqali, login/API darajasida | `10-umumiy-arxitektura.md` — Redis "rate-limit" vazifasi uchun allaqachon rejalashtirilgan |
-| CSP (Content Security Policy) | Qat'iy CSP: `default-src 'self'`, `frame-ancestors 'none'` | Majburiy (qaror #57) |
+| CSP (Content Security Policy) | Qat'iy CSP: `default-src 'self'`, `frame-ancestors 'none'` (faqat HTTP sarlavhada), `style-src` — har so'rovga nonce (Radix `<style>`), agent porti konfiguratsiyadan — `24-frontend-arxitekturasi.md` §4.4 | Majburiy (qaror #57) |
 | Kirish nazorati (input validation) | Pydantic v2 (backend), zod (frontend) | `10-umumiy-arxitektura.md`, `24-frontend-arxitekturasi.md` — ikkalasi ham allaqachon tanlangan |
-| Dependency va sir skanerlash | CI'da `pip-audit`, `npm audit --audit-level=high`, `gitleaks`; `.env.example` majburiy (haqiqiy sir repozitoriyga tushmaydi) | Majburiy (qaror #57); kod sifati — `32-kod-qoidalari.md` |
+| Dependency va sir skanerlash | CI'da `pip-audit`, `pnpm audit --audit-level=high`, `gitleaks`; `.env.example` majburiy (haqiqiy sir repozitoriyga tushmaydi) | Majburiy (qaror #57); kod sifati — `32-kod-qoidalari.md` |
 | Penetratsion test | **Ikki bosqich** (qaror #23 — tavsiya #14): (1) **pilotdan oldin** — bepul avtomatik DAST skaner (masalan OWASP ZAP) + ichki OAuth/to'lov/fiskal tekshiruv ro'yxati; (2) **ommaviy sotuvdan oldin** — Celion yoki ONESEC'dan (ikkalasidan narx so'rab) OWASP ASVS L2 bo'yicha to'liq pentest (veb, API, OAuth, Android). Byudjet rezervi: **~60 mln so'm (~$5 000)** | Standart/qamrov — yuqori ishonch; narx — xalqaro ma'lumot bo'yicha baho ($1 500–7 000; aniq narx firmalar taklifidan), mahalliy firmalar (Celion, ONESEC, Toshkent) narxni ochiq bermaydi — rasmiy taklif so'ralishi kerak |
 | Shifrlash (tinch holatda) | (1) S3 ga yoziladigan hujjat va fotolar — ilova darajasida shifrlanadi (SSE-C yoki mijoz tomonida AES-GCM, kalit — §4.2 KEK zanjiri); (2) backup arxivlari — pgBackRest shifrlashi; (3) DBaaS disk shifrlashi UzCloud'dan so'raladi | UzCloud faqat BaaS uchun "encrypted during transfer and storage" deydi, S3/DBaaS/VM uchun bayonot yo'q (qaror #65) |
 
@@ -485,7 +487,7 @@ Muddatlar manbali: VMQ-415 4-band (transchegaraviy uzatishda tarqalish — 24 so
 1. **Tashqi javob kerak** — virtual kassa reyestri uchun "Kiberxavfsizlik markazi" ekspertiza xulosasi narxi va reyestrga kiritish bosqichlari, Soliq qo'mitasi / csec.uz (Xat 1, Xat 3, Xat 10) — interim: ЗРУ-764 majburiy emas (§9.1), ekspertiza Bosqich 5 rejasida, byudjetda zahira — 26 #42 (OQ-011).
 2. **Tashqi javob kerak** — oferta/foydalanish shartlari matni: chegaradan tashqari AI uzatishga rozilik bandi, maskalangan ma'lumot maqomi, tenant ↔ platforma ↔ sub-processor rollari, xodim ma'lumoti asosi, yurist — interim: majburiy maskalash, `ai_cross_border_enabled=false`, `terms_versions`/`consents` saqlanadi (qaror #61); birinchi real tenantdan oldin kerak (Bosqich 6) — 26 #127 (OQ-042).
 3. **Tashqi javob kerak** — UzCloud shartnoma SLA foizi va kompensatsiya, DBaaS HA/PITR/disk shifrlash, S3 SSE/versioning, UzCloud savdo bo'limi — interim: o'z WAL PITR, ilova darajasidagi shifrlash, boshqa provayderdagi nusxa, ichki maqsad 99,5% (qaror #65) — 26 #51 (OQ-043).
-4. **Tashqi javob kerak** — Eskiz.uz SMS shartnomasi va OTP yetkazish tezligi, Eskiz.uz — interim: Telegram asosiy kanal (01 #34), `OtpPort` → `EskizSmsAdapter`, `ESKIZ_TEST_MODE=true` — 26 #45 (OQ-102).
+4. **Tashqi javob kerak** — Eskiz.uz SMS shartnomasi va OTP yetkazish tezligi, Eskiz.uz — interim: Telegram asosiy kanal (01 #34), `OtpPort` → `EskizSmsAdapter`, `ERP_ESKIZ_TEST_MODE=true` — 26 #45 (OQ-102).
 
 ## Manbalar
 

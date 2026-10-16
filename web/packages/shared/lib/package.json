@@ -1,0 +1,34 @@
+{
+  "name": "@shared/lib",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "imports": {
+    "#*": "./src/*"
+  },
+  "exports": {
+    "./money": "./src/money/index.ts",
+    "./format": "./src/format/index.ts",
+    "./phone": "./src/phone/index.ts",
+    "./date": "./src/date/index.ts",
+    "./runtime-config": "./src/runtime-config/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "dayjs": "catalog:",
+    "decimal.js": "catalog:"
+  },
+  "devDependencies": {
+    "@shared/eslint-config": "workspace:*",
+    "@shared/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "extends": "@shared/typescript-config/base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "lib": ["ES2023", "DOM"]
+  },
+  "include": [
+    "vite.config.ts",
+    "vitest.config.ts",
+    "playwright.config.ts",
+    "tailwind.config.ts",
+    "csp.ts",
+    "*.test.ts",
+    "dev",
+    "deploy",
+    "e2e"
+  ]
+}

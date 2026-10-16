@@ -1,0 +1,120 @@
+{
+  "app": {
+    "name": "ERP",
+    "tagline": "Do'kon boshqaruv paneli",
+    "storePlaceholder": "[Do'kon nomi]"
+  },
+  "actions": {
+    "save": "Saqlash",
+    "cancel": "Bekor qilish",
+    "retry": "Qayta urinish",
+    "continue": "Davom etish",
+    "login": "Kirish",
+    "logout": "Chiqish",
+    "back": "Orqaga"
+  },
+  "states": {
+    "loading": "Yuklanmoqda…",
+    "empty": "Ma'lumot yo'q"
+  },
+  "lang": {
+    "groupLabel": "Interfeys tili",
+    "uz": "UZ",
+    "ru": "RU",
+    "uzName": "O'zbekcha",
+    "ruName": "Русский"
+  },
+  "nav": {
+    "label": "Asosiy menyu",
+    "groups": {
+      "main": "ASOSIY",
+      "sales": "SAVDO",
+      "warehouse": "OMBOR",
+      "finance": "MOLIYA",
+      "management": "BOSHQARUV"
+    },
+    "items": {
+      "dashboard": "Dashboard",
+      "aiAssistant": "AI yordamchi",
+      "approvals": "Tasdiqlash navbati",
+      "pos": "Kassa (POS)",
+      "debtors": "Qarzdorlar",
+      "catalogPrices": "Tovarlar va narxlar",
+      "stock": "Qoldiq va ko'chirish",
+      "purchases": "Xaridlar",
+      "labels": "Yorliqlar",
+      "expenses": "Xarajatlar",
+      "bankSettlements": "Bank tushumi",
+      "einvoices": "E-faktura",
+      "taxReconciliation": "QQS va davlat hisoboti",
+      "accounting": "Buxgalteriya",
+      "reports": "Hisobotlar",
+      "onec": "1C integratsiyasi",
+      "settings": "Sozlamalar"
+    },
+    "badgeLabel": "{{count}} ta kutilmoqda"
+  },
+  "topbar": {
+    "searchLabel": "Qidiruv",
+    "searchPlaceholder": "Tovar, mijoz, ekran…",
+    "branch": "Filial",
+    "allBranches": "Barcha filiallar",
+    "notifications": "Bildirishnomalar",
+    "openMenu": "Menyuni ochish",
+    "closeMenu": "Menyuni yopish"
+  },
+  "user": {
+    "menuLabel": "Foydalanuvchi menyusi",
+    "roles": {
+      "owner": "Egasi",
+      "manager": "Menejer",
+      "accountant": "Buxgalter",
+      "cashier": "Kassir",
+      "storekeeper": "Omborchi"
+    },
+    "revokeAll": "Barcha seanslarni tugatish",
+    "unknownRole": "Foydalanuvchi"
+  },
+  "network": {
+    "online": "Online",
+    "offline": "Offlayn"
+  },
+  "session": {
+    "logoutFailed": "Tizimdan chiqib bo'lmadi. Aloqani tekshirib, qayta urinib ko'ring",
+    "checkFailed": "Server bilan aloqa yo'q. Qayta ulanilmoqda…"
+  },
+  "placeholder": {
+    "title": "Tez orada",
+    "description": "Bu bo'lim keyingi bosqichlarda quriladi."
+  },
+  "notFound": {
+    "title": "Sahifa topilmadi",
+    "action": "Bosh sahifaga"
+  },
+  "noPermission": {
+    "title": "Sizda bu bo'limga kirish huquqi yo'q"
+  },
+  "routeError": {
+    "title": "Sahifani ochib bo'lmadi",
+    "body": "Kutilmagan xatolik yuz berdi. Qayta urinib ko'ring yoki sahifani qayta yuklang.",
+    "updateBody": "Ilovaning yangi versiyasi chiqqan. Davom etish uchun sahifani qayta yuklang.",
+    "retry": "Qayta urinish",
+    "reload": "Sahifani qayta yuklash"
+  },
+  "errors": {
+    "internal_error": "Xatolik yuz berdi. Qayta urinib ko'ring",
+    "request_canceled": "So'rov bekor qilindi",
+    "network": "Internet aloqasi yo'q. Offlayn rejimda davom etiladi",
+    "permission_denied": "Sizda bu amal uchun huquq yo'q",
+    "subscription_restricted": "Obuna muddati tugagan. Davom etish uchun to'lang",
+    "invalid_credentials": "Telefon yoki parol noto'g'ri",
+    "csrf_invalid": "Sahifa eskirgan, qayta yuklang",
+    "rate_limited": "Juda ko'p so'rov. Birozdan keyin qayta urinib ko'ring",
+    "account_locked": "Hisob vaqtincha bloklangan. Birozdan keyin qayta urinib ko'ring"
+  },
+  "validation": {
+    "required": "Bu maydonni to'ldirish shart",
+    "phone_format": "Telefon raqami formatiga mos emas",
+    "max_length": "Ruxsat etilgan uzunlikdan oshdi"
+  }
+}

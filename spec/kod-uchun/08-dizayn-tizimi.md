@@ -69,7 +69,7 @@ Qiymatlar manbai — `design/USLUB.md` «Ranglar» jadvali va maketlar; hex — 
 | `--sidebar-ring` | — | `#7FD6C1` | `166 51% 67%` | Qorong'i fondagi brend urg'usi (ikonka, fokus) |
 | `--overlay` | — | `#0F1B2D` / 55% | `216 50% 12%` | Modal orqa fon: `hsl(var(--overlay) / 0.55)` |
 
-### `apps/shell/src/app/ui/theme.css`
+### `packages/shared/ui/src/styles/theme.css`
 
 ```css
 :root {
@@ -280,7 +280,7 @@ Gradient, neon rang va chap-chegarali (rangli chap chiziqli) karta ishlatilmaydi
 
 ## 2. Tipografiya
 
-Shrift: **Manrope** (400, 500, 600, 700, 800) — ilova bilan birga bundle qilingan woff2 (`@fontsource-variable/manrope`, subsetlar latin, latin-ext, cyrillic, cyrillic-ext; ulash — `24-frontend-arxitekturasi.md` §4.1); runtime'da CDN/Google Fonts yuklanmaydi (CSP `default-src 'self'`, offline PWA keshi — qaror #57). Stek: `font-family: 'Manrope Variable', 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`. U+02BB (ʻ — `oʻ`, `gʻ`) va o'zbek kirill (`Ққ Ғғ Ҳҳ Ўў`) gliflari — Bosqich 0 skrinshot testi (Windows/Android/iOS); Manrope'da yo'q glif `system-ui` zaxirasidan chiqadi, natija yomon bo'lsa self-hosted Noto Sans subset'i zaxira qatoriga qo'shiladi (qaror #57).
+Shrift: **Manrope** (400, 500, 600, 700, 800) — ilova bilan birga bundle qilingan woff2 (`@fontsource-variable/manrope`, subsetlar latin, latin-ext, cyrillic, cyrillic-ext; ulash — `24-frontend-arxitekturasi.md` §4.1); runtime'da CDN/Google Fonts yuklanmaydi (CSP `default-src 'self'`, offline PWA keshi — qaror #57). Stek: `font-family: 'Manrope Variable', 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`. Manrope'da U+02BB/U+02BC (ʻ — `oʻ`, `gʻ`) va `Ққ Ғғ Ҳҳ` gliflari **yo'q** (`Ўў` va rus kirill bor) — ular stekdagi tizim shriftidan chiqadi (Bosqich 0 spike: `research_notes/ochiq-savollar/spike-font.md`); self-hosted Noto Sans subset'ini zaxira qatoriga qo'shish — 26 #141 (qaror #57).
 
 | Token | `font-size` / `line-height`, og'irlik | Back-office qo'llanishi | POS qo'llanishi |
 |---|---|---|---|

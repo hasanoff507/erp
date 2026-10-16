@@ -1544,7 +1544,7 @@ Ruxsat — hammasi `platform.admin` (**faqat `platform_admins`**, majburiy TOTP,
 
 ## AI (AI-01, AI-03, AI-05, AI-06)
 
-> **Umumiy AI qoidalari** (`22-ai-qatlami.md`): (1) AI provayderiga yuboriladigan matnda shaxsiy maydonlar (ism, telefon, STIR/PINFL, manzil, karta maskasi) **har doim maskalanadi** (qaror #61); (2) AI-03 rasmlari (va maskalab bo'lmaydigan har qanday ma'lumot) tenant `ai_cross_border_enabled=true` (40h rozilik) bo'lmaguncha yuborilmaydi → `403 AI_CONSENT_REQUIRED`; (3) xarajat so'mda — Markaziy bankning kunlik rasmiy kursi (`platform.fx_rates`, scheduler har kuni 09:30), har so'rovda `ai_requests.fx_rate_used` yoziladi, kurs olinmasa `FX_USD_UZS_FALLBACK = 12 500` (qaror #55); (4) `AI_LOW_CONFIDENCE` xato kodi emas — `200` javobda `low_confidence_fields[]` (qaror #55), OpenAPI'da xato javobi sifatida e'lon qilinmaydi.
+> **Umumiy AI qoidalari** (`22-ai-qatlami.md`): (1) AI provayderiga yuboriladigan matnda shaxsiy maydonlar (ism, telefon, STIR/PINFL, manzil, karta maskasi) **har doim maskalanadi** (qaror #61); (2) AI-03 rasmlari (va maskalab bo'lmaydigan har qanday ma'lumot) tenant `ai_cross_border_enabled=true` (40h rozilik) bo'lmaguncha yuborilmaydi → `403 AI_CONSENT_REQUIRED`; (3) xarajat so'mda — Markaziy bankning kunlik rasmiy kursi (`platform.fx_rates`, scheduler har kuni 09:30), har so'rovda `ai_requests.fx_rate_used` yoziladi, kurs olinmasa `ERP_FX_USD_UZS_FALLBACK = 12 500` (qaror #55); (4) `AI_LOW_CONFIDENCE` xato kodi emas — `200` javobda `low_confidence_fields[]` (qaror #55), OpenAPI'da xato javobi sifatida e'lon qilinmaydi.
 
 ### 72. `POST /ai/chat`
 

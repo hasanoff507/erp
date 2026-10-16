@@ -1,0 +1,28 @@
+{
+  "description": "Shared money rounding vectors (01-qarorlar.md #26, 32-kod-qoidalari.md §3). Backend (app/core/money.py) and web (shared/lib/money) must both pass every case.",
+  "line_total": {
+    "formula": "ROUND_HALF_UP(qty * unit_price - discount, 0), serialized with 2 decimals",
+    "cases": [
+      {"qty": "10.000", "unit_price": "12000.0000", "discount": "0.00", "expected": "120000.00"},
+      {"qty": "0.375", "unit_price": "18990.0000", "discount": "0.00", "expected": "7121.00"},
+      {"qty": "1.250", "unit_price": "9999.0000", "discount": "500.00", "expected": "11999.00"},
+      {"qty": "3.000", "unit_price": "0.5000", "discount": "0.00", "expected": "2.00"},
+      {"qty": "1.000", "unit_price": "2.5000", "discount": "0.00", "expected": "3.00"},
+      {"qty": "1.000", "unit_price": "3.5000", "discount": "0.00", "expected": "4.00"},
+      {"qty": "2.000", "unit_price": "15000.0000", "discount": "1500.00", "expected": "28500.00"},
+      {"qty": "0.333", "unit_price": "10000.0000", "discount": "0.00", "expected": "3330.00"},
+      {"qty": "1.000", "unit_price": "100.0000", "discount": "100.00", "expected": "0.00"}
+    ]
+  },
+  "vat_from_gross": {
+    "formula": "ROUND_HALF_UP(amount * rate / (100 + rate), 2)",
+    "cases": [
+      {"amount": "120000.00", "rate": "12.00", "expected": "12857.14"},
+      {"amount": "11999.00", "rate": "12.00", "expected": "1285.61"},
+      {"amount": "112.00", "rate": "12.00", "expected": "12.00"},
+      {"amount": "5.00", "rate": "12.00", "expected": "0.54"},
+      {"amount": "100.00", "rate": "0.00", "expected": "0.00"},
+      {"amount": "7121.00", "rate": "12.00", "expected": "762.96"}
+    ]
+  }
+}

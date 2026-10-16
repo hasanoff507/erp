@@ -76,7 +76,7 @@ Bu ekran bo'lmasa, Egasi/Buxgalter OFD yoki e-faktura 48 soatdan ko'p muvaffaqiy
 
 **Arxitektura (qaror #60)**: bulutdan OFD'ga chek yuboradigan ochiq API **yo'q**. Chekni **fiskal modul (FM)** — JavaCard applet (USB-ridyer yoki Android SAM/NFC) — imzolaydi va do'kondagi lokal xizmat (masalan Multikassa `localhost:8080`, FiscalDriveService `127.0.0.1:3449`) OFD'ga paket bilan yuboradi; FM tarmoqsiz ham imzolaydi va yuborilmagan cheklar ro'yxatini yuritadi. Shu sababli `FiscalPort` ikki turdagi real adapterni qo'llaydi:
 
-| Rejim | `FISCAL_PROVIDER` | Oqim | Qachon |
+| Rejim | `ERP_FISCAL_PROVIDER` | Oqim | Qachon |
 |---|---|---|---|
 | **Lokal ko'prik** (asosiy kutilgan yo'l) | `multikassa_local`, `fiscaldrive_local` | POS (veb-kassa) → **Do'kon agenti** lokal API (`127.0.0.1`, 16-bo'lim) → hamkorning lokal xizmati → FM → OFD | Do'konda Windows PK + FM bo'lsa |
 | **Hamkor bulut** | `partner_cloud` | POS → `/sync/push` → backend → `outbox_jobs(kind=ofd_send)` → worker → hamkor bulut API → OFD | Faqat fiskal hamkorda PK'siz bulut rejimi bo'lsa (Xat 1/Xat 9 savoli) |
@@ -129,7 +129,7 @@ Port chegarasida pul — **tiyin `int64`**; ichki o'nlik satrdan (qaror #26) kon
 **Monitoring**: BO-14 + har kassa uchun `fm_state`, yuborilmagan cheklar soni, eng eski yuborilmagan chek yoshi; 24/40/46/48 soat bosqichlarida ogohlantirish (M18) — cron `fiscal_unacked_monitor` (`23-backend-arxitekturasi.md` §4).
 
 **MVP bosqichi va fiskal yo'l**:
-1. **Kod**: Bosqich 0–4 — `FISCAL_PROVIDER=fake`; real adapter (lokal ko'prik yoki hamkor bulut) — **Bosqich 5**, hamkor javobi (Xat 1, Xat 9) va arxitektura tanlovidan keyin. Lokal ko'prik tanlansa, Do'kon agentining fiskal moduli ham Bosqich 5 da (qaror #60).
+1. **Kod**: Bosqich 0–4 — `ERP_FISCAL_PROVIDER=fake`; real adapter (lokal ko'prik yoki hamkor bulut) — **Bosqich 5**, hamkor javobi (Xat 1, Xat 9) va arxitektura tanlovidan keyin. Lokal ko'prik tanlansa, Do'kon agentining fiskal moduli ham Bosqich 5 da (qaror #60).
 2. **O'z virtual kassamizni Davlat reyestriga kiritish** — Bosqich 0 da boshlanadi: fiskal ma'lumotlar operatori xulosasi (**10 ish kuni**, 4-ilova 12-band) va Kiberxavfsizlik markazi ekspertizasi (**15 ish kuni**, 11-band) arizadan **oldin**, parallel olinadi; DSQ qarori ariza kunidan **20 ish kuni** (16-band), texnik tartibga solish agentligi va "O'zeltexsanoat" xulosasi (5 ish kuni, 12¹-band) shu ichida. Reja — **35 ish kuni** (ketma-ket bo'lsa 45) + hujjat tayyorlash. Virtual kassa uchun **zaxira mablag' talab qilinmaydi** (4-ilova 11-band; 1-ilova 4-band). ЗРУ-764 bo'yicha sertifikatlash bizga majburiy emas — faqat shu reyestr ekspertizasi kerak. Reyestr talablari (2-ilova 6-band, VMQ-393): barcha bank kartalari va QR-kodlar orqali to'lovni qurilmaning o'zida qabul qilish imkoniyati, UzQR va elektron to'lov tizimlariga ulanish (9-bo'lim).
 3. **1 BHM/yil** (440 000 so'm, 2026-09-01 dan) — reyestr narxi emas: **do'kon** (kassa foydalanuvchisi) operatorga to'laydigan fiskal modul xizmati haqi (1-ilova 55-band); interim — har kassa uchun.
 4. **Pilot (10–20 do'kon)** — reyestr tasdiqlanguncha bitta fiskal hamkor orqali, `FiscalPort` ortida; pilot davridagi hamkor haqini biz to'laymiz (ommaviy chakana narx: Rahmat virtual kassa **123 600 so'm/oy**, ulgurji narx so'raladi; 20 kassa × 3 oy ≈ 7,4 mln so'm + ulanish). **Xavf (VMQ-393, 2026-10-22 dan, 3-ilova 25-band)**: reyestrdagi onlayn-NKT'larga "ikkilamchi" axborot tizimlarini QR chek chop etish uchun integratsiya qilish — TXKM'ni reyestrdan chiqarish asosi; "ERP + hamkor kassa" pilot modeliga ta'siri Xat 1 da so'raladi.
@@ -744,7 +744,7 @@ class SmsAdapter(Protocol):   # OtpPort ichidagi SMS kanali; adapterlar: EskizSm
     async def send(self, phone: str, text: str) -> SmsSendResult: ...
     async def get_status(self, provider_message_id: str) -> SmsStatus: ...
 ```
-Sozlamalar: `sms.sender="4546"`, `ESKIZ_TEST_MODE=true` (faqat ruxsat etilgan test matni), token keshi har 25 kunda yangilanadi; OTP shabloni: "Kod: {code}. [Brend] tizimiga kirish. Hech kimga bermang."
+Sozlamalar: `sms.sender="4546"`, `ERP_ESKIZ_TEST_MODE=true` (faqat ruxsat etilgan test matni), token keshi har 25 kunda yangilanadi; OTP shabloni: "Kod: {code}. [Brend] tizimiga kirish. Hech kimga bermang."
 
 **Ma'lumot moslashtirish**: `notifications_log(tenant_id, channel=sms, recipient, template, status, cost)` (`11-malumotlar-modeli.md`, 10-bo'lim).
 
@@ -840,7 +840,7 @@ class TelegramAdapter(Protocol):
 
 **SLA**: qattiq muddat yo'q; foydalanuvchi tajribasi darajasida tezlik kutiladi (bir necha soniya).
 
-**Xavfsizlik va shaxsiy ma'lumot (qaror #61)**: Claude API kaliti platforma darajasida shifrlangan (bitta platforma kaliti, tenant limiti `ai_requests` orqali kuzatiladi). Lokalizatsiya majburiyati faqat biometrik/genetik/telekom ma'lumotga tegishli (ZRU-547 27-1-modda), lekin **chet elga uzatish** alohida qoida bilan tartibga solinadi (15-modda, VMQ-415): AQSh faqat EU-US DPF ishtirokchilari uchun "teng himoya" ro'yxatida, Anthropic esa DPF ishtirokchisi emas. Shuning uchun: (a) promptga yuborishdan oldin jismoniy shaxs maydonlari **majburiy maskalanadi** (tenant o'chira olmaydi, `22-ai-qatlami.md` §7); (b) maskalab bo'lmaydigan AI-03 rasmlari `tenants.settings.ai_cross_border_enabled=true` (tenant foydalanish shartlarida chegaradan tashqari uzatishga rozilik bergan) bo'lgandagina yuboriladi; standart yo'l — rozilik + Anthropic API. Muqobil — VMQ-415 ro'yxatidagi davlatda ishlov beradigan endpoint (AWS Bedrock EU Geo profili, `AiProvider` ning `BedrockEuProvider` adapteri, `AI_PII_ROUTE` sozlamasi) — asoschi tanlovi. Shaxsiy ma'lumotga AI yordamida qonunga xilof ishlov berish — MJtK 46-2-modda 2-qism.
+**Xavfsizlik va shaxsiy ma'lumot (qaror #61)**: Claude API kaliti platforma darajasida shifrlangan (bitta platforma kaliti, tenant limiti `ai_requests` orqali kuzatiladi). Lokalizatsiya majburiyati faqat biometrik/genetik/telekom ma'lumotga tegishli (ZRU-547 27-1-modda), lekin **chet elga uzatish** alohida qoida bilan tartibga solinadi (15-modda, VMQ-415): AQSh faqat EU-US DPF ishtirokchilari uchun "teng himoya" ro'yxatida, Anthropic esa DPF ishtirokchisi emas. Shuning uchun: (a) promptga yuborishdan oldin jismoniy shaxs maydonlari **majburiy maskalanadi** (tenant o'chira olmaydi, `22-ai-qatlami.md` §7); (b) maskalab bo'lmaydigan AI-03 rasmlari `tenants.settings.ai_cross_border_enabled=true` (tenant foydalanish shartlarida chegaradan tashqari uzatishga rozilik bergan) bo'lgandagina yuboriladi; standart yo'l — rozilik + Anthropic API. Muqobil — VMQ-415 ro'yxatidagi davlatda ishlov beradigan endpoint (AWS Bedrock EU Geo profili, `AiProvider` ning `BedrockEuProvider` adapteri, `ERP_AI_PII_ROUTE` sozlamasi) — asoschi tanlovi. Shaxsiy ma'lumotga AI yordamida qonunga xilof ishlov berish — MJtK 46-2-modda 2-qism.
 
 **Monitoring**: `ai_requests` orqali xarajat/latency/xato darajasi; tenant oylik limiti (`plans.limits.ai_monthly_tokens`) tugaganda ogohlantirish (M17/M18); `POST /ai/chat` rate-limit — 10 so'rov/daqiqa/foydalanuvchi, 300 so'rov/kun/tenant → `429 RATE_LIMITED` (qaror #55).
 
@@ -943,7 +943,7 @@ Tanlov mezoni: (a) ochiq API/test muhiti birinchi, (b) qonuniy bosim (48 soat OF
 
    **POS holati «Karta terminali ulanmagan»**: agent yoki terminal javob bermasa — integratsiyalangan karta yo'li o'chiriladi (`CARD_TERMINAL_UNREACHABLE`, lokal holat), terminalsiz karta (rekvizitsiz) §9.2 siyosati bilan; sotuvning boshqa to'lov usullari to'xtamaydi.
 
-   **POS holati «Fiskal modul ulanmagan»**: lokal ko'prik rejimida (`FISCAL_PROVIDER` = `multikassa_local`/`fiscaldrive_local`) `GET /v1/status` javob bermasa, token rad etilsa yoki `fm_state` noma'lum bo'lsa — POS (`$agentStatus != online`, `24-frontend-arxitekturasi.md` §6.4) chekni **yopmaydi**, savatni saqlaydi va agentni qayta ishga tushirish yo'riqnomasini ko'rsatadi; bu lokal holat, server xato kodi emas. `fm_state='locked'` → `FISCAL_DEVICE_LOCKED`, 48 soat → `FISCAL_OFFLINE_48H_BLOCKED` (1-bo'lim).
+   **POS holati «Fiskal modul ulanmagan»**: lokal ko'prik rejimida (`ERP_FISCAL_PROVIDER` = `multikassa_local`/`fiscaldrive_local`) `GET /v1/status` javob bermasa, token rad etilsa yoki `fm_state` noma'lum bo'lsa — POS (`$agentStatus != online`, `24-frontend-arxitekturasi.md` §6.4) chekni **yopmaydi**, savatni saqlaydi va agentni qayta ishga tushirish yo'riqnomasini ko'rsatadi; bu lokal holat, server xato kodi emas. `fm_state='locked'` → `FISCAL_DEVICE_LOCKED`, 48 soat → `FISCAL_OFFLINE_48H_BLOCKED` (1-bo'lim).
 2. **Bulut kanali (agent ↔ server)** — `33-1c-integratsiya.md` §9 dagi **bir xil** identifikatsiya va protokol: OAuth mijozi `onec-agent` (RFC 8628 device grant bilan ulash, keyin `client_credentials` + `private_key_jwt`, access token 10 daqiqa), yo'llar `/api/v1/onec-agent/*` (long-poll pull, Ed25519 imzoli vazifalar, lease/heartbeat). Bitta do'kon PK'si — bitta agent yozuvi (`devices.kind='onec_agent'`), imkoniyatlar sozlamada yoqiladi. **Agent infratuzilmasi — Bosqich 5** (qaror #66): agent ro'yxati, ulash, token, vazifa navbati va imzo — umumiy registr jadvallari `onec_agents` (`capabilities JSONB`), `onec_agent_tasks`, `onec_task_results`, `auth.onec_device_authorizations`, migratsiya `0028 store_agent`; 1C ga xos qism — Bosqich 7 (`0029 onec_integration`). A-01 `hello` so'rovi `capabilities` ni yuboradi (`34-1c-agent.md` §14.2 sxemasi, `X-Agent-Protocol: 2`), server uni `onec_agents.capabilities` ga yozadi.
    - **Kassa bog'lanishi**: lokal ko'prik kassasi `cash_registers.fiscal_agent_id` (xizmat qiluvchi agent) + `fiscal_local_device_id` (agent `capabilities.fiscal.devices[].local_id`) orqali bog'lanadi; `fiscal_agent_id` berilsa `fiscal_local_device_id` majburiy. Sozlash — BO-12 kassa qatorida "Fiskal agent" (`PATCH /cash-registers/{id}`, ruxsat `settings.branches`).
    - **Imkoniyat tekshiruvi**: vazifa faqat agent `capabilities` da yoqilgan (`capabilities.<oila>.enabled = true`) oilaga qo'yiladi, aks holda `AgentTaskPort.enqueue` → `409 AGENT_CAPABILITY_DISABLED`.
@@ -970,7 +970,7 @@ Bu ro'yxat `23-backend-arxitekturasi.md` §4.2, `33-1c-integratsiya.md` §9.5 va
 
 ### 16.1 Lokal API sxemalari
 
-Standart port `47110` (agent sozlamasida o'zgaradi). Barcha so'rov/javob JSON, pul — butun son tiyin (`int64`), vaqt — ISO 8601 UTC.
+Standart port `47110` (agent sozlamasida o'zgaradi — faqat deploy konfiguratsiyasidagi ruxsat etilgan agent portlari ro'yxatidagi qiymatga: veb-kassa CSP `connect-src`i shu ro'yxatdan generatsiya qilinadi, `24-frontend-arxitekturasi.md` §4.4). Barcha so'rov/javob JSON, pul — butun son tiyin (`int64`), vaqt — ISO 8601 UTC.
 
 | Yo'l | So'rov | Javob |
 |---|---|---|
@@ -999,7 +999,7 @@ Standart port `47110` (agent sozlamasida o'zgaradi). Barcha so'rov/javob JSON, p
 
 Faqat tashqi javob kerak bo'lgan bandlar; har biri port + stub/flag ortida interim standart bilan kodlanadi.
 
-1. **Fiskal hamkor** — lokal ko'prik (PWA ↔ localhost) ruxsati, PK'siz bulut rejimi (iOS/Android yo'li shunga bog'liq), autentifikatsiya, dasturimizni sertifikatlash talabi, test stend va test FM, holat kodlari (`fm_state` xaritasi) — 26 #109 (OQ-012), 26 #89 (OQ-008). Interim: `FISCAL_PROVIDER=fake`; blok — Bosqich 5 real adapter.
+1. **Fiskal hamkor** — lokal ko'prik (PWA ↔ localhost) ruxsati, PK'siz bulut rejimi (iOS/Android yo'li shunga bog'liq), autentifikatsiya, dasturimizni sertifikatlash talabi, test stend va test FM, holat kodlari (`fm_state` xaritasi) — 26 #109 (OQ-012), 26 #89 (OQ-008). Interim: `ERP_FISCAL_PROVIDER=fake`; blok — Bosqich 5 real adapter.
 2. **"Kredit" turidagi chek** — qarzga sotuvda majburiymi va OFD chek turi kodi — 26 #9 (OQ-002). Interim: `FiscalPolicy.credit_sale_receipt='none'`.
 3. **"Ikkilamchi tizim" xavfi** (VMQ-393, 3-ilova 25-band) — "ERP + hamkor kassa" pilot modeliga ta'siri — 26 #169. **Karta/UzQR integratsiyasi reyestr sharti** — reyestr ekspertizasi "shu qurilma orqali" talabini qanday tekshiradi (SoftPOS yoki tashqi terminal integratsiyasi yetarlimi) — 26 #170; VMQ-943 1-ilova 6-band 2-xatboshi har do'konga majburiyatmi — 26 #177. Interim: o'z reyestr arizasidan oldin kamida bitta real karta terminali adapteri; do'konda mustaqil terminal + terminalsiz karta (rekvizitsiz) qonuniy model (§9.2).
 4. **Reyestr xarajatlari** — Kiberxavfsizlik markazi ekspertizasi narxi, virtual kassaga muvofiqlik sertifikati shartmi, 1 BHM birligi (modul yoki subyekt) — 26 #42 (OQ-011).

@@ -101,7 +101,7 @@ flowchart LR
 |---|---|---|---|
 | (a) Do'kon ko'prigi (Local Bridge) | POS → `127.0.0.1` Do'kon agenti → FM / hamkor lokal xizmati (imzo, `fiscal_sign`, QR) → OFD (FM paket bilan yuboradi); natija POS → `/sync/push` bilan serverga | Asosiy yo'l (hamkor lokal ko'prikka ruxsat bersa — 26 #109) | Windows PK'li do'kon; Chrome/Edge veb-kassa |
 | (b) Hamkor bulut API | POS → backend → worker → hamkor bulut API → OFD | Faqat hamkorda PK'siz bulut rejimi bo'lsa | iPhone/iPad uchun yagona fiskal yo'l (qaror #21); aks holda iOS — back-office + elektron chek |
-| MVP ishlab chiqish | `FISCAL_PROVIDER=fake` — `FakeFiscalAdapter` + FM emulyatori | Bosqich 3–4, CI | Hammasi |
+| MVP ishlab chiqish | `ERP_FISCAL_PROVIDER=fake` — `FakeFiscalAdapter` + FM emulyatori | Bosqich 3–4, CI | Hammasi |
 
 FM tarmoqsiz ham imzolaydi; yuborilmagan cheklar `ofd_acked_at IS NULL` bilan kuzatiladi; eng eskisidan 48 soat o'tsa yangi fiskal chek bloklanadi (qaror #43). Chek raqami: qurilma `receipt_seq` (idempotentlik) + FM `fm_receipt_seq` (qaror #12). Provayder (Click/Payme/Uzum) tomonidagi avtofiskalizatsiya o'chiq — chekni har doim bizning kassa chiqaradi (qaror #64).
 
@@ -153,7 +153,7 @@ Deploy: Docker konteynerlar (api, worker, scheduler, web statik, bot) + PostgreS
 
 ## Ochiq savollar
 
-- Fiskal yo'l: hamkor lokal ko'prikka ruxsat beradimi va PK'siz bulut rejimi bormi (iOS) — 26 #109 (OQ-012); VMQ-393 "ikkilamchi tizim" xavfi — 26 #169. Vaqtinchalik standart: `FISCAL_PROVIDER=fake`, yo'l (a) asosiy.
+- Fiskal yo'l: hamkor lokal ko'prikka ruxsat beradimi va PK'siz bulut rejimi bormi (iOS) — 26 #109 (OQ-012); VMQ-393 "ikkilamchi tizim" xavfi — 26 #169. Vaqtinchalik standart: `ERP_FISCAL_PROVIDER=fake`, yo'l (a) asosiy.
 - UzCloud shartnoma SLA va DBaaS PITR — 26 #51 (OQ-043). Vaqtinchalik standart: o'z WAL PITR va boshqa provayderdagi zaxira nusxa (qaror #65).
 - Foydalanish shartlari / oferta matni (chegaradan tashqari uzatish roziligi bilan) — 26 #127 (OQ-042).
 

@@ -1570,7 +1570,7 @@ Faqat tashqi javob talab qiladigan bandlar, `26-ochiq-savollar-reestri.md` raqam
 | #105 | Authenticode OV kod-imzolash sertifikati — CA, kalit saqlash usuli, yuridik shaxs nomi (qaror #38) | Asoschi + CA | Olinmaguncha agent faqat ichki sinovda (tarqatilmaydi); imzolash qo'lda tasdiq bilan (§2.5) |
 | #100 | Agentning COM ulanishi alohida ish o'rni/litsenziya hisoblanadimi; parallel sessiyalar (`max_parallel_bases`) litsenziyani ortiqcha egallaydimi (P-14) | 1C rasmiy hamkori | `max_parallel_bases=2`; litsenziya xatosi ko'p bo'lsa 1 ga tushiriladi; `license_source` tekshiruvi |
 | #102 | «ERP integratsiya» 1C foydalanuvchisining minimal rollari (P-18) | Real БП UZ baza / 1C hamkori | §6.7 tavsiyasi; `user_rights` tekshiruvi |
-| #109 | Fiskal hamkor, lokal ko'prik (hamkor lokal xizmati/SDK), autentifikatsiya, sertifikatlash talabi (§14) | Fiskal hamkor | `FISCAL_PROVIDER=fake` (`FakeFiscalAdapter` + FM emulyatori); §14.3 fiskal payload sxemalari hamkor tanlangach aniqlanadi |
+| #109 | Fiskal hamkor, lokal ko'prik (hamkor lokal xizmati/SDK), autentifikatsiya, sertifikatlash talabi (§14) | Fiskal hamkor | `ERP_FISCAL_PROVIDER=fake` (`FakeFiscalAdapter` + FM emulyatori); §14.3 fiskal payload sxemalari hamkor tanlangach aniqlanadi |
 
 ### 13.3 Manbalar
 
@@ -1585,7 +1585,7 @@ Faqat tashqi javob talab qiladigan bandlar, `26-ochiq-savollar-reestri.md` raqam
 
 ## 14. Do'kon agenti kengaytmasi (qaror #60, Bosqich 5)
 
-Qaror #60: do'kon Windows kompyuteridagi **bitta** lokal dastur — «Do'kon agenti»; shu faylning §1–§13 dagi 1C moduli uning imkoniyatlaridan biri (Bosqich 7). Agent infratuzilmasi (ulash, token, A-API, imzoli vazifa navbati, avto-yangilanish — qaror #66), fiskal ko'prik va karta terminali imkoniyati (qaror #71) — **Bosqich 5**; MVP kodi `FISCAL_PROVIDER=fake` (`FakeFiscalAdapter` + FM emulyatori) bilan yoziladi, real adapter fiskal hamkor tanlangach (26 #109). Quyida — o'zgarmas asos.
+Qaror #60: do'kon Windows kompyuteridagi **bitta** lokal dastur — «Do'kon agenti»; shu faylning §1–§13 dagi 1C moduli uning imkoniyatlaridan biri (Bosqich 7). Agent infratuzilmasi (ulash, token, A-API, imzoli vazifa navbati, avto-yangilanish — qaror #66), fiskal ko'prik va karta terminali imkoniyati (qaror #71) — **Bosqich 5**; MVP kodi `ERP_FISCAL_PROVIDER=fake` (`FakeFiscalAdapter` + FM emulyatori) bilan yoziladi, real adapter fiskal hamkor tanlangach (26 #109). Quyida — o'zgarmas asos.
 
 ### 14.1 Umumiy asos
 

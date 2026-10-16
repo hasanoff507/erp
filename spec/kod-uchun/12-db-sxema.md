@@ -13,18 +13,50 @@ Loyiha ildizi: `E:/Project/erp`. Bu faylda "11", "11-model" — `11-malumotlar-m
 
 ## 0. Rollar (oldindan)
 
-Barcha quyidagi DDL'dan oldin uch DB rol mavjud bo'lishi kerak (parollar — muhit sirlari, bu yerda ko'rsatilmaydi):
+Barcha quyidagi DDL'dan oldin uch DB rol mavjud bo'lishi kerak. `erp_migrator` — `NOCREATEROLE`, ya'ni rol yarata olmaydi va `ALTER ROLE … SET` bajara olmaydi; shuning uchun rollarni Alembic emas, **DBA bootstrap bosqichi** superuser (yoki DBaaS admin) huquqi bilan, birinchi migratsiyadan oldin bir marta yaratadi. Lokal/CI muhitda bu — `backend/docker/postgres/initdb.sh` (postgres konteynerining `/docker-entrypoint-initdb.d` skripti, bo'sh ma'lumotlar katalogida bir marta ishlaydi); UzCloud DBaaS'da xuddi shu SQL'ni DBA admin hisobidan ishga tushiradi. Parollar — muhit sirlari (`ERP_MIGRATOR_PASSWORD`, `ERP_APP_PASSWORD`; baza nomi `ERP_DB_NAME`, standart `erp`), psql o'zgaruvchisi sifatida beriladi:
 
 ```sql
+-- DBA bootstrap (superuser, `postgres` bazasida; migratsiyadan oldin, bir marta)
 -- Alembic migratsiyalarini ishga tushiruvchi, barcha ob'ektlarning egasi
-CREATE ROLE erp_migrator LOGIN NOSUPERUSER CREATEDB NOCREATEROLE;
+CREATE ROLE erp_migrator LOGIN NOSUPERUSER CREATEDB NOCREATEROLE PASSWORD :'migrator_pw';
 
 -- FastAPI/worker/scheduler/bot ulanadigan rol — BYPASSRLS YO'Q (`15` §3.2)
-CREATE ROLE erp_app LOGIN NOSUPERUSER NOBYPASSRLS;
+CREATE ROLE erp_app LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD :'app_pw';
 
 -- SECURITY DEFINER funksiyalarning egasi — BYPASSRLS, lekin LOGIN emas
 -- (hech kim to'g'ridan-to'g'ri shu rol bilan ulanmaydi, faqat funksiya ichida "ishlaydi")
 CREATE ROLE erp_system NOLOGIN BYPASSRLS;
+
+-- migrator funksiyalarni erp_system'ga topshira olishi uchun (ALTER FUNCTION … OWNER TO erp_system, 4.5-bo'lim)
+-- shu rol a'zosi bo'lishi shart; BYPASSRLS — rol atributi, a'zolik orqali meros qilinmaydi
+GRANT erp_system TO erp_migrator;
+
+ALTER ROLE erp_app SET search_path = app, platform, public;
+ALTER ROLE erp_system SET search_path = app, auth, platform, public;
+
+CREATE DATABASE :"db" OWNER erp_migrator;
+```
+
+`0001` revizioni rollarni **faqat** migratsiyani ishga tushirayotgan rol bunga ruxsatga ega bo'lsa (superuser yoki `CREATEROLE`) va rol hali yo'q bo'lsa yaratadi (parolsiz — parolni DBA beradi); `erp_migrator` bilan ishlaganda bu blok hech narsa qilmaydi. `erp_app`/`erp_system` topilmasa revizion xato bilan to'xtaydi — bootstrap bajarilmagan:
+
+```sql
+DO $$
+DECLARE
+  can_manage boolean := (SELECT rolsuper OR rolcreaterole FROM pg_roles WHERE rolname = current_user);
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'erp_migrator') AND can_manage THEN
+    CREATE ROLE erp_migrator LOGIN NOSUPERUSER CREATEDB NOCREATEROLE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'erp_app') AND can_manage THEN
+    CREATE ROLE erp_app LOGIN NOSUPERUSER NOBYPASSRLS;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'erp_system') AND can_manage THEN
+    CREATE ROLE erp_system NOLOGIN BYPASSRLS;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname IN ('erp_app', 'erp_system') HAVING count(*) = 2) THEN
+    RAISE EXCEPTION 'roles erp_app/erp_system are missing: run the DBA bootstrap first (backend/docker/postgres/initdb.sh or the 12 §0 SQL)';
+  END IF;
+END $$;
 ```
 
 `erp_app` RLS siyosatlariga **to'liq bo'ysunadi** (bu — tenant izolyatsiyasining asosiy DB darajasidagi mexanizmi, `15-xavfsizlik-va-audit.md` Asosiy xulosa 3). `erp_system` — faqat quyida 4-bo'limda ro'yxatlangan `SECURITY DEFINER` funksiyalarning egasi; bu funksiyalar ichida ishlayotgan SQL `erp_system`ning `BYPASSRLS` huquqidan vaqtincha foydalanadi (login/billing kabi tenant-kontekstisiz amallar uchun yagona qonuniy yo'l).
@@ -52,8 +84,15 @@ GRANT USAGE ON SCHEMA platform TO erp_app, erp_system;
 -- auth sxemasiga erp_app'ga USAGE HECH QACHON berilmaydi (`15` §3.3, `14` §19)
 GRANT USAGE ON SCHEMA auth TO erp_system;
 
-ALTER ROLE erp_app SET search_path = app, platform, public;
-ALTER ROLE erp_system SET search_path = app, auth, platform, public;
+-- search_path asosan DBA bootstrap'da o'rnatiladi (0-bo'lim); ALTER ROLE … SET CREATEROLE talab qiladi,
+-- shuning uchun 0001 uni faqat migratsiya roli bunga ruxsatga ega bo'lsa takrorlaydi
+DO $$
+BEGIN
+  IF (SELECT rolsuper OR rolcreaterole FROM pg_roles WHERE rolname = current_user) THEN
+    ALTER ROLE erp_app SET search_path = app, platform, public;
+    ALTER ROLE erp_system SET search_path = app, auth, platform, public;
+  END IF;
+END $$;
 ```
 
 `search_path`da `auth` yo'q — `erp_app` ulanishida `auth.*` nomlari hatto tasodifan ham ko'rinmaydi; faqat `SECURITY DEFINER` funksiyalar o'z `SET search_path` bilan ichkarida `auth`ga kiradi (4-bo'lim).
@@ -213,7 +252,7 @@ CREATE TABLE platform.marking_product_groups (
 );
 
 -- (qaror #55) Markaziy bankning kunlik rasmiy kursi — scheduler `fetch_fx_rates` har kuni 09:30 (Toshkent)
--- cbu.uz JSON'dan yozadi; global, tenant ma'lumoti emas (RLS istisnosi). Kurs olinmasa FX_USD_UZS_FALLBACK.
+-- cbu.uz JSON'dan yozadi; global, tenant ma'lumoti emas (RLS istisnosi). Kurs olinmasa ERP_FX_USD_UZS_FALLBACK.
 CREATE TABLE platform.fx_rates (
   rate_date  DATE NOT NULL,
   currency   TEXT NOT NULL CHECK (currency ~ '^[A-Z]{3}$'), -- 'USD'
@@ -2291,6 +2330,7 @@ CREATE INDEX idx_vat_moves_period ON app.vat_moves (tenant_id, period, kind);
 **Balans jadvallarining upsert naqshi** (posting xizmati ichida, `23-backend-arxitekturasi.md` §2.1 qulfi ostida):
 
 ```sql
+-- namuna: posting xizmati ichidagi so'rov, migratsiya emas
 INSERT INTO app.stock_balances (tenant_id, warehouse_id, product_id, qty, value, updated_at)
 VALUES (:tenant_id, :warehouse_id, :product_id, :delta_qty, :delta_value, now())
 ON CONFLICT (tenant_id, warehouse_id, product_id)
@@ -2552,7 +2592,7 @@ CREATE TABLE app.outbox_jobs (
                      'ettn_accept','poa_send','marking_verify','marking_accept','marking_supplier_return',
                      'marking_writeoff','state_report_reminder','sms','telegram','ai','report_export','label_pdf',
                      'billing_webhook_reconcile')),
-                  -- ofd_send — faqat FISCAL_PROVIDER=partner_cloud rejimida (lokal ko'prikda chekni agent/FM yuboradi)
+                  -- ofd_send — faqat ERP_FISCAL_PROVIDER=partner_cloud rejimida (lokal ko'prikda chekni agent/FM yuboradi)
   payload         JSONB NOT NULL,
   status          TEXT NOT NULL CHECK (status IN ('queued','running','done','retry','failed')) DEFAULT 'queued',
   attempts        INT NOT NULL DEFAULT 0,
@@ -2820,6 +2860,7 @@ $$;
 Barcha jadvallar yaratilgandan so'ng, bitta martalik migratsiya qadami:
 
 ```sql
+-- 0025 updated_at_triggers
 DO $$
 DECLARE r RECORD;
 BEGIN
@@ -2841,6 +2882,7 @@ END $$;
 Bu blok — bitta martalik (0025-revizion). Undan keyingi revizionlar `updated_at`li yangi jadvallarga trigger'ni aniq yozadi. `0028 store_agent` (2.11-bo'lim, Do'kon agenti umumiy registri) — 2 jadval:
 
 ```sql
+-- 0028 store_agent
 DO $$
 DECLARE t TEXT;
 BEGIN
@@ -2854,6 +2896,7 @@ END $$;
 `0029 onec_integration` (2.11-bo'lim, 1C ga xos jadvallar) — 11 jadval:
 
 ```sql
+-- 0029 onec_integration
 DO $$
 DECLARE t TEXT;
 BEGIN
@@ -3658,7 +3701,11 @@ RLS uchligi — 4.2-bo'lim, grantlar — 4.4, `updated_at` trigger'lari — 2.10
 
 ## 3. Registrlar: append-only mahkamlash
 
-Haqiqiy append-only registrlar — **faqat** `stock_moves`, `debt_moves`, `cash_moves`, `ledger_entries`, `vat_moves`, `audit_log`, `sync_receipts`, `auth.login_attempts`. Ikki qatlamli himoya: (a) `erp_app`dan `UPDATE`/`DELETE` huquqi **olib tashlanadi**, (b) trigger — kod xatosi yoki boshqa (masalan `erp_migrator`) rol bilan ulanish ham qatorni o'zgartira olmasligi uchun.
+Haqiqiy append-only jadvallar — **faqat** `stock_moves`, `debt_moves`, `cash_moves`, `ledger_entries`, `vat_moves`, `audit_log`, `sync_receipts`, `doc_approvals` (tasdiq jurnali), `auth.login_attempts`. Ikki qatlamli himoya: (a) `erp_app`dan `UPDATE`/`DELETE` huquqi **olib tashlanadi**, (b) trigger — kod xatosi yoki boshqa (masalan `erp_migrator`) rol bilan ulanish ham qatorni o'zgartira olmasligi uchun.
+
+`auth.login_attempts` — append-only, lekin saqlash muddati bor (90 kun — standart, sozlanadi, `14-autentifikatsiya-oauth2.md` §19). `erp_app`ning `auth.*`ga umuman huquqi yo'q (4.4); `erp_system`dan `UPDATE` olib tashlanadi, `DELETE` esa faqat saqlash muddati tozalovchisi `app.auth_purge_login_attempts(p_older_than interval)` (4.5) orqali: `app.login_attempts_guard()` trigger'i `UPDATE`ni har doim, `DELETE`ni esa `current_user <> 'erp_system'` bo'lsa rad etadi. `erp_system` — `NOLOGIN`, ya'ni `current_user = 'erp_system'` faqat `SECURITY DEFINER` funksiya ichida bo'ladi; `auth.login_attempts`dan `DELETE` qiladigan yagona funksiya — `auth_purge_login_attempts`. Uni har kuni scheduler job'i chaqiradi (`23-backend-arxitekturasi.md` §4).
+
+`app.forbid_mutation()` — `0001` da. `REVOKE` + trigger har jadval uchun jadval mavjud bo'lgan revizionda qo'llanadi (jadvalni yaratgan revizionda yoki undan keyin): `0015` — beshta registr, `doc_approvals` (0010 da yaratiladi) va `auth.login_attempts` (0003 da yaratiladi; `app.login_attempts_guard()` ham shu yerda); `0022` — `sync_receipts`; `0024` — `audit_log`. `0026`dagi sxema bo'yicha GRANT'lar bu `REVOKE`larni bekor qiladi, shuning uchun `0026` ularni qayta qo'llaydi (4.4-bo'lim).
 
 ```sql
 CREATE OR REPLACE FUNCTION app.forbid_mutation() RETURNS trigger
@@ -3668,14 +3715,16 @@ BEGIN
     USING ERRCODE = 'integrity_constraint_violation';
 END;
 $$;
+```
 
+```sql
+-- 0015 registers
 DO $$
 DECLARE
   t TEXT;
   append_only_tables TEXT[] := ARRAY[
     'app.stock_moves', 'app.debt_moves', 'app.cash_moves',
-    'app.ledger_entries', 'app.vat_moves', 'app.audit_log', 'app.sync_receipts',
-    'app.doc_approvals'
+    'app.ledger_entries', 'app.vat_moves', 'app.doc_approvals'
   ];
 BEGIN
   FOREACH t IN ARRAY append_only_tables LOOP
@@ -3687,8 +3736,34 @@ BEGIN
   END LOOP;
 END $$;
 
-REVOKE UPDATE, DELETE ON auth.login_attempts FROM erp_system;
-CREATE TRIGGER trg_no_update_delete BEFORE UPDATE OR DELETE ON auth.login_attempts
+-- auth.login_attempts: UPDATE — hech kimga; DELETE — faqat erp_system (SECURITY DEFINER app.auth_purge_login_attempts)
+CREATE OR REPLACE FUNCTION app.login_attempts_guard() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP = 'DELETE' AND current_user = 'erp_system' THEN
+    RETURN OLD;
+  END IF;
+  RAISE EXCEPTION 'append-only jadval: % operatsiyasi taqiqlangan (jadval: %)', TG_OP, TG_TABLE_NAME
+    USING ERRCODE = 'integrity_constraint_violation';
+END;
+$$;
+
+REVOKE UPDATE ON auth.login_attempts FROM erp_system;
+CREATE TRIGGER trg_login_attempts_guard BEFORE UPDATE OR DELETE ON auth.login_attempts
+  FOR EACH ROW EXECUTE FUNCTION app.login_attempts_guard();
+```
+
+```sql
+-- 0022 integration_sync
+REVOKE UPDATE, DELETE ON app.sync_receipts FROM erp_app;
+CREATE TRIGGER trg_no_update_delete BEFORE UPDATE OR DELETE ON app.sync_receipts
+  FOR EACH ROW EXECUTE FUNCTION app.forbid_mutation();
+```
+
+```sql
+-- 0024 audit_periods
+REVOKE UPDATE, DELETE ON app.audit_log FROM erp_app;
+CREATE TRIGGER trg_no_update_delete BEFORE UPDATE OR DELETE ON app.audit_log
   FOR EACH ROW EXECUTE FUNCTION app.forbid_mutation();
 ```
 
@@ -3744,6 +3819,7 @@ Bu blok — **bitta martalik** ijro (boshlang'ich migratsiyada, barcha jadvallar
 2.11-bo'lim jadvallari — hammasi oddiy `tenant_isolation` (maxsus siyosat yo'q; `auth.onec_device_authorizations` — RLS'siz, 6.2 istisnosi). `0028 store_agent` — 3 jadval:
 
 ```sql
+-- 0028 store_agent
 DO $$
 DECLARE t TEXT;
 BEGIN
@@ -3758,6 +3834,7 @@ END $$;
 `0029 onec_integration` — 15 jadval:
 
 ```sql
+-- 0029 onec_integration
 DO $$
 DECLARE t TEXT;
 BEGIN
@@ -3825,13 +3902,29 @@ GRANT SELECT, INSERT, UPDATE ON platform.fx_rates TO erp_app;
 REVOKE ALL ON platform.platform_admins FROM erp_app;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA app TO erp_app;
--- 3-bo'limdagi REVOKE UPDATE/DELETE append-only jadvallar uchun yuqorida alohida qo'llanadi (tartib muhim: shundan keyin ishga tushiriladi)
 
 REVOKE ALL ON SCHEMA auth FROM PUBLIC, erp_app;
 GRANT ALL ON ALL TABLES IN SCHEMA auth TO erp_system;
+
+-- yuqoridagi ikki sxema-GRANT append-only jadvallardagi REVOKE'larni (3-bo'lim, 0015/0022/0024) bekor qiladi —
+-- shuning uchun 0026 ularni darhol qayta qo'llaydi (tartib muhim: GRANT'lardan keyin)
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'app.stock_moves', 'app.debt_moves', 'app.cash_moves', 'app.ledger_entries', 'app.vat_moves',
+    'app.audit_log', 'app.sync_receipts', 'app.doc_approvals'
+  ] LOOP
+    EXECUTE format('REVOKE UPDATE, DELETE ON %s FROM erp_app', t);
+  END LOOP;
+END $$;
+-- auth.login_attempts: DELETE erp_system'da qoladi — uni trigger faqat auth_purge_login_attempts ichida o'tkazadi (3-bo'lim)
+REVOKE UPDATE ON auth.login_attempts FROM erp_system;
 ```
 
-`ON ALL TABLES IN SCHEMA` grantlari faqat ijro paytidagi jadvallarga ta'sir qiladi va keyingi revizionda qayta ishlatilmaydi (append-only jadvallardagi `REVOKE UPDATE, DELETE`ni qaytarib beradi, 3-bo'lim). `0028 store_agent` va `0029 onec_integration` grantlarni jadval nomi bilan beradi:
+`ON ALL TABLES IN SCHEMA` grantlari faqat ijro paytidagi jadvallarga ta'sir qiladi va keyingi revizionda qayta ishlatilmaydi (ular append-only jadvallardagi `REVOKE UPDATE, DELETE`ni qaytarib bergani uchun `0026` `REVOKE`larni yuqorida qayta qo'llaydi; trigger'lar GRANT'dan ta'sirlanmaydi).
+
+`public.alembic_version` — Alembic o'zi yaratadi (revizion emas). `/health/ready` sxema versiyasini `erp_app` ulanishi bilan o'qiydi (`23-backend-arxitekturasi.md` §8), shuning uchun `alembic/env.py` har `alembic upgrade`dan keyin, `erp_app` roli mavjud bo'lsa, `GRANT SELECT ON public.alembic_version TO erp_app` bajaradi (idempotent; boshqa huquq berilmaydi). `0028 store_agent` va `0029 onec_integration` grantlarni jadval nomi bilan beradi:
 
 ```sql
 -- 0028 store_agent
@@ -3852,6 +3945,13 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON
 ### 4.5 `SECURITY DEFINER` funksiyalar
 
 Faqat shu bo'limdagi funksiyalar tenant-kontekstidan **oldin** yoki undan tashqarida ishlaydigan amallarni qamrab oladi (login, scheduler fan-out, billing/to'lov webhook, ochiq havola, 1C agentini ulash va agent tokeni). Barchasi `erp_system` egaligida, `SET search_path` bilan (search_path hijack'dan himoya — chaqiruvchi sessiyaning `search_path`i e'tiborga olinmaydi).
+
+Funksiyani `erp_migrator` yaratadi, keyin `ALTER FUNCTION … OWNER TO erp_system` bilan topshiradi. Superuser bo'lmagan migrator uchun PostgreSQL ikki shart qo'yadi: migrator yangi egasi rolining a'zosi (`GRANT erp_system TO erp_migrator` — 0-bo'lim bootstrap) va yangi ega funksiya sxemasida `CREATE` huquqiga ega. `erp_system`ga `app` sxemasida doimiy `CREATE` berilmaydi — u faqat egalikni topshiruvchi revizion davomida beriladi: `0027` (yadro revizionlarining oxirgisi) birinchi bayonot sifatida `GRANT`, oxirgi bayonot sifatida `REVOKE` bajaradi; `0028`/`0029` ham o'z funksiyalarini xuddi shu juftlik ichida topshiradi.
+
+```sql
+-- 0027 boshida
+GRANT CREATE ON SCHEMA app TO erp_system;
+```
 
 ```sql
 CREATE OR REPLACE FUNCTION app.auth_find_user_by_phone(p_phone text)
@@ -3985,6 +4085,8 @@ $$;
 --   'reuse_revoked'— qayta ishlatish: butun oila va sessiyalar bekor qilinadi (audit: refresh_token_reuse_detected);
 --   'invalid'      — topilmadi / muddati o'tgan / bekor qilingan.
 -- suspended_at bo'lsa ham 'rotated' qaytadi, `suspended=true` — AS faqat scope=sync.drain beradi (14 §16.4).
+-- Yangi token eski tokenning suspended_at va revoked_reason ('subscription') qiymatlarini oladi — lokaut paytida
+-- (sync.drain) aylantirilgan token ham to'lovdan keyin auth_suspend_tenant(.., false) bilan tiklanadi.
 CREATE OR REPLACE FUNCTION app.auth_rotate_refresh(p_token_hash text, p_new_token_hash text, p_new_expires_at timestamptz)
 RETURNS TABLE (outcome text, refresh_token_id uuid, family_id uuid, client_id uuid, user_id uuid,
                tenant_id uuid, device_id uuid, scope text, suspended boolean)
@@ -4017,9 +4119,9 @@ BEGIN
     RETURN;
   END IF;
   INSERT INTO auth.refresh_tokens (token_hash, family_id, client_id, user_id, tenant_id, device_id, scope,
-                                   expires_at, suspended_at)
+                                   expires_at, suspended_at, revoked_reason)
   VALUES (p_new_token_hash, r.family_id, r.client_id, r.user_id, r.tenant_id, r.device_id, r.scope,
-          p_new_expires_at, r.suspended_at)
+          p_new_expires_at, r.suspended_at, r.revoked_reason)
   RETURNING id INTO new_id;
   UPDATE auth.refresh_tokens t SET used_at = now(), replaced_by_id = new_id WHERE t.id = r.id;
   UPDATE auth.sessions s SET current_refresh_token_id = new_id, last_seen_at = now()
@@ -4042,8 +4144,8 @@ AS $$
 $$;
 
 -- Obuna lokauti (14 §16.1.3): p_suspend=true — refresh_tokens.suspended_at=now(), revoked_reason='subscription'
--- (to'liq bekor emas); p_suspend=false — to'lovdan keyin tozalash (§16.1.5). sessions o'zgarmaydi — kirish
--- Redis sub_status orqali to'xtaydi.
+-- (to'liq bekor emas); p_suspend=false — to'lovdan keyin tozalash (§16.1.5): to'xtatilgan token suspended_at
+-- bo'yicha topiladi. sessions o'zgarmaydi — kirish Redis sub_status orqali to'xtaydi.
 CREATE OR REPLACE FUNCTION app.auth_suspend_tenant(p_tenant_id uuid, p_suspend boolean)
 RETURNS void
 LANGUAGE sql SECURITY DEFINER
@@ -4053,7 +4155,7 @@ AS $$
      SET suspended_at   = CASE WHEN p_suspend THEN now() ELSE NULL END,
          revoked_reason = CASE WHEN p_suspend THEN 'subscription' ELSE NULL END
    WHERE tenant_id = p_tenant_id AND revoked_at IS NULL
-     AND (CASE WHEN p_suspend THEN suspended_at IS NULL ELSE revoked_reason = 'subscription' END);
+     AND (CASE WHEN p_suspend THEN suspended_at IS NULL ELSE suspended_at IS NOT NULL END);
 $$;
 
 ALTER FUNCTION app.auth_consume_code(text) OWNER TO erp_system;
@@ -4070,7 +4172,7 @@ GRANT EXECUTE ON FUNCTION app.auth_revoke_tenant(uuid, text) TO erp_app;
 GRANT EXECUTE ON FUNCTION app.auth_suspend_tenant(uuid, boolean) TO erp_app;
 ```
 
-AS yozuvchi va sessiya funksiyalari (`14-autentifikatsiya-oauth2.md` §2, §4, §7, §16, §18, §19) — 14 ta, naqsh yuqoridagi bilan bir xil; `erp_app` `auth.*` jadvallariga faqat shu bo'limdagi funksiyalar orqali kiradi.
+AS yozuvchi va sessiya funksiyalari (`14-autentifikatsiya-oauth2.md` §1, §2, §4, §7, §12, §16, §18, §19, §20) — 17 ta, naqsh yuqoridagi bilan bir xil; `erp_app` `auth.*` jadvallariga faqat shu bo'limdagi funksiyalar orqali kiradi. `auth_lookup_refresh` va `auth_revoke_refresh_family` — `/oauth/revoke` (RFC 7009) va `/oauth/introspect` (RFC 7662) uchun refresh tokenni xeshi bo'yicha topish/bekor qilish; `auth_purge_login_attempts` — `login_attempts` saqlash muddati (3-bo'lim).
 
 ```sql
 -- Authorization Code berish (14 §4): TTL standart 60 s.
@@ -4372,6 +4474,81 @@ AS $$
   LIMIT 1;
 $$;
 
+-- Refresh token metama'lumoti xeshi bo'yicha (tokenning o'zi emas): AS mijoz bog'lanishini, oilaning mutlaq
+-- muddatini (sliding refresh, 14 §7) va unga bog'langan BFF sessiyasini tekshiradi (/oauth/introspect, rotatsiyadan oldin).
+CREATE OR REPLACE FUNCTION app.auth_lookup_refresh(p_token_hash text)
+RETURNS TABLE (refresh_token_id uuid, family_id uuid, client_id uuid, user_id uuid, tenant_id uuid,
+               device_id uuid, scope text, issued_at timestamptz, expires_at timestamptz, used_at timestamptz,
+               revoked_at timestamptz, suspended_at timestamptz, family_issued_at timestamptz,
+               session_id uuid, session_revoked_at timestamptz)
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+  SELECT t.id, t.family_id, t.client_id, t.user_id, t.tenant_id, t.device_id, t.scope, t.issued_at,
+         t.expires_at, t.used_at, t.revoked_at, t.suspended_at,
+         (SELECT min(f.issued_at) FROM auth.refresh_tokens f WHERE f.family_id = t.family_id),
+         s.id, s.revoked_at
+  FROM auth.refresh_tokens t
+  LEFT JOIN LATERAL (
+    SELECT se.id, se.revoked_at
+    FROM auth.sessions se
+    JOIN auth.refresh_tokens f ON f.id = se.current_refresh_token_id
+    WHERE f.family_id = t.family_id
+    ORDER BY se.created_at
+    LIMIT 1
+  ) s ON true
+  WHERE t.token_hash = p_token_hash;
+$$;
+
+-- RFC 7009: berilgan refresh tokenning butun oilasi va unga bog'langan BFF sessiyasi bekor qilinadi.
+-- Qaytaradi — sessiya/foydalanuvchi/tenant (AS Redis sid-revoke keshini yangilaydi, 14 §5); token topilmasa bo'sh.
+CREATE OR REPLACE FUNCTION app.auth_revoke_refresh_family(p_token_hash text, p_reason text)
+RETURNS TABLE (session_id uuid, user_id uuid, tenant_id uuid, family_id uuid)
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+#variable_conflict use_column
+DECLARE
+  r     auth.refresh_tokens%ROWTYPE;
+  v_sid uuid;
+BEGIN
+  SELECT * INTO r FROM auth.refresh_tokens t WHERE t.token_hash = p_token_hash FOR UPDATE;
+  IF NOT FOUND THEN
+    RETURN;
+  END IF;
+  SELECT se.id INTO v_sid
+    FROM auth.sessions se
+   WHERE se.current_refresh_token_id IN (SELECT f.id FROM auth.refresh_tokens f WHERE f.family_id = r.family_id)
+   LIMIT 1;
+  UPDATE auth.sessions se SET revoked_at = now(), revoked_reason = p_reason
+   WHERE se.id = v_sid AND se.revoked_at IS NULL;
+  UPDATE auth.refresh_tokens t SET revoked_at = now(), revoked_reason = p_reason
+   WHERE t.family_id = r.family_id AND t.revoked_at IS NULL;
+  RETURN QUERY SELECT v_sid, r.user_id, r.tenant_id, r.family_id;
+END;
+$$;
+
+-- login_attempts saqlash muddati (14 §19; 90 kun — standart, sozlanadi): p_older_than dan eski qatorlar o'chiriladi,
+-- qaytaradi — o'chirilganlar soni. 15 daqiqalik blok oynasi (auth_record_login) buzilmasligi uchun kamida 1 kun.
+-- Yagona chaqiruvchi — scheduler job'i purge_login_attempts (23 §4); trigger DELETE'ni faqat shu yerda o'tkazadi (3-bo'lim).
+CREATE OR REPLACE FUNCTION app.auth_purge_login_attempts(p_older_than interval)
+RETURNS bigint
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+DECLARE
+  v_n bigint;
+BEGIN
+  IF p_older_than IS NULL OR p_older_than < interval '1 day' THEN
+    RAISE EXCEPTION 'login_attempts retention must be at least 1 day, got %', p_older_than
+      USING ERRCODE = 'invalid_parameter_value';
+  END IF;
+  DELETE FROM auth.login_attempts a WHERE a.created_at < now() - p_older_than;
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  RETURN v_n;
+END;
+$$;
+
 -- funksiyalar ichida o'qiladigan qo'shimcha app jadvali
 GRANT SELECT ON app.telegram_links TO erp_system;
 
@@ -4389,6 +4566,9 @@ ALTER FUNCTION app.auth_revoke_session(uuid, text) OWNER TO erp_system;
 ALTER FUNCTION app.auth_revoke_user(uuid, uuid, text) OWNER TO erp_system;
 ALTER FUNCTION app.auth_list_user_sessions(uuid, uuid) OWNER TO erp_system;
 ALTER FUNCTION app.auth_telegram_chat_by_phone(text) OWNER TO erp_system;
+ALTER FUNCTION app.auth_lookup_refresh(text) OWNER TO erp_system;
+ALTER FUNCTION app.auth_revoke_refresh_family(text, text) OWNER TO erp_system;
+ALTER FUNCTION app.auth_purge_login_attempts(interval) OWNER TO erp_system;
 
 REVOKE ALL ON FUNCTION app.auth_issue_code(text, uuid, uuid, uuid, text, text, text, int) FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.auth_issue_tokens(uuid, uuid, uuid, uuid, text, timestamptz, text, boolean, timestamptz, timestamptz, inet, text) FROM PUBLIC;
@@ -4404,6 +4584,9 @@ REVOKE ALL ON FUNCTION app.auth_revoke_session(uuid, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.auth_revoke_user(uuid, uuid, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.auth_list_user_sessions(uuid, uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.auth_telegram_chat_by_phone(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_lookup_refresh(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_revoke_refresh_family(text, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_purge_login_attempts(interval) FROM PUBLIC;
 
 GRANT EXECUTE ON FUNCTION app.auth_issue_code(text, uuid, uuid, uuid, text, text, text, int) TO erp_app;
 GRANT EXECUTE ON FUNCTION app.auth_issue_tokens(uuid, uuid, uuid, uuid, text, timestamptz, text, boolean, timestamptz, timestamptz, inet, text) TO erp_app;
@@ -4419,6 +4602,14 @@ GRANT EXECUTE ON FUNCTION app.auth_revoke_session(uuid, text) TO erp_app;
 GRANT EXECUTE ON FUNCTION app.auth_revoke_user(uuid, uuid, text) TO erp_app;
 GRANT EXECUTE ON FUNCTION app.auth_list_user_sessions(uuid, uuid) TO erp_app;
 GRANT EXECUTE ON FUNCTION app.auth_telegram_chat_by_phone(text) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_lookup_refresh(text) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_revoke_refresh_family(text, text) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_purge_login_attempts(interval) TO erp_app;
+```
+
+```sql
+-- 0027 oxirida (egalik topshirilgach)
+REVOKE CREATE ON SCHEMA app FROM erp_system;
 ```
 
 #### Do'kon agenti va 1C integratsiyasi funksiyalari (`0028 store_agent`, `0029 onec_integration`)
@@ -4426,6 +4617,7 @@ GRANT EXECUTE ON FUNCTION app.auth_telegram_chat_by_phone(text) TO erp_app;
 7 ta funksiya — agentni ulash (RFC 8628 device grant, `auth.onec_device_authorizations`), agent tokeni (`private_key_jwt`) va SAQ cron fan-out uchun (`33-1c-integratsiya.md` §5.18, §4.4, §9.2). Naqsh yuqoridagi bilan bir xil: `erp_system` egaligida, `SET search_path = app, auth, pg_temp` (`auth`ga tegmaydiganlarida `app, pg_temp`), `erp_app`ga faqat `EXECUTE`. `0028 store_agent` — `onec_device_auth_start/lookup/approve/poll/deny`, `onec_agent_credentials` (6 ta); `0029 onec_integration` — `onec_tenants_due`.
 
 ```sql
+-- 0028 store_agent
 -- AS POST /oauth/device_authorization: yangi pending yozuv (10 daqiqa).
 -- user_code to'qnashsa (uq_onec_device_auth_user_code_pending) — ilova yangi kod bilan qayta chaqiradi.
 CREATE OR REPLACE FUNCTION app.onec_device_auth_start(
@@ -4626,6 +4818,7 @@ GRANT EXECUTE ON FUNCTION app.onec_agent_credentials(text) TO erp_app;
 `0029 onec_integration`:
 
 ```sql
+-- 0029 onec_integration
 -- SAQ cron fan-out (33 §4.4): arxivlanmagan 1C bazasi bor tenantlar;
 -- 'sweep' — yana queued/leased vazifasi yoki retry_wait itemi borlar.
 CREATE OR REPLACE FUNCTION app.onec_tenants_due(p_kind text)
@@ -4694,11 +4887,13 @@ INSERT INTO platform.label_templates (code, name, width_mm, height_mm, fields) V
    '{"fields": ["product_name", "price", "barcode"]}'::jsonb);
 
 INSERT INTO platform.oauth_clients (client_id, client_type, name, allowed_grant_types, allowed_scopes, status) VALUES
-  ('web-bff',      'confidential', 'Veb BFF (back-office + veb-kassa)', ARRAY['authorization_code','refresh_token'], ARRAY['*'],              'pending_secret'),
+  ('web-bff',      'confidential', 'Veb BFF (back-office + veb-kassa)', ARRAY['authorization_code','refresh_token'], ARRAY['*','sync','pos'], 'pending_secret'),
   ('admin-bff',    'confidential', 'Platforma admin BFF',               ARRAY['authorization_code','refresh_token'], ARRAY['platform.admin'], 'pending_secret'),
   ('android-pos',  'public',       'Android POS',                       ARRAY['authorization_code','refresh_token'], ARRAY['*','sync','pos'], 'active'),
   ('telegram-bot', 'confidential', 'Telegram bot',                      ARRAY['client_credentials'],                 ARRAY['bot.internal'],   'pending_secret'),
   ('onec-agent',   'public',       'Do''kon agenti (Windows)',               ARRAY['urn:ietf:params:oauth:grant-type:device_code','client_credentials'], ARRAY['onec.agent'], 'active');
+-- allowed_scopes: '*' — foydalanuvchi ruxsatlaridan hisoblangan prefikslar; 'sync'/'pos' faqat aniq yozilganda (14 §10) —
+-- veb-kassa web-bff orqali /sync/push, /sync/pull chaqiradi.
 -- onec-agent: ulash — device code (RFC 8628), keyin client_credentials + private_key_jwt
 -- (agentning shaxsiy client_id'si 'onec-agent:{agent_id}', kaliti app.onec_agents.public_jwk; 33-1c-integratsiya.md §9.2).
 -- redirect_uris bo'sh, client_secret yo'q.
@@ -4781,9 +4976,16 @@ INSERT INTO app.warehouses (tenant_id, branch_id, name, type, inventory_account)
 
 ### 6.1 Alembic revizion rejasi
 
+Revizionlardan oldin — DBA bootstrap (0-bo'lim: rollar, parollar, `GRANT erp_system TO erp_migrator`, `search_path`, `erp_migrator` egaligidagi baza); barcha revizionlar `erp_migrator` bilan ishlaydi. Revizionlar zanjiri chiziqli: `0001` → … → `0027` → `0028` → `0029`; `0028 store_agent` ning `down_revision` — `0027` (yadro revizionlarining oxirgisi).
+
+**SQL fayllar shu hujjatdan generatsiya qilinadi** (`backend/scripts/gen_migration_sql.py` → `backend/alembic/sql/NNNN_<nom>.{up,down}.sql`; `--check` rejimi CI'da drift'ni ushlaydi). Har ` ```sql ` bloki revizionga quyidagi tartibda biriktiriladi:
+1. Blokning birinchi qatori — marker izoh: `-- NNNN <nom>` (masalan `-- 0015 registers`, `-- 0027 boshida`) — butun blok shu revizionga; `-- DBA bootstrap` — revizion emas (0-bo'lim, `initdb.sh`); `-- namuna` — DDL emas, misol.
+2. Markersiz blok — bo'lim sarlavhasi bo'yicha: 0, 1.1–1.4 → `0001`; 2.1–2.9 → har bayonot o'z jadvalining revizioniga (quyidagi jadval; jadvaldan keyin yozilgan kechiktirilgan FK/indeks — FK bog'langan eng kech jadval revizioniga), `app.next_doc_number()` → `0019`; 2.11 → `0028`/`0029`; 4.1–4.4 → `0026`; 4.5 → `0027`; 5 (seed) va 6.2 (CI) — revizion emas.
+3. `0028`/`0029` bloklari tegishli bosqichgacha generatsiya qilinmaydi.
+
 | № | Revizion | Mazmuni |
 |---|---|---|
-| 0001 | `extensions_roles_schemas` | Sxemalar, kengaytmalar, rollar, `app.uuidv7()`, `app.set_updated_at()`, `app.forbid_mutation()` |
+| 0001 | `extensions_roles_schemas` | Rollar (faqat migratsiya roli superuser/`CREATEROLE` bo'lsa va rol yo'q bo'lsa; aks holda mavjudligi tekshiriladi — 0-bo'lim), sxemalar, kengaytmalar, `search_path` (xuddi shu shart bilan, 1.1), `app.uuidv7()`, `app.set_updated_at()`, `app.forbid_mutation()` |
 | 0002 | `core_tenant_user` | `tenants` (+`legal_form`, `go_live_date`, `accepted_terms_*`), `users`, `branches` (+`code`), `branch_tax_settings`, `warehouses` (+`inventory_account`, standartsiz), `cash_registers` (+`ofd_status`, `fm_state`, `last_unacked_receipt_at`, `fm_receipts_pending`, `tax_registered_at`, `outlet_address_snapshot`, `txkm_contract_ref`, `fiscal_agent_id` — FK 0028 da, `fiscal_local_device_id`), `devices` (`kind` ichida `onec_agent`, qaror #58), `memberships`, `roles`, `role_permissions` |
 | 0003 | `auth_schema` | `platform.oauth_clients` (+`status`, `pending_secret` CHECK — auth FK'lari uchun oldin), `auth.*` (6 jadval, `otp_challenges.channel` — qaror #34) + ularning `app.users`/`tenants`/`devices`ga FK'lari, `app.license_tokens`, **`app.user_identities`** (Google OIDC bog'lash, qaror #34) |
 | 0004 | `label_templates` | `platform.label_templates`, `platform.marking_product_groups` (qaror #63) |
@@ -4797,23 +4999,23 @@ INSERT INTO app.warehouses (tenant_id, branch_id, name, type, inventory_account)
 | 0012 | `docs_returns` | `returns` (+smena/kassa/qaytarish usuli — `uzqr`/`click`/`payme`/`uzum` bilan; karta qaytarish rekvizitlari `card_entry_mode`/`card_terminal_transaction_id`/`card_type`/`card_mask`/`rrn`/`approval_code`/`card_scheme`/`manual_reason` + `uq_returns_card_tx` — qaror #71), `return_lines` (+QQS/marking, `restock` — qaror #48) |
 | 0013 | `docs_purchasing` | `purchase_orders` (+`warehouse_id`), `po_lines` (`price` ixtiyoriy), `goods_receipts` (+`source`/`einvoice_id`/`ai_ocr_job_id`/`ettn_ref`/`poa_id`/`poa_number`/`kind`), `receipt_lines` (+`vat_exemption_code`, `discrepancy_reason`) |
 | 0014 | `docs_inventory` | `transfers` (+`sent_at/by`, `received_at/by`), `transfer_lines` (`lot_id` yo'q, `lot_allocations` JSONB), `transfers` (+`transport_mode`/`ettn_ref`/`vehicle_plate`/`driver_name`), `stock_counts` (+`started_at`/`responsible_user_id`), `count_lines` (`counted` NULL, +`snapshot_qty`/`counted_at` — qaror #53), `write_offs` (+`responsible_user_id`/`promo_order_ref`/`source_return_id`), `write_off_lines` (+`expired_return`, `gift_kind`), `stock_openings`, `opening_lines` |
-| 0015 | `registers` | `stock_moves`, `stock_lots` (`source_doc_type` ko'plik, +`stock_counts`, `blocked_qty`) (+ `supplier_returns` (+`reason`) / `supplier_return_lines`), `avg_costs` (+`total_value`), `stock_balances`, `debt_moves` (+`limit_exceeded`), `debt_balances`, `cash_moves` (`method` CHECK + bank_account_id izohi), `ledger_entries` (+`branch_id`, hisob kodi formati CHECK), `vat_moves`; append-only `REVOKE`+trigger (3-bo'lim, **+`app.doc_approvals`) |
+| 0015 | `registers` | `stock_moves`, `stock_lots` (`source_doc_type` ko'plik, +`stock_counts`, `blocked_qty`) (+ `supplier_returns` (+`reason`) / `supplier_return_lines`), `avg_costs` (+`total_value`), `stock_balances`, `debt_moves` (+`limit_exceeded`), `debt_balances`, `cash_moves` (`method` CHECK + bank_account_id izohi), `ledger_entries` (+`branch_id`, hisob kodi formati CHECK), `vat_moves`; append-only `REVOKE`+trigger (3-bo'lim): beshta registr, `app.doc_approvals` (0010 jadvali) va `auth.login_attempts` (0003 jadvali; `app.login_attempts_guard()` — `DELETE` faqat `auth_purge_login_attempts` ichida) |
 | 0016 | `ledger_adjustments` | `app.ledger_adjustments` (doc_sequences kodi `BX`, +`analytics`) |
 | 0017 | `docs_pricing_debts` | `price_changes`, `price_change_lines` (+`valid_from`), `debt_openings` (+`due_date`), `debt_payments` (`method` to'liq ro'yxat + checkout/promise_date, +`card_type`/`card_mask`/`rrn`/`qr_type`, `receipt_seq`, `unallocated_amount`, bank ↔ kassasiz CHECK; qaror #71 karta ustunlari va `uq_debt_payments_card_tx` — `sale_payments` bilan bir xil), `debt_payment_allocations` (`target_doc_type` CHECK, +`debt_writeoffs`), `debt_writeoffs` (+`reason`, `account_choice` default, `tax_writeoff_basis`), `supplier_payments` (+`cash_register_id`/`shift_id`), `supplier_payment_allocations` (`target_doc_type` CHECK) |
 | 0018 | `docs_expenses_cash` | `expense_categories` (+`version`, `code`/`default_account`/`source_ref`), `recurring_expenses`, `attachments` (+`content_type`/`original_name`/`sha256`/`kind` CHECK), `expenses` (+`tax_type`), `cash_movements` (+`counterparty_id`, `account`, `employee_id`, `reason`↔`direction` CHECK), `bank_statement_imports`, `bank_settlements` (qaror #42, `attachments`dan keyin; +`variance_amount`, `statement_import_id`), `card_terminal_settlements` (qaror #71, `bank_settlements`dan keyin) + `fk_ctt_settlement`, `tax_settlements` (kod `ST`; `vat_offset` — (tenant, davr), `turnover_tax` — (filial, davr) bo'yicha yagona); shu revizionda `attachments` mavjud bo'lgach `ALTER TABLE billing_payments ADD CONSTRAINT fk_bp_invoice_attachment ...` |
 | 0019 | `doc_sequences` | `doc_sequences`, `app.next_doc_number()`; kod ro'yxatiga `BX`=ledger_adjustments, `BT`=bank_settlements, `ST`=tax_settlements |
 | 0020 | `fiscal_marking_edocs` | `fiscal_receipts` (`kind` + `debt_settlement`/`credit_sale`, `debt_payment_id`, `fm_terminal_id`/`fm_receipt_seq`/`fiscal_at`/`ofd_acked_at`, `payment_form`, `delivery`; qaror #30, #43, #45), `marking_codes`, `einvoices` (status CHECK + summalar + `uq_einvoice_out_per_doc`, `risk_flag` + `unknown`, `factura_type`/`related_einvoice_id`), `powers_of_attorney` (`einvoices` dan keyin), `ettn_documents` (+`transfer_id`/`transport_type`/`direction`/`counterparty_id`/`receipt_id`/`doc_date`/`payload`/`signed_at`/`last_error`, `status` CHECK `failed` bilan — qaror #63), `state_reports` (+solishtirish ustunlari, `confirmed`, `correction_comment`/`correction_portal_ref`/`confirmed_at`/`confirmed_by`), `state_report_diffs`; shu revizionda `einvoices`/`marking_codes`/`powers_of_attorney` mavjud bo'lgach `fk_gr_einvoice`, `fk_vm_einvoice`, `fk_sl_marking`, `fk_gr_poa` |
 | 0021 | `ai_ocr_jobs` | `app.ai_requests` (`ai_ocr_jobs.ai_request_id` FK uchun oldin), `app.ai_ocr_jobs` (`doc_type_hint` — `purchase`/`catalog`, `created_product_ids`) + `fk_gr_ocr_job` (`goods_receipts.ai_ocr_job_id` → `ai_ocr_jobs.id`) |
-| 0022 | `integration_sync` | `app.tenant_secrets` (integratsiya hisob ma'lumotlari, +`cash_register_id` — UzQR kaliti); `outbox_jobs` (17 qiymatli `kind` ro'yxati — `poa_send`, `marking_supplier_return`, `marking_writeoff`, `billing_webhook_reconcile` bilan; job-progress ustunlari), `sync_receipts`, `sync_exceptions` (qaror #56; `kind` CHECK — 16 §5 ro'yxati, +`card_result_mismatch`/`card_orphan_transaction` — qaror #71), `idempotency_keys`, `recost_jobs`, `import_jobs` (holatlar + `result`) |
+| 0022 | `integration_sync` | `app.tenant_secrets` (integratsiya hisob ma'lumotlari, +`cash_register_id` — UzQR kaliti); `outbox_jobs` (17 qiymatli `kind` ro'yxati — `poa_send`, `marking_supplier_return`, `marking_writeoff`, `billing_webhook_reconcile` bilan; job-progress ustunlari), `sync_receipts`, `sync_exceptions` (qaror #56; `kind` CHECK — 16 §5 ro'yxati, +`card_result_mismatch`/`card_orphan_transaction` — qaror #71), `idempotency_keys`, `recost_jobs`, `import_jobs` (holatlar + `result`); `sync_receipts` append-only `REVOKE`+trigger (3-bo'lim) |
 | 0023 | `notifications_ai` | `telegram_links`, `notification_settings`, `notifications_log`, `ai_training_samples`, `ai_feedback`, `tenant_glossary` |
-| 0024 | `audit_periods` | `audit_log`, `period_closings` |
+| 0024 | `audit_periods` | `audit_log`, `period_closings`; `audit_log` append-only `REVOKE`+trigger (3-bo'lim) |
 | 0025 | `updated_at_triggers` | 2.10-bo'limdagi `DO` bloki (jumladan `card_terminals`, `card_terminal_transactions`, `card_terminal_settlements`, `platform.card_bin_rules`) |
-| 0026 | `rls_policies` | 4.2–4.4-bo'limlardagi `DO` bloki + maxsus siyosatlar + GRANT/REVOKE (+`platform.label_templates`/`marking_product_groups`/`terms_versions`/`turnover_tax_rates`/`card_bin_rules` SELECT, `platform.fx_rates` SELECT/INSERT/UPDATE) |
-| 0027 | `security_definer_functions` | 4.5-bo'limdagi 4 funksiya + `auth_consume_code`/`auth_rotate_refresh`/`auth_revoke_tenant`/`auth_suspend_tenant` + (`payments_checkout_by_provider_tx`, `payments_checkout_by_ref`, `billing_payment_by_id`, `public_statement_by_token`) + 14 ta AS yozuvchi/sessiya funksiyasi (`auth_issue_code` … `auth_telegram_chat_by_phone`) — jami 26; ular o'qiydigan `app` jadvallariga `erp_system` uchun nomma-nom `GRANT SELECT` |
+| 0026 | `rls_policies` | 4.2–4.4-bo'limlardagi `DO` bloki + maxsus siyosatlar + GRANT/REVOKE (+`platform.label_templates`/`marking_product_groups`/`terms_versions`/`turnover_tax_rates`/`card_bin_rules` SELECT, `platform.fx_rates` SELECT/INSERT/UPDATE); sxema-GRANT'lardan keyin append-only `REVOKE`lar qayta qo'llanadi, `auth.login_attempts` uchun `erp_system`dan `UPDATE` (4.4) |
+| 0027 | `security_definer_functions` | 4.5-bo'limdagi 4 funksiya + `auth_consume_code`/`auth_rotate_refresh`/`auth_revoke_tenant`/`auth_suspend_tenant` + (`payments_checkout_by_provider_tx`, `payments_checkout_by_ref`, `billing_payment_by_id`, `public_statement_by_token`) + 17 ta AS yozuvchi/sessiya funksiyasi (`auth_issue_code` … `auth_telegram_chat_by_phone`, `auth_lookup_refresh`, `auth_revoke_refresh_family`, `auth_purge_login_attempts`) — jami 29; ular o'qiydigan `app` jadvallariga `erp_system` uchun nomma-nom `GRANT SELECT`; boshida `GRANT CREATE ON SCHEMA app TO erp_system`, oxirida `REVOKE` (egalik topshirish uchun vaqtincha, 4.5) |
 | 0028 | `store_agent` | Do'kon agenti umumiy registri (2.11-bo'lim, qaror #66): `app.onec_agents` (+`capabilities`), `app.onec_agent_tasks` (1C ustunlari FK'siz; fiskal/printer/tarozi/karta terminali xizmat vazifalari — `card.status`, `card.settlement` (qaror #71), `purpose='device_service'`), `app.onec_task_results`, `auth.onec_device_authorizations`; `fk_cr_fiscal_agent` (`cash_registers.fiscal_agent_id` → `onec_agents`), `fk_ct_agent` (`card_terminals.agent_id` → `onec_agents`, qaror #71); `updated_at` trigger'lari (2.10, 2 jadval); RLS uchligi (4.2, 3 jadval); grantlar (4.4); 6 ta `SECURITY DEFINER` funksiya (`onec_device_auth_start/lookup/approve/poll/deny`, `onec_agent_credentials`; 4.5). `0002`/`0007` dagi `devices`, `signing_keys`, `cash_registers` ga bog'liq. Bosqich 5 |
 | 0029 | `onec_integration` | 1C integratsiyasi (2.11-bo'lim, `33-1c-integratsiya.md` §5): 15 ta `app.onec_*` jadval (FK tartibida: `onec_bases` → `onec_settings`, `onec_branch_bindings`, `onec_metadata_snapshots`, `onec_catalog_items`, `onec_mappings`, `onec_value_mappings`, `onec_ref_create_requests` → `onec_export_batches` → `onec_export_items` → `onec_export_item_sources`, `onec_object_refs` → `onec_reconciliations`, `onec_events`, `onec_agent_logs`); `onec_forbid_namespace_change` trigger'i; kechiktirilgan FK'lar, jumladan `onec_agent_tasks` ga `fk_oat_base`, `fk_oat_batch`, `fk_oat_item`, `fk_oat_ref_create`, `fk_oat_reconciliation`; `updated_at` trigger'lari (2.10, 11 jadval); RLS uchligi (4.2, 15 jadval); grantlar (4.4); `onec_tenants_due` (4.5). `onec_metadata_snapshots`/`onec_reconciliations`/`onec_events` `task_id` FK'lari `ON DELETE SET NULL` (o'qish vazifalari 30 kunda tozalanadi). `0018` dagi `attachments`ga bog'liq. Bosqich 7 |
 
-Seed (5-bo'lim) — **Alembic revizion emas** (`23-backend-arxitekturasi.md` §11: "bazani versiyalash bilan aralashtirmaslik uchun"), `migrate` konteyneridan keyin alohida `scripts/seed.py` bosqichi, faqat 5.1 (global) qismini bir marta ishga tushiradi; 5.2 (tenant-provisioning) — har signup'da ilova kodi tomonidan.
+Seed (5-bo'lim) — **Alembic revizion emas** (`23-backend-arxitekturasi.md` §11: "bazani versiyalash bilan aralashtirmaslik uchun"), `migrate` konteyneridan keyin alohida `python -m scripts.seed global` bosqichi (`erp_migrator` ulanishi bilan — `platform.*` jadvallariga faqat u yozadi, 4.4), faqat 5.1 (global) qismini ishga tushiradi (idempotent, `ON CONFLICT DO NOTHING`); 5.2 (tenant-provisioning) — har signup'da ilova kodi tomonidan.
 
 > Diqqat: yuqoridagi tartib 2-bo'limning **o'qish tartibidan** farq qiladi (masalan `supplier_returns`/`supplier_return_lines` 2-bo'limda purchasing ostida ko'rsatilgan, lekin `stock_lots`ga FK'i borligi sababli 0015-revizionda, registrlardan keyin yaratiladi). Bu — FK bog'liqligini hal qilish uchun zarur qayta tartiblash, 11-model mazmuniga ta'sir qilmaydi.
 
@@ -4872,11 +5074,12 @@ WHERE n.nspname = 'app' AND p.prosecdef
                      'auth_otp_create','auth_otp_verify','auth_record_login','auth_set_credentials',
                      'auth_reset_credentials','auth_get_pin_hash','auth_revoke_session','auth_revoke_user',
                      'auth_list_user_sessions','auth_telegram_chat_by_phone',
+                     'auth_lookup_refresh','auth_revoke_refresh_family','auth_purge_login_attempts',
                      'onec_device_auth_start','onec_device_auth_lookup',
                      'onec_device_auth_approve','onec_device_auth_deny','onec_device_auth_poll',
                      'onec_agent_credentials','onec_tenants_due');
--- 33 qator qaytishi shart (0027 — 26, 0028 — 6, 0029 — 1); kamroq bo'lsa CI qizil.
--- 0028 qo'llanmagan muhitda — 26, 0029 qo'llanmagan muhitda — 32.
+-- 36 qator qaytishi shart (0027 — 29, 0028 — 6, 0029 — 1); kamroq bo'lsa CI qizil.
+-- 0028 qo'llanmagan muhitda — 29, 0029 qo'llanmagan muhitda — 35.
 ```
 
 ---

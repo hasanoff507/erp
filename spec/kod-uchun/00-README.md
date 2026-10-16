@@ -12,7 +12,7 @@ Bu papka — ilovani yozish uchun **yagona va to'liq** spetsifikatsiya. Kod faqa
 4. Belgilar: *taxmin* — tasdiqlanmagan raqam; *(qaror #N)* — `01-qarorlar.md` dagi qarorga havola; **26 #N (OQ-0xx)** — `26-ochiq-savollar-reestri.md` dagi band (holati faqat **Yopildi** yoki **Tashqi javob kerak**; ikkinchisida kod vaqtinchalik standart bilan sozlama/adapter ortida yoziladi). Fayllarning "Ochiq savollar" bo'limlarida faqat tashqi javob kutayotgan bandlar 26 raqami bilan qoladi; yopilgan savollarga matn to'g'ridan-to'g'ri 26 yoki qarorga havola qiladi (qaror #59). Fayllarda faqat **joriy haqiqat** yoziladi — o'zgarishlar tarixi git'da va `spec/tarix/` da.
 5. Har fayl boshida standart blok: **Maqsad · Kim uchun · Bog'liq fayllar · Holat**.
 6. Mahsulot noldan quriladi va yadro 1C'siz ishlaydi. 1C bilan bog'lanish faqat alohida **1C integratsiya moduli** orqali (qaror #36–#42): kanal faqat COM (Do'kon agentining 1C imkoniyati, bulutdan pull), ERP → 1C bir tomonlama, MVP'dan keyin Bosqich 7 — `33-1c-integratsiya.md` (server moduli `onec_integration`), `34-1c-agent.md` (agent); tadqiqot — `research_notes/1c-integratsiya/`.
-7. **Do'kon agenti** (qaror #60) — do'kon Windows PK'sidagi yagona lokal dastur: fiskal ko'prik (POS → FM → OFD) va LAN printer/tarozi — Bosqich 5, 1C — Bosqich 7. Ochiq bulut OFD API yo'q; MVP kodi `FISCAL_PROVIDER=fake` bilan yoziladi, real fiskal adapter fiskal hamkor javobidan keyin (26 #109).
+7. **Do'kon agenti** (qaror #60) — do'kon Windows PK'sidagi yagona lokal dastur: fiskal ko'prik (POS → FM → OFD) va LAN printer/tarozi — Bosqich 5, 1C — Bosqich 7. Ochiq bulut OFD API yo'q; MVP kodi `ERP_FISCAL_PROVIDER=fake` bilan yoziladi, real fiskal adapter fiskal hamkor javobidan keyin (26 #109).
 
 ## O'qish tartibi
 

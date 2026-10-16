@@ -80,12 +80,13 @@ To'liq ma'lumotnoma ro'yxati (page pagination): `products`, `product-categories`
 | Header | Yo'nalish | Majburiyligi | Tavsif |
 |---|---|---|---|
 | `X-Branch-Id` | So'rov | Filialga bog'langan resurslarda majburiy | Joriy filial konteksti; `memberships.branch_ids`ga qarshi tekshiriladi, mos kelmasa `403 BRANCH_SCOPE_DENIED` (`15-xavfsizlik-va-audit.md` §2.4) |
-| `Idempotency-Key` | So'rov | Barcha **yozuvchi** (POST/PUT/PATCH/DELETE) back-office so'rovlarida majburiy | UUID, frontend avtomatik generatsiya qiladi; `/sync/push` bundan mustasno (`16-offline-sync.md` dedupe `client_event_id` orqali), `/onec-agent/*` ham (idempotentlik `lease_id`/`client_log_id` bilan, `33-1c-integratsiya.md` §9.1) — `23-backend-arxitekturasi.md` §3 |
+| `Idempotency-Key` | So'rov | Barcha **yozuvchi** (POST/PUT/PATCH/DELETE) back-office so'rovlarida majburiy | UUID, frontend avtomatik generatsiya qiladi; `/sync/push` bundan mustasno (`16-offline-sync.md` dedupe `client_event_id` orqali), `/onec-agent/*` ham (idempotentlik `lease_id`/`client_log_id` bilan, `33-1c-integratsiya.md` §9.1). Sarlavha yo'q yoki 200 belgidan uzun → `422 VALIDATION_ERROR`, `details=[{"field": "Idempotency-Key", "message_key": "validation.required"}]` (uzun bo'lsa `validation.max_length`) — alohida xato kodi yo'q. Faqat `2xx` javob saqlanadi; takrorga saqlangan javob qaytadi — `23-backend-arxitekturasi.md` §3 |
 | `X-CSRF-Token` | So'rov | Cookie-autentifikatsiyali (BFF, veb) barcha yozuvchi so'rovlarda majburiy | `GET /api/v1/auth/csrf` orqali olinadi; Android va 1C agenti (`/onec-agent/*`) Bearer so'rovlari ozod (`15-xavfsizlik-va-audit.md` §1.3) |
 | `Accept-Language` | So'rov | Ixtiyoriy, standart `uz` | `uz` \| `ru` — `message_key` tarjimasi va hisobot/eksport tili (`25-nofunksional-talablar.md`) |
 | `Authorization: Bearer <token>` | So'rov | Android (to'g'ridan-to'g'ri API) va 1C agenti (`/onec-agent/*`, `aud=urn:erp:onec-agent`) | Veb — BFF cookie, header yo'q (`14-autentifikatsiya-oauth2.md` §2, §2.3) |
 | `X-Agent-Version`, `X-Agent-Protocol` | So'rov | Faqat `/onec-agent/*` da majburiy | Agent versiyasi va protokol versiyasi (`2`); qo'llanmaydigan versiya → `426 ONEC_AGENT_UPDATE_REQUIRED` (`33-1c-integratsiya.md` §9.1) |
 | `Retry-After` | Javob | `429`/`409 IDEMPOTENCY_IN_PROGRESS`da | Soniyalarda qayta urinish tavsiyasi |
+| `Idempotent-Replayed` | Javob | Saqlangan javob qaytarilganda | `true` — javob `idempotency_keys` jurnalidan, so'rov qayta bajarilmagan (`23-backend-arxitekturasi.md` §3) |
 | `X-Request-Id` | Javob | Har doim | `structlog` so'rov ID'si, `error.request_id` bilan bir xil qiymat |
 
 ## 7. Xato konverti va HTTP status
@@ -116,7 +117,7 @@ To'liq ma'lumotnoma ro'yxati (page pagination): `products`, `product-categories`
 | `201 Created` | Yangi resurs yaratildi (`POST /{resurs}`, `Location` header bilan) |
 | `202 Accepted` | Asinxron ish navbatga qo'yildi (eksport job, AI OCR submit) — javobda `job_id`; 1C agenti vazifasi agent oflayn bo'lsa ham navbatga qo'yiladi, javob `warnings[]` da `ONEC_AGENT_OFFLINE` (ogohlantirish, xato emas) |
 | `204 No Content` | Muvaffaqiyatli amal, javob tanasi yo'q (masalan `DELETE`, ba'zi `POST .../revoke`) |
-| `400 Bad Request` | Noto'g'ri so'rov shakli (JSON parse xatosi) |
+| `400 Bad Request` | Katalogda `400` bilan belgilangan kodlar (`OTP_INVALID`, `OTP_EXPIRED`, `PIN_INVALID`); noto'g'ri JSON tanasi — `400` emas, `422 VALIDATION_ERROR` (`details[].message_key="validation.json_invalid"`) |
 | `401 Unauthorized` | Sessiya/token yo'q yoki tugagan |
 | `403 Forbidden` | Ruxsat yo'q (`PERMISSION_DENIED`), filial mos kelmadi, obuna `restricted`, CSRF xato |
 | `404 Not Found` | Resurs topilmadi (yoki RLS tufayli boshqa tenantga tegishli — farqlanmaydi, xavfsizlik) |
@@ -130,6 +131,8 @@ To'liq ma'lumotnoma ro'yxati (page pagination): `products`, `product-categories`
 | `500 Internal Server Error` | Kutilmagan server xatosi (`sentry-sdk`ga yoziladi) |
 | `502 Bad Gateway` | Tashqi tizim xato javob berdi (`FISCAL_SEND_FAILED`, `PAYMENT_PROVIDER_ERROR`) |
 | `503 Service Unavailable` | Tashqi tizim (AI provider, CRPT `MARKING_VERIFY_UNAVAILABLE`, EDO operatori `EINVOICE_PROVIDER_UNAVAILABLE`) vaqtincha ishlamaydi — faqat AI/tashqi integratsiya qatlamida, ichki tranzaksion endpoint'larda ishlatilmaydi |
+
+**Kodsiz HTTP xatolarining xaritasi** (framework darajasida chiqqan, endpoint `AppError` bermagan xatolar — `app/core/errors.py`): `401` → `UNAUTHORIZED`, `403` → `PERMISSION_DENIED`, `404` → `NOT_FOUND`, `429` → `RATE_LIMITED`; boshqa har qanday `4xx` (masalan `405 Method Not Allowed`) → `VALIDATION_ERROR`, HTTP status o'zgarmaydi; `5xx` va kutilmagan istisno → `500 INTERNAL_ERROR`. Pydantic validatsiya xatosi (shu jumladan noto'g'ri JSON) → `422 VALIDATION_ERROR`, `details[]` to'ldirilgan. Konvert har doim 7.1 shaklida.
 
 ## 8. Optimistik qulflash
 
@@ -361,7 +364,7 @@ Bu — **yagona manba**; `code` ustuni barqaror (frontend/mobil/test shu bo'yich
 | Fayl/umumiy | `UNSUPPORTED_FILE_TYPE` | 415 | `errors.unsupported_file_type` | Fayl turi qo'llab-quvvatlanmaydi | Тип файла не поддерживается | 12-bo'lim |
 | Fayl/umumiy | `EXPORT_JOB_FAILED` | 200 *(job holati)* | `errors.export_job_failed` | Eksport muvaffaqiyatsiz bo'ldi, qayta urinib ko'ring | Экспорт не удался, попробуйте снова | 13-bo'lim |
 | Fayl/umumiy | `WEBHOOK_SIGNATURE_INVALID` | 403 | `errors.webhook_signature_invalid` | — (tashqi tizimga qaytariladi, foydalanuvchiga ko'rinmaydi) | — | 14-bo'lim |
-| Fayl/umumiy | `RATE_LIMITED` | 429 | `errors.rate_limited` | Juda ko'p so'rov, biroz kutib qayta urinib ko'ring | Слишком много запросов, подождите | `slowapi` umumiy limit; `POST /ai/chat` — 10 so'rov/daqiqa/foydalanuvchi, 300 so'rov/kun/tenant (qaror #55) |
+| Fayl/umumiy | `RATE_LIMITED` | 429 | `errors.rate_limited` | Juda ko'p so'rov, biroz kutib qayta urinib ko'ring | Слишком много запросов, подождите | Redis fixed-window hisoblagichlari (`23-backend-arxitekturasi.md` §5); `/oauth/token` — 30/daqiqa/(`client_id`, IP), javob RFC 6749 shaklida `{"error": "slow_down"}`; `POST /ai/chat` — 10 so'rov/daqiqa/foydalanuvchi, 300 so'rov/kun/tenant (qaror #55) |
 | Fayl/umumiy | `INTERNAL_ERROR` | 500 | `errors.internal_error` | Kutilmagan xato yuz berdi | Произошла непредвиденная ошибка | Kutilmagan server istisnosi |
 | Fayl/umumiy | `NOTIFY_CONSENT_REQUIRED` | 422 | `errors.notify_consent_required` | Mijoz xabar olishga rozilik bermagan | Клиент не дал согласия на уведомления | AI-06 yuborish, `notify_consent=false` |
 | Do'kon agenti | `AGENT_CAPABILITY_DISABLED` | 409 | `errors.agent_capability_disabled` | Do'kon agentida bu imkoniyat yoqilmagan | На агенте магазина эта возможность не включена | Agent vazifasi navbatga qo'yilganda (`AgentTaskPort.enqueue`) `onec_agents.capabilities.<oila>.enabled` `true` emas (qaror #66); `params.capability`; `ONEC_*` sanog'iga kirmaydi |
@@ -454,7 +457,7 @@ Quyidagi kalitlar xato **kodi emas** — katalogdagi kod bilan birga `details[].
 
 | message_key | Qayerda | Bog'liq kod / manba |
 |---|---|---|
-| `validation.required`, `validation.max_length`, `validation.phone_format` | `details[]` (har maydon), zod `errorMap` | `VALIDATION_ERROR` |
+| `validation.required`, `validation.max_length`, `validation.phone_format` | `details[]` (har maydon), zod `errorMap`; `details[].field="Idempotency-Key"` — sarlavha yo'q (`required`) yoki 200 belgidan uzun (`max_length`), §6 | `VALIDATION_ERROR` |
 | `validation.variance_note_required` | `details[].field="variance_note"` — smena yopishda farq bor, izoh yo'q (`18-api-kassa.md` §3) | `VALIDATION_ERROR` |
 | `validation.card_manual_details_forbidden` | `details[].field="payments[i].card_mask"`/`"rrn"`/`"card_type"`/`"card_type_source"`/`"approval_code"`/`"card_scheme"`/`"card_result"`/`"terminal_ref"` (shuningdek `refund_card.*`, `debt_payment` ildizi) — `card_entry_mode="manual"` (terminalsiz karta, rekvizitsiz) da karta rekviziti berilgan; shuningdek `POST /card-terminal-transactions`da `result.resolved_by="manager"` bilan `rrn`/`card_mask`/`approval_code`/`card_type` berilgan (qaror #64, #71) | `VALIDATION_ERROR` |
 | `validation.card_entry_mode_required` | `details[].field="payments[i].card_entry_mode"` — `method="card"` da kiritish usuli yo'q (qaror #71) | `VALIDATION_ERROR` |

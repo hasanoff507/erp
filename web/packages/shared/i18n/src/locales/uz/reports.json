@@ -1,0 +1,34 @@
+{
+  "dashboard": {
+    "title": "Dashboard",
+    "greeting": "Xayrli kun, {{name}}",
+    "period": {
+      "label": "Davr",
+      "today": "Bugun",
+      "week": "Hafta",
+      "month": "Oy"
+    },
+    "kpi": {
+      "sales": "Bugungi savdo",
+      "receipts": "Cheklar",
+      "customerDebt": "Mijozlar qarzi",
+      "stockValue": "Ombor qiymati"
+    },
+    "salesChart": {
+      "title": "Savdo — oxirgi 7 kun",
+      "unit": "mln so'm"
+    },
+    "alerts": {
+      "title": "Diqqat talab qiladi"
+    },
+    "topProducts": {
+      "title": "Eng ko'p sotilgan"
+    },
+    "ai": {
+      "title": "AI yordamchi",
+      "placeholder": "Savolingizni yozing…",
+      "ask": "So'rash"
+    },
+    "pending": "Ma'lumotlar hisobot moduli ulanganda ko'rinadi."
+  }
+}

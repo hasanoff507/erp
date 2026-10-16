@@ -181,12 +181,12 @@
 | Qarz to'lovi cheki | Чек по оплате долга | Debt settlement receipt | `fiscal_receipts.kind = 'debt_settlement'` | Nasiya to'lovi uchun chiqariladigan fiskal chek — bitta to'lov = bitta chek (qaror #30, #45) | 11, 12 |
 | Kredit cheki | Чек кредита | Credit sale receipt | `fiscal_receipts.kind = 'credit_sale'`; `tenants.settings.fiscal_policy.credit_sale_receipt` (`none` standart / `credit_type`) | Qarzga sotuv paytidagi chek — faqat `credit_type` rejimida (26 #9 (OQ-002)) | 12 |
 | Chek yetkazish usuli | Способ выдачи чека | Receipt delivery | `fiscal_receipts.delivery` (`printed` standart / `electronic`) + `delivery_reason` | Elektron chek — zaxira, sabab bilan (26 #112 (OQ-018)) | 12 |
-| Fiskal port | Фискальный порт | Fiscal port | `FiscalPort` (`FISCAL_PROVIDER=fake` MVP'da) | Fiskal chek chiqarishning yagona interfeysi — hamkor bulut API yoki Do'kon ko'prigi adapterlari ortida (qaror #60) | 21, 23 |
+| Fiskal port | Фискальный порт | Fiscal port | `FiscalPort` (`ERP_FISCAL_PROVIDER=fake` MVP'da) | Fiskal chek chiqarishning yagona interfeysi — hamkor bulut API yoki Do'kon ko'prigi adapterlari ortida (qaror #60) | 21, 23 |
 | Fiskal modul (FM) | Фискальный модуль | Fiscal module | `FiscalPort`, `cash_registers.fm_state` | Chekni imzolovchi va OFD'ga yuboruvchi apparat/virtual modul (JavaCard applet, USB yoki SAM) | 21 |
 | FM chek raqami | Номер чека ФМ | FM receipt sequence | `fiscal_receipts.fm_receipt_seq`, `fm_terminal_id` | Fiskal modul bergan raqam (`ReceiptSeq`), qurilmaning `receipt_seq`idan alohida (qaror #12) | 12, 21 |
 | FM holati | Состояние ФМ | FM state | `cash_registers.fm_state` (`ok`/`locked`/`ack_overdue`/`memory_full`/`unknown`) | `locked` → sotuv `FISCAL_DEVICE_LOCKED` bilan to'xtaydi (26 #89) | 12, 17 |
 | 48 soatlik blok | Блокировка через 48 часов | 48-hour offline lock | `FISCAL_OFFLINE_48H_BLOCKED`, `fiscal_receipts.ofd_acked_at` | `ofd_acked_at IS NULL` bo'lgan eng eski chekdan 48 soat o'tsa yangi fiskal chek chiqmaydi; 24/40/46 soat ogohlantirish (qaror #43) | 16, 17 |
-| Do'kon ko'prigi (Local Bridge) | Локальный мост | Local fiscal bridge | `FISCAL_PROVIDER=multikassa_local`/`fiscaldrive_local` | POS → Do'kon agenti → FM/hamkor lokal xizmati → OFD yo'li (qaror #60) | 10, 21 |
+| Do'kon ko'prigi (Local Bridge) | Локальный мост | Local fiscal bridge | `ERP_FISCAL_PROVIDER=multikassa_local`/`fiscaldrive_local` | POS → Do'kon agenti → FM/hamkor lokal xizmati → OFD yo'li (qaror #60) | 10, 21 |
 | Sotuvdan oldingi markirovka tekshiruvi | Предпроверка кода | Marking precheck | `MARKING_PRECHECK` (`off`/`warn`/`block`, standart `warn`) | `warn` — ogohlantirish + audit, sotuv to'xtamaydi; `block` — qat'iy rad (qaror #62) | 18, 21 |
 | Lokal takror-kod tekshiruvi | Локальная проверка дубля | Local duplicate check | `marking_codes` | Bir markirovka kodi ikki marta sotilmasligini qurilma/server tekshiradi — rejimdan qat'i nazar (qaror #62) | 16, 18 |
 | Ombordan omborga (E-TTN) | Склад-склад | Warehouse transfer waybill | `transfers.ettn_ref`, `transfers.transport_mode` | O'z omborlari/filiallari orasidagi ko'chirish uchun E-TTN rejimi — avtotransportda (`transport_mode='vehicle'`) majburiy; piyoda/jamoat transportida — yo'q (VM 249 31-ilova 24-band; qaror #63) | 03, 21 |
@@ -254,7 +254,7 @@
 
 | O'zbekcha atama | Ruscha | Inglizcha | Koddagi nom | Ta'rif | Manba fayl |
 |---|---|---|---|---|---|
-| Maskalash | Маскирование | PII masking | `tenant_glossary`, AI so'rov quvuri | Claude'ga yuborishdan oldin shaxsiy maydonlarni almashtirish — majburiy, o'chirib bo'lmaydi (qaror #61) | 15, 22 |
+| Maskalash | Маскирование | PII masking | `TokenGlossary` (so'rov ichidagi xotira xaritasi), AI so'rov quvuri | Claude'ga yuborishdan oldin shaxsiy maydonlarni almashtirish — majburiy, o'chirib bo'lmaydi (qaror #61) | 15, 22 |
 | AI yordamchi chat | AI-чат-помощник | AI business chat | `AI-01` | Umumiy biznes savol-javob chati ("bugun qancha foyda?") | 09, 22 |
 | OCR hujjat tanish | Распознавание документа (OCR) | Document OCR | `AI-03` | Faktura/yuk xati/chek fotosidan ma'lumot chiqarish | 09, 22 |
 | Davlat hisoboti tushuntirishi | Объяснение расхождения отчёта | State report explanation | `AI-05` | Davlat hisoboti bilan ichki hisob farqini tushuntirish | 09, 22 |

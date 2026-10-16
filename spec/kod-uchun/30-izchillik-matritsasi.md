@@ -22,7 +22,7 @@
 
 | US-id | Qisqa nomi | MVP | BP | Ekran(lar) | API | Jadvallar | Provodka | Ruxsat | Bosqich |
 |---|---|---|---|---|---|---|---|---|---|
-| US-M01-01 | Chek yaratish va to'lov qabul qilish | Must | BP-02, BP-05 | POS-02, POS-03, POS-04 | voqea `sale.created` (`18-api-kassa.md` §4); `GET /api/v1/sales` (chek qidiruv, §4.8); fiskal chek — `FiscalPort` (hamkor bulut API yoki Do'kon agenti → FM → OFD, qaror #60; MVP'da `FISCAL_PROVIDER=fake`); bloklar `409 FISCAL_OFFLINE_48H_BLOCKED` (qaror #43), `409 FISCAL_DEVICE_LOCKED` | `app.sales`, `app.sale_lines`, `app.sale_payments` (`card_type`, `card_mask`, `rrn` — faqat integratsiyalangan karta, terminal natijasidan; terminalsiz karta — summa + `card_entry_mode='manual'` + `manual_reason`, rekvizitsiz; `qr_type`, `provider_tx_id` — qaror #64, #71), `app.stock_moves`, `app.stock_lots`, `app.vat_moves`, `app.ledger_entries`, `app.fiscal_receipts` (`fm_terminal_id`, `fm_receipt_seq`, `fiscal_at`, `ofd_acked_at`, `payment_form`, `delivery` — qaror #12, #43; terminalsiz karta cheki `payment_form='card'`, karta rekvizitlarisiz — 26 #178), `app.cash_registers` (`fm_state`, `last_unacked_receipt_at`, `fm_receipts_pending`) | §2.1–2.4 (naqdsiz → 5710, qaror #42) | `sales.create` | 3 (fiskal real adapter — 5, 26 #109 (OQ-012)) |
+| US-M01-01 | Chek yaratish va to'lov qabul qilish | Must | BP-02, BP-05 | POS-02, POS-03, POS-04 | voqea `sale.created` (`18-api-kassa.md` §4); `GET /api/v1/sales` (chek qidiruv, §4.8); fiskal chek — `FiscalPort` (hamkor bulut API yoki Do'kon agenti → FM → OFD, qaror #60; MVP'da `ERP_FISCAL_PROVIDER=fake`); bloklar `409 FISCAL_OFFLINE_48H_BLOCKED` (qaror #43), `409 FISCAL_DEVICE_LOCKED` | `app.sales`, `app.sale_lines`, `app.sale_payments` (`card_type`, `card_mask`, `rrn` — faqat integratsiyalangan karta, terminal natijasidan; terminalsiz karta — summa + `card_entry_mode='manual'` + `manual_reason`, rekvizitsiz; `qr_type`, `provider_tx_id` — qaror #64, #71), `app.stock_moves`, `app.stock_lots`, `app.vat_moves`, `app.ledger_entries`, `app.fiscal_receipts` (`fm_terminal_id`, `fm_receipt_seq`, `fiscal_at`, `ofd_acked_at`, `payment_form`, `delivery` — qaror #12, #43; terminalsiz karta cheki `payment_form='card'`, karta rekvizitlarisiz — 26 #178), `app.cash_registers` (`fm_state`, `last_unacked_receipt_at`, `fm_receipts_pending`) | §2.1–2.4 (naqdsiz → 5710, qaror #42) | `sales.create` | 3 (fiskal real adapter — 5, 26 #109 (OQ-012)) |
 | US-M01-02 | Offline savdo + avtomatik sinxronlanish | Must | BP-02 (offline variant) | POS-02, POS-12 | `POST /api/v1/sync/push`, `GET /api/v1/sync/pull` (§17, `16-offline-sync.md`) | `app.sync_receipts`, `app.idempotency_keys` | §2.1–2.4 | `sales.create` | 3 |
 | US-M01-03 | Markirovkalangan tovar kodini tekshirish | Must | BP-02 (qadam 5) | POS-02 | kod chek ichida OFD'ga (`FiscalPort` `items[].marking_codes`, qaror #17, #62); sotuvdan oldin `POST /api/v1/marking-codes/verify` (§15) — `MARKING_PRECHECK=warn` + lokal takror-kod tekshiruvi | `app.marking_codes`, `app.fiscal_receipts` | §2.1–2.4 (sale_lines ichida) | — (CRPT integratsiyasiga `integrations.retry` tegishli, sotuvda alohida kod yo'q) | 5 (sotuv UI va `MARKING_PRECHECK` — Bosqich 3 vazifasi; CRPT `verify`/`writeoff` real adapteri — 26 #40 (OQ-025)) |
 | US-M01-04 | Smena ochish va yopish (Z-hisobot) | Must | **— (gap, BP yo'q)** | POS-01, POS-07 | voqea `shift.opened`/`shift.closed`; `GET /api/v1/shifts/{id}/z-report` (§3) | `app.shifts`, `app.cash_moves` | §2.19 (X-01) | `shift.open` / `shift.close` | 3 |
@@ -285,7 +285,7 @@ Har bir fayl o'zining endpoint indeksidagi tartib raqami bilan berilgan (`18-api
 
 | Endpoint | US |
 |---|---|
-| `/.well-known/*`, `/oauth/*`, `/auth/login`, `/auth/otp/*`, `/auth/google/*`, `/auth/logout`, `/auth/sessions/revoke-all`, `/auth/pin/verify`, `/auth/session`, `/auth/license` | — (gap: infratuzilma — barcha US'larga xizmat qiladi, maxsus US yo'q) |
+| `/.well-known/*`, `/oauth/*`, `/auth/login/start`, `/auth/callback`, `/api/v1/auth/csrf`, `/auth/otp/*`, `/auth/google/*`, `/auth/logout`, `/auth/sessions/revoke-all`, `/auth/pin/verify`, `/auth/session`, `/auth/license` | — (gap: infratuzilma — barcha US'larga xizmat qiladi, maxsus US yo'q) |
 | `POST /auth/signup` | US-M17-01 |
 | `GET /billing/pay` | US-M17-03 |
 | `POST /billing/checkout` | US-M17-02 |
@@ -520,7 +520,7 @@ Asos — `13-provodka-qoidalari.md` §2.25 "Posting qamrovi" jadvali (hujjat↔A
 | `app.telegram_links`, `app.notification_settings`, `app.notifications_log` | `notifications/telegram/*`, `notification-settings` | US-M18-01, US-M18-02, US-M18-03 |
 | `app.ai_requests`, `app.ai_ocr_jobs` | `ai/chat`, `ai/ocr/jobs`, `ai/debt-reminders/*` | US-M18-04, US-M04-04, US-M08-03/08 |
 | `app.ai_training_samples`, `app.ai_feedback` | ichki AI quvuri (`22-ai-qatlami.md`; `12` izohi — qaror #58 b) | infratuzilma |
-| `app.tenant_glossary` | ichki AI quvuri — maskalash xaritasi (qaror #61, #58 b) | infratuzilma |
+| `app.tenant_glossary` | ichki AI quvuri — tenant atamalari lug'ati ("kola" → mahsulot; PII xaritasi emas — maskalash so'rov ichida xotirada, `22` §7; qaror #58 b) | infratuzilma |
 | `app.audit_log` | barcha state-change endpointlari (yon ta'sir sifatida, `15-xavfsizlik-va-audit.md` §6) | hammasi |
 | `app.outbox_jobs`, `app.sync_receipts`, `app.idempotency_keys`, `app.doc_sequences` | ko'plab endpointlar ichida ichki (OFD/e-faktura/marking retry, sync) | infratuzilma |
 | `app.attachments` | `POST /attachments` (BO-04/BO-17/AI-03 oqimlarida) | US-M04-04, US-M07-03, US-M15-01 |
@@ -563,7 +563,7 @@ Yo'q — barcha 41 ekranning (39 MVP + BO-22, BO-23) har birida kamida bitta `Bo
 
 ### G. Jadvallar — hech qanday endpoint tomonidan yozilmaydi
 
-Bo'shliq yo'q: `app.ettn_documents` — yozuvchi `POST /transfers/{id}/post` va `/ettn-documents/*` (qaror #63). Qolganlari `12-db-sxema.md` izohi bilan "seed/ops/ichki quvur yozadi" deb belgilangan (qaror #58 b): `app.ai_training_samples`, `app.ai_feedback`, `app.tenant_glossary` (ichki AI quvuri, qaror #61), `platform.fx_rates` (scheduler, qaror #55), `platform.label_templates` (seed, faqat `GET`), `platform.plans`, `platform.addons`, `platform.oauth_clients`, `platform.signing_keys`, `platform.platform_admins` (seed/migratsiya/ops). Yozuvchisiz jadval qolmagan.
+Bo'shliq yo'q: `app.ettn_documents` — yozuvchi `POST /transfers/{id}/post` va `/ettn-documents/*` (qaror #63). Qolganlari `12-db-sxema.md` izohi bilan "seed/ops/ichki quvur yozadi" deb belgilangan (qaror #58 b): `app.ai_training_samples`, `app.ai_feedback`, `app.tenant_glossary` (ichki AI quvuri — atamalar lug'ati), `platform.fx_rates` (scheduler, qaror #55), `platform.label_templates` (seed, faqat `GET`), `platform.plans`, `platform.addons`, `platform.oauth_clients`, `platform.signing_keys`, `platform.platform_admins` (seed/migratsiya/ops). Yozuvchisiz jadval qolmagan.
 
 ### H. Ruxsat kodlari — endpoint tomonidan ishlatiladi, lekin 15-katalogda yo'q / aksincha
 

@@ -1,0 +1,19 @@
+{
+  "shell": {
+    "title": "ERP Kassa",
+    "register": "Kassa {{number}}",
+    "shiftClosed": "Smena ochilmagan",
+    "onlineSynced": "Online · OFD sinxron",
+    "offline": "Offlayn",
+    "printerNotConfigured": "Printer sozlanmagan",
+    "cashier": "Kassir"
+  },
+  "login": {
+    "title": "Kassaga kirish",
+    "pending": "PIN bilan kirish va smena ochish (POS-01) Bosqich 3 da quriladi."
+  },
+  "sale": {
+    "title": "Sotish paneli",
+    "pending": "Sotish paneli (POS-02) Bosqich 3 da quriladi."
+  }
+}

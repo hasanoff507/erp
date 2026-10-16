@@ -267,7 +267,7 @@ Server hisoblaydi: `expected_cash = opening_cash + Σcash_moves(shift_id)` (`cas
 | `branch_id`, `cash_register_id`, `shift_id` | UUID | ha | `shift_id` — `status=open`, shu `device_id` |
 | `receipt_seq` | integer\|null | shartli | **Qurilma beradi**, shu smena ichida ketma-ket (`kind='sale'` cheki raqami); faqat-qarz sotuvda (`payments[]` faqat `debt` — `sale` cheki chiqmaydi) `null`, aks holda majburiy. Server `UNIQUE (tenant_id, cash_register_id, shift_id, receipt_seq)` tekshiradi, o'zi raqam bermaydi (istisno — §4.6 `RECEIPT_SEQ_CONFLICT` qayta raqamlash) |
 | `credit_receipt_seq` | integer\|null | shartli | `FiscalPolicy.credit_sale_receipt='credit_type'` va `payments[]`da `debt` bo'lsa majburiy — `kind='credit_sale'` cheki raqami (shu smenadagi `receipt_seq` ketma-ketligidan); aks holda `null` |
-| `fiscal_result` | object\|null | shartli | Lokal ko'prik rejimida (`FISCAL_PROVIDER = multikassa_local \| fiscaldrive_local`) chek FM'da imzolangan bo'lsa **majburiy**: `{fm_terminal_id, fm_receipt_seq, fiscal_sign, qr_url, fiscal_at}`; hamkor bulut va `fake` rejimida, faqat-qarz sotuvda — `null` (qaror #68) |
+| `fiscal_result` | object\|null | shartli | Lokal ko'prik rejimida (`ERP_FISCAL_PROVIDER = multikassa_local \| fiscaldrive_local`) chek FM'da imzolangan bo'lsa **majburiy**: `{fm_terminal_id, fm_receipt_seq, fiscal_sign, qr_url, fiscal_at}`; hamkor bulut va `fake` rejimida, faqat-qarz sotuvda — `null` (qaror #68) |
 | `delivery` | enum | yo'q | `printed` / `electronic`, standart `printed` → `fiscal_receipts.delivery` |
 | `delivery_reason` | enum\|null | shartli | `printer_failure` / `customer_request`; `delivery=electronic` bo'lsa majburiy, aks holda `null` |
 | `temp_number` | string | ha | `{device_id}-{local_seq}` (`11-malumotlar-modeli.md` §6/§11) |
@@ -392,7 +392,7 @@ Chek chop etish shabloni (`shared/lib/printer` adapteri — WebUSB/Serial/Blueto
 
 ### 4.10 Fiskal bloklar (sotuv, qaytarish, qarz to'lovi uchun umumiy)
 
-Fiskal chek `FiscalPort` orqali chiqariladi — hamkor bulut API'si yoki do'kon kompyuteridagi **Do'kon agenti** (fiskal modul ko'prigi, qaror #60; `34-1c-agent.md`); MVP kodi `FISCAL_PROVIDER=fake` bilan. Fiskal modul o'z raqamini beradi — `fiscal_receipts.fm_receipt_seq` (qurilma `receipt_seq`idan alohida, ikkisi ham saqlanadi), shuningdek `fm_terminal_id`, `fiscal_at`, OFD tasdig'i vaqti `ofd_acked_at`.
+Fiskal chek `FiscalPort` orqali chiqariladi — hamkor bulut API'si yoki do'kon kompyuteridagi **Do'kon agenti** (fiskal modul ko'prigi, qaror #60; `34-1c-agent.md`); MVP kodi `ERP_FISCAL_PROVIDER=fake` bilan. Fiskal modul o'z raqamini beradi — `fiscal_receipts.fm_receipt_seq` (qurilma `receipt_seq`idan alohida, ikkisi ham saqlanadi), shuningdek `fm_terminal_id`, `fiscal_at`, OFD tasdig'i vaqti `ofd_acked_at`.
 
 | Shart | Natija |
 |---|---|

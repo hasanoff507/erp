@@ -1,5 +1,7 @@
 # Kod uchun spetsifikatsiya — yagona manba
 
+**Maqsad:** kod uchun spec'ga kirish nuqtasi va o'qish tartibi. · **Kim uchun:** hammasi. · **Bog'liq fayllar:** 01–34. · **Holat:** joriy, 2026-10-16.
+
 Bu papka — ilovani yozish uchun **yagona va to'liq** spetsifikatsiya. Kod faqat shu hujjatlarga tayanadi. Tarix, tadqiqot va tekshiruv yozuvlari boshqa joyda (`spec/tarix/`, `research_notes/`) — kod yozishda ular kerak emas.
 
 ## Qoidalar
@@ -16,7 +18,7 @@ Bu papka — ilovani yozish uchun **yagona va to'liq** spetsifikatsiya. Kod faqa
 
 | # | Fayl | Nima uchun | Qachon o'qiladi |
 |---|---|---|---|
-| 01 | `01-qarorlar.md` | Barcha qabul qilingan qarorlar #1–#65 (tarif, auth, chek, fiskal — 48 soatlik blok #43, markirovka #62, e-TTN #63, karta/UzQR #64; Do'kon agenti #60, AI shaxsiy ma'lumot #61, hosting #65…) | **Har doim birinchi** |
+| 01 | `01-qarorlar.md` | Barcha qabul qilingan qarorlar #1–#70 (tarif, auth, chek, fiskal — 48 soatlik blok #43, markirovka #62, e-TTN #63, karta/UzQR #64; Do'kon agenti #60 va uning infratuzilmasi #66, AI shaxsiy ma'lumot #61, hosting #65, qarz to'lovi cheki #67, POS fiskal natijasi #68, yopilgan davrga kech voqealar #69, obuna to'lovi #70…) | **Har doim birinchi** |
 | | **Mahsulot — nima quriladi** | | |
 | 02 | `02-rollar-va-ssenariylar.md` | 5 rol, kundalik ssenariylar, huquqlar matritsasi | Boshida |
 | 03 | `03-modullar-talablari.md` | 18 modul + M19 (1C integratsiyasi, MVP'dan keyin), 104 ta foydalanuvchi hikoyasi (US-Mxx-nn; 86 tasi M01–M18, 18 tasi M19), qabul mezonlari | Har modul oldidan |
@@ -53,7 +55,7 @@ Bu papka — ilovani yozish uchun **yagona va to'liq** spetsifikatsiya. Kod faqa
 | 32 | `32-kod-qoidalari.md` | Repo tuzilmasi, nomlash, test, git oqimi, Definition of Done | Kod yozishdan oldin |
 | | **1C integratsiyasi (MVP'dan keyin, Bosqich 7)** | | |
 | 33 | `33-1c-integratsiya.md` | ERP → 1C kunlik eksport: server moduli `onec_integration`, `onec_*` jadvallar, agent↔server protokoli, veb API W-01…W-55, ruxsatlar, `ONEC_*` xato kodlari, BO-22/BO-23, M19 | Bosqich 7 oldidan |
-| 34 | `34-1c-agent.md` | Do'kon agenti (C#/.NET Fx 4.8, tray + worker'lar, DPAPI, 1C yozish algoritmi, avto-yangilanish; fiskal ko'prik/printer/tarozi — "Kengaytirish") — repo `agent-1c/` | Bosqich 5 (agent asosi) va 7 (1C) |
+| 34 | `34-1c-agent.md` | Do'kon agenti (C#/.NET Fx 4.8, tray + worker'lar, DPAPI, 1C yozish algoritmi, avto-yangilanish; fiskal ko'prik/printer/tarozi — §14 «Do'kon agenti kengaytmasi») — repo `agent-1c/` | Bosqich 5 (agent infratuzilmasi, qaror #66) va 7 (1C) |
 
 ## Bosqich bo'yicha minimal o'qish to'plami
 
@@ -63,7 +65,7 @@ Bu papka — ilovani yozish uchun **yagona va to'liq** spetsifikatsiya. Kod faqa
 | Katalog va ombor | 03 (M04–M07, M09), 04, 11, 12, 13, 19, 07 (BO-02…05, BO-18) |
 | Kassa (veb, Bosqich 3) | 01 #43/#62/#64, 03 (M01–M03, M08, M16), 04, 13, 16, 18, 07 (POS-01…16), 08, 24 §6 (printer matritsasi) |
 | Moliya, hisobot, obuna (Bosqich 4, 6) | 03 (M10–M12, M15, M17, M18), 13 (§2.18a `bank_settlements`, §2.26 `tax_settlements`), 20 (bank ko'chirmasi importi, tranzit qoldiq), 07 (BO-06…21, BO-24) |
-| Fiskal va integratsiyalar (Bosqich 5) | 01 #60/#62/#63, 10 §2, 21, 34 (Kengaytirish), 16, 18–20 tegishli bo'limlar, 26 Jadval B |
+| Fiskal va integratsiyalar (Bosqich 5) | 01 #60/#62/#63/#66–#68, 10 §2, 21, 33 §5.15/§9 (agent registri va A-API), 34 §14, 16, 18–20 tegishli bo'limlar, 26 Jadval B |
 | AI | 09, 22, 20 (AI bo'limi) |
 | 1C integratsiyasi (Bosqich 7) | 01 #36–#42, #60, 33, 34, 12 §2.11, 15, 17, 07 BO-22/23, 26 #93–#105, #131–#137 |
 
@@ -72,3 +74,4 @@ Bu papka — ilovani yozish uchun **yagona va to'liq** spetsifikatsiya. Kod faqa
 - `spec/tarix/` — tekshiruvlar, qabul agentlari qarorlari, kamchiliklar tahlili, tuzatishlar jurnali, rasmiy xatlar (`tarix/tekshiruv/rasmiy-xatlar.md`).
 - `research_notes/` — bozor va texnik tadqiqot (manbalar).
 - `research_notes/ochiq-savollar/` — ochiq savollarni yopish tadqiqoti: `00-inventar.md` (OQ-001…OQ-102), P1–P7 desk-research (lex.uz, vendor hujjatlari), `D-qarorlar-va-E-standartlar.md` (qarorlar #43–#59, E-bandlar interim standartlari, xat matnlari), `01-qollash-yoriqnomasi.md` (#60–#65 va ustun qoidalar). Natijasi — `01` va `26`; kod yozishda shu ikki fayl yetarli.
+- `research_notes/mustaqil-tekshiruv/` — spec'ning mustaqil tekshiruvi va tuzatish rejasi (qarorlar #66–#70 manbasi).

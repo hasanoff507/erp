@@ -12,7 +12,7 @@
 3. **Ruxsat etilgan grant turlari**: Authorization Code + PKCE (RFC 7636, S256) — veb (BFF ichida) va Android uchun majburiy; Refresh Token — **rotatsiya + qayta ishlatish aniqlash (reuse detection)** bilan; Client Credentials — faqat ichki xizmatlar/bot va 1C agenti (`private_key_jwt` bilan) uchun; Device Authorization Grant (RFC 8628) — faqat 1C agentini ulash uchun. **Implicit va Resource Owner Password Credentials (parol) grant'lari umuman yo'q** — OAuth 2.1 tavsiyasiga mos, xavfsizroq.
 4. **Kirish usullari — to'rt**: telefon+parol (back-office rollari); **Google bilan kirish** (OIDC, tashqi identity provider — hisob bog'lash tasdiqlangan email/telefon bo'yicha, §2.2); telefon+OTP (**faqat ro'yxatdan o'tish, parolni tiklash va h.k.**, kundalik kirish usuli emas — asosiy kanal **Telegram bot**, SMS (Eskiz) faqat zaxira, §4.2); kassir **PIN — OAuth grant emas**, qurilmada mahalliy (hatto offline) tezkor almashish/tasdiqlash vositasi (4-bo'lim).
 5. **Access token — JWT, RFC 9068 profili**, 15 daqiqa (qaror #44), EdDSA bilan imzolanadi, `JWKS` orqali ochiq kalit e'lon qilinadi; **refresh token — opaque, bazada faqat hash holida**, qurilmaga bog'langan, rotatsiya va oila (`family_id`) bo'yicha qayta ishlatish aniqlanadi (7-bo'lim).
-6. **Obuna muddati — qattiq to'xtatish** (qaror #15): 24 soatlik imtiyoz tugagach tenant **barcha** sessiya/tokenlari bekor qilinadi, har bir mijoz login sahifasiga yo'naltiriladi, login **rad etiladi** (faqat to'lov havolasi ochiq qoladi, 16-bo'lim). Fiskal oqibat: chek chiqarib bo'lmaydi — bu do'konning mas'uliyati, foydalanish shartlarida alohida qayd etiladi.
+6. **Obuna muddati — qattiq to'xtatish** (qaror #15): 24 soatlik imtiyoz tugagach tenant **barcha** refresh tokenlari to'xtatiladi (`suspended`, 16.1.3-bo'lim), har bir mijoz login sahifasiga yo'naltiriladi, login **rad etiladi** (faqat to'lov havolasi ochiq qoladi, 16-bo'lim). Fiskal oqibat: chek chiqarib bo'lmaydi — bu do'konning mas'uliyati, foydalanish shartlarida alohida qayd etiladi.
 7. **Offline qurilmalar — imzolangan litsenziya tokeni** (`license`, JWT): `tenant_id`, `device_id`, `valid_until = min(grace_ends_at, issued_at + 7 kun)`; qurilma (veb-kassa ham, Android ham) internet bo'lmasa ham shu tokenni mahalliy tekshiradi va muddat o'tganda **o'zini mahalliy bloklaydi** — serverga murojaat shart emas (17-bo'lim).
 8. **Veb-kassaning 48 soatlik offline oynasi** (fiskal, VM 943) va **24 soatlik obuna imtiyozi** (ichki qaror) — **ikki mustaqil muddat**, bir-biriga bog'liq emas; qurilmaga bog'langan refresh token muddati ikkisidan ham ancha uzun qilib loyihalanadi (sliding 14 kun / mutlaq 180 kun — 26 #73, qaror #44) — shu sababli 48 soatlik offline davrda mahalliy PIN, outbox yozish va `actor_user_id` bilan ishlash to'xtamaydi (8-bo'lim).
 9. **Admin panel ikki qatlamda**: platforma admin (`platform_admins`) — tenant/Egasi darajasida boshqaradi (obuna uzaytirish, sessiyalarni majburiy bekor qilish, AI sarfi); tenant Egasi — o'z xodimlarini qo'shadi/bloklaydi, rol/filial tayinlaydi, **PIN'ni qayta o'rnatadi**, sessiya/qurilmalarni bekor qiladi (18-bo'lim).
@@ -39,7 +39,7 @@ AS va RS **bitta jarayon, bitta DB** bo'lgani uchun token imzosini tashqi tarmoq
 
 ## 2. Mijozlar (OAuth clients)
 
-| Mijoz (`oauth_clients.name`) | Turi | Oqim | Tafsilot |
+| Mijoz (`oauth_clients.client_id`) | Turi | Oqim | Tafsilot |
 |---|---|---|---|
 | `web-bff` | **Confidential** (client_secret serverda, brauzerga hech qachon chiqmaydi) | Authorization Code + PKCE | Back-office va veb-kassa SPA'si **BFF naqshi** orqali: brauzer hech qachon access/refresh tokenni ko'rmaydi, faqat `sid` (sessiya ID) bilan imzolangan HttpOnly cookie oladi (3-bo'lim). PKCE confidential mijozda ham ishlatiladi (OAuth 2.1 tavsiyasi — qo'shimcha himoya qatlami, kod o'g'irlanishiga qarshi). |
 | `admin-bff` | Confidential | Authorization Code + PKCE | ADM-01 ichki admin panel — alohida `client_id`/`scope` (`platform.admin`), login faqat `platform_admins` jadvaliga qarshi (18-bo'lim). |
@@ -67,15 +67,16 @@ sequenceDiagram
     BFF-->>Br: 302 Location: /oauth/authorize?client_id=web-bff&code_challenge=...&state=...&redirect_uri=/auth/callback
     Br->>AS: GET /oauth/authorize (brauzer AS login sahifasini ko'rsatadi, bitta domen)
     Br->>AS: POST (login sahifasidan) {phone, password} — parol faqat shu yerda, hech qachon BFF orqali emas
-    AS->>DB: auth_find_user_by_phone(phone) (SECURITY DEFINER) + argon2id tekshirish
+    AS->>DB: app.auth_find_user_by_phone(phone) (SECURITY DEFINER) + argon2id tekshirish
+    AS->>DB: app.auth_record_login(phone, ip, success, failure_reason) — xato/muvaffaqiyat qaydi, progressiv blok
     DB-->>AS: user_id, memberships (tenant tanlash kerak bo'lsa alohida qadam)
-    AS->>DB: authorization_codes INSERT (code_hash, code_challenge, 60s TTL, bir martalik)
+    AS->>DB: app.auth_issue_code(code_hash, client_id, user_id, tenant_id, code_challenge, redirect_uri, scope, 60) — bir martalik
     AS-->>Br: 302 /auth/callback?code=...&state=...
     Br->>BFF: GET /auth/callback?code=...&state=...
     BFF->>BFF: state mosligini tekshiradi (login-CSRF/session-fixation'ga qarshi)
     BFF->>AS: POST /oauth/token {grant_type=authorization_code, code, code_verifier, client_secret}
     AS->>AS: S256(code_verifier) == code_challenge? redirect_uri mos?
-    AS->>DB: access_token (JWT) + refresh_token (opaque) yaratish, sessions INSERT (yangi sid)
+    AS->>DB: app.auth_consume_code(code_hash); access_token (JWT) + refresh_token (opaque) — app.auth_issue_tokens(..., p_with_session=true) (yangi sid)
     AS-->>BFF: access_token (15 daqiqa), refresh_token
     BFF->>DB: sessions.id = sid — token'lar serverda saqlanadi, brauzerga chiqmaydi
     BFF-->>Br: Set-Cookie: __Host-sid=... (HttpOnly, Secure, Path=/, Domain yo'q, SameSite=Lax)
@@ -123,7 +124,7 @@ Kanonik protokol — `33-1c-integratsiya.md` §9.1–9.2 (parametrlar, javob sha
 | Auditoriya ajratish | Tenant API (`aud=urn:erp:api`) `urn:erp:onec-agent` tokenini rad etadi, `/api/v1/onec-agent/*` esa `urn:erp:api` (foydalanuvchi) tokenini rad etadi (confused deputy'ga qarshi) — `aud=urn:erp:platform` bilan bir xil naqsh (§18.1). Agent yo'llarida CSRF yo'q (Bearer), `Idempotency-Key` talab qilinmaydi (`17-api-umumiy.md` §1). |
 | Bekor qilish (revocation) | (a) Back-office W-05 `POST /api/v1/onec-agents/{id}/revoke` (`onec.settings.manage`) yoki (b) agentdan A-10 `POST /api/v1/onec-agent/unpair` (uninstall/«Uzish»): `onec_agents.status='revoked'` (yakuniy), `devices.revoked_at` o'rnatiladi, Redis `onec:agent_status:{agent_id}` (60 s kesh) darhol o'chiriladi. RS har agent so'rovida shu keshni tekshiradi — `revoked` → `403 ONEC_AGENT_REVOKED`; amaldagi access token ≤ 60 s ichida kuchini yo'qotadi; yangi token berilmaydi (`invalid_client`). Qayta ulash — yangi device grant va yangi `onec_agents` yozuvi. Audit `onec.agent.revoked` / `onec.agent.unpaired`. |
 | Login bloklash istisnosi | Agent parol/OTP bilan kirmaydi — §12 dagi telefon/IP bo'yicha progressiv **login bloklash** va `ACCOUNT_LOCKED` unga qo'llanmaydi; o'rniga: `/oauth/device_authorization` IP bo'yicha 10/soat, device grant polling `slow_down`, assertion `jti` qayta ishlatish taqiqi, `client_id` bo'yicha `/oauth/token` rate limit. |
-| Obuna lokauti istisnosi | §16.1 qoidasidan farqli: `restricted`/`closed` tenant agentiga **token beriladi** (lease'dagi 1C yozuvi yarim qolmasligi uchun); cheklovni RS qo'llaydi — A-01 `hello` va A-03 `poll` → `403 SUBSCRIPTION_RESTRICTED` (yangi vazifa berilmaydi), A-04 heartbeat, A-05 natija, A-06 log — ruxsat (`33-1c-integratsiya.md` §9.1). |
+| Obuna lokauti istisnosi | §16.1 qoidasidan farqli: `restricted`/`closed` tenant agentiga **token beriladi** (lease'dagi 1C yozuvi yarim qolmasligi uchun); cheklovni RS qo'llaydi — lokautda A-01 `hello`, A-02, A-03 `poll` → `403 SUBSCRIPTION_RESTRICTED` (yangi vazifa berilmaydi); A-04…A-10 — ruxsat (`33-1c-integratsiya.md` §9.1). |
 
 ---
 
@@ -147,10 +148,12 @@ Kanonik protokol — `33-1c-integratsiya.md` §9.1–9.2 (parametrlar, javob sha
 
 Back-office rollari (Egasi, Menejer, Buxgalter) uchun asosiy usul. Parol — **argon2id** (`passlib[argon2]`/`argon2-cffi`), parametrlar OWASP tavsiyasi bo'yicha: m=19 MiB, t=2, p=1 (26 #76; server resursiga qarab sozlanadi).
 
+**Parol siyosati:** uzunligi 8–128 belgi; heshlash — argon2id (`07` BO-21 validatsiyasi bilan bir xil). Yozish — `app.auth_set_credentials` orqali (§19).
+
 ### 4.2 Telefon + OTP — faqat ro'yxatdan o'tish va tiklash; kanal — Telegram bot birinchi, SMS zaxira (qaror #34)
 
 **Kanal tanlovi**: OTP yetkazish uchun ikki kanal mavjud —
-1. **Telegram bot (standart, birinchi)**: foydalanuvchi avval botga telefon raqamini "share contact" tugmasi orqali ulagan bo'lsa (`telegram_links`, `15-xavfsizlik-va-audit.md` §1.4 bilan bir xil jadval/oqim, lekin bu yerda **tenant/xodim konteksti bo'lmasdan** ham — faqat `phone ↔ chat_id` bog'lanishi), OTP kodi botdan xabar sifatida keladi — bepul, tezkor. Xodim/Egasi uchun ulash tugmasi — back-office BO-20 ekranida (`06`, qaror #56); bir martalik `link_code` 10 daqiqa amal qiladi (qaror #54).
+1. **Telegram bot (standart, birinchi)**: foydalanuvchi avval botga telefon raqamini "share contact" tugmasi orqali ulagan bo'lsa (`telegram_links`, `15-xavfsizlik-va-audit.md` §1.4 bilan bir xil jadval/oqim; tenant kontekstisiz qidiruv — `app.auth_telegram_chat_by_phone(phone)` (SECURITY DEFINER, `12` §4.5): `users.phone` → faol `telegram_links` dagi eng oxirgi `chat_id`), OTP kodi botdan xabar sifatida keladi — bepul, tezkor. Xodim/Egasi uchun ulash tugmasi — back-office BO-20 ekranida (`06`, qaror #56); bir martalik `link_code` 10 daqiqa amal qiladi (qaror #54).
 2. **SMS (Eskiz) — faqat zaxira**: `telegram_links`da shu telefon uchun yozuv yo'q (hali ulanmagan) yoki Telegram yetkazib berish muvaffaqiyatsiz bo'lsa, server avtomatik SMS'ga o'tadi. Kanal tanlovi `OtpPort` ortida (Telegram → `EskizSmsAdapter`); Eskiz shartnomasi va real yetkazish tezligi — tashqi javob (26 #45, OQ-102), shu paytgacha `ESKIZ_TEST_MODE=true`. Google bilan kirgan foydalanuvchi uchun OTP umuman kerak emas (§2.2).
 
 - **Ro'yxatdan o'tish** (US-M17-01, BO-21): telefon → OTP (Telegram ulangan bo'lsa bot orqali, bo'lmasa SMS) → 6 xonali kod (5 daqiqa TTL — standart, sozlanadi, qaror #54) → tasdiqlangach `users` yaratiladi. Ro'yxatdan o'tish bosqichida Telegram hali ulanmagan bo'lishi odatiy holat — bu holda SMS ishlatiladi, keyin profilda Telegram ulash tavsiya qilinadi.
@@ -165,7 +168,7 @@ Back-office rollari (Egasi, Menejer, Buxgalter) uchun asosiy usul. Parol — **a
 PIN — token olish vositasi emas, balki **allaqachon OAuth orqali autentifikatsiya qilingan qurilmada** mahalliy, tezkor amal bajaruvchini aniqlash/tasdiqlash vositasi:
 
 1. Qurilma (veb-kassa brauzeri yoki Android POS) kuniga bir marta (yoki smena boshida) **to'liq OAuth Authorization Code+PKCE login** qiladi — bu qurilmaga bog'langan `sessions`/`refresh_tokens` yozuvini yaratadi (`scope` ichida `pos` bor).
-2. Shundan keyin kassir almashganda **yangi OAuth login kerak emas** — PIN mahalliy keshlangan `users.pin_hash` (sync orqali tushadi, `16-offline-sync.md` §1 `permissions` jadvali) bilan solishtiriladi, offline ham ishlaydi.
+2. Shundan keyin kassir almashganda **yangi OAuth login kerak emas** — PIN mahalliy keshlangan `user_credentials.pin_hash` (sync orqali tushadi, `16-offline-sync.md` §1 `permissions` jadvali) bilan solishtiriladi, offline ham ishlaydi.
 3. PIN natijasi **token emas** — u outbox voqeasining `actor_user_id` maydonini to'ldiradi (allaqachon `16-offline-sync.md` §2'da bor naqsh); server sinxronlashda `actor_user_id`ning shu `created_at` paytida faol `membership`i borligini qayta tekshiradi.
 4. **Step-up tasdiqlash PIN** (limitdan yuqori chegirma/qaytarish/nasiya, `15-xavfsizlik-va-audit.md` §2.3): Menejer/Egasi PIN kiritadi → bu ham token emas, balki voqea payload'iga qo'shiladigan tasdiqlovchi maydon (`approved_by_user_id`, `approved_by_pin_verified_at`), server qayta tekshiradi (limit, faollik). Mahalliy noto'g'ri PIN limiti — mavjud qoida (5 urinish — standart, sozlanadi, qaror #54; `16-offline-sync.md` §12) o'zgarmaydi, bu yerda faqat OAuth bilan bog'liq emasligi aniqlashtiriladi.
 5. Online holatda PIN qurilma-almashtirish uchun qo'shimcha server tasdig'i kerak bo'lsa — `POST /auth/pin/verify` (20-bo'lim) chaqiriladi, lekin bu ham yangi OAuth token qaytarmaydi, faqat `actor_user_id`ni serverda tasdiqlaydi va audit yozadi.
@@ -249,7 +252,7 @@ sequenceDiagram
 | Muddat | Nima uchun | Qayerda hisoblanadi | Tugaganda nima bo'ladi |
 |---|---|---|---|
 | **48 soat** | Fiskal qonun (VMQ-943, 2-ilova 6-band, VMQ-23 tahririda) — offline chek OFD'ga yetib borish muddati | OFD tasdig'i olinmagan (`fiscal_receipts.ofd_acked_at IS NULL`) eng eski fiskal chekdan (`16-offline-sync.md` §6) | Ogohlantirish shkalasi 24/40/46 soat; **48 soatda kassa bloklanadi** — yangi fiskal chek chiqarilmaydi (`409 FISCAL_OFFLINE_48H_BLOCKED`), faqat sinxron/yuborish ruxsat (qaror #43, `16-offline-sync.md` §6) |
-| **24 soat** | Ichki obuna qarori — to'lov imtiyozi | `subscriptions.current_period_end`'dan (`grace_ends_at`) | **Qattiq to'xtatish**: barcha sessiya bekor, login rad etiladi, offline qurilma mahalliy bloklanadi (16–17-bo'lim) |
+| **24 soat** | Ichki obuna qarori — to'lov imtiyozi | `subscriptions.current_period_end`'dan (`grace_ends_at`) | **Qattiq to'xtatish**: barcha refresh tokenlar `suspended`, login rad etiladi, offline qurilma mahalliy bloklanadi (16–17-bo'lim) |
 
 Bu ikkisi mustaqil bo'lgani uchun, masalan, obuna muddati tugashi 48 soatlik fiskal taymerni "qisqartirmaydi" va aksincha — lekin amaliyotda obuna `restricted` bo'lgan tenant allaqachon yangi sotuv qila olmaydi (17-bo'lim), shu sababli yangi fiskal taymer boshlanmaydi; **lokautdan oldin** qonuniy yaratilgan, hali OFD'ga yetmagan cheklar esa yo'qolmasligi kerak (fiskal 48 soat, VM 943) — bu **tor, cheklangan** `sync.drain` yo'li orqali ta'minlanadi, batafsil **16.4-bo'lim**. Bu cheklov emas, faqat **yangi** amal (`sale.created` va h.k.) mahalliy litsenziya tekshiruvidan o'tmaydi.
 
@@ -349,15 +352,18 @@ Barchasi `slowapi` (Redis backend) orqali, `23-backend-arxitekturasi.md` §5'dag
 
 ## 16. Obuna muddati bo'yicha kirish nazorati
 
-**Qaror** (qaror #15): 24 soatlik imtiyoz tugagach — kassa **to'liq** to'xtaydi. Barcha sessiya/token bekor, har bir mijoz login sahifasiga yo'naltiriladi, login rad etiladi (faqat to'lov yo'li ochiq).
+**Qaror** (qaror #15): 24 soatlik imtiyoz tugagach — kassa **to'liq** to'xtaydi. Barcha refresh tokenlar to'xtatiladi (`suspended`, 16.1.3), har bir mijoz login sahifasiga yo'naltiriladi, login rad etiladi (faqat to'lov yo'li ochiq).
+
+**Obuna holatlari** (qaror #70): `trial` (30 kun) tugasa yoki to'langan davr tugasa → `grace` (24 soat) → `restricted`; to'lov → `active`. `closed` — faqat platforma admini (`platform_admins`) amali bilan, avtomatik `restricted → closed` o'tishi yo'q; ma'lumot ≥ 5 yil saqlanadi.
 
 ### 16.1 Mexanizm
 
-1. **Har bir himoyalangan so'rov**: `require_subscription_ok` dependency Redis'dan `sub_status:{tenant_id}` o'qiydi (qisqa TTL kesh, masalan 60 soniya fallback bilan — asosiy yangilanish cron/webhook orqali darhol). `restricted`/`closed` bo'lsa → `403 {code: SUBSCRIPTION_RESTRICTED}`, **faqat** quyidagilar bundan mustasno: `/auth/*` (login rad javobi, parol/PIN tiklash OTP oqimi), `/.well-known/*`, to'lov sahifasi yo'li (`/billing/pay`, 16.3-bo'lim), **`GET /billing/plan`, `GET /billing/subscription`, `GET /billing/addons`, `GET /billing/payments`** (o'qish — tenant qancha qarzi borligini ko'rishi uchun), **`POST /billing/checkout`** (16.1.1a-bo'lim — oddiy sessiya o'rniga `pay_token` bilan ishlaydi) va **`/billing/webhooks/*`** (provayder o'z imzosi bilan tasdiqlaydi, sessiyadan mustaqil, 9-bo'lim). Eksport **yopiq** (US-M17-03/US-M17-05) — faqat to'lov sahifasidan alohida, cheklangan yo'l bilan mumkin (16.5-bo'lim), `/billing/export-my-data` shu sabab yuqoridagi istisno ro'yxatiga **kiritilmaydi** o'z OTP shartisiz. `/sync/push` bundan alohida: faqat `scope=sync.drain` bilan, faqat lokautdan oldingi voqealar uchun ochiq (16.4-bo'lim). Bu ro'yxat `23-backend-arxitekturasi.md` §3 middleware tartibida ham bir xil — `POST /billing/checkout` shu ro'yxatda bo'lishi shart, aks holda `restricted` tenant hech qanday yo'l bilan to'lay olmaydi.
-   - **Redis ishlamasa yoki kalit topilmasa**: `require_subscription_ok` **fail-to-DB** qiladi — `subscriptions.status` to'g'ridan-to'g'ri Postgres'dan o'qiladi (fail-closed emas, soft-fail — Redis uzilishi butun tizimni to'xtatmaydi), natija qisqa muddatga qayta Redis'ga yoziladi.
-2. **Har bir `/oauth/token` (kod almashtirish YOKI refresh)**: xuddi shu tekshiruv — `restricted` tenant uchun token **berilmaydi** (bundan mustasno — 16.4-bo'limdagi `sync.drain` va 1C agenti `onec-agent`: unga token beriladi, cheklovni `/api/v1/onec-agent/*` qo'llaydi — §2.3), lekin javobda `tenant_id`, `plan_id`, `amount_due`, `pay_url` qaytariladi — shunda BFF/login sahifasi generik xato o'rniga "Obuna muddati tugagan" + to'lov havolasi ko'rsatadi (`24-frontend-arxitekturasi.md`da bu holat). **`pay_url`** — hisob-faktura/to'lov havolasi uchun alohida, **token bermaydigan** qisqa muddatli havola (hech qanday OAuth scope yoki sessiya bermaydi, faqat Click/Payme checkout'ga olib boradi); u faqat parol muvaffaqiyatli tasdiqlangandan (yoki mavjud sessiya tasdiqlangandan) keyin qaytariladi — anonim so'rovchiga tenant to'lov holati oshkor qilinmaydi.
+#### 16.1.1 Har bir himoyalangan so'rov
 
-### 16.1.1a `pay_token` — `restricted` holatda `POST /billing/checkout`ni ochish
+`require_subscription_ok` dependency Redis'dan `sub_status:{tenant_id}` o'qiydi (qisqa TTL kesh, masalan 60 soniya fallback bilan — asosiy yangilanish cron/webhook orqali darhol). `restricted`/`closed` bo'lsa → `403 {code: SUBSCRIPTION_RESTRICTED}`, **faqat** quyidagilar bundan mustasno: `/auth/*` (login rad javobi, parol/PIN tiklash OTP oqimi), `/.well-known/*`, to'lov sahifasi yo'li (`/billing/pay`, 16.3-bo'lim), **`GET /billing/plan`, `GET /billing/subscription`, `GET /billing/addons`, `GET /billing/payments`** (o'qish — tenant qancha qarzi borligini ko'rishi uchun), **`POST /billing/checkout`** (16.1.1a-bo'lim — oddiy sessiya o'rniga `pay_token` bilan ishlaydi) va **`/billing/webhooks/*`** (provayder o'z imzosi bilan tasdiqlaydi, sessiyadan mustaqil, 9-bo'lim). Eksport **yopiq** (US-M17-03/US-M17-05) — faqat to'lov sahifasidan alohida, cheklangan yo'l bilan mumkin (16.5-bo'lim), `/billing/export-my-data` shu sabab yuqoridagi istisno ro'yxatiga **kiritilmaydi** o'z OTP shartisiz. `/sync/push` bundan alohida: faqat `scope=sync.drain` bilan, faqat lokautdan oldingi voqealar uchun ochiq (16.4-bo'lim). Bu ro'yxat `23-backend-arxitekturasi.md` §3 middleware tartibida ham bir xil — `POST /billing/checkout` shu ro'yxatda bo'lishi shart, aks holda `restricted` tenant hech qanday yo'l bilan to'lay olmaydi.
+- **Redis ishlamasa yoki kalit topilmasa**: `require_subscription_ok` **fail-to-DB** qiladi — `subscriptions.status` to'g'ridan-to'g'ri Postgres'dan o'qiladi (fail-closed emas, soft-fail — Redis uzilishi butun tizimni to'xtatmaydi), natija qisqa muddatga qayta Redis'ga yoziladi.
+
+#### 16.1.1a `pay_token` — `restricted` holatda `POST /billing/checkout`ni ochish
 
 `restricted`/`closed` holatda oddiy OAuth sessiya/access-token berilmaydi (16.1.3-bo'lim), lekin tenant aynan shu holatda to'lov qilishi kerak — `POST /billing/checkout`ning o'zi himoyalangan endpoint, demak sessiyasiz chaqirilmaydi. Yechim — checkout uchun **alohida, juda tor** autentifikatsiya artefakti:
 
@@ -369,9 +375,21 @@ Barchasi `slowapi` (Redis backend) orqali, `23-backend-arxitekturasi.md` §5'dag
 
 Bu mexanizm `active`/`grace` holatida ishlatilmaydi — u yerda oddiy sessiya orqali `POST /billing/checkout` chaqiriladi, `pay_token` faqat `restricted`/`closed`ga xos.
 
-3. **Zudlik bilan ta'sir — `suspended`, to'liq `revoked` emas**: grace tugashi bilan scheduler (SAQ cron, `23-backend-arxitekturasi.md` §4) shu tenant bo'yicha **barcha** `sessions`/`refresh_tokens`ni **`suspended_at=now`, `revoked_reason='subscription'`** bilan belgilaydi — bu **xavfsiz-sodda tanlov**: to'liq `revoked_at` emas, chunki keyin to'lov qilinganda token zanjirini qaytadan yaratish (qayta login) shart bo'lmasin, oddiy kassir faqat PIN biladi va parol bilan qayta kira olmaydi. `suspended` refresh token **oddiy** (`scope` to'liq) access token olishga yaroqsiz — faqat `scope=sync.drain` bilan cheklangan access token olishi mumkin (16.4-bo'lim). Redis `sub_status`/`sid`-revoke keshi darhol yangilanadi — shu sababli hali amal qilishi kerak bo'lgan (15 daqiqalik) access tokenlar ham keyingi so'rovda rad etiladi, tabiiy `exp`ni kutish shart emas.
-4. **Frontend javobi**: mavjud 401/403 interceptor (`24-frontend-arxitekturasi.md` §3) `SUBSCRIPTION_RESTRICTED` kodini tanib, `/login?reason=subscription_expired` ga yo'naltiradi. **Bu logout emas** — Dexie/outbox o'chirilmaydi (16.4-bo'lim bilan izchil). Ekran ochiq, lekin foydalanuvchi hech narsa bosmasa ham tezroq sezish uchun — yengil davriy "heartbeat" (`GET /auth/session`, ~30 soniya) tavsiya etiladi; "zudlik" uchun oddiy polling + ixtiyoriy SSE heartbeat yetarli, WebSocket kanali MVP'da yo'q (26 #75).
-5. **To'lov qaytganda**: Click/Payme webhook → `billing_payments` yoziladi → `subscriptions.status='active'`, `current_period_end` uzayadi → Redis kesh **darhol** yangilanadi → shu tenant bo'yicha barcha `suspended_at`/`revoked_reason='subscription'` yozuvlar **tozalanadi** (tokenlar odatdagi holatga qaytadi, qayta login shart emas — 16.1.3 va 17.2.4 bilan izchil) → kirish darhol tiklanadi.
+#### 16.1.2 Har bir `/oauth/token` (kod almashtirish yoki refresh)
+
+Xuddi shu tekshiruv — `restricted` tenant uchun token **berilmaydi** (bundan mustasno — 16.4-bo'limdagi `sync.drain` va 1C agenti `onec-agent`: unga token beriladi, cheklovni `/api/v1/onec-agent/*` qo'llaydi — §2.3), lekin javobda `tenant_id`, `plan_id`, `amount_due`, `pay_url` qaytariladi — shunda BFF/login sahifasi generik xato o'rniga "Obuna muddati tugagan" + to'lov havolasi ko'rsatadi (`24-frontend-arxitekturasi.md`da bu holat). **`pay_url`** — hisob-faktura/to'lov havolasi uchun alohida, **token bermaydigan** qisqa muddatli havola (hech qanday OAuth scope yoki sessiya bermaydi, faqat Click/Payme checkout'ga olib boradi); u faqat parol muvaffaqiyatli tasdiqlangandan (yoki mavjud sessiya tasdiqlangandan) keyin qaytariladi — anonim so'rovchiga tenant to'lov holati oshkor qilinmaydi.
+
+#### 16.1.3 Zudlik bilan ta'sir — `suspended`, to'liq `revoked` emas
+
+Grace tugashi bilan scheduler (SAQ cron, `23-backend-arxitekturasi.md` §4) `app.auth_suspend_tenant(tenant_id, true)` ni chaqiradi: `refresh_tokens.suspended_at = now()`, `revoked_reason = 'subscription'`; `sessions` o'zgarmaydi — kirish Redis `sub_status` orqali to'xtaydi. Bu **xavfsiz-sodda tanlov**: to'liq `revoked_at` emas, chunki keyin to'lov qilinganda token zanjirini qaytadan yaratish (qayta login) shart bo'lmasin, oddiy kassir faqat PIN biladi va parol bilan qayta kira olmaydi. `suspended` refresh token **oddiy** (`scope` to'liq) access token olishga yaroqsiz — faqat `scope=sync.drain` bilan cheklangan access token olishi mumkin (16.4-bo'lim). Redis `sub_status`/`sid`-revoke keshi darhol yangilanadi — shu sababli hali amal qilishi kerak bo'lgan (15 daqiqalik) access tokenlar ham keyingi so'rovda rad etiladi, tabiiy `exp`ni kutish shart emas.
+
+#### 16.1.4 Frontend javobi
+
+Mavjud 401/403 interceptor (`24-frontend-arxitekturasi.md` §3) `SUBSCRIPTION_RESTRICTED` kodini tanib, `/login?reason=subscription_expired` ga yo'naltiradi. **Bu logout emas** — Dexie/outbox o'chirilmaydi (16.4-bo'lim bilan izchil). Ekran ochiq, lekin foydalanuvchi hech narsa bosmasa ham tezroq sezish uchun — yengil davriy "heartbeat" (`GET /auth/session`, ~30 soniya) tavsiya etiladi; "zudlik" uchun oddiy polling + ixtiyoriy SSE heartbeat yetarli, WebSocket kanali MVP'da yo'q (26 #75).
+
+#### 16.1.5 To'lov qaytganda
+
+Click/Payme webhook → `billing_payments` yoziladi → `subscriptions.status='active'`, `current_period_end` uzayadi → Redis kesh **darhol** yangilanadi → shu tenant bo'yicha barcha `suspended_at`/`revoked_reason='subscription'` yozuvlar **tozalanadi** (tokenlar odatdagi holatga qaytadi, qayta login shart emas — 16.1.3 va 17.2.4 bilan izchil) → kirish darhol tiklanadi.
 
 ### 16.2 Diagramma
 
@@ -385,7 +403,7 @@ sequenceDiagram
 
     Note over DB: grace_ends_at <= now(), status='grace'
     SCH->>DB: UPDATE subscriptions SET status='restricted'
-    SCH->>DB: shu tenant bo'yicha barcha sessions/refresh_tokens — revoke
+    SCH->>DB: app.auth_suspend_tenant(tenant_id, true) — refresh_tokens.suspended_at=now(), revoked_reason='subscription' (sessions o'zgarmaydi)
     SCH->>R: SET sub_status:{tenant_id} = restricted
     SCH->>SCH: outbox_jobs: Telegram/SMS ogohlantirish (M18)
 
@@ -417,7 +435,7 @@ Kassa to'liq to'xtagach **chek chiqarib bo'lmaydi** — bu holatda savdo davom e
 2. `suspended` refresh token bilan `/oauth/token` so'rovi qilinganda AS **faqat** cheklangan scope — `scope=sync.drain` — bilan qisqa muddatli (5 daqiqa — standart, sozlanadi) access token qaytaradi. Bu token boshqa hech qanday scope so'rolsa rad etiladi.
 3. `sync.drain` scope'li access token bilan **faqat** `POST /sync/push` ishlaydi, u ham faqat `created_at <= grace_ends_at` bo'lgan voqealar uchun (qurilma `seq` va `license.jti` bo'yicha server tekshiradi, §8 clamp qo'llanadi). Lokautdan **keyin** yaratilgan har qanday voqea (`created_at > grace_ends_at`) `rejected: SUBSCRIPTION_RESTRICTED` bilan rad etiladi — yangi sotuv imkonsiz. **Boshqa hech qanday endpoint** (`/sync/pull`, `GET /reports/*`, login, boshqa yozuvchi amallar) `sync.drain` token bilan ochilmaydi — 403.
 4. Frontend/Android worker `SUBSCRIPTION_RESTRICTED` holatini **logout deb hisoblamaydi**: Dexie/outbox **o'chirilmaydi**, login sahifasi ko'rsatiladi (foydalanuvchi uchun UI — "obuna tugagan"), lekin fon rejimida (service worker/Android background job) drain davom etadi — qolgan offline voqealar jim yuboriladi.
-5. To'lovdan keyin (16.1.5-bo'lim) `suspended` tokenlar odatdagi holatga qaytadi — endi to'liq scope bilan ishlaydi, drain alohida bosqich sifatida tugaydi (agar hali yuborilmagan voqea qolmagan bo'lsa).
+5. To'lovdan keyin (16.1.5-bo'lim) `suspended` tokenlar odatdagi holatga qaytadi — to'liq scope bilan ishlaydi, drain alohida bosqich sifatida tugaydi (agar hali yuborilmagan voqea qolmagan bo'lsa).
 6. Audit: `sync_drain_started`, `sync_drain_completed` (tenant_id, device_id, qancha voqea yuborildi) — 14-bo'limdagi ro'yxatga qo'shiladi.
 
 ```mermaid
@@ -437,10 +455,10 @@ sequenceDiagram
 
 ### 16.5 Ma'lumotlarni eksport qilish — faqat to'lov sahifasidan (qaror #20)
 
-**Qaror**: `restricted` holatda oddiy `/reports/export` yopiq (16.1.1-bo'lim). Buning o'rniga login/to'lov sahifasida alohida, tor tugma: **"Ma'lumotlarimni yuklab olish"**.
+**Qaror**: `restricted` holatda oddiy `/reports/export` yopiq (16.1.1-bo'lim). Buning o'rniga login/to'lov sahifasida alohida, tor tugma: **"Ma'lumotlarimni yuklab olish"**. Eksport faqat `billing.manage` ruxsati egasiga (Egasi); boshqa rolga `403 FORBIDDEN`.
 
 1. Foydalanuvchi `/login?reason=subscription_expired` sahifasida telefon+parol bilan tasdiqlanadi (to'liq login emas — token berilmaydi, faqat identifikatsiya).
-2. Tasdiqlangandan keyin **SMS OTP** bilan qo'shimcha tasdiqlash talab qilinadi (`purpose=data_export`) — ikki faktorli, chunki bu amal to'liq tenant ma'lumotini tashqariga chiqaradi.
+2. Tasdiqlangandan keyin OTP (`purpose=data_export`) bilan qo'shimcha tasdiqlash talab qilinadi — Telegram birinchi, SMS zaxira (qaror #34); ikki faktorli, chunki bu amal to'liq tenant ma'lumotini tashqariga chiqaradi.
 3. OTP tasdiqlangach, bir martalik eksport tokeni beriladi; to'liq eksport (`POST`/`GET /billing/export-my-data?token=...`, `20-api-moliya-admin.md` 65a) — ZIP: har jadval CSV (UTF-8) + `manifest.json`, ≤ 24 soatda tayyorlanadi, yuklab olish havolasi (signed URL) 24 soat amal qiladi (qaror #51).
 4. **Rate limit**: tenant bo'yicha 1 marta / 24 soat (qaror #51) — qayta-qayta to'liq ma'lumot bazasini yuklab olishning oldini olish uchun.
 5. **Audit**: `data_export_during_restriction` (tenant_id, user_id, ip, created_at) — 14-bo'limdagi ro'yxatga qo'shiladi, `15-xavfsizlik-va-audit.md` §6.1'dagi "ma'lumot eksporti" talabining lokaut-maxsus holati.
@@ -481,7 +499,7 @@ BFF naqshida token brauzer JS'iga chiqmaydi (3-bo'lim) — lekin veb-kassa **to'
 
 - `platform_admins` (id, **`user_id` → `users`**, role, **`mfa_secret_encrypted`**, **`allowed_ips`** (ixtiyoriy, CIDR ro'yxati)) — platforma admini oddiy `users` hisobiga bog'lanadi (parol — `user_credentials.password_hash`, boshqa foydalanuvchilar bilan bir xil argon2id), lekin `admin-bff` login'da **majburiy ikkinchi faktor — TOTP** (RFC 6238, 30 s, 6 raqam — standart; WebAuthn — MVP'dan keyin) talab qilinadi; `allowed_ips` berilgan bo'lsa, shundan tashqari IP'dan login rad etiladi.
 - Admin token: `aud: "urn:erp:platform"` (tenant API'nikidan — `urn:erp:api` — **qat'iy farqli**), `scope: platform.admin`, **`tenant_id`siz**. Tenant API'lari `aud=urn:erp:platform` tokenni avtomatik rad etadi, va aksincha — platforma endpoint'lari `aud=urn:erp:api` tokenni rad etadi.
-- Platforma endpoint'lari **`/platform/*`** prefiksida (tenant Egasining `/admin/users` bilan endi aralashmaydi).
+- Platforma endpoint'lari **`/platform/*`** prefiksida (tenant `/admin/users` dan alohida).
 - `admin-bff` — alohida `client_id` (mavjud), access token muddati **5 daqiqa** (standart, sozlanadi; tenant tokenidan qisqa — yuqori huquqli rol), refresh — **8 soat mutlaq** (sliding yo'q — har smena boshida qayta login).
 
 Mavjud ADM-01 (`06-ekranlar-umumiy.md`) ustiga qo'shiladi:
@@ -514,7 +532,9 @@ Mavjud BO-11 ("Foydalanuvchilar va huquqlar" + "Qurilmalar" tab) ustiga quyidagi
 
 | Amal | Ekran | API |
 |---|---|---|
-| Xodim qo'shish/bloklash (mavjud) | BO-11 | `POST /admin/users`, `PATCH /admin/users/{id}` (`status`) — **`status='blocked'` qo'yilganda shu foydalanuvchining barcha `sessions`/`refresh_tokens` oilasi darhol revoke qilinadi + Redis `sid`-revoke keshi yangilanadi** (US-M13-05 talabi, keyingi so'rov emas — hozir) |
+| Xodimlar ro'yxati | BO-11 | `GET /admin/users` → `{items:[{user_id, name, phone, role_ids, branch_ids, status, last_login_at}], next_cursor}` (`17` §4 cursor sahifalash) |
+| Xodim qo'shish | BO-11 | `POST /admin/users` — tana `{phone, name, role_ids, branch_ids}` → `memberships(status='active')` + taklif OTP (`purpose=invite`, 4.2-bo'lim) — xodim kod bilan o'z parol/PIN'ini o'rnatadi; telefon `users` da bo'lsa mavjud `user_id` bog'lanadi |
+| Xodimni bloklash | BO-11 | `PATCH /admin/users/{id}` (`status`) — **`status='blocked'` qo'yilganda shu foydalanuvchining barcha `sessions`/`refresh_tokens` oilasi darhol revoke qilinadi + Redis `sid`-revoke keshi yangilanadi** (US-M13-05 talabi, keyingi so'rov emas — hozir) |
 | Rol/filial tayinlash (mavjud) | BO-11 | `PATCH /admin/users/{id}` (`role_ids`, `branch_ids`) — tayinlashdan keyin foydalanuvchining `sid`i "claims stale" deb belgilanadi (5-bo'lim) |
 | **PIN'ni qayta o'rnatish** | BO-11, xodim qatoridagi "PIN'ni qayta o'rnatish" tugmasi | `POST /admin/users/{id}/reset-pin` — eski `pin_hash` bekor, xodim keyingi kirishda yangi PIN o'rnatishga majburlanadi (`16-offline-sync.md` §9'dagi qurilma-bekor-qilish PIN majburiy almashtirish bilan bir xil naqsh); `otp_challenges.purpose='pin_reset'` (4.2-bo'lim) |
 | **Parolni tiklash (Egasi tomonidan)** | BO-11, xodim qatoridagi "Parolni tiklash" tugmasi | `POST /admin/users/{id}/reset-password` — eski `password_hash` bekor qilinadi, barcha sessiya/refresh-token oilasi revoke qilinadi, xodimga SMS orqali **bir martalik tiklash kodi** (`purpose=admin_reset`) yuboriladi; xodim kod bilan o'zi yangi parol o'rnatadi — **parol hech qachon SMS'da ochiq matnda yuborilmaydi** |
@@ -530,10 +550,10 @@ Bu amallar `settings.users` ruxsat kodi ostida (`15-xavfsizlik-va-audit.md` §2.
 
 | Jadval | Asosiy ustunlar | Izoh |
 |---|---|---|
-| `users` (mavjud, tozalanadi) | id, phone (unique), name, locale | Parol/PIN heshlari `user_credentials`ga ko'chirildi |
+| `users` | id, phone (unique), name, locale | Parol/PIN heshlari `user_credentials` da |
 | `user_credentials` | user_id (PK/FK), password_hash, password_algo, password_updated_at, pin_hash, pin_updated_at, failed_login_count, locked_until, **must_change_password**, **must_change_pin** | Sirlarni `users`dan ajratish — oddiy ro'yxat so'rovida heshlar oshkor bo'lmasin. Oxirgi ikki ustun — `admin_reset`/`pin_reset`/`invite` OTP tasdiqlangandan keyin `true`, yangi kredensial o'rnatilganda `false` (18.2-bo'lim) |
 | `memberships` (mavjud) | — | O'zgarmaydi |
-| `oauth_clients` | id, client_id, client_type (`confidential`/`public`), name, client_secret_encrypted (null=public), redirect_uris[], allowed_grant_types[], allowed_scopes[] | 2-bo'limdagi 5 mijoz shu yerda ro'yxatga olinadi (`onec-agent` — bitta seed yozuvi; har agentning `onec-agent:<agent_id>` client_id'si `onec_agents.client_id`da, §2.3) |
+| `oauth_clients` | id, client_id, client_type (`confidential`/`public`), name, client_secret_encrypted (NULL = `public` mijoz yoki `status='pending_secret'`), redirect_uris[], allowed_grant_types[], allowed_scopes[] | 2-bo'limdagi 5 mijoz shu yerda ro'yxatga olinadi (`onec-agent` — bitta seed yozuvi; har agentning `onec-agent:<agent_id>` client_id'si `onec_agents.client_id`da, §2.3) |
 | `authorization_codes` | code_hash, client_id, user_id, tenant_id, code_challenge, code_challenge_method, redirect_uri, scope, expires_at (60s), used_at | Bir martalik |
 | `refresh_tokens` | id, token_hash, family_id, client_id, user_id, tenant_id, device_id (null), scope, issued_at, expires_at, used_at, replaced_by_id, revoked_at, **revoked_reason**, **suspended_at** | 7-bo'lim. `suspended_at` — `revoked_at`dan **farqli**: `revoked_reason='subscription'` bilan birga qo'yiladi (16.1.3-bo'lim), to'liq bekor qilish emas, faqat `scope=sync.drain`ga toraytiradi (16.4-bo'lim); to'lovdan keyin tozalanadi (`NULL`) — token qayta yaratilmaydi |
 | `sessions` | id (=`sid`), user_id, tenant_id, client_id, device_id (null), current_refresh_token_id, created_at, last_seen_at, idle_expires_at, absolute_expires_at, revoked_at, revoked_reason, ip, user_agent | BFF cookie shu yozuvga ishora qiladi |
@@ -546,7 +566,33 @@ Bu amallar `settings.users` ruxsat kodi ostida (`15-xavfsizlik-va-audit.md` §2.
 | `onec_device_authorizations` (`auth` sxemasi) | id, device_code_hash, user_code, client_id, scope, public_jwk, public_key_thumbprint, machine_hash, pc_name, os_version, agent_version, request_ip, status (`pending`/`approved`/`denied`/`consumed`/`expired`), tenant_id, approved_by, approved_at, agent_id, poll_interval_s, last_poll_at, expires_at | §2.3 — RFC 8628 holati; to'liq DDL va SECURITY DEFINER funksiyalar — `33-1c-integratsiya.md` §5.18 |
 | `platform_admins` | id, **user_id** (→ `users`), role, **mfa_secret_encrypted**, **allowed_ips** | Kredensial `user_id` orqali `user_credentials`dan keladi, MFA majburiy |
 
-**RLS**: `user_credentials` (foydalanuvchi global, hali tenant tanlanmagan bo'lishi mumkin), `otp_challenges` (ro'yxatdan o'tishda tenant hali yo'q), `login_attempts` (phone/ip — tenant kontekstidan tashqari), `authorization_codes`/`refresh_tokens`/`sessions` (tenant kontekstidan **oldin** `code_hash`/`token_hash` bo'yicha qidiriladi) — bu jadvallarda oddiy `tenant_id` RLS **ishlamaydi yoki AS'ni sindiradi** (login paytida `app.tenant_id` hali o'rnatilmagan). Shuning uchun: `oauth_clients`, `signing_keys` — platforma darajasida global (`plans`/`units` kabi istisno, faqat SELECT ilova roliga). **`user_credentials`, `otp_challenges`, `login_attempts`, `authorization_codes`, `refresh_tokens`, `sessions`, `onec_device_authorizations`** — **auth-sxema jadvallari**: alohida PostgreSQL `auth` sxemasida, ilova (`app`) roliga to'g'ridan-to'g'ri `SELECT`/`INSERT`/`UPDATE` ruxsati **yo'q**, kirish faqat `SECURITY DEFINER` funksiyalar orqali (`auth_find_user_by_phone(phone)`, `auth_consume_code(code_hash)`, `auth_rotate_refresh(token_hash)`, `auth_revoke_tenant(tenant_id)`, `auth_suspend_tenant(tenant_id)` — 16.1.3 uchun, `onec_device_auth_start/lookup/approve/poll`, `onec_agent_credentials` — §2.3 uchun, va h.k.) — bu funksiyalar o'z ichida kerakli `tenant_id`/`user_id` tekshiruvini bajaradi. **`license_tokens`** — bu alohida: tenant/qurilma konteksti login'dan **keyin** mavjud, shuning uchun standart `tenant_id` RLS siyosati qo'llaniladi. CI RLS testi (`15-xavfsizlik-va-audit.md` §3.3) auth-sxema jadvallarini **istisno** sifatida (RLS o'rniga SECURITY DEFINER funksiya qamrovi tekshiriladi), `license_tokens`ni esa **standart** ro'yxatda tekshiradi.
+**RLS**: `user_credentials` (foydalanuvchi global, hali tenant tanlanmagan bo'lishi mumkin), `otp_challenges` (ro'yxatdan o'tishda tenant hali yo'q), `login_attempts` (phone/ip — tenant kontekstidan tashqari), `authorization_codes`/`refresh_tokens`/`sessions` (tenant kontekstidan **oldin** `code_hash`/`token_hash` bo'yicha qidiriladi) — bu jadvallarda oddiy `tenant_id` RLS **ishlamaydi yoki AS'ni sindiradi** (login paytida `app.tenant_id` hali o'rnatilmagan). Shuning uchun: `oauth_clients`, `signing_keys` — platforma darajasida global (`plans`/`units` kabi istisno, faqat SELECT ilova roliga). **`user_credentials`, `otp_challenges`, `login_attempts`, `authorization_codes`, `refresh_tokens`, `sessions`, `onec_device_authorizations`** — **auth-sxema jadvallari**: alohida PostgreSQL `auth` sxemasida, ilova (`app`) roliga to'g'ridan-to'g'ri `SELECT`/`INSERT`/`UPDATE` ruxsati **yo'q**, kirish faqat `SECURITY DEFINER` funksiyalar orqali (to'liq ro'yxat — quyida, imzolar `12` §4.5 bilan aynan) — bu funksiyalar o'z ichida kerakli `tenant_id`/`user_id` tekshiruvini bajaradi. **`license_tokens`** — bu alohida: tenant/qurilma konteksti login'dan **keyin** mavjud, shuning uchun standart `tenant_id` RLS siyosati qo'llaniladi. CI RLS testi (`15-xavfsizlik-va-audit.md` §3.3) auth-sxema jadvallarini **istisno** sifatida (RLS o'rniga SECURITY DEFINER funksiya qamrovi tekshiriladi), `license_tokens`ni esa **standart** ro'yxatda tekshiradi.
+
+**Auth `SECURITY DEFINER` funksiyalari** (sxema `app`, egasi `erp_system`, `REVOKE ALL … FROM PUBLIC`, `GRANT EXECUTE … TO erp_app`; `12` §4.5):
+
+| Funksiya | Imzo | Mazmuni |
+|---|---|---|
+| `auth_find_user_by_phone` | `(p_phone text)` | Login: telefon bo'yicha foydalanuvchi va kredensial (argon2id tekshiruvi ilovada) |
+| `auth_list_memberships` | `(p_user_id uuid)` | Login: foydalanuvchining tenant a'zoliklari (tenant tanlash) |
+| `auth_issue_code` | `(p_code_hash text, p_client_id uuid, p_user_id uuid, p_tenant_id uuid, p_code_challenge text, p_redirect_uri text, p_scope text, p_ttl_s int) RETURNS void` | `authorization_codes` INSERT, `expires_at = now() + p_ttl_s` (standart 60) |
+| `auth_consume_code` | `(p_code_hash text)` | Kodni bir martalik iste'mol qilish (`used_at`) |
+| `auth_issue_tokens` | `(p_user_id uuid, p_tenant_id uuid, p_client_id uuid, p_device_id uuid, p_refresh_token_hash text, p_refresh_expires_at timestamptz, p_scope text, p_with_session boolean, p_idle_expires_at timestamptz, p_absolute_expires_at timestamptz, p_ip inet, p_user_agent text) RETURNS TABLE (session_id uuid, refresh_token_id uuid, family_id uuid)` | Bitta tranzaksiyada yangi `family_id = app.uuidv7()` bilan birinchi `refresh_tokens` qatori; `p_with_session=true` (BFF mijozlari) — `sessions` qatori (`current_refresh_token_id` = shu token); Android (public client) — `false`, `session_id = NULL` |
+| `auth_rotate_refresh` | `(p_token_hash text, p_new_token_hash text, p_new_expires_at timestamptz)` | Refresh rotatsiyasi va qayta ishlatishni aniqlash (7-bo'lim) |
+| `auth_session_by_id` | `(p_session_id uuid) RETURNS TABLE (session_id uuid, user_id uuid, tenant_id uuid, client_id uuid, device_id uuid, current_refresh_token_id uuid, idle_expires_at timestamptz, absolute_expires_at timestamptz, revoked_at timestamptz)` | BFF `__Host-sid` bo'yicha sessiyani o'qiydi (Redis keshi bo'sh bo'lganda) |
+| `auth_touch_session` | `(p_session_id uuid, p_idle_expires_at timestamptz) RETURNS void` | `last_seen_at = now()`, sliding `idle_expires_at` |
+| `auth_otp_create` | `(p_phone text, p_purpose text, p_channel text, p_code_hash text, p_ttl_s int) RETURNS uuid` | `otp_challenges` INSERT (TTL standart 300, qaror #54); shu `(phone, purpose)` dagi oldingi tasdiqlanmagan challenge'lar `expires_at = now()` |
+| `auth_otp_verify` | `(p_challenge_id uuid, p_code_hash text) RETURNS text` | `'ok'` (`verified_at = now()`), `'invalid'` (`attempts += 1`), `'expired'`, `'locked'` (`attempts >= max_attempts`), `'used'` (`verified_at` bor) |
+| `auth_record_login` | `(p_phone text, p_ip inet, p_success boolean, p_failure_reason text) RETURNS TABLE (failed_login_count int, locked_until timestamptz)` | `login_attempts` INSERT; foydalanuvchi topilsa `user_credentials`: muvaffaqiyatda `failed_login_count = 0, locked_until = NULL`; xatoda `+1`, 5 xato/15 daq oynasida progressiv blok 1→5→15→60 daqiqa (qaror #54) |
+| `auth_set_credentials` | `(p_user_id uuid, p_password_hash text, p_pin_hash text) RETURNS void` | UPSERT `user_credentials`; NULL argument — o'sha maydon o'zgarmaydi; berilganda `*_updated_at = now()`, mos `must_change_* = false` |
+| `auth_reset_credentials` | `(p_user_id uuid, p_reset_password boolean, p_reset_pin boolean) RETURNS void` | Tanlangan hash `NULL`, `must_change_* = true`; `p_reset_password=true` bo'lsa foydalanuvchining barcha sessiya/refresh oilasi revoke (`revoked_reason='credential_reset'`) |
+| `auth_get_pin_hash` | `(p_user_id uuid) RETURNS TABLE (pin_hash text, must_change_pin boolean)` | `/auth/pin/verify` uchun |
+| `auth_revoke_session` | `(p_session_id uuid, p_reason text) RETURNS void` | Sessiya + uning `current_refresh_token_id` oilasi revoke |
+| `auth_revoke_user` | `(p_user_id uuid, p_tenant_id uuid, p_reason text) RETURNS int` | Foydalanuvchining (`p_tenant_id` berilsa — faqat shu tenantdagi) barcha sessiya/refresh tokenlari revoke; qaytaradi — revoke qilingan sessiyalar soni |
+| `auth_list_user_sessions` | `(p_user_id uuid, p_tenant_id uuid) RETURNS TABLE (session_id uuid, client_id uuid, device_id uuid, created_at timestamptz, last_seen_at timestamptz, ip inet, user_agent text)` | `GET /admin/users/{id}/sessions` (faol, revoke qilinmagan) |
+| `auth_revoke_tenant` | `(p_tenant_id uuid, p_reason text)` | Tenant bo'yicha barcha sessiya/refresh tokenlar revoke (insident, 18.1) |
+| `auth_suspend_tenant` | `(p_tenant_id uuid, p_suspend boolean)` | `true` — `refresh_tokens.suspended_at = now()`, `revoked_reason = 'subscription'` (`sessions` o'zgarmaydi); `false` — tozalash (16.1.3, 16.1.5) |
+| `auth_telegram_chat_by_phone` | `(p_phone text) RETURNS text` | `app.users.phone = p_phone` → `app.telegram_links` (`revoked_at IS NULL`), eng oxirgi `linked_at` dagi `chat_id`; topilmasa NULL (4.2-bo'lim) |
+| `onec_device_auth_start`, `onec_device_auth_lookup`, `onec_device_auth_approve`, `onec_device_auth_poll`, `onec_device_auth_deny`, `onec_agent_credentials` | `12` §4.5 / `33-1c-integratsiya.md` §5.18 | 1C/do'kon agenti device grant va `private_key_jwt` (§2.3); `onec_device_auth_approve` natijasi — `approved|not_found|expired|used` |
 
 ---
 
@@ -562,7 +608,7 @@ Bu amallar `settings.users` ruxsat kodi ostida (`15-xavfsizlik-va-audit.md` §2.
 | `/oauth/revoke` | POST | AS | RFC 7009 |
 | `/oauth/introspect` | POST | AS | RFC 7662 (faqat confidential mijozlar) |
 | `/auth/login` | POST | BFF | Telefon+parol → ichki kod+token almashinuvi → cookie |
-| `/auth/signup` | POST | BFF | `{phone, otp_challenge_id (purpose=signup, verified), password, store_name, business_type}` → bitta tranzaksiyada `15-xavfsizlik-va-audit.md` §1.5 provisioning (tenant, `subscriptions(status=trial, 30 kun)`, Egasi membership, 5 rol, standart filial/ombor/kassa, `doc_sequences`, standart xarajat toifalari) + login cookie; xatolar `OTP_INVALID`, `VALIDATION_ERROR` (telefon allaqachon ro'yxatda), `RATE_LIMITED` |
+| `/auth/signup` | POST | BFF | `{phone, otp_challenge_id (purpose=signup, verified), password, owner_name (2–100), store_name, business_type, legal_form (llc|jsc|private_enterprise|sole_proprietor), accepted_terms_version (majburiy — joriy `platform.terms_versions` (`kind='terms'`, `is_current`) bilan mos bo'lmasa `422 VALIDATION_ERROR`), ai_cross_border_consent? (bool)}`; server `tenants.accepted_terms_at`, `accepted_terms_ip` ni yozadi → bitta tranzaksiyada `15-xavfsizlik-va-audit.md` §1.5 provisioning (tenant, `subscriptions(status=trial, 30 kun)`, Egasi membership, 5 rol, standart filial/ombor/kassa, `doc_sequences`, standart xarajat toifalari) + login cookie; xatolar `OTP_INVALID`, `VALIDATION_ERROR` (telefon allaqachon ro'yxatda), `RATE_LIMITED` |
 | `/auth/otp/request` | POST | BFF/AS | Signup/recovery OTP yuborish — kanal avtomatik tanlanadi (Telegram birinchi, SMS zaxira, §4.2); javobda `channel_used` |
 | `/auth/otp/verify` | POST | BFF/AS | OTP tasdiqlash |
 | `/auth/google/start` | GET | BFF | Google OIDC redirect boshlash (§2.2) |
@@ -577,7 +623,7 @@ Bu amallar `settings.users` ruxsat kodi ostida (`15-xavfsizlik-va-audit.md` §2.
 | `/billing/checkout` | POST | BFF/RS | `active`/`grace`da oddiy sessiya; `restricted`/`closed`da `pay_token` (`Authorization: PayToken ...`) bilan — ikkisida ham lokaut ro'yxatida ochiq, aks holda tenant to'lov qila olmay qoladi (16.1.1a-bo'lim) |
 | `GET /billing/plan`, `/subscription`, `/addons`, `/payments` | GET | BFF/RS | Lokaut holatida ham ochiq (o'qish, 16.1-bo'lim) |
 | `/billing/webhooks/{provider}` | POST | RS | Provayder imzosi bilan, sessiyadan mustaqil — lokautda ham ochiq |
-| `/billing/export-my-data` | POST/GET | BFF | Login+SMS OTP tasdiqlangandan keyin bir martalik eksport havolasi (16.5-bo'lim) |
+| `/billing/export-my-data` | POST/GET | BFF | Login + OTP (`purpose=data_export`) — Telegram birinchi, SMS zaxira (qaror #34) — tasdiqlangandan keyin bir martalik eksport havolasi; faqat `billing.manage` (Egasi) (16.5-bo'lim) |
 | `/platform/tenants...` | GET/POST | RS (platform, `aud=urn:erp:platform`) | 18.1-bo'lim |
 | `/platform/tenants/{id}/owner/...` | GET/POST | RS (platform) | US-M13-08, Egasi hisobi boshqaruvi (18.1-bo'lim) |
 | `/admin/users...` | GET/POST/PATCH | RS (tenant) | 18.2-bo'lim |
@@ -594,7 +640,7 @@ Vazifa talabi: **hech qanday mock** — haqiqiy PostgreSQL va Redis (`testcontai
 | Test | Tekshiradi |
 |---|---|
 | To'liq Authorization Code+PKCE oqimi | `code_verifier`/`code_challenge` mos kelmasa rad; `redirect_uri` mos kelmasa rad; kod bir martalik (ikkinchi marta ishlatilsa rad) |
-| Refresh rotatsiyasi | Bir marta ishlatilgan RT yangi RT beradi; eski RT qayta kelsa — butun oila bekor, keyingi legitim refresh ham endi muvaffaqiyatsiz |
+| Refresh rotatsiyasi | Bir marta ishlatilgan RT yangi RT beradi; eski RT qayta kelsa — butun oila bekor, keyingi legitim refresh ham muvaffaqiyatsiz |
 | Revoke | `/oauth/revoke` dan keyin shu `sid`li, hali `exp`i tugamagan JWT bilan so'rov rad etiladi (Redis `sid`-revoke tekshiruvi orqali, nafaqat `exp`) |
 | Introspect | Revoke'dan keyin `active: false` |
 | **Obuna lokaut** | `grace` → `restricted` o'tganda: (a) refresh so'rovi rad etiladi (`sync.drain`dan tashqari), (b) hali amal qiladigan eski access token bilan so'rov Redis kesh orqali rad etiladi, (c) to'lov kelgach kesh darhol yangilanadi va login muvaffaqiyatli bo'ladi |
@@ -606,7 +652,7 @@ Vazifa talabi: **hech qanday mock** — haqiqiy PostgreSQL va Redis (`testcontai
 | **Platforma admin MFA** | TOTP kodi noto'g'ri bo'lsa login rad etiladi; `aud=urn:erp:platform` token bilan tenant API so'rovi 403, va aksincha |
 | **Tenant almashtirish (9-bo'lim)** | Tenant almashtirilganda eski `sid`/refresh-token oilasi bekor bo'ladi; bitta cookie bilan ikki tenant parallel ishlay olmaydi |
 | RLS | Yangi jadvallar (19-bo'lim) `15-xavfsizlik-va-audit.md` §3.3'dagi "har jadvalda RLS" CI testiga kiradi; cross-tenant leak testi. Auth-sxema jadvallari — `SECURITY DEFINER` funksiya qamrovi alohida tekshiriladi |
-| **1C agenti (§2.3)** | Device grant: `authorization_pending` → tasdiqdan keyin bir martalik token (ikkinchi poll rad); `slow_down`; muddati o'tgan `user_code` W-04'da `ONEC_PAIRING_CODE_EXPIRED`. `private_key_jwt`: noto'g'ri imzo, `exp > iat + 60`, takror `jti` — rad. Agent tokeni bilan `/api/v1/*` tenant endpoint'i rad, foydalanuvchi tokeni bilan `/api/v1/onec-agent/*` rad. Revoke'dan keyin ≤ 60 s ichida `403 ONEC_AGENT_REVOKED` va `invalid_client`. `restricted` tenant: token beriladi, `hello`/`poll` 403, `result` qabul qilinadi |
+| **1C agenti (§2.3)** | Device grant: `authorization_pending` → tasdiqdan keyin bir martalik token (ikkinchi poll rad); `slow_down`; W-04 `app.onec_device_auth_approve` natijalari `approved|not_found|expired|used` (`12` §4.5) — `expired` → `ONEC_PAIRING_CODE_EXPIRED`. `private_key_jwt`: noto'g'ri imzo, `exp > iat + 60`, takror `jti` — rad. Agent tokeni bilan `/api/v1/*` tenant endpoint'i rad, foydalanuvchi tokeni bilan `/api/v1/onec-agent/*` rad. Revoke'dan keyin ≤ 60 s ichida `403 ONEC_AGENT_REVOKED` va `invalid_client`. `restricted` tenant: token beriladi, `hello`/`poll` 403, `result` qabul qilinadi |
 | Kalit rotatsiyasi | Eski `kid` bilan imzolangan token rotatsiyadan keyin ham retirement oynasi ichida tasdiqlanadi; yangi tokenlar yangi `kid` bilan; JWKS ikkisini ham ko'rsatadi overlap davrida |
 
 ---
@@ -619,7 +665,7 @@ Vazifa talabi: **hech qanday mock** — haqiqiy PostgreSQL va Redis (`testcontai
 
 - `spec/kod-uchun/10-umumiy-arxitektura.md`, `11-malumotlar-modeli.md`, `15-xavfsizlik-va-audit.md`, `16-offline-sync.md`, `24-frontend-arxitekturasi.md`, `23-backend-arxitekturasi.md`.
 - `spec/kod-uchun/03-modullar-talablari.md` (M13, M17 — US-M17-03), `06-ekranlar-umumiy.md` (BO-11, BO-21, ADM-01).
-- `spec/kod-uchun/01-qarorlar.md` (#3 veb-kassa autentifikatsiyasi, #4 CSRF, #13 obuna holati).
+- `spec/kod-uchun/01-qarorlar.md` (#14 veb-kassa autentifikatsiyasi, #3 — 401 qayta kirish qismi, #4 CSRF, #13 obuna holati).
 - RFC 6749 (OAuth 2.0), RFC 7636 (PKCE), RFC 8628 (Device Authorization Grant), RFC 7523 (JWT client authentication — `private_key_jwt`), RFC 7638 (JWK Thumbprint), RFC 7009 (Token Revocation), RFC 7662 (Token Introspection), RFC 8414 (Authorization Server Metadata), RFC 9068 (JWT Profile for OAuth 2.0 Access Tokens), RFC 8252 (OAuth 2.0 for Native Apps).
 - Authlib (https://authlib.org), joserfc — kutubxona tanlovi asosi.
 - `research_notes/ochiq-savollar/D-qarorlar-va-E-standartlar.md` (qarorlar #44, #54–#56), `01-qollash-yoriqnomasi.md` A.1, A.16.

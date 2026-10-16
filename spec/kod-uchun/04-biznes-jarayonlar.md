@@ -96,9 +96,9 @@ Manba: `02-kassa-ofd-markirovka.md` (fiskal chek, MXIK), `research_notes/ochiq-s
 flowchart TD
     A["1-3. Tovar tanlash, markirovka,\nchegirma — BP-02 bilan bir xil"] --> B["4. Kassir 'nasiya' usulini tanlaydi,\nmijoz tanlanadi/yaratiladi"]
     B --> C{"Mijoz yuridik\nshaxs (B2B)?"}
-    C -- "Ha" --> D["5a. E-faktura ham chiqariladi\n(B2B yoki bank o'tkazmasi bilan to'lovchi YaTT)"]
+    C -- "Ha" --> D["5a. E-faktura ham chiqariladi\n(counterparty.kind='company';\nSTIR'li YaTT mijoz company sifatida kiritiladi)"]
     C -- "Yo'q" --> E["5b. E-faktura yo'q"]
-    D --> F["6. Sotuv hujjati yoziladi\n(tovar qatorlari, qoldiq −);\nFISKAL CHEK HALI CHIQARILMAYDI\n(holat: deferred)"]
+    D --> F["6. Sotuv hujjati yoziladi\n(tovar qatorlari, qoldiq −);\nFISKAL CHEK HALI CHIQARILMAYDI\n(sotuv posted,\nfiscal.status='deferred')"]
     E --> F
     F --> G["7. Debitorlik qarzi ochiladi,\nto'lov muddati belgilanadi (M08)"]
     G --> H["8. To'lov muddati yaqinlashganda AI\neslatma loyihasini tayyorlaydi,\nMenejer/Buxgalter tasdiqlab yuboradi"]
@@ -110,12 +110,12 @@ flowchart TD
 | 1-3 | Kassir | M01, M04, M03 | — | Asl belgisi, MXIK | BP-02 bilan bir xil |
 | 4 | Kassir | M08 | Mijoz kartasi | — | — |
 | 5a | Tizim | M08, M10 | E-faktura (agar B2B) | E-faktura, E-IMZO | — |
-| 6 | Tizim | M01, M08 | Sotuv hujjati (`deferred`) — fiskal chek to'lovda chiqadi (qaror #30); sotuv paytidagi "kredit" turidagi chek — `FiscalPolicy.credit_sale_receipt` (standart `none`) | — | Ombor kamayadi; savdo daromadi va QQS majburiyati **sotuv kuni** tan olinadi (SK 242, 78-modda; BHMS 2; `13-provodka-qoidalari.md` §2.14, qaror #30). Provodka sanasi (sotuv kuni) ≠ fiskal chek sanasi (to'lov kuni, BP-11) |
+| 6 | Tizim | M01, M08 | Sotuv hujjati (sotuv `posted`, `fiscal.status='deferred'`) — fiskal chek to'lovda chiqadi (qaror #30); sotuv paytidagi "kredit" turidagi chek — `FiscalPolicy.credit_sale_receipt` (standart `none`) | — | Ombor kamayadi; savdo daromadi va QQS majburiyati **sotuv kuni** tan olinadi (SK 242, 78-modda; BHMS 2; `13-provodka-qoidalari.md` §2.14, qaror #30). Provodka sanasi (sotuv kuni) ≠ fiskal chek sanasi (to'lov kuni, BP-11) |
 | 7 | Tizim | M08 | Nasiya hujjati | — | Debitorlik qarzi ortadi (pul o'rniga) |
 | 8 | Tizim (AI) / Menejer | M08 | Eslatma matni (loyiha) | — | Effekt yo'q — AI faqat matn loyihasini tayyorlaydi, odam tasdiqlagandan keyin yuboriladi (AI-06, `09-ai-funksiyalar.md`) |
 | 9 | — | M08 | **Fiskal chek shu yerda chiqadi** | — | Davomi BP-11'da (nasiya qarzini undirish) |
 
-Manba: `03-efaktura-va-tolov.md` (B2B e-faktura), `research_notes/ochiq-savollar/P1-soliq-fiskal.md` (OQ-002), `P2-efaktura-markirovka.md` (OQ-022); qaror #30, #42. B2C — e-faktura chiqarilmaydi (kassa cheki EHF o'rnini bosadi, SK 47-modda 3-qism, VM 489 3-band); B2B (`counterparty.kind=company`) va bank o'tkazmasi bilan to'laydigan YaTT — e-faktura majburiy. Sotuv paytida "kredit" turidagi chek majburiyligi va OFD chek turi kodi — Tashqi javob kerak: 26 #9 (OQ-002).
+Manba: `03-efaktura-va-tolov.md` (B2B e-faktura), `research_notes/ochiq-savollar/P1-soliq-fiskal.md` (OQ-002), `P2-efaktura-markirovka.md` (OQ-022); qaror #30, #42. B2C — e-faktura chiqarilmaydi (kassa cheki EHF o'rnini bosadi, SK 47-modda 3-qism, VM 489 3-band); e-faktura — `counterparty.kind='company'` (STIR'li YaTT mijoz `company` sifatida kiritiladi) uchun majburiy. Sotuv paytida "kredit" turidagi chek majburiyligi va OFD chek turi kodi — Tashqi javob kerak: 26 #9 (OQ-002).
 
 ---
 
@@ -139,8 +139,8 @@ flowchart TD
 | 2a | Kassir | M02, M04 | Qaytarish chekidagi markirovka kodi — OFD orqali Asl belgisiga (VM 833 90-band) | Asl belgisi (OFD orqali) | — |
 | 3 | Tizim | M01, M02 | Korrektsiya cheki | Virtual kassa/OFD, MXIK | Savdo daromadi kamayadi |
 | 4 | Kassir | M02 | To'lov qaytarish kvitansiyasi | To'lov tizimi (karta bo'lsa) | Pul mablag'i kamayadi |
-| 5 | Omborchi | M04 | Ichki kirim hujjati | — | Ombor qoldig'i ortadi |
-| 6 | Buxgalter | M10, M11 | Avtomatik provodka | — | QQS majburiyati mos ravishda qayta hisoblanadi |
+| 5 | Tizim | M04 | `returns` posting — `stock_moves +qty` asl partiyaga; `restock=false` (muddati o'tgan, qaror #48) bo'lsa shu miqdor `stock_lots.blocked_qty` ga va `write_offs` qoralamasi | — | Ombor qoldig'i ortadi |
+| 6 | Tizim | M10, M11 | Avtomatik provodka | — | QQS majburiyati mos ravishda qayta hisoblanadi |
 
 Manba: `02-kassa-ofd-markirovka.md`, `research_notes/ochiq-savollar/P2-efaktura-markirovka.md` (OQ-026). **Markirovkalangan tovarni qaytarish faqat internet bor paytda (online) amalga oshiriladi** — qonundan qat'iyroq ichki tanlov (kod holatini tekshirish, firibgarlik xavfi), offline rejimda bloklanadi (`03-modullar-talablari.md`, M02 Offline xatti-harakati). Muddati o'tgan tovar qaytarilsa — `returns.approve` bilan, `restock=false`, avtomatik `write_offs` qoralamasi (sabab `expired_return`) (qaror #48). 48 soatlik offline blokda qaytarish cheki ham chiqarilmaydi (qaror #43).
 
@@ -200,9 +200,10 @@ Manba: `00-xulosa-va-ochiq-savollar.md`.
 
 ```mermaid
 flowchart TD
-    A["1. Har savdo/xaridda QQS\navtomatik ajratib hisoblanadi"] --> B["2. Kiruvchi e-fakturalar AI\nxavf-baholashdan o'tadi"]
+    A["1. Har savdo/xaridda QQS\navtomatik ajratib hisoblanadi"] --> B["2. Kiruvchi e-fakturalar: davlat\nxavf-baholashi (VM 830) / qo'lda belgi"]
     B --> C{"Faktura\nxavf darajasi?"}
     C -- "Yashil" --> D["3a. QQS krediti darhol\nolinadi"]
+    C -- "Noma'lum (unknown)\n— qizil kabi" --> E
     C -- "Qizil" --> E["3b. QQS krediti to'lov\namalga oshirilgunga qadar kechiktiriladi"]
     D --> F["4. Davr yakunida QQS balansi\n(to'lash/qaytarish) ichki hisoblanadi"]
     E --> F
@@ -215,7 +216,7 @@ flowchart TD
 | 3a/3b | Buxgalter | M10 | — | — | QQS krediti olinadi yoki kechiktiriladi |
 | 4 | Buxgalter | M10, M11 | Soliq hisob-kitobi hujjati (`tax_settlements`, ST, `tax_kind='vat_offset'`) — server qoralamani hisoblaydi, Buxgalter o'tkazadi; aylanma solig'i to'lovchida `tax_kind='turnover_tax'` | — | QQS: hisobga olinadigan QQS chiquvchi QQS bilan yopiladi (Dt 6410 / Kt 4410); aylanma solig'i: xarajat va budjetga qarz (Dt 9430 / Kt 6410) — `13-provodka-qoidalari.md` §2.26, §4.3 |
 
-Manba: `03-efaktura-va-tolov.md` (davlat xavf-baholashi, ≤10% cheklov, VM Qarori №830-son — 1.2-band). *Eslatma: 2026-01-01 dan QQS deklaratsiyasining o'zini Soliq qo'mitasi tuzgani sababli, bu jarayonning natijasi endi "deklaratsiya topshirish" emas — BP-08'ga kirish ma'lumoti.*
+Manba: `03-efaktura-va-tolov.md` (davlat xavf-baholashi, ≤10% cheklov, VM Qarori №830-son — 1.2-band). *Eslatma: 2026-01-01 dan QQS deklaratsiyasining o'zini Soliq qo'mitasi tuzgani sababli, bu jarayonning natijasi "deklaratsiya topshirish" emas — BP-08'ga kirish ma'lumoti.*
 
 ---
 
@@ -224,7 +225,7 @@ Manba: `03-efaktura-va-tolov.md` (davlat xavf-baholashi, ≤10% cheklov, VM Qaro
 ```mermaid
 flowchart TD
     A["1. 2026-01-01 dan soliq organlari\nQQS/aylanma/mol-mulk/yer/JShDS/\nijtimoiy soliq hisobotlarini o'zi\ntuzadi (foyda solig'i bundan mustasno)"] --> A1["1a. Hisobot tuzilgan/e'lon\nqilingan kundan keyingi kundan 5 ish\nkunlik hisoblagich ishga tushadi (topshirish\nmuddatidan oshmagan holda)"]
-    A0["0. 10-sanagacha: interaktiv ma'lumotlar\neslatmasi — tizim raqamlarni tayyorlaydi,\nBuxgalter kabinetga kiritadi"] --> A
+    A0["0. Har oyning 10-sanasi (ichki eslatma\nsanasi, sozlanadi; qonuniy muddat emas):\ninteraktiv ma'lumotlar eslatmasi — tizim raqamlarni tayyorlaydi,\nBuxgalter kabinetga kiritadi"] --> A
     A1 --> B["2. Buxgalter hisobot faylini kabinetdan\nyuklab olib tizimga yuklaydi\n(ommaviy API yo'q)"]
     B --> C["3. Ichki buxgalteriya ma'lumotlari\n(BP-06, BP-07) bilan avtomatik\nsolishtiriladi — FAQAT QQS va\naylanma solig'i bo'yicha"]
     C --> D{"Farq\nbormi?"}
@@ -237,7 +238,7 @@ flowchart TD
 
 | Qadam | Rol | Modul | Hujjat | Davlat tizimi | Buxgalteriya effekti |
 |---|---|---|---|---|---|
-| 0 | Tizim/Buxgalter | M10, M12 | Interaktiv ma'lumotlar eslatmasi (10-sanagacha): aylanma — soliq solinmaydigan daromad, chegirmalar, imtiyozlar; QQS — hisobga olinadigan QQS tuzatishlari, imtiyozlar | Soliq hisobotlari (my.soliq.uz) | — |
+| 0 | Tizim/Buxgalter | M10, M12 | Interaktiv ma'lumotlar eslatmasi (har oyning 10-sanasi — ichki eslatma sanasi, sozlanadi; qonuniy muddat emas): aylanma — soliq solinmaydigan daromad, chegirmalar, imtiyozlar; QQS — hisobga olinadigan QQS tuzatishlari, imtiyozlar | Soliq hisobotlari (my.soliq.uz) | — |
 | 1 | Davlat (tashqi) | — | Davlat tuzgan hisobot | Soliq hisobotlari (my.soliq.uz) | — |
 | 1a | Tizim | M12 | 5 ish kunlik hisoblagich (deadline obyekti, topshirish muddati bilan cheklangan) | — | — |
 | 2 | Buxgalter | M12 | Kabinetdan yuklab olingan hisobot fayli (PDF/Excel), tizimga yuklanadi | Soliq hisobotlari (my.soliq.uz) | — |

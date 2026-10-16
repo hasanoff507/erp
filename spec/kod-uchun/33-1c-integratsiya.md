@@ -96,7 +96,7 @@ Baza qo'shilgach va har `POST /onec-bases/{id}/checks` da server vazifalar zanji
 
 | `code` | Nima tekshiriladi | Qanday (vazifa) | `fail` / `warn` sharti | Xato kodi | Foydalanuvchi harakati |
 |---|---|---|---|---|---|
-| `com_registered` | `V8x.COMConnector` (8.5/8.3/8.2) kamida bitta bitlikda ro'yxatdan o'tgan (`comcntr.dll` yo'qligi — «Класс не зарегистрирован» / «Недопустимая строка с указанием класса», `0x800401F3`) | `probe` | hech qaysi bitlikda yo'q → fail | `ONEC_COM_NOT_REGISTERED` | Agentda [Tuzatish] — onboarding'da **bir martalik** UAC qadami (`regsvr32 "<bin>\comcntr.dll"`, kerakli bitlik uchun); agentning o'zi admin huquqisiz ishlaydi (qaror #38) |
+| `com_registered` | `V85.COMConnector` yoki `V83.COMConnector` kamida bitta bitlikda ro'yxatdan o'tgan (8.2 qo'llab-quvvatlanmaydi — faqat 8.2 platformasi bo'lsa `platform_version` → `ONEC_PLATFORM_VERSION_MISMATCH`) (`comcntr.dll` yo'qligi — «Класс не зарегистрирован» / «Недопустимая строка с указанием класса», `0x800401F3`) | `probe` | hech qaysi bitlikda yo'q → fail | `ONEC_COM_NOT_REGISTERED` | Agentda [Tuzatish] — onboarding'da **bir martalik** UAC qadami (`regsvr32 "<bin>\comcntr.dll"`, kerakli bitlik uchun); agentning o'zi admin huquqisiz ishlaydi (qaror #38) |
 | `bitness` | Baza ochiladigan platforma bitligi uchun mos worker va `comcntr.dll` bor | `probe` | ikkala worker ham ulana olmadi (bitlik xatosi) → fail | `ONEC_BITNESS_MISMATCH` | Mos bitlikdagi 1C platformasini o'rnatish yoki COM'ni ro'yxatdan o'tkazish |
 | `platform_version` | Platforma 8.3.x/8.5.x; klient-server bazada `comcntr` versiyasi server versiyasiga teng | `probe` | versiya nomuvofiq → fail | `ONEC_PLATFORM_VERSION_MISMATCH` | PK'dagi platformani server versiyasiga yangilash |
 | `connect` | Saqlangan ulanish satri va 1C foydalanuvchisi bilan `Connect` muvaffaqiyatli | `probe(base)` | ulanmadi → fail (kod sababga ko'ra) | `ONEC_AUTH_FAILED` / `ONEC_BASE_UNAVAILABLE` / `ONEC_BASE_LOCKED` / `ONEC_BASE_EXCLUSIVE` / `ONEC_NO_RIGHTS` / `ONEC_LICENSE_UNAVAILABLE` | Agent oynasida bazani tahrirlash, 1C'ni yopish va h.k. (§12) |
@@ -210,7 +210,7 @@ backend/app/modules/onec_integration/
 │   ├── content_hash.py      # JCS (RFC 8785) kanonik JSON → SHA-256 (§8.2)
 │   ├── object_spec.py       # ObjectSpec / QuerySpec / Value Pydantic modellari (§9.6–9.8) — JSON Schema manbasi
 │   ├── money.py             # ROUND_HALF_UP qoidalari (shared/money bilan bir xil, qaror #26)
-│   └── errors.py            # ONEC_* kodlari, sinfi (transient/unknown/config/validation/duplicate) (§12)
+│   └── errors.py            # ONEC_* kodlari, sinfi (transient/unknown/config/validation) (§12)
 ├── application/
 │   ├── ports.py             # kiruvchi portlar (pastda §4.3) + OneCChangeTracker (chiquvchi)
 │   ├── pairing.py           # PairingService — device grant tasdiqlash, agent/device yaratish, revoke
@@ -254,7 +254,7 @@ OAuth qismi (device authorization endpoint, `client_credentials` + `private_key_
 
 | Xizmat | Asosiy metodlar | Tranzaksiya / qulf |
 |---|---|---|
-| `PairingService` | `lookup(user_code)`, `approve(user_code, actor)`, `revoke(agent_id, actor, reason)`, `unpair_from_agent(agent)` | `tenant_transaction`; device auth jadvali faqat SECURITY DEFINER funksiyalar orqali (§5.18) |
+| `PairingService` | `lookup(user_code)`, `approve(user_code, actor)`, `deny(user_code, actor)`, `revoke(agent_id, actor, reason)`, `unpair_from_agent(agent)` | `tenant_transaction`; device auth jadvali faqat SECURITY DEFINER funksiyalar orqali (§5.18) |
 | `BaseService` | `register_from_agent(agent, dto)`, `apply_hello(agent, bases[])`, `run_checks(base_id)`, `on_check_result(task)`, `reassign(base_id, agent_id)`, `archive(base_id)` | `onec_bases` `FOR UPDATE` |
 | `SettingsService` | `get/patch(base_id)`, `bind_branch(branch_id, base_id, bound_from)`, `unbind(branch_id)` | `version` optimistik qulf |
 | `MappingService` | `summary`, `list_unmatched(base, entity)`, `auto_match(base, entities)`, `confirm(items)`, `remove(id)`, `upsert_value_mappings` | — |
@@ -298,7 +298,7 @@ Har job imzosida birinchi argument `tenant_id` (qaror #1, #2); tana `tenant_tran
 | `onec_on_shift_closed` | `shift.closed` posting'dan keyin navbatga | `tenant_id, shift_id` | Smena filiali bog'langan baza uchun `schedule_mode='on_shift_close'` bo'lsa §7.2 qoidasi bo'yicha kunlarni tayyorlaydi | `(shift_id)` bo'yicha bir marta |
 | `onec_prepare_batch` | qo'lda (W-36), jadval, `on_shift_close`, kech ma'lumot | `tenant_id, base_id, business_date, trigger, rebuild_batch_id?` | `BatchBuilder.prepare/rebuild` → `preview`; avto-tasdiq sharti | advisory lock; mavjud joriy `draft/preview` qayta quriladi |
 | `onec_schedule_tick` | cron, har 5 daqiqa, `app.onec_tenants_due()` fan-out | `tenant_id` | `at_time` rejimidagi bazalar: Toshkent vaqti `schedule_time` dan o'tgan va bugun hali ishga tushmagan bo'lsa §7.2 bo'yicha tayyorlash | `onec_settings.last_schedule_run_on` |
-| `onec_lease_sweeper` | cron, har 1 daqiqa, `app.onec_tenants_due()` fan-out | `tenant_id` | `lease_until < now()` → task `expired`; yozish → item `unknown`; o'qish → qayta `queued`; `retry_wait` muddati kelganlarni `queued` | `FOR UPDATE SKIP LOCKED` |
+| `onec_lease_sweeper` | cron, har 1 daqiqa, `app.onec_tenants_due()` fan-out | `tenant_id` | `lease_until < now()` → task `expired` (yakuniy); yozish → item `unknown`; o'qish → **yangi vazifa qatori** (`attempt + 1`, ≤ 3), 3-urinishdan keyin bog'liq `onec_reconciliations` / `onec_ref_create_requests` / tekshiruv `failed`; `retry_wait` muddati kelgan itemlarni `queued` | `FOR UPDATE SKIP LOCKED` |
 | `onec_finalize_batch` | barcha itemlar yakunlanganda (`ResultService`) | `tenant_id, batch_id` | `sending → verifying` + `read_totals` vazifasi yoki `failed/done` (§7.1) | holat tekshiruvi bilan |
 | `onec_verify_batch` | `read_totals` natijasi kelganda | `tenant_id, batch_id, task_id` | Solishtirish → `done/partial/mismatch`, `onec_reconciliations` yozuvi, Telegram | `(batch_id, task_id)` |
 | `onec_auto_revision` | partiya yakunlanganda `needs_resync=true` va `schedule_mode<>'manual'` | `tenant_id, batch_id` | Yangi revision `draft` → `onec_prepare_batch` | `(batch_id)` |
@@ -330,7 +330,7 @@ Cron ro'yxati `workers/cron.py` ga qo'shiladi: `onec_schedule_tick` (*/5), `onec
 
 ### 5.1 Umumiy
 
-Konventsiyalar — `12-db-sxema.md` §1: hammasi `app` sxemasida (device grant jadvali — `auth`), `id UUID` ilova tomonida UUIDv7 bilan generatsiya qilinadi (`DEFAULT app.uuidv7()` — faqat zaxira), har jadvalda `tenant_id NOT NULL`, pul `NUMERIC(18,2)`, miqdor `NUMERIC(18,3)`, enum — `TEXT + CHECK`, vaqt `TIMESTAMPTZ` (UTC). Istisno: 1C hujjat vaqti (`doc_time`, `onec_date`) — `TIMESTAMP` (zonasiz, Asia/Tashkent mahalliy vaqti — 1C `Дата` shunday saqlaydi). `updated_at` trigger'i 12 §2.10 bloki bilan ulanadi (revizion oxirida aniq `CREATE TRIGGER trg_set_updated_at` ham yoziladi). Migratsiya — alohida Alembic revizion **`0028 onec_integration`** (12 §6.1), `core_tenant_user`, `auth_schema`, `platform_global`, `integration_sync` revizionlaridan keyin. Shu bo'limdagi DDL, RLS, grant va SECURITY DEFINER funksiyalar matni `12-db-sxema.md` §2.11, §4.2, §4.4, §4.5 bilan aynan bir xil; DDL matnida farq topilsa `12` ustun.
+Konventsiyalar — `12-db-sxema.md` §1: hammasi `app` sxemasida (device grant jadvali — `auth`), `id UUID` ilova tomonida UUIDv7 bilan generatsiya qilinadi (`DEFAULT app.uuidv7()` — faqat zaxira), har jadvalda `tenant_id NOT NULL`, pul `NUMERIC(18,2)`, miqdor `NUMERIC(18,3)`, enum — `TEXT + CHECK`, vaqt `TIMESTAMPTZ` (UTC). Istisno: 1C hujjat vaqti (`doc_time`, `onec_date`) — `TIMESTAMP` (zonasiz, Asia/Tashkent mahalliy vaqti — 1C `Дата` shunday saqlaydi). `updated_at` trigger'i 12 §2.10 bloki bilan ulanadi (revizion oxirida aniq `CREATE TRIGGER trg_set_updated_at` ham yoziladi). Migratsiya — ikki Alembic revizion (12 §6.1, qaror #66), `core_tenant_user`, `auth_schema`, `platform_global`, `integration_sync` revizionlaridan keyin: **`0028 store_agent`** (Bosqich 5) — Do'kon agentining umumiy registri `onec_agents`, `onec_agent_tasks`, `onec_task_results`, `auth.onec_device_authorizations` (nomi moslik uchun `onec_` prefiksli; `onec_agent_tasks` ning 1C ga ishora qiluvchi ustunlari FK'siz), `cash_registers.fiscal_agent_id` FK'i, ulash/token funksiyalari; **`0029 onec_integration`** (Bosqich 7) — qolgan 15 ta 1C ga xos jadval, `onec_forbid_namespace_change`, `onec_tenants_due` va kechiktirilgan FK'lar (§5.21), jumladan `onec_agent_tasks` ga `fk_oat_*`. Shu bo'limdagi DDL, RLS, grant va SECURITY DEFINER funksiyalar matni `12-db-sxema.md` §2.11, §4.2, §4.4, §4.5 bilan aynan bir xil; DDL matnida farq topilsa `12` ustun.
 
 ```mermaid
 erDiagram
@@ -358,7 +358,7 @@ erDiagram
 
 | Jadval | Maqsad | Saqlash muddati |
 |---|---|---|
-| `onec_agents` | Ulangan agentlar (har PK — bitta), `devices` bilan 1:1 | Doimiy (revoke — holat) |
+| `onec_agents` | Ulangan Do'kon agentlari (har PK — bitta), `devices` bilan 1:1, imkoniyatlar (`capabilities`) | Doimiy (revoke — holat) |
 | `onec_bases` | Agent ulagan 1C bazalari, qulf №1, onboarding natijasi | Doimiy (arxiv — holat) |
 | `onec_settings` | Baza bo'yicha rejim, jadval, avto-tasdiq, siyosatlar | Doimiy |
 | `onec_branch_bindings` | Filial → baza yo'naltirish | Doimiy (arxiv) |
@@ -371,7 +371,7 @@ erDiagram
 | `onec_export_items` | Partiyadagi har 1C obyekti (urinish, holat) | 5 yil (`op_spec` — 90 kun) |
 | `onec_export_item_sources` | Item ↔ ERP manba hujjatlari | 5 yil |
 | `onec_object_refs` | ERP yozgan har 1C obyektining daftari | 5 yil |
-| `onec_agent_tasks` | Imzolangan vazifalar navbati, lease | 5 yil (yozish), 30 kun (o'qish) |
+| `onec_agent_tasks` | Imzolangan vazifalar navbati (1C va qurilma xizmati), lease | 5 yil (yozish), 30 kun (o'qish va xizmat) |
 | `onec_task_results` | Har urinish natijasi (xom) | 5 yil (yozish), 30 kun (o'qish) |
 | `onec_reconciliations` | Solishtirish natijalari (partiya jamlari, drift, qoldiq) | 5 yil |
 | `onec_events` | Server voqealar lentasi (BO-23 progress, BO-22 jurnal) | 1 yil |
@@ -399,6 +399,8 @@ CREATE TABLE app.onec_agents (
   public_key_thumbprint   TEXT NOT NULL,                 -- RFC 7638 JWK thumbprint (base64url)
   status                  TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','revoked')),
   update_channel          TEXT NOT NULL DEFAULT 'stable' CHECK (update_channel IN ('stable','pilot')),
+  capabilities            JSONB NOT NULL DEFAULT '{}',   -- 34 §14.2 sxemasi; A-01 hello'dan yangilanadi
+                                                         -- (vazifa faqat capabilities.<oila>.enabled = true bo'lsa navbatga qo'yiladi)
   paired_by               UUID NOT NULL REFERENCES app.users(id),
   paired_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
   paired_ip               INET NULL,
@@ -419,6 +421,8 @@ CREATE TABLE app.onec_agents (
   CHECK (status <> 'revoked' OR (revoked_at IS NOT NULL AND revoke_reason IS NOT NULL))
 );
 CREATE INDEX idx_onec_agents_tenant_status ON app.onec_agents (tenant_id, status);
+-- kassa ↔ agent bog'lanishi (lokal fiskal ko'prik, qaror #66); cash_registers.fiscal_agent_id 0002 da FK'siz
+ALTER TABLE app.cash_registers ADD CONSTRAINT fk_cr_fiscal_agent FOREIGN KEY (fiscal_agent_id) REFERENCES app.onec_agents(id);
 ```
 
 Holatlar: `active` → `revoked` (yakuniy). Qayta ulash — yangi agent yozuvi (bazalar `reassign` bilan o'tkaziladi, §5.3). `revoke`: `devices.revoked_at` ham o'rnatiladi, `onec:agent_status` keshi o'chiriladi, `queued` vazifalar `cancelled`, bazalar `disabled`.
@@ -499,7 +503,7 @@ CREATE TRIGGER trg_onec_bases_namespace_immutable BEFORE UPDATE ON app.onec_base
 | `ready` | `error` | `config`-sinf xato (§12: `ONEC_AUTH_FAILED`, `ONEC_COM_NOT_REGISTERED`, `ONEC_ACCESS_DENIED`, `ONEC_NO_RIGHTS`, `ONEC_METADATA_MISMATCH`, `ONEC_PROFILE_UNSUPPORTED`, `ONEC_BASE_UNAVAILABLE` 3 marta ketma-ket) | server |
 | `error` | `ready` | Keyingi muvaffaqiyatli vazifa yoki tekshiruvlar qayta `pass` | server |
 | `onboarding`/`ready`/`error` | `disabled` | Agent `revoked`; yoki baza agentning `hello` ro'yxatida yo'q (`ONEC_BASE_NOT_ON_PC`) | server |
-| `disabled` | `onboarding` | `POST /onec-bases/{id}/reassign` (W-14) — yangi agentga | Egasi |
+| `onboarding`/`ready`/`error`/`disabled` | `onboarding` | `POST /onec-bases/{id}/reassign` (W-14) — yangi agentga; shart: eski agent `revoked` yoki yangi agent A-02 da `ONEC_BASE_DUPLICATE` olgan; navbatda faol partiya bo'lsa va eski agent hali `active` — `409 ONEC_ACTIVE_BATCH_EXISTS` (W-14 bilan bir xil) | Egasi |
 | `archived`dan boshqa har qanday | `archived` | `POST /onec-bases/{id}/archive` (W-15), faol partiya bo'lmasa | Egasi |
 
 `disabled`/`archived`ga o'tishda `write_enabled=false`. `archived` bazaning `onec_object_refs`, partiyalari va moslashtirishlari saqlanadi.
@@ -603,8 +607,8 @@ CREATE TABLE app.onec_catalog_items (
   full_name      TEXT NULL,
   name_norm      TEXT NOT NULL,          -- §6.13 normallashtirish
   inn            TEXT NULL,              -- ИНН (STIR, 9 raqam)
-  pinfl          TEXT NULL,              -- ПИНФЛ (14 raqam) — rekvizit nomi taxmin (P-04)
-  ikpu           TEXT NULL,              -- ИКПУ/MXIK (17 raqam) — rekvizit nomi taxmin (P-04)
+  pinfl          TEXT NULL,              -- ПИНФЛ (14 raqam) — 1C rekvizit nomi metadata o'qishda tasdiqlanadi (26 #132)
+  ikpu           TEXT NULL,              -- ИКПУ/MXIK (17 raqam) — 1C rekvizit nomi metadata o'qishda tasdiqlanadi (26 #132)
   article        TEXT NULL,              -- Артикул
   barcodes       TEXT[] NOT NULL DEFAULT '{}',
   parent_guid    UUID NULL,
@@ -761,13 +765,16 @@ stateDiagram-v2
     approved --> sending: write_object vazifasi lease qilindi
     sending --> created: natija done → onec_mappings(source=created_by_erp, confirmed)
     sending --> failed: doimiy xato (validation/config)
-    sending --> approved: transient yoki unknown — qayta urinish (GUID bir xil)
+    sending --> approved: transient yoki unknown — §7.5 backoff bilan yangi vazifa (GUID bir xil)
+    sending --> failed: attempts ≥ 8
     failed --> approved: "Qayta urinish" (onec.refs.create)
     failed --> rejected: sabab bilan
     created --> [*]
     rejected --> [*]
     superseded --> [*]
 ```
+
+**Yaratish tartibi:** `unit` / `payment_method` → `counterparty` → `counterparty_contract` → `product` — oldingi bosqichdagi so'rov `created` bo'lmaguncha keyingisining vazifasi navbatga qo'yilmaydi. **Qayta urinish:** transient/unknown natija → `approved`, yangi `write_object` vazifasi §7.5 backoff'i bilan (`not_before = now() + min(30 daq, 60 s × 2^(attempts−1)) + random(0..30 s)`); `attempts ≥ 8` → `failed`.
 
 `ref_create_policy='deny'` bo'lsa `proposed` yaratilmaydi — preview'da faqat «qo'lda moslang» bloki. `created` natijasida `onec_mappings` (`status='confirmed'`, `source='created_by_erp'`, `confirmed_by = approved_by`) va `onec_object_refs` (`kind='catalog_{entity}'`) yoziladi.
 
@@ -965,23 +972,24 @@ CREATE INDEX idx_onec_object_refs_drift ON app.onec_object_refs (base_id, last_w
 
 ### 5.15 `onec_agent_tasks`
 
-**Maqsad:** agent faqat shu jadvaldan vazifa oladi (pull, lease, imzo). Eksport itemi har urinishda yangi vazifa qatorini oladi (`attempt` = `onec_export_items.attempts`).
+**Maqsad:** agent faqat shu jadvaldan vazifa oladi (pull, lease, imzo). Do'kon agenti xizmat vazifalari (`fiscal.*`, `print.raw`, `scale.plu_upload`) — `purpose='device_service'`, `base_id IS NULL` (§9.5). Jadval `0028 store_agent` da yaratiladi; `base_id`, `batch_id`, `item_id`, `ref_create_request_id`, `reconciliation_id` FK'lari — `0029 onec_integration` da (§5.21). Eksport itemi har urinishda yangi vazifa qatorini oladi (`attempt` = `onec_export_items.attempts`).
 
 ```sql
 CREATE TABLE app.onec_agent_tasks (
   id                     UUID PRIMARY KEY DEFAULT app.uuidv7(),
   tenant_id              UUID NOT NULL REFERENCES app.tenants(id),
   agent_id               UUID NOT NULL REFERENCES app.onec_agents(id),
-  base_id                UUID NULL REFERENCES app.onec_bases(id),   -- NULL: agent darajasidagi vazifa
-  batch_id               UUID NULL REFERENCES app.onec_export_batches(id),
-  item_id                UUID NULL REFERENCES app.onec_export_items(id),
-  ref_create_request_id  UUID NULL REFERENCES app.onec_ref_create_requests(id),
-  reconciliation_id      UUID NULL,                                 -- FK §5.21
+  base_id                UUID NULL,   -- NULL: agent darajasidagi vazifa; FK fk_oat_base (0029)
+  batch_id               UUID NULL,   -- FK fk_oat_batch (0029)
+  item_id                UUID NULL,   -- FK fk_oat_item (0029)
+  ref_create_request_id  UUID NULL,   -- FK fk_oat_ref_create (0029)
+  reconciliation_id      UUID NULL,   -- FK fk_oat_reconciliation (0029)
   kind                   TEXT NOT NULL CHECK (kind IN ('probe','discover_bases','read_metadata','read_refs',
                            'read_date_prohibition','read_totals','read_stock_balances','preview_object','write_object',
-                           'post_object','unpost_object','mark_delete_object','collect_diagnostics')),
+                           'post_object','unpost_object','mark_delete_object','collect_diagnostics',
+                           'fiscal.status','fiscal.resend_unsent','fiscal.zreport','print.raw','scale.plu_upload')),
   purpose                TEXT NOT NULL CHECK (purpose IN ('onboarding','mapping','export','reconcile','correction',
-                           'ref_create','diagnostics','user_test')),
+                           'ref_create','diagnostics','user_test','device_service')),
   is_write               BOOLEAN GENERATED ALWAYS AS
                            (kind IN ('write_object','post_object','unpost_object','mark_delete_object')) STORED,
   priority               SMALLINT NOT NULL DEFAULT 100,  -- kichik = birinchi: user_test/onboarding 10, mapping 30, ref_create 50, export 100, reconcile 150
@@ -1007,7 +1015,10 @@ CREATE TABLE app.onec_agent_tasks (
   updated_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
   CHECK (status <> 'leased' OR (lease_id IS NOT NULL AND lease_until IS NOT NULL AND signature IS NOT NULL)),
   CHECK (status NOT IN ('done','failed') OR outcome IS NOT NULL),
-  CHECK (base_id IS NOT NULL OR kind IN ('probe','discover_bases','collect_diagnostics')),
+  CHECK (base_id IS NOT NULL OR kind IN ('probe','discover_bases','collect_diagnostics',
+         'fiscal.status','fiscal.resend_unsent','fiscal.zreport','print.raw','scale.plu_upload')),
+  CHECK ((kind LIKE '%.%') = (purpose = 'device_service')),
+  CHECK (kind NOT LIKE '%.%' OR base_id IS NULL),
   CHECK (NOT is_write OR base_id IS NOT NULL)
 );
 CREATE INDEX idx_onec_tasks_dispatch ON app.onec_agent_tasks (agent_id, priority, not_before) WHERE status = 'queued';
@@ -1032,9 +1043,10 @@ CREATE INDEX idx_onec_tasks_item ON app.onec_agent_tasks (item_id) WHERE item_id
 | `leased` | `done` | Natija `outcome='done'` |
 | `leased` | `failed` | Natija `outcome IN ('failed','unknown')` (item holati §7.5 bo'yicha) |
 | `leased` | `expired` | `lease_until < now()` (sweeper) — yozish vazifasida item `unknown` |
+| `leased` | `cancelled` | Faqat o'qish vazifasi: `NOT is_write AND batch.cancel_requested_at IS NOT NULL` (A-04 javobida `cancel_requested=true`); agent to'xtatadi va natija yubormaydi; `onec_lease_sweeper` `lease_until < now()` da bunday vazifani `expired` emas, `cancelled` qiladi |
 | `expired` | `done`/`failed` | **Kech natija** (agentning `results.jsonl` outbox'idan) — qabul qilinadi, `onec_task_results.late=true` |
 
-`leased` holatidagi yozish vazifasi bekor qilinmaydi (sinxron COM chaqiruvini to'xtatib bo'lmaydi) — natija kutiladi.
+`expired` — yakuniy (kech natija qabulidan tashqari); o'qish vazifasini qayta urinish — **yangi vazifa qatori** (`attempt + 1`, ≤ 3, §4.4 `onec_lease_sweeper`), eski qator qayta `queued` qilinmaydi. `leased` holatidagi yozish vazifasi bekor qilinmaydi (sinxron COM chaqiruvini to'xtatib bo'lmaydi) — natija kutiladi.
 
 ### 5.16 `onec_task_results`
 
@@ -1119,11 +1131,12 @@ CREATE TABLE auth.onec_device_authorizations (
 CREATE UNIQUE INDEX uq_onec_device_auth_user_code_pending ON auth.onec_device_authorizations (user_code) WHERE status = 'pending';
 ```
 
-6 ta funksiya — hammasi `erp_system` egaligida, `SECURITY DEFINER`, `SET search_path = app, auth, pg_temp` (`auth`ga tegmaydiganlarida `app, pg_temp`; chaqiruvchi sessiyaning `search_path`i e'tiborga olinmaydi), `erp_app`ga faqat `EXECUTE`. Holat qoidalari:
+7 ta funksiya (`0028 store_agent` — `onec_device_auth_start/lookup/approve/poll/deny`, `onec_agent_credentials`; `0029 onec_integration` — `onec_tenants_due`) — hammasi `erp_system` egaligida, `SECURITY DEFINER`, `SET search_path = app, auth, pg_temp` (`auth`ga tegmaydiganlarida `app, pg_temp`; chaqiruvchi sessiyaning `search_path`i e'tiborga olinmaydi), `erp_app`ga faqat `EXECUTE`. Holat qoidalari:
 
 - **lookup** (W-03) — faqat `pending` va muddati o'tmagan yozuv; `public_jwk`, `public_key_thumbprint`, `machine_hash` ham qaytadi — W-04 `onec_agents` qatorini aynan shu qiymatlar bilan yaratadi.
-- **approve** (W-04) — `p_tenant_id = app.current_tenant_id()` va `p_user_id = app.current_user_id()` bo'lmasa istisno (`insufficient_privilege`); `pending → approved` faqat muddati o'tmagan yozuvda, `p_agent_id` agenti joriy tenantda va uning `public_key_thumbprint`i so'rovdagi bilan bir xil bo'lsa; aks holda `false` (W-04 → `ONEC_PAIRING_CODE_EXPIRED`/`ONEC_PAIRING_CODE_INVALID`).
-- **poll** (AS `/oauth/token`, device grant) — `approved` faqat bir marta qaytadi va shu chaqiruvda `consumed` bo'ladi (token beriladi), keyingi chaqiruvlar `consumed` → `invalid_grant`; `slow_down` (`now() − last_poll_at < poll_interval_s`) holatni o'zgartirmaydi va `approved`ni iste'mol qilmaydi; muddati o'tgan `pending`/`approved` → `expired` (`expired_token`); topilmasa bo'sh natija → `invalid_grant`.
+- **approve** (W-04) — `p_tenant_id = app.current_tenant_id()` va `p_user_id = app.current_user_id()` bo'lmasa istisno (`insufficient_privilege`); `pending → approved` faqat muddati o'tmagan yozuvda, `p_agent_id` agenti joriy tenantda va uning `public_key_thumbprint`i so'rovdagi bilan bir xil bo'lsa. `RETURNS text`: `approved` | `not_found` (kod yo'q yoki agent/kalit mos emas) | `expired` | `used` (allaqachon tasdiqlangan/rad etilgan/iste'mol qilingan); W-04 xaritasi — `not_found`/`used` → `404 ONEC_PAIRING_CODE_INVALID`, `expired` → `409 ONEC_PAIRING_CODE_EXPIRED` (§10.3).
+- **deny** (W-04 «Rad etish») — tenant/foydalanuvchi konteksti tekshiruvi approve kabi; `pending → denied` faqat muddati o'tmagan yozuvda; natija `denied` | `not_found` | `expired` | `used` (approve bilan bir xil xaritalash); agent poll'i `denied` holatini oladi → AS `access_denied`.
+- **poll** (AS `/oauth/token`, device grant) — `approved` faqat bir marta qaytadi va shu chaqiruvda `consumed` bo'ladi (token beriladi), keyingi chaqiruvlar `consumed` → `invalid_grant`; `slow_down` (`now() − last_poll_at < poll_interval_s`) holatni o'zgartirmaydi va `approved`ni iste'mol qilmaydi; muddati o'tgan `pending`/`approved` → `expired` (`expired_token`); `denied` → `access_denied`; topilmasa bo'sh natija → `invalid_grant`.
 
 ```sql
 -- AS POST /oauth/device_authorization: yangi pending yozuv (10 daqiqa).
@@ -1163,13 +1176,16 @@ $$;
 
 -- W-04: onec_agents/devices shu tranzaksiyada RLS ostida yaratilgandan keyin chaqiriladi.
 -- pending → approved. Agent joriy tenant'da bo'lishi va kaliti so'rovdagi kalit bilan bir xil bo'lishi shart.
--- false = kod topilmadi / muddati o'tdi / allaqachon ishlatilgan.
+-- Natija: 'approved' | 'not_found' (kod yo'q yoki agent/kalit mos emas → 404 ONEC_PAIRING_CODE_INVALID) |
+-- 'expired' (→ 409 ONEC_PAIRING_CODE_EXPIRED) | 'used' (allaqachon tasdiqlangan/rad etilgan/iste'mol qilingan → 404 ONEC_PAIRING_CODE_INVALID).
 CREATE OR REPLACE FUNCTION app.onec_device_auth_approve(
   p_user_code text, p_tenant_id uuid, p_user_id uuid, p_agent_id uuid
-) RETURNS boolean
+) RETURNS text
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = app, auth, pg_temp
 AS $$
+DECLARE
+  r auth.onec_device_authorizations%ROWTYPE;
 BEGIN
   IF p_tenant_id IS DISTINCT FROM app.current_tenant_id()
      OR p_user_id IS DISTINCT FROM app.current_user_id() THEN
@@ -1177,16 +1193,71 @@ BEGIN
       USING ERRCODE = 'insufficient_privilege';
   END IF;
 
+  -- user_code faqat pending orasida noyob — pending birinchi, aks holda eng oxirgisi
+  SELECT * INTO r FROM auth.onec_device_authorizations d
+   WHERE d.user_code = p_user_code
+   ORDER BY (d.status = 'pending') DESC, d.created_at DESC
+   LIMIT 1
+   FOR UPDATE;
+  IF NOT FOUND THEN
+    RETURN 'not_found';
+  END IF;
+  IF r.status = 'expired' OR (r.status = 'pending' AND r.expires_at <= now()) THEN
+    UPDATE auth.onec_device_authorizations d SET status = 'expired' WHERE d.id = r.id AND d.status = 'pending';
+    RETURN 'expired';
+  END IF;
+  IF r.status <> 'pending' THEN
+    RETURN 'used';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM app.onec_agents a
+                 WHERE a.id = p_agent_id AND a.tenant_id = p_tenant_id
+                   AND a.public_key_thumbprint = r.public_key_thumbprint) THEN
+    RETURN 'not_found';
+  END IF;
+
   UPDATE auth.onec_device_authorizations d
      SET status = 'approved', tenant_id = p_tenant_id, approved_by = p_user_id,
          approved_at = now(), agent_id = p_agent_id
+   WHERE d.id = r.id;
+  RETURN 'approved';
+END;
+$$;
+
+-- W-04 "Rad etish": pending → denied; agent poll'i 'denied' oladi (AS: access_denied).
+-- Natija: 'denied' | 'not_found' | 'expired' | 'used' (approve bilan bir xil xaritalash).
+CREATE OR REPLACE FUNCTION app.onec_device_auth_deny(p_user_code text, p_user_id uuid)
+RETURNS text
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+DECLARE
+  r auth.onec_device_authorizations%ROWTYPE;
+BEGIN
+  IF app.current_tenant_id() IS NULL OR p_user_id IS DISTINCT FROM app.current_user_id() THEN
+    RAISE EXCEPTION 'onec_device_auth_deny: tenant/foydalanuvchi konteksti mos emas'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  SELECT * INTO r FROM auth.onec_device_authorizations d
    WHERE d.user_code = p_user_code
-     AND d.status = 'pending'
-     AND d.expires_at > now()
-     AND EXISTS (SELECT 1 FROM app.onec_agents a
-                 WHERE a.id = p_agent_id AND a.tenant_id = p_tenant_id
-                   AND a.public_key_thumbprint = d.public_key_thumbprint);
-  RETURN FOUND;
+   ORDER BY (d.status = 'pending') DESC, d.created_at DESC
+   LIMIT 1
+   FOR UPDATE;
+  IF NOT FOUND THEN
+    RETURN 'not_found';
+  END IF;
+  IF r.status = 'expired' OR (r.status = 'pending' AND r.expires_at <= now()) THEN
+    UPDATE auth.onec_device_authorizations d SET status = 'expired' WHERE d.id = r.id AND d.status = 'pending';
+    RETURN 'expired';
+  END IF;
+  IF r.status <> 'pending' THEN
+    RETURN 'used';
+  END IF;
+
+  UPDATE auth.onec_device_authorizations d
+     SET status = 'denied', tenant_id = app.current_tenant_id()
+   WHERE d.id = r.id;
+  RETURN 'denied';
 END;
 $$;
 
@@ -1240,6 +1311,34 @@ AS $$
   WHERE a.client_id = p_client_id;
 $$;
 
+-- 0028: funksiyalar ichida o'qiladigan app jadvali (erp_system — BYPASSRLS, lekin jadval grant'i baribir kerak)
+GRANT SELECT ON app.onec_agents TO erp_system;
+
+ALTER FUNCTION app.onec_device_auth_start(text, text, jsonb, text, text, text, text, text, inet) OWNER TO erp_system;
+ALTER FUNCTION app.onec_device_auth_lookup(text) OWNER TO erp_system;
+ALTER FUNCTION app.onec_device_auth_approve(text, uuid, uuid, uuid) OWNER TO erp_system;
+ALTER FUNCTION app.onec_device_auth_deny(text, uuid) OWNER TO erp_system;
+ALTER FUNCTION app.onec_device_auth_poll(text) OWNER TO erp_system;
+ALTER FUNCTION app.onec_agent_credentials(text) OWNER TO erp_system;
+
+REVOKE ALL ON FUNCTION app.onec_device_auth_start(text, text, jsonb, text, text, text, text, text, inet) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.onec_device_auth_lookup(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.onec_device_auth_approve(text, uuid, uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.onec_device_auth_deny(text, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.onec_device_auth_poll(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.onec_agent_credentials(text) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION app.onec_device_auth_start(text, text, jsonb, text, text, text, text, text, inet) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.onec_device_auth_lookup(text) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.onec_device_auth_approve(text, uuid, uuid, uuid) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.onec_device_auth_deny(text, uuid) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.onec_device_auth_poll(text) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.onec_agent_credentials(text) TO erp_app;
+```
+
+`0029 onec_integration`:
+
+```sql
 -- SAQ cron fan-out (33 §4.4): arxivlanmagan 1C bazasi bor tenantlar;
 -- 'sweep' — yana queued/leased vazifasi yoki retry_wait itemi borlar.
 CREATE OR REPLACE FUNCTION app.onec_tenants_due(p_kind text)
@@ -1263,28 +1362,9 @@ BEGIN
 END;
 $$;
 
--- funksiyalar ichida o'qiladigan app jadvallari (erp_system — BYPASSRLS, lekin jadval grant'i baribir kerak)
-GRANT SELECT ON app.onec_agents, app.onec_bases, app.onec_agent_tasks, app.onec_export_items TO erp_system;
-
-ALTER FUNCTION app.onec_device_auth_start(text, text, jsonb, text, text, text, text, text, inet) OWNER TO erp_system;
-ALTER FUNCTION app.onec_device_auth_lookup(text) OWNER TO erp_system;
-ALTER FUNCTION app.onec_device_auth_approve(text, uuid, uuid, uuid) OWNER TO erp_system;
-ALTER FUNCTION app.onec_device_auth_poll(text) OWNER TO erp_system;
-ALTER FUNCTION app.onec_agent_credentials(text) OWNER TO erp_system;
+GRANT SELECT ON app.onec_bases, app.onec_agent_tasks, app.onec_export_items TO erp_system;
 ALTER FUNCTION app.onec_tenants_due(text) OWNER TO erp_system;
-
-REVOKE ALL ON FUNCTION app.onec_device_auth_start(text, text, jsonb, text, text, text, text, text, inet) FROM PUBLIC;
-REVOKE ALL ON FUNCTION app.onec_device_auth_lookup(text) FROM PUBLIC;
-REVOKE ALL ON FUNCTION app.onec_device_auth_approve(text, uuid, uuid, uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION app.onec_device_auth_poll(text) FROM PUBLIC;
-REVOKE ALL ON FUNCTION app.onec_agent_credentials(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.onec_tenants_due(text) FROM PUBLIC;
-
-GRANT EXECUTE ON FUNCTION app.onec_device_auth_start(text, text, jsonb, text, text, text, text, text, inet) TO erp_app;
-GRANT EXECUTE ON FUNCTION app.onec_device_auth_lookup(text) TO erp_app;
-GRANT EXECUTE ON FUNCTION app.onec_device_auth_approve(text, uuid, uuid, uuid) TO erp_app;
-GRANT EXECUTE ON FUNCTION app.onec_device_auth_poll(text) TO erp_app;
-GRANT EXECUTE ON FUNCTION app.onec_agent_credentials(text) TO erp_app;
 GRANT EXECUTE ON FUNCTION app.onec_tenants_due(text) TO erp_app;
 ```
 
@@ -1339,7 +1419,7 @@ CREATE INDEX idx_onec_agent_logs_agent_time ON app.onec_agent_logs (agent_id, at
 
 ### 5.21 Kechiktirilgan FK, RLS, grant
 
-Aylana bog'liqliklar (`onec_agent_tasks` ↔ `onec_reconciliations`, `onec_export_items` ↔ `onec_object_refs` va h.k.) — barcha jadvallar yaratilgandan keyin, shu revizionda. Uzoq yashovchi jadvallarning vazifaga havolasi (`onec_metadata_snapshots.task_id`, `onec_reconciliations.task_id`, `onec_events.task_id`) — `ON DELETE SET NULL`: o'qish vazifalari 30 kundan keyin `onec_cleanup` bilan o'chiriladi (§4.4), bu yozuvlarning o'zi qoladi.
+Aylana bog'liqliklar (`onec_agent_tasks` ↔ `onec_reconciliations`, `onec_export_items` ↔ `onec_object_refs` va h.k.) — `0029 onec_integration` revizionida, barcha jadvallar yaratilgandan keyin; `onec_agent_tasks` (`0028 store_agent` da FK'siz yaratilgan) ning 1C jadvallariga FK'lari (`fk_oat_*`) ham shu yerda. Uzoq yashovchi jadvallarning vazifaga havolasi (`onec_metadata_snapshots.task_id`, `onec_reconciliations.task_id`, `onec_events.task_id`) — `ON DELETE SET NULL`: o'qish vazifalari 30 kundan keyin `onec_cleanup` bilan o'chiriladi (§4.4), bu yozuvlarning o'zi qoladi.
 
 ```sql
 ALTER TABLE app.onec_metadata_snapshots  ADD CONSTRAINT fk_onec_meta_task        FOREIGN KEY (task_id)           REFERENCES app.onec_agent_tasks(id) ON DELETE SET NULL;
@@ -1348,18 +1428,37 @@ ALTER TABLE app.onec_export_items        ADD CONSTRAINT fk_onec_items_last_task 
 ALTER TABLE app.onec_object_refs         ADD CONSTRAINT fk_onec_refs_last_item   FOREIGN KEY (last_item_id)      REFERENCES app.onec_export_items(id);
 ALTER TABLE app.onec_ref_create_requests ADD CONSTRAINT fk_onec_rcr_task         FOREIGN KEY (task_id)           REFERENCES app.onec_agent_tasks(id);
 ALTER TABLE app.onec_ref_create_requests ADD CONSTRAINT fk_onec_rcr_batch        FOREIGN KEY (batch_id)          REFERENCES app.onec_export_batches(id);
-ALTER TABLE app.onec_agent_tasks         ADD CONSTRAINT fk_onec_tasks_recon      FOREIGN KEY (reconciliation_id) REFERENCES app.onec_reconciliations(id);
+-- onec_agent_tasks (0028 da FK'siz yaratilgan) — 1C jadvallariga FK'lar
+ALTER TABLE app.onec_agent_tasks         ADD CONSTRAINT fk_oat_base              FOREIGN KEY (base_id)               REFERENCES app.onec_bases(id);
+ALTER TABLE app.onec_agent_tasks         ADD CONSTRAINT fk_oat_batch             FOREIGN KEY (batch_id)              REFERENCES app.onec_export_batches(id);
+ALTER TABLE app.onec_agent_tasks         ADD CONSTRAINT fk_oat_item              FOREIGN KEY (item_id)               REFERENCES app.onec_export_items(id);
+ALTER TABLE app.onec_agent_tasks         ADD CONSTRAINT fk_oat_ref_create        FOREIGN KEY (ref_create_request_id) REFERENCES app.onec_ref_create_requests(id);
+ALTER TABLE app.onec_agent_tasks         ADD CONSTRAINT fk_oat_reconciliation    FOREIGN KEY (reconciliation_id)     REFERENCES app.onec_reconciliations(id);
 ```
 
-RLS uchligi (12 §4.2) — 18 ta `app.onec_*` jadvali, hammasi oddiy `tenant_isolation` (`auth.onec_device_authorizations` — RLS'siz, 12 §6.2 CI istisnosi):
+RLS uchligi (12 §4.2) — 18 ta `app.onec_*` jadvali, hammasi oddiy `tenant_isolation` (`auth.onec_device_authorizations` — RLS'siz, 12 §6.2 CI istisnosi). `0028 store_agent` — 3 jadval:
 
 ```sql
 DO $$
 DECLARE t TEXT;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['onec_agents','onec_bases','onec_settings','onec_branch_bindings','onec_metadata_snapshots',
+  FOREACH t IN ARRAY ARRAY['onec_agents','onec_agent_tasks','onec_task_results'] LOOP
+    EXECUTE format('ALTER TABLE app.%I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format('ALTER TABLE app.%I FORCE ROW LEVEL SECURITY', t);
+    EXECUTE format('CREATE POLICY tenant_isolation ON app.%I USING (tenant_id = app.current_tenant_id()) WITH CHECK (tenant_id = app.current_tenant_id())', t);
+  END LOOP;
+END $$;
+```
+
+`0029 onec_integration` — 15 jadval:
+
+```sql
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['onec_bases','onec_settings','onec_branch_bindings','onec_metadata_snapshots',
     'onec_catalog_items','onec_mappings','onec_value_mappings','onec_ref_create_requests','onec_export_batches',
-    'onec_export_items','onec_export_item_sources','onec_object_refs','onec_agent_tasks','onec_task_results',
+    'onec_export_items','onec_export_item_sources','onec_object_refs',
     'onec_reconciliations','onec_events','onec_agent_logs'] LOOP
     EXECUTE format('ALTER TABLE app.%I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('ALTER TABLE app.%I FORCE ROW LEVEL SECURITY', t);
@@ -1371,25 +1470,31 @@ END $$;
 Grantlar jadval nomi bilan (12 §4.4) — `ON ALL TABLES IN SCHEMA` keyingi revizionda ishlatilmaydi, chunki u append-only jadvallardan olingan `UPDATE`/`DELETE` huquqini qaytarib beradi (12 §3):
 
 ```sql
-GRANT SELECT, INSERT, UPDATE, DELETE ON
-  app.onec_agents, app.onec_bases, app.onec_settings, app.onec_branch_bindings, app.onec_metadata_snapshots,
-  app.onec_catalog_items, app.onec_mappings, app.onec_value_mappings, app.onec_ref_create_requests,
-  app.onec_export_batches, app.onec_export_items, app.onec_export_item_sources, app.onec_object_refs,
-  app.onec_agent_tasks, app.onec_task_results, app.onec_reconciliations, app.onec_events, app.onec_agent_logs
-  TO erp_app;
+-- 0028 store_agent
+GRANT SELECT, INSERT, UPDATE, DELETE ON app.onec_agents, app.onec_agent_tasks, app.onec_task_results TO erp_app;
 GRANT ALL ON auth.onec_device_authorizations TO erp_system; -- erp_app'ga hech qanday grant yo'q
 ```
 
-`auth.onec_device_authorizations` 12 §6.2 CI istisno ro'yxatida (boshqa `auth.*` kabi); 6 ta SECURITY DEFINER funksiya (§5.18) — CI ro'yxatida.
+```sql
+-- 0029 onec_integration
+GRANT SELECT, INSERT, UPDATE, DELETE ON
+  app.onec_bases, app.onec_settings, app.onec_branch_bindings, app.onec_metadata_snapshots,
+  app.onec_catalog_items, app.onec_mappings, app.onec_value_mappings, app.onec_ref_create_requests,
+  app.onec_export_batches, app.onec_export_items, app.onec_export_item_sources, app.onec_object_refs,
+  app.onec_reconciliations, app.onec_events, app.onec_agent_logs
+  TO erp_app;
+```
+
+`auth.onec_device_authorizations` 12 §6.2 CI istisno ro'yxatida (boshqa `auth.*` kabi); 7 ta SECURITY DEFINER funksiya (§5.18) — CI ro'yxatida.
 
 ### 5.22 Mavjud jadval va protokollardagi o'zgarishlar (12, 14, 16 ko'chiradi)
 
 | Joy | O'zgarish | Sabab |
 |---|---|---|
-| `app.devices.kind` | CHECK → `('web','android','onec_agent')` | Agent `devices` yozuviga ega (token `device_id`, revoke) |
+| `app.devices.kind` | CHECK → `('web','android','onec_agent')` — Bosqich 0 migratsiyasida (qaror #58c), 12 da shu CHECK bilan; Bosqich 7 vazifasi emas | Agent `devices` yozuviga ega (token `device_id`, revoke) |
 | `app.devices` | `+ outbox_pending_count INT NULL`, `+ outbox_oldest_pending_at TIMESTAMPTZ NULL`, `+ outbox_reported_at TIMESTAMPTZ NULL` | §7.3 qurilma tayyorligi (`16` §9) |
 | `POST /sync/push` so'rovi (`16` §3.1, `18` §2.6) | `+ "outbox_state": {"pending_count": 0, "oldest_pending_created_at": null}` (majburiy, yo'q bo'lsa `422 VALIDATION_ERROR`) — shu so'rovga **kiritilmagan** outbox qismi. `pending` = server natijasi hali `accepted`/`duplicate` bo'lmagan voqealar: yuborilishini kutayotganlar, partiyaga sig'maganlar va avval `rejected` bo'lib qayta yuborilishi kutilayotganlar; `oldest_pending_created_at` — ulardan eng eskisining `created_at`i (`pending_count = 0` da `null`). Onlayn qurilma outbox'i bo'sh bo'lsa ham har 5 daqiqada (*taxmin*) `"events": []` bilan push yuboradi | Server bitta tranzaksiyada: `last_sync_at = outbox_reported_at = now()`, `outbox_pending_count = pending_count + shu so'rovda rad etilgan voqealar soni`, `outbox_oldest_pending_at = min(oldest_pending_created_at, rad etilganlarning created_at)` |
-| `platform.signing_keys.purpose` | CHECK → `('access','license','onec_task','agent_update')` | Vazifa imzosi; agent yangilanish manifesti va vazifa kalitlari to'plami imzosi (§9.4) |
+| `platform.signing_keys.purpose` | CHECK → `('access','license','onec_task','agent_update')` — Bosqich 0 migratsiyasida (qaror #58c), 12 da shu CHECK bilan; Bosqich 7 vazifasi emas | Vazifa imzosi; agent yangilanish manifesti va vazifa kalitlari to'plami imzosi (§9.4) |
 | `platform.oauth_clients` seed | `onec-agent`: `client_type='public'`, `allowed_grant_types={'urn:ietf:params:oauth:grant-type:device_code','client_credentials'}`, `allowed_scopes={'onec.agent'}`, `redirect_uris={}`, `client_secret` yo'q. Agentning shaxsiy `client_id`si `onec-agent:{agent_id}` — `oauth_clients` qatori emas: AS uni `app.onec_agent_credentials()` orqali `onec_agents.client_id` bo'yicha topadi, kalit — `onec_agents.public_jwk` | §9.2 |
 | `app.attachments.kind` | CHECK'ga `'onec_diagnostics'` | Agent diagnostika paketi (A-07) |
 | `app.notification_settings.kind` | qiymatlar: `onec_export_result`, `onec_problems` | §13.3 |
@@ -1522,7 +1627,7 @@ Naqd qism jadvalga yozilmaydi — 1C uni `Σ Товары − Σ Возврат�
 
 **`retail_return_cash_out` — РКО «Возврат денежных средств покупателю»** [t]: `Дата = D 23:56:{k}`, `Касса = map(cash_desk)`, `Контрагент = val(retail_customer.default)`, `СуммаДокумента = Σ` naqd qaytarishlar, `СтатьяДвиженияДенежныхСредств = val(cash_flow_item.customer_refund)`, `ДокументОснование = ref(retail_return)` (bo'lsa).
 
-**`retail_return_card_refund` — «Операция по платежной карте» (qaytarish)** [t] (P-08): `Дата = D 23:56:{k}`, `ВидОперации` — qaytarish varianti, `ВидОплаты = val(payment_method.<method>)`, `Сумма = Σ` shu usulda kartaga qaytarishlar. P-08 da hujjat topilmasa — `card_refund_mode='orp_negative_payment'` (shu kun ОРП'ida `Оплата` manfiy qatori; shu kassada shu kuni ОРП bo'lmasa — `blocking_issues: ONEC_SETTING_NOT_SUPPORTED`).
+**`retail_return_card_refund` — «Операция по платежной карте» (qaytarish)** [t] (P-08): `Дата = D 23:56:{k}`, `ВидОперации` — qaytarish varianti, `ВидОплаты = val(payment_method.<method>)`, `Сумма = Σ` shu usulda kartaga qaytarishlar. P-08 da hujjat topilmasa — `card_refund_mode='orp_negative_payment'` (manfiy `Оплата` qatori yozilmaydi — qaytarish summasi shu kun ОРП'ining shu usuldagi `СуммаОплаты` sidan ayiriladi; natija < 0 → `ONEC_ORP_CASH_MISMATCH`; shu kassada shu kuni ОРП bo'lmasa — `blocking_issues: ONEC_SETTING_NOT_SUPPORTED`).
 
 **`customer_return` — nomli qaytarish (1:1):** `Дата` haqiqiy; `Контрагент = map(counterparty)`; `ДоговорКонтрагента = map(counterparty_contract, customer)`; `ДокументРеализации = ref(credit_sale:{sale_id})` — asl chek eksport qilingan bo'lsa (`onec_object_refs` da bor); `Товары` — qator bo'yicha (`return_lines`). `refund_method='debt_adjustment'` — pul hujjati yo'q (qarz kamayadi). **`customer_return_refund`**: naqd → РКО `ВозвратДенежныхСредствПокупателю` (`Касса = map(cash_desk)`, `Контрагент`, `Договор`, `Сумма`); karta → `ОперацияПоПлатежнойКарте` (qaytarish).
 
@@ -1675,7 +1780,7 @@ Ikki filial **turli bazalarga** bog'langan bo'lsa ko'chirish yuborilmaydi — og
 | `product` | `ИКПУ = mxik_code` **va** nom trigram ≥ 0.6, aynan 1 ta (`auto_ikpu`) | shtrix-kod (`barcodes` ∩ `product_barcodes`, aynan 1 ta — `auto_barcode`) → `Артикул` = EAN (`auto_article`) | `name_norm` aynan (`name` yoki `name_ru`, `auto_name`); trigram ≥ 0.6 — faqat `probable` (`auto_fuzzy`) | yaratish taklifi / qo'lda tanlash; sotilgan tovar moslanmasa — kun `blocking_issues` |
 | `counterparty` (`company`) | `ИНН = stir` aynan 1 ta (`auto_inn`) | `name_norm` aynan (`probable`) | — | yaratish taklifi |
 | `counterparty` (`person`) | `name_norm` + telefon `extra` da aynan | — | — | yaratish taklifi (`debtor_folder` ichida) |
-| `counterparty_contract` | `owner_guid = map(counterparty)` va `ВидДоговора` mos (`СПокупателем`/`СПоставщиком`), «Основной договор» | yagona mos shartnoma | — | kontragent yaratish tasdig'i bilan birga yaratiladi |
+| `counterparty_contract` | `owner_guid = map(counterparty)` va `ВидДоговора` mos (`СПокупателем`/`СПоставщиком`), «Основной договор» | yagona mos shartnoma | — | kontragent yaratish tasdig'i bilan birga tasdiqlanadi; vazifasi kontragent `created` bo'lgach navbatga qo'yiladi (§5.10 yaratish tartibi) |
 | `expense_category` | `name_norm` aynan (`СтатьиЗатрат`) | — | — | yaratish taklifi + hisobni buxgalter tanlaydi |
 | `vat_rate` (value) | taqdimot `12%`/`0%`/`Без НДС` | — | — | **Blok**, yaratilmaydi |
 | `payment_method` (value) | nom (`Uzcard`, `Humo`, `Click`, `Payme`, `Uzum`, `UzQR`) | — | — | yaratish taklifi (ekvayer kontragenti va shartnoma tanlanadi) |
@@ -1689,7 +1794,7 @@ Auto-match natijasi — `status='suggested'` (`match_quality='exact'|'probable'`
 |---|---|---|
 | `product` | `Справочник.Номенклатура` | `Наименование = name` (≤ 100), `НаименованиеПолное = name / name_ru`, `ЕдиницаИзмерения = val(unit.<unit_code>)`, `ВидНоменклатуры = val(goods_kind.goods)`, `СтавкаНДС = val(vat_rate.<kalit>)`, ИКПУ = `mxik_code`, «Упаковка (ЭДО)» = `package_code` — «ЭДО» bo'limi rekvizitlari (P-04); QQS imtiyozi Номенклатура'ga yozilmaydi («Льготы по НДС» registri, P-04), `Артикул` = birinchi EAN (ixtiyoriy), `Родитель = map(product_category)` yoki `val(product_folder.default)` |
 | `counterparty` | `Справочник.Контрагенты` | `Наименование`, `НаименованиеПолное`, `ЮридическоеФизическоеЛицо` (`ЮрЛицо`/`ФизЛицо`), `ИНН = stir`, telefon/manzil (bo'lsa), `Родитель = val(debtor_folder.default)` (jismoniy) |
-| `counterparty_contract` | `Справочник.ДоговорыКонтрагентов` | `Владелец = ref(counterparty)`, `Организация`, `ВидДоговора` (`СПокупателем`/`СПоставщиком`), `Наименование = "Основной договор"` |
+| `counterparty_contract` | `Справочник.ДоговорыКонтрагентов` | `Владелец = ref(counterparty)`, `Организация`, `ВидДоговора` (`СПокупателем`/`СПоставщиком`), `Наименование = "Основной договор"`; `Владелец` GUID'i ma'lum bo'lishi uchun kontragent `created` bo'lgach yaratiladi |
 | `warehouse` | `Справочник.Склады` | `Наименование`, `ТипСклада = РозничныйМагазин` (`store`) / `ОптовыйСклад` (`stock`) |
 | `cash_register` / `cash_desk` | `Справочник.Кассы` (faqat «По кассам» yoqilgan bazada) | `Наименование`, `Владелец = Организация` [t] |
 | `branch` | `Справочник.ПодразделенияОрганизаций` | `Наименование`, `Владелец = Организация` |
@@ -1697,6 +1802,8 @@ Auto-match natijasi — `status='suggested'` (`match_quality='exact'|'probable'`
 | `unit` | `Справочник.КлассификаторЕдиницИзмерения` | `Код` (ОКЕИ), `Наименование` |
 | `payment_method` | `Справочник.ВидыОплатОрганизаций` | `Наименование`, `ТипОплаты = ПлатежнаяКарта`, `Контрагент` (ekvayer — foydalanuvchi tanlaydi), `ДоговорКонтрагента`, hisob 5710 (`val(account.cash_in_transit)`) |
 | `cash_flow_item`, `retail_customer` | `Справочник.СтатьиДвиженияДенежныхСредств` / `Справочник.Контрагенты` | `Наименование` |
+
+Yaratish tartibi va qayta urinish — §5.10: `unit` / `payment_method` → `counterparty` → `counterparty_contract` → `product` (oldingisi `created` bo'lmaguncha keyingisi navbatga qo'yilmaydi); transient/unknown → `approved` + §7.5 backoff bilan yangi vazifa; `attempts ≥ 8` → `failed`.
 
 ERP'da ma'lumotnoma o'zgarsa (`products.version > onec_mappings.erp_version`) 1C elementi **avtomatik o'zgarmaydi** — BO-22 «Yangilash taklifi» ro'yxati (Bosqich 7 da faqat ko'rsatish; 1C'ni yangilash — keyingi bosqich).
 
@@ -1722,7 +1829,10 @@ stateDiagram-v2
     verifying --> done: jamlar mos, failed yo'q
     verifying --> partial: yozilganlari mos, ≥1 failed
     verifying --> mismatch: 1C jamlari / holati farq qiladi
+    verifying --> mismatch: read_totals 3 urinishdan keyin failed/expired (T12a)
     partial --> queued: "Faqat xatolarni qayta yuborish"
+    mismatch --> done: W-50 — barcha itemlar mos (T17)
+    done --> mismatch: W-50 — farq topildi (T17b)
     draft --> cancelled
     preview --> cancelled
     approved --> cancelled
@@ -1735,7 +1845,7 @@ stateDiagram-v2
     cancelled --> [*]
 ```
 
-`done`, `partial`, `mismatch`, `failed`, `cancelled` — yakuniy holatlar; ulardan keyin o'zgarish faqat **yangi revision** (W-48) yoki **tuzatuvchi partiya** (W-49) orqali. `partial`/`mismatch` qabul qilinsa (`accepted_at`) status o'zgarmaydi — faqat navbatni ochadi.
+Yakuniy holatlar: `done`, `failed`, `cancelled`. `partial` → T13 (qayta yuborish) yoki T14 (qabul); `mismatch` → T14 (qabul), T17 (W-50). `partial`/`mismatch` qabul qilinsa (`accepted_at`) status o'zgarmaydi — faqat navbatni ochadi. `done` dan faqat T17b (W-50 farq topsa); ERP ma'lumotini o'zgartirish — **yangi revision** (W-48) yoki **tuzatuvchi partiya** (W-49) orqali.
 
 | # | Dan → Ga | Kim / nima | Shartlar (guard) | Yon ta'sir |
 |---|---|---|---|---|
@@ -1746,18 +1856,21 @@ stateDiagram-v2
 | T5 | `preview → approved` | W-43 (`onec.export.approve`) | `blocking_issues = []`; so'rovdagi `preview_hash` = saqlangan = **qayta hisoblangan** (advisory lock ichida ERP'dan qayta qurib); `acknowledged_warnings ⊇ warnings[].code`; `base.status='ready'`, `base.write_enabled`; obuna `restricted` emas | `approved_by/at`, `approval_mode='manual'`, `approved_preview_hash`; audit `onec.export.approved`; T7 urinish |
 | T5a | `preview → approved` | `ApprovalService.try_auto_approve` (T2 dan keyin) | `onec_settings.auto_approve`; `schedule_mode <> 'manual'`; `blocking_issues = []` **va** `warnings = []`; `base.write_enabled` | `approval_mode='auto'`, `approved_by = auto_approve_set_by`; audit `onec.export.auto_approved` |
 | T6 | `approved → preview` | `OneCChangeTracker.touch` (shu kun ERP ma'lumoti o'zgardi) | `status='approved'` (hali `queued` emas) | Tasdiq maydonlari tozalanadi, qayta quriladi; Telegram `onec_preview_ready` («ma'lumot o'zgardi — qayta tasdiqlang») |
-| T7 | `approved → queued` | `Dispatcher.advance_queue(base)` — approve, partiya yakunlanishi, agent `hello`, sweeper'dan keyin | (a) shu bazada `queued/sending/verifying` partiya yo'q; (b) `business_date` dan oldingi barcha joriy partiyalar `done`, yoki `partial`/`mismatch` + `accepted_at`, yoki `cancelled`; (c) eng kichik `(business_date, kind='regular' oldin, revision)`; (d) `base.status='ready'`; (e) `negative_stock_setting` qiymati 6 soatdan eski emas (eskirgan bo'lsa avval `read_metadata` (`constants`) vazifasi, natijada qayta urinish, §7.3) | `queued_at`; birinchi itemlar `pending → queued`; agentni uyg'otish |
+| T7 | `approved → queued` | `Dispatcher.advance_queue(base)` — approve, partiya yakunlanishi, agent `hello`, sweeper'dan keyin | (a) shu bazada `queued/sending/verifying` partiya yo'q; (b) `business_date` dan oldingi barcha joriy partiyalar `done`, yoki `partial`/`mismatch` + `accepted_at`, yoki `cancelled`; (c) eng kichik `(business_date, kind='regular' oldin, revision)`; (d) `base.status='ready'`; (e) `negative_stock_setting` qiymati 6 soatdan eski emas (eskirgan bo'lsa avval `read_metadata` (`constants`) vazifasi, natijada qayta urinish, §7.3) | `queued_at`; partiyaning **barcha** `pending` itemlari → `queued` (dispetcher ularni `(phase, seq)` tartibida oladi, §7.6); agentni uyg'otish |
 | T8 | `queued → sending` | `Dispatcher` (birinchi lease) | — | `started_at`; `batch.started` |
 | T9 | `sending → verifying` | `onec_finalize_batch` | Barcha itemlar `written/skipped/failed`, kamida bitta `written` | `read_totals` vazifasi (`purpose='reconcile'`), `onec_reconciliations(kind='batch_totals', status='running')` |
 | T10 | `sending → done` | `onec_finalize_batch` | Barcha itemlar `skipped` | `finished_at`; Telegram `onec_export_done` |
 | T11 | `sending → failed` | `onec_finalize_batch` | `written = 0`, `failed ≥ 1` | `error_code` = birinchi failed itemning kodi; Telegram `onec_export_failed` |
 | T12 | `verifying → done/partial/mismatch` | `onec_verify_batch` | §8.10 solishtiruvi | `actual_totals`, `finished_at`, itemlar `verified`/`mismatch`; Telegram mos shablon; `needs_resync` bo'lsa `onec_auto_revision` |
+| T12a | `verifying → mismatch` | `onec_lease_sweeper` / `ResultService` | `read_totals` vazifasi 3 urinishdan keyin `failed`/`expired` | `onec_reconciliations.status='failed'`; partiya `error_code` = vazifa xato kodi; itemlar `written` holatida qoladi; `finished_at`; Telegram `onec_export_mismatch`; foydalanuvchi W-50 (qayta solishtirish) yoki W-47 (qabul) qila oladi |
 | T13 | `partial → queued` | W-45 (`onec.export.correct`) | Faqat `failed` itemlar (yoki tanlanganlari) → `queued`, `attempts=0`; T7 (a) sharti | `accepted_*` tozalanadi; audit `onec.export.resent` |
 | T14 | `partial/mismatch` qabul | W-47 (`onec.export.correct`) | Sabab majburiy | `accepted_by/at/reason`; T7 orqali keyingi kunlar ochiladi; audit `onec.export.accepted` |
 | T15 | `draft/preview/approved/queued → cancelled` | W-44 (`onec.export.approve`) | Sabab majburiy | Ochiq vazifalar `cancelled`, itemlar `skipped (cancelled)`; audit `onec.export.cancelled` |
 | T16 | `sending → cancelled` | W-44 | `cancel_requested_at` qo'yiladi; joriy lease'dagi vazifa tugagach | Qolgan itemlar `skipped (cancelled)`; yozilganlari 1C'da **qoladi** (o'chirilmaydi) |
+| T17 | `mismatch → done` | `onec_verify_batch` (W-50 natijasi) | Qayta solishtiruvda barcha itemlar mos | `accepted_by/accepted_at/accept_reason` tozalanadi (`accepted_at` faqat `partial`/`mismatch` da — CHECK buzilmaydi); itemlar `mismatch → verified`; `actual_totals`, `finished_at`; Telegram `onec_export_done` |
+| T17b | `done → mismatch` | `onec_verify_batch` (W-50 natijasi) | Qayta solishtiruv farq topdi | Farqli itemlar `verified → mismatch`; `actual_totals`; Telegram `onec_export_mismatch` |
 
-`verifying` holatida bekor qilish va qayta qurish taqiqlanadi (`409 ONEC_BATCH_INVALID_STATE`).
+`verifying` holatida bekor qilish va qayta qurish taqiqlanadi (`409 ONEC_BATCH_INVALID_STATE`); undan chiqish — faqat T12 yoki T12a (T12a dan tashqari barcha chiqishlar `read_totals` natijasiga bog'liq).
 
 ### 7.2 Avtomatik tayyorlash (jadval)
 
@@ -1826,7 +1939,8 @@ Qurilma sinxronlanganda (`/sync/push` qayta ishlangach) `OneCChangeTracker.devic
 stateDiagram-v2
     [*] --> pending: qurildi
     pending --> skipped: unchanged / empty / dependency / cancelled
-    pending --> queued: partiya queued va navbati keldi
+    pending --> queued: partiya queued bo'lganda (T7)
+    pending --> skipped: W-46 (sabab bilan)
     queued --> sending: vazifa lease qilindi
     sending --> written: natija done (created/updated/existed/existed_foreign)
     sending --> retry_wait: transient xato (§12 sinf)
@@ -1836,8 +1950,12 @@ stateDiagram-v2
     unknown --> queued: avtomatik "tekshir-va-yoz" (§8.4)
     failed --> queued: W-45 (qayta yuborish)
     failed --> skipped: W-46 (sabab bilan)
+    queued --> skipped: W-46 (sabab bilan)
+    retry_wait --> skipped: W-46 (sabab bilan)
     written --> verified: read_totals mos
     written --> mismatch: read_totals farq
+    mismatch --> verified: W-50 (T17)
+    verified --> mismatch: W-50 farq (T17b)
     verified --> [*]
     skipped --> [*]
 ```
@@ -1848,7 +1966,6 @@ stateDiagram-v2
 | `unknown` | `unknown` → darhol `queued` | Keyingi urinish §8.3 algoritmi (GUID bo'yicha tekshiradi); `attempts` hisobiga kiradi |
 | `config` | `retry_wait` (`next_attempt_at = NULL`) + `onec_bases.status='error'` | Baza qayta `ready` bo'lganda (`hello`/`probe` muvaffaqiyati) avtomatik `queued`; Telegram `onec_base_error` |
 | `validation` | `failed` (o'lik xat) | Faqat qo'lda: tuzatib W-45 yoki W-46 |
-| `duplicate` | `written` (`result.outcome_detail='existed'`) | — |
 
 ### 7.6 Dispetcher
 
@@ -1873,7 +1990,7 @@ lease_for_agent(agent, ready_base_ids, max_tasks ≤ 4):
              WHERE batch_id = batch.id AND status IN ('queued','unknown')
                AND depends_on bajarilgan (written|verified) yoki NULL
              ORDER BY phase, seq LIMIT 1 FOR UPDATE SKIP LOCKED
-      # bitta phase'dagi oldingi itemlar yakunlanmaguncha keyingi phase boshlanmaydi
+      # qat'iy (phase, seq) tartibi: oldingi item yakunlanmaguncha keyingisi olinmaydi; retry_wait keyingi itemlarni ham kuttiradi (ataylab)
       if item yo'q yoki undan oldingi (phase, seq) itemlar orasida queued/sending/retry_wait/unknown bor: continue
       task = INSERT onec_agent_tasks(kind = item.action→§9.5, payload = op_spec, attempt = item.attempts + 1, status='leased', …)
       item.status='sending'; item.attempts += 1; item.last_task_id = task.id; batch: queued → sending (T8)
@@ -1921,9 +2038,9 @@ idempotency   = f"{base_id}:{kind}:{erp_key}"             # onec_export_items.id
 | `stock_adjustment` | `{warehouse_id}:{D}` |
 | `shift_variance` | `{shift_id}` |
 | qolgan 1:1 turlar (`credit_sale`, `credit_sale_payment`, `customer_return`, `customer_return_refund`, `debt_payment`, `goods_receipt`, `goods_receipt_payment`, `supplier_return`, `supplier_payment`, `transfer`, `transfer_loss`, `write_off`, `stock_count`, `stock_count_loss`, `stock_count_gain`, `expense`, `cash_movement`, `bank_settlement`) | manba hujjat `id` (`credit_sale_payment` — `sale_payments.id`) |
-| `catalog_product`, `catalog_counterparty`, `catalog_warehouse`, `catalog_cash_register`, `catalog_cash_desk`, `catalog_division`, `catalog_expense_item` | ERP qator `id` (`catalog_division` — `branches.id`) |
+| `catalog_product`, `catalog_counterparty`, `catalog_warehouse`, `catalog_cash_register`, `catalog_cash_desk`, `catalog_branch`, `catalog_expense_category` | ERP qator `id` (`catalog_branch` — `branches.id`) |
 | `catalog_counterparty_contract` | `{counterparty_id}:{customer\|supplier}` |
-| `catalog_unit` / `catalog_payment_kind` / `catalog_cash_flow_item` / `catalog_retail_customer` | `units.code` / `method` / `cash_flow_item` kaliti / `default` |
+| `catalog_unit` / `catalog_payment_method` / `catalog_cash_flow_item` / `catalog_retail_customer` | `units.code` / `method` / `cash_flow_item` kaliti / `default` |
 
 **Test vektorlari** (`shared/onec-guid-vectors.json`, backend va agent testlari uchun; namespace `6f1c2a9e-3b4d-4c5e-8f60-718293a4b5c6`):
 
@@ -1932,6 +2049,9 @@ idempotency   = f"{base_id}:{kind}:{erp_key}"             # onec_export_items.id
 | `retail_sales_report:0192a6c1-7e00-7a00-8000-000000000101:0192a6c1-7e00-7a00-8000-000000000201:2026-10-15` | `266a501b-553e-5bcf-8148-533909a9f339` |
 | `credit_sale:0192a6c1-7e00-7a00-8000-000000000301` | `b5e6e8b9-ebe4-52a3-83c9-9bac01e144ff` |
 | `catalog_product:0192a6c1-7e00-7a00-8000-000000000401` | `0eaa2ce4-e894-57dc-a65a-e825b019d668` |
+| `catalog_branch:0192a6c1-7e00-7a00-8000-000000000501` | `01b569aa-4aac-58a7-8ad8-088ab2a72bc4` |
+| `catalog_expense_category:0192a6c1-7e00-7a00-8000-000000000601` | `29494522-1aa4-5262-8eb1-2a151b728bec` |
+| `catalog_payment_method:click` | `024041e8-09a3-5d4b-a5e5-4c2f6a8be5a2` |
 
 ### 8.2 Kontent xeshi
 
@@ -2086,13 +2206,13 @@ Muvaffaqiyatli tuzatishdan keyin asl `onec_object_refs.content_snapshot` **o'zga
 | Transport | Faqat chiquvchi HTTPS 443 (TLS 1.2+, OS sertifikat ombori; SPKI pinning standart o'chiq — AV/proksi HTTPS tekshiruvi bilan to'qnashadi), tizim proksisi (.NET Framework 4.8: `WebRequest.DefaultWebProxy` — IE/WinINET sozlamalari, PAC ham) |
 | Base path | `https://<domen>/api/v1/onec-agent/*` (A-01…A-10); OAuth — `https://<domen>/oauth/*`. Domen kanal build'iga kompilyatsiya qilinadi (`settings.json` da yo'q; faqat DEV build'da `--server`) |
 | Autentifikatsiya | `Authorization: Bearer <access_token>` (`aud=urn:erp:onec-agent`, `scope=onec.agent`); CSRF yo'q; `Idempotency-Key` talab qilinmaydi (idempotentlik `lease_id`/`client_log_id` bilan) |
-| Majburiy headerlar | `X-Agent-Version: 1.4.2`, `X-Agent-Protocol: 1`, `User-Agent: ErpOneCAgent/1.4.2 (Windows 10.0.19045; x64)` |
+| Majburiy headerlar | `X-Agent-Version: 1.4.2`, `X-Agent-Protocol: 2`, `User-Agent: ErpOneCAgent/1.4.2 (Windows 10.0.19045; x64)` |
 | Siqish | So'rov tanasi > 16 KB → `Content-Encoding: gzip`; javob — `Accept-Encoding: gzip` |
 | Format | JSON, snake_case; pul/miqdor — o'nlik satr (qaror #26); vaqt — ISO-8601 UTC (`Z`); 1C qiymatlari — §9.8 kodlash |
 | Xato | `17` §7 konverti `{"error":{code, message_key, params, details, request_id}}` |
 | Tenant | Faqat tokendan (`tenant_id`, `agent_id`); so'rov tanasidagi tenant/agent maydonlari e'tiborga olinmaydi |
 | Hajm chegarasi | So'rov ≤ 10 MB (gzip'dan keyin), A-07 fayl ≤ 20 MB |
-| Protokol versiyasi | Server `1` ni qo'llaydi; qo'llanmaydigan versiya yoki `agent_version < min_agent_version` → `426 ONEC_AGENT_UPDATE_REQUIRED` |
+| Protokol versiyasi | Server `2` ni qo'llaydi (A-01 `capabilities` bilan, qaror #66); qo'llanmaydigan versiya yoki `agent_version < min_agent_version` → `426 ONEC_AGENT_UPDATE_REQUIRED` |
 | Obuna lokauti (qaror #15) | `restricted`/`closed` tenant agentiga token beriladi (§9.2), cheklovni agent API qo'llaydi. **Rad** (`403 SUBSCRIPTION_RESTRICTED`): A-01 `hello`, A-02 `bases`, A-03 `poll` — yangi baza va yangi vazifa yo'q. **Ruxsat**: A-04 `heartbeat`, A-05 `result`, A-06 `logs` (lease'dagi yozish yarim qolmasin, natija va loglar yetib borsin), A-07 `diagnostics` (qo'llab-quvvatlash), A-08 `task-keys` (lease'dagi vazifa imzosini tekshirish), A-09 `update-manifest` (xavfsizlik yangilanishi), A-10 `unpair` (o'chirish). Agent `403` dan keyin faqat `hello` ni har 600 s takrorlaydi (§9.9) |
 | Vaqt | Agent `hello.server_time` dan ofset hisoblaydi; imzo `exp` tekshiruvi tuzatilgan vaqt bilan, ±120 s tolerans |
 
@@ -2158,7 +2278,7 @@ Ishga tushganda, har 600 s, baza ro'yxati yoki PK qulfi o'zgarganda darhol.
 ```json
 // So'rov
 {
-  "agent_version": "1.4.2", "protocol": 1,
+  "agent_version": "1.4.2", "protocol": 2,
   "os_version": "Windows 10 Pro 22H2 (19045)", "machine_hash": "…64 hex…", "pc_name": "DOKON-PC",
   "worker_bits": [32, 64],
   "platforms": [{"version": "8.3.25.1374", "bits": 64, "progid": "V83.COMConnector", "registered": true,
@@ -2166,6 +2286,13 @@ Ishga tushganda, har 600 s, baza ro'yxati yoki PK qulfi o'zgarganda darhol.
   "bases": [{"local_id": "…", "base_id": "…", "status": "ok", "pc_write_enabled": true,
              "last_error_code": null, "config_version": "3.0.64.8", "platform_version": "8.3.25.1374"}],
   "task_keyset_version": 3, "busy_base_ids": [], "results_outbox_pending": 0,
+  "capabilities": {
+    "onec":   {"enabled": true,  "version": 1},
+    "fiscal": {"enabled": false, "version": 0, "provider": null, "devices": []},
+    "print":  {"enabled": true,  "version": 1,
+               "devices": [{"local_id": "…", "transport": "tcp9100", "host": "192.168.1.50", "port": 9100, "status": "ok"}]},
+    "scale":  {"enabled": false, "version": 0, "devices": []}
+  },
   "clock": "2026-10-15T18:02:11Z"
 }
 // Javob 200
@@ -2180,9 +2307,9 @@ Ishga tushganda, har 600 s, baza ro'yxati yoki PK qulfi o'zgarganda darhol.
 }
 ```
 
-`bases[].status` ∈ `ok`, `error`, `credentials_missing`; A-02 da `409` olgan (hali ro'yxatdan o'tmagan) baza `base_id=null` bilan yuboriladi — W-14 dan keyin `bases_control` da `local_id` orqali bog'lanadi. Agent metrikalari `hello` sxemasida yo'q — A-06 orqali (`code="agent.metrics"`, har 600 s).
+`bases[].status` ∈ `ok`, `error`, `credentials_missing`; A-02 da `409` olgan (hali ro'yxatdan o'tmagan) baza `base_id=null` bilan yuboriladi — W-14 dan keyin `bases_control` da `local_id` orqali bog'lanadi. `capabilities` — Do'kon agenti modullari (sxema va qoidalar — `34-1c-agent.md` §14.2; `fiscal.devices[].local_id` — kassa tomonida `cash_registers.fiscal_local_device_id` bilan bog'lanadi); maydonsiz `hello` — faqat `onec` yoqilgan deb olinadi. Agent metrikalari `hello` sxemasida yo'q — A-06 orqali (`code="agent.metrics"`, har 600 s).
 
-Server: `last_hello_at`, `agent_version`, `platforms`, `worker_bits`, `last_ip` yangilanadi; `machine_hash` o'zgarsa `machine_hash_changed_at` + Telegram `onec_base_error` (ogohlantirish); har baza bo'yicha `pc_write_enabled`, `config_version` (o'zgarsa `read_metadata` + tekshiruvlar navbatga), ro'yxatda yo'q baza → `disabled` (`ONEC_BASE_NOT_ON_PC`); `task_keyset_version` eski bo'lsa yangi to'plam; so'ng `Dispatcher.advance_queue`. Xatolar: `401 UNAUTHORIZED`, `403 ONEC_AGENT_REVOKED`, `403 SUBSCRIPTION_RESTRICTED`, `426 ONEC_AGENT_UPDATE_REQUIRED`.
+Server: `last_hello_at`, `agent_version`, `os_version`, `pc_name`, `platforms`, `worker_bits`, `capabilities` (→ `onec_agents.capabilities`), `last_ip` yangilanadi; `machine_hash` o'zgarsa `machine_hash_changed_at` + Telegram `onec_base_error` (ogohlantirish); har baza bo'yicha `pc_write_enabled`, `config_version` (o'zgarsa `read_metadata` + tekshiruvlar navbatga), ro'yxatda yo'q baza → `disabled` (`ONEC_BASE_NOT_ON_PC`); `task_keyset_version` eski bo'lsa yangi to'plam; so'ng `Dispatcher.advance_queue`. Xatolar: `401 UNAUTHORIZED`, `403 ONEC_AGENT_REVOKED`, `403 SUBSCRIPTION_RESTRICTED`, `426 ONEC_AGENT_UPDATE_REQUIRED`.
 
 #### A-02. `POST /api/v1/onec-agent/bases`
 
@@ -2232,7 +2359,7 @@ Uzun vazifada har 15 s (supervisor yuboradi — worker COM chaqiruvida band bo'l
 {"lease_until": "2026-10-15T18:05:42Z", "cancel_requested": false}
 ```
 
-`stage` ∈ `connecting`, `reading`, `resolving`, `filling`, `writing`, `posting`, `rereading`, `querying`, `uploading`. `lease_until = min(now + 90 s, leased_at + timeout_s + 60 s)`. `cancel_requested=true` — o'qish vazifasini agent to'xtatishi mumkin (to'xtatilgan o'qish vazifasi natijasi yuborilmaydi, agent jurnaliga `cancelled`; server holatni o'zi yopadi); yozish vazifasi baribir tugatiladi. Xato: `409 ONEC_TASK_LEASE_LOST` (vazifa bekor qilingan/boshqa lease) — agent o'qishni to'xtatadi, yozishni tugatib natijani baribir yuboradi.
+`stage` ∈ `connecting`, `reading`, `resolving`, `filling`, `writing`, `posting`, `rereading`, `querying`, `uploading`. `lease_until = min(now + 90 s, leased_at + timeout_s + 60 s)`. `cancel_requested` hisoblanadi (ustun emas): `NOT is_write AND batch.cancel_requested_at IS NOT NULL` (vazifaning `batch_id` partiyasi bo'yicha). `cancel_requested=true` — o'qish vazifasini agent to'xtatishi mumkin (to'xtatilgan o'qish vazifasi natijasi yuborilmaydi, agent jurnaliga `cancelled`; server vazifani `leased → cancelled` qiladi, §5.15); yozish vazifasi baribir tugatiladi. Xato: `409 ONEC_TASK_LEASE_LOST` (vazifa bekor qilingan/boshqa lease) — agent o'qishni to'xtatadi, yozishni tugatib natijani baribir yuboradi.
 
 #### A-05. `POST /api/v1/onec-agent/tasks/{task_id}/result`
 
@@ -2247,7 +2374,7 @@ Uzun vazifada har 15 s (supervisor yuboradi — worker COM chaqiruvida band bo'l
 {"accepted": true, "duplicate": false, "late": false}
 ```
 
-`outcome` ∈ `done`, `failed` (aniq xato, `error` majburiy), `unknown` (yozish paytida worker o'ldi/aloqa uzildi — natija noma'lum, `error.code='ONEC_UNKNOWN_OUTCOME'`). Idempotent: bir xil `(task_id, lease_id)` takror kelsa — o'sha javob, `duplicate=true`. Lease muddati o'tgan bo'lsa ham qabul qilinadi (`late=true`, §8.4). Agent natijani avval diskdagi `results.jsonl` outbox'iga yozadi, `200` olgach o'chiradi (34). Xatolar: `404 NOT_FOUND` (vazifa bu agentniki emas), `409 ONEC_TASK_LEASE_LOST` (`lease_id` bu vazifaning hech qaysi lease'iga mos emas), `413 FILE_TOO_LARGE` (so'rov > 10 MB, §9.1), `422 VALIDATION_ERROR`.
+`started_at`/`finished_at` saqlanmaydi — faqat `duration_ms` (`onec_task_results.duration_ms`; vazifaning `finished_at` — server qabul vaqti). `outcome` ∈ `done`, `failed` (aniq xato, `error` majburiy), `unknown` (yozish paytida worker o'ldi/aloqa uzildi — natija noma'lum, `error.code='ONEC_UNKNOWN_OUTCOME'`). Idempotent: bir xil `(task_id, lease_id)` takror kelsa — o'sha javob, `duplicate=true`. Lease muddati o'tgan bo'lsa ham qabul qilinadi (`late=true`, §8.4). Agent natijani avval diskdagi `results.jsonl` outbox'iga yozadi, `200` olgach o'chiradi (34). Xatolar: `404 NOT_FOUND` (vazifa bu agentniki emas), `409 ONEC_TASK_LEASE_LOST` (`lease_id` bu vazifaning hech qaysi lease'iga mos emas), `413 FILE_TOO_LARGE` (so'rov > 10 MB, §9.1), `422 VALIDATION_ERROR`.
 
 #### A-06. `POST /api/v1/onec-agent/logs`
 
@@ -2264,7 +2391,7 @@ Har 60 s yoki 200 yozuvda, ≤ 500 yozuv/so'rov. Agent metrikalari ham shu yerda
 
 #### A-07. `POST /api/v1/onec-agent/diagnostics`
 
-`multipart/form-data`: `file` (zip, ≤ 20 MB: loglar, `settings.json` sirlarsiz, `actions.jsonl`), `task_id` (`collect_diagnostics`). Javob `201 {"attachment_id": "…"}` (`attachments.kind='onec_diagnostics'`). Xato: `413 FILE_TOO_LARGE` (> 20 MB).
+`multipart/form-data`: `file` (zip, ≤ 20 MB: loglar, `settings.json` sirlarsiz, `actions.jsonl`), `task_id` (`collect_diagnostics`). Javob `201 {"attachment_id": "…"}` (`attachments.kind='onec_diagnostics'`; `attachments.uploaded_by` = `collect_diagnostics` vazifasining `created_by` — W-07 so'rovchisi). Xatolar: `413 FILE_TOO_LARGE` (> 20 MB); `422 VALIDATION_ERROR` — vazifaning `created_by` NULL.
 
 #### A-08. `GET /api/v1/onec-agent/task-keys`
 
@@ -2276,7 +2403,7 @@ Javob `200 {"manifest": "<base64(JSON baytlari)>", "signature": "<base64 Ed25519
 
 #### A-10. `POST /api/v1/onec-agent/unpair`
 
-O'chirishda (uninstall) yoki agent oynasidagi «Uzish». So'rov `{"reason": "uninstall" | "user"}`, javob `204`. Server: `onec_agents.status='revoked'`, `revoke_reason='uninstall'`, bazalar `disabled`, audit `onec.agent.unpaired`, Telegram `onec_agent_paired` (uzildi varianti).
+O'chirishda (uninstall) yoki agent oynasidagi «Uzish». So'rov `{"reason": "uninstall" | "user"}`, javob `204`. Server: `onec_agents.status='revoked'`, `revoke_reason = <so'rovdagi reason>` (`uninstall` | `user`), bazalar `disabled`, audit `onec.agent.unpaired`, Telegram `onec_agent_paired` (uzildi varianti).
 
 ### 9.4 Imzolar va kalitlar
 
@@ -2314,7 +2441,7 @@ Agent faqat shu 13 turni biladi; boshqasi → `ONEC_TASK_REJECTED`. **`delete` (
 
 `Target = {"meta_kind": "Document"|"Catalog", "meta_name": "…", "guid": "…"}`.
 
-**Do'kon agenti kengaytmasi (qaror #60, Bosqich 5).** Yuqoridagi 13 tur — 1C modulining oq ro'yxati, u o'zgarmaydi; 1C protokoli (§9) ham o'zgarmaydi. Xuddi shu agent va shu bulut kanali (A-01…A-10, imzoli vazifa, lease) orqali server navbatga qo'yadigan Do'kon agenti xizmat vazifalari — alohida oila oq ro'yxati, `base_id = null` (1C bazasi talab qilinmaydi), agent `hello` da modulni e'lon qilgandagina: `fiscal.status`, `fiscal.resend_unsent`, `fiscal.zreport`, `print.raw`, `scale.plu_upload` (vazifa va natija — `21-integratsiyalar.md` §16, ishlovchi modullar — `23-backend-arxitekturasi.md` §4.2, agent tomoni — `34-1c-agent.md` §14). Sotuv paytidagi fiskallashtirish, chek chop etish va tortish — server vazifasi emas: POS ularni agentning lokal API'si (`127.0.0.1`, `Origin` oq ro'yxati + qurilmaga bog'langan token, `21` §16) orqali bajaradi.
+**Do'kon agenti kengaytmasi (qaror #60, Bosqich 5).** Yuqoridagi 13 tur — 1C modulining oq ro'yxati, u o'zgarmaydi; 1C protokoli (§9) ham o'zgarmaydi. Xuddi shu agent va shu bulut kanali (A-01…A-10, imzoli vazifa, lease) orqali server navbatga qo'yadigan Do'kon agenti xizmat vazifalari — alohida oila oq ro'yxati, `base_id = null` (1C bazasi talab qilinmaydi), agent `hello` da modulni e'lon qilgandagina (`capabilities.<oila>.enabled = true`, aks holda `AgentTaskPort.enqueue` → `409 AGENT_CAPABILITY_DISABLED`): `fiscal.status`, `fiscal.resend_unsent`, `fiscal.zreport`, `print.raw`, `scale.plu_upload` (MVP'dan keyin). Bu vazifalar `purpose='device_service'` (§5.15 CHECK'lari: `kind` nuqtali ⇔ `purpose='device_service'`, `base_id IS NULL`). Payload'lar: `fiscal.status` / `fiscal.resend_unsent` — `{cash_register_id}`; `fiscal.zreport` — `{cash_register_id, shift_id}`; `print.raw` — `{printer_local_id, data_base64, encoding: "cp866"|"raster"}`; `scale.plu_upload` — `{scale_local_id, items:[{plu, name, price, barcode_prefix}]}`. Natija `fiscal.status` — `{cash_register_id, fm_state, pending_count, oldest_unacked_at, acked:[{fm_terminal_id, fm_receipt_seq, acked_at}]}` → `cash_registers.fm_state`, `fm_receipts_pending`, `last_unacked_receipt_at`, `acked[]` → `fiscal_receipts.ofd_acked_at`. Kassa bog'lanishi — `cash_registers.fiscal_agent_id` + `fiscal_local_device_id` (`capabilities.fiscal.devices[].local_id`). Vazifa va natija — `21-integratsiyalar.md` §16, ishlovchi modullar — `23-backend-arxitekturasi.md` §4.2, agent tomoni — `34-1c-agent.md` §14. Agent infratuzilmasining o'zi (A-01, A-03…A-10, ulash, token, imzo, lease, imzoli yangilanish, `0028 store_agent`) Bosqich 5 da quriladi (qaror #66); 1C vazifa turlari, A-02 va `0029 onec_integration` — Bosqich 7. Sotuv paytidagi fiskallashtirish, chek chop etish va tortish — server vazifasi emas: POS ularni agentning lokal API'si (`127.0.0.1`, `Origin` oq ro'yxati + qurilmaga bog'langan token; sxemalar — `21` §16.1) orqali bajaradi.
 
 Turlar bo'yicha aniqliklar (agent 34 shu qoidalar bilan ishlaydi):
 
@@ -2572,7 +2699,7 @@ Rad etilgan vazifa natijasi (A-05, konvertdagi `lease_id` va `attempt` bilan —
 
 ## 10. Veb API (BO-22, BO-23 uchun)
 
-Umumiy (`17`): base `/api/v1`, BFF cookie + `X-CSRF-Token` (yozuvchi so'rovlarda), **`Idempotency-Key` barcha `POST/PUT/PATCH/DELETE` da majburiy**, `require_subscription_ok`, kebab-case ko'plik URL, snake_case JSON, pul/miqdor — o'nlik satr, xato konverti `17` §7. Ro'yxatlar: hujjat turidagilar (`onec-export-batches`, `onec-events`, `onec-agent-logs`, `onec-reconciliations`) — cursor (`?cursor=&limit=`); ma'lumotnoma turidagilar (`onec-agents`, `onec-bases`, `onec-mappings`, `onec-catalog-items`, `onec-ref-create-requests`) — page (`?page=&size=`). Har endpointning umumiy xatolari (`UNAUTHORIZED`, `CSRF_INVALID`, `PERMISSION_DENIED`, `NOT_FOUND`, `VALIDATION_ERROR`, `SUBSCRIPTION_RESTRICTED`) qayta yozilmaydi. **Ogohlantirishlar** (§12 dagi `warn` sinfi) hech qachon xato javobi emas: amal bajariladi va kod muvaffaqiyatli javobning (`200`/`201`/`202`) `warnings: [{code, params}]` massivida qaytadi (`17` dagi `warnings[]` qoidasi); partiya ogohlantirishlari — `onec_export_batches.warnings`. **Offline:** barcha endpointlar faqat onlayn (BO ekranlari; PWA keshida faqat oxirgi ko'rilgan holat). OpenAPI teg: `onec`.
+Umumiy (`17`): base `/api/v1`, BFF cookie + `X-CSRF-Token` (yozuvchi so'rovlarda), **`Idempotency-Key` barcha `POST/PUT/PATCH/DELETE` da majburiy**, `require_subscription_ok`, kebab-case ko'plik URL, snake_case JSON, pul/miqdor — o'nlik satr, xato konverti `17` §7. Ro'yxatlar: hujjat/voqea turidagilar (`/onec-export-batches` W-34, `/onec-export-batches/{id}/items` W-38, `/onec-export-batches/{id}/events` W-51, `/onec-agents/{id}/logs` W-08, `/onec-reconciliations` W-52) — cursor (`?cursor=&limit=`); ma'lumotnoma turidagilar (`/onec-agents`, `/onec-bases`, `/onec-mappings`, `/onec-catalog-items`, `/onec-ref-create-requests`) — page (`?page=&size=`). Har endpointning umumiy xatolari (`UNAUTHORIZED`, `CSRF_INVALID`, `PERMISSION_DENIED`, `NOT_FOUND`, `VALIDATION_ERROR`, `SUBSCRIPTION_RESTRICTED`) qayta yozilmaydi. **Ogohlantirishlar** (§12 dagi `warn` sinfi) hech qachon xato javobi emas: amal bajariladi va kod muvaffaqiyatli javobning (`200`/`201`/`202`) `warnings: [{code, params}]` massivida qaytadi (`17` dagi `warnings[]` qoidasi); partiya ogohlantirishlari — `onec_export_batches.warnings`. **Offline:** barcha endpointlar faqat onlayn (BO ekranlari; PWA keshida faqat oxirgi ko'rilgan holat). OpenAPI teg: `onec`.
 
 ### 10.1 Endpoint indeksi
 
@@ -2581,7 +2708,7 @@ Umumiy (`17`): base `/api/v1`, BFF cookie + `X-CSRF-Token` (yozuvchi so'rovlarda
 | W-01 | `GET /onec-agents` | Agentlar ro'yxati | `onec.view` |
 | W-02 | `GET /onec-agents/{id}` | Agent tafsiloti | `onec.view` |
 | W-03 | `GET /onec-agents/pairing-requests/{user_code}` | Ulash kodi bo'yicha PK ma'lumoti | `onec.settings.manage` |
-| W-04 | `POST /onec-agents/pair` | Kompyuterni ulash (device grant tasdig'i) | `onec.settings.manage` |
+| W-04 | `POST /onec-agents/pair`; rad etish varianti — `POST /onec-agents/pairing-requests/{user_code}/deny` | Kompyuterni ulash (device grant tasdig'i) yoki ulash so'rovini rad etish | `onec.settings.manage` |
 | W-05 | `POST /onec-agents/{id}/revoke` | Agentni uzish | `onec.settings.manage` |
 | W-06 | `POST /onec-agents/{id}/discover-bases` | PK'da 1C bazalarini qayta qidirish | `onec.settings.manage` |
 | W-07 | `POST /onec-agents/{id}/diagnostics-requests` | Diagnostika paketini so'rash | `onec.settings.manage` |
@@ -2642,7 +2769,7 @@ Jami **55** veb endpoint + **10** agent endpoint (§9.3) + OAuth (`/oauth/device
 // OneCAgent
 {"id":"…","name":"DOKON-PC","pc_name":"DOKON-PC","os_version":"Windows 10 Pro 22H2","agent_version":"1.4.2",
  "worker_bits":[32,64],"platforms":[{"version":"8.3.25.1374","bits":64,"registered":true}],
- "status":"active","online":true,"last_hello_at":"…","last_poll_at":"…","paired_by":{"id":"…","name":"Aziz"},
+ "status":"active","online":true,"last_hello_at":"…","last_poll_at":"…","paired_by":"…","paired_by_name":"Aziz",
  "paired_at":"…","update_available":"1.4.3","bases_count":1,"version":3}
 // OneCBase
 {"id":"…","agent_id":"…","agent_name":"DOKON-PC","name":"Do'kon BP","connect_kind":"file","connect_display":"D:\\1C\\Shop",
@@ -2650,16 +2777,18 @@ Jami **55** veb endpoint + **10** agent endpoint (§9.3) + OAuth (`/oauth/device
  "platform_version":"8.3.25.1374","platform_bits":64,"profile_code":"bp30_uz","status":"ready","write_enabled":true,
  "pc_write_enabled":true,"checks":[{"code":"connect","status":"pass","value":null,"error_code":null,"checked_at":"…"}],
  "checks_at":"…","date_prohibition":"2026-09-30","date_prohibition_read_at":"…","last_ok_at":"…","last_error_code":null,"version":7}
-// ExportBatch (ro'yxatda — preview'siz)
+// ExportBatch (W-37 dagi to'liq shakl; W-34 ro'yxatida — `preview` maydonisiz)
 {"id":"…","base_id":"…","business_date":"2026-10-15","revision":1,"kind":"regular","correction_date":null,"is_current":true,
  "status":"preview","trigger":"shift_close","mode":"full","readiness":{…},"blocking_issues":[],"warnings":[…],
  "excluded_devices":[],"preview":{…§7.4…},"preview_hash":"…","expected_totals":{…},"actual_totals":null,
  "item_counts":{"pending":6},"needs_resync":false,"approved_by":null,"approved_at":null,"approval_mode":null,
- "started_at":null,"finished_at":null,"accepted_by":null,"error_code":null,"created_at":"…"}
+ "started_at":null,"finished_at":null,"accepted_by":null,"accepted_at":null,"accept_reason":null,
+ "cancel_requested_at":null,"cancelled_at":null,"cancel_reason":null,"error_code":null,"created_at":"…"}
 // ExportItem
 {"id":"…","seq":4,"phase":60,"kind":"retail_sales_report","action":"create","title":"ОРП · Kassa-1 · 15.10.2026",
  "onec_type":"Документ.ОтчетОРозничныхПродажах","onec_guid":"…","doc_time":"2026-10-15T23:50:00","line_count":312,
- "expected_amount":"44100000.00","expected_vat":"4725000.00","status":"written","attempts":1,"next_attempt_at":null,
+ "expected_amount":"44100000.00","expected_vat":"4725000.00","status":"written","attempts":1,"max_attempts":8,
+ "next_attempt_at":null,"progress":null,
  "last_error_code":null,"last_error":null,"onec_number":"0000-000123","onec_posted":true,"written_at":"…","skip_reason":null}
 ```
 
@@ -2699,7 +2828,7 @@ Jami **55** veb endpoint + **10** agent endpoint (§9.3) + OAuth (`/oauth/device
 | Ruxsat | `onec.settings.manage` |
 | So'rov | `user_code` — chiziqchali yoki chiziqchasiz, katta-kichik harf farqsiz |
 | Javob | `200 {pc_name, os_version, agent_version, request_ip, created_at, expires_at}` |
-| Xatolar | `404 ONEC_PAIRING_CODE_INVALID` (yo'q, muddati o'tgan yoki ishlatilgan); `429 RATE_LIMITED` (foydalanuvchi bo'yicha 10/daq) |
+| Xatolar | `404 ONEC_PAIRING_CODE_INVALID` (noma'lum yoki ishlatilgan kod); `409 ONEC_PAIRING_CODE_EXPIRED` (muddati o'tgan); `429 RATE_LIMITED` (foydalanuvchi bo'yicha 10/daq) |
 | Idempotentlik | Kerak emas |
 | Offline | Yo'q |
 | Bog'liq | US-M19-01; BO-22 «Ulash» dialogi |
@@ -2712,7 +2841,8 @@ Jami **55** veb endpoint + **10** agent endpoint (§9.3) + OAuth (`/oauth/device
 | Ruxsat | `onec.settings.manage` |
 | So'rov | `{user_code, name?}` |
 | Javob | `201 OneCAgent` |
-| Xatolar | `404 ONEC_PAIRING_CODE_INVALID`, `409 ONEC_PAIRING_CODE_EXPIRED` |
+| Xatolar | `app.onec_device_auth_approve` natijasi (`RETURNS text`) bo'yicha: `approved` → `201`; `not_found`, `used` → `404 ONEC_PAIRING_CODE_INVALID`; `expired` → `409 ONEC_PAIRING_CODE_EXPIRED` |
+| Rad etish | `POST /onec-agents/pairing-requests/{user_code}/deny` (`onec.settings.manage`, `Idempotency-Key` majburiy) → `app.onec_device_auth_deny` → `204`; agent poll'iga (`/oauth/token`) `400 access_denied`. Natija xaritasi W-04 bilan bir xil (`not_found`/`used` → `404 ONEC_PAIRING_CODE_INVALID`, `expired` → `409 ONEC_PAIRING_CODE_EXPIRED`) |
 | Idempotentlik | Majburiy |
 | Offline | Yo'q |
 | Bog'liq | US-M19-01; audit `onec.agent.paired`; Telegram `onec_agent_paired` |
@@ -2750,7 +2880,7 @@ Jami **55** veb endpoint + **10** agent endpoint (§9.3) + OAuth (`/oauth/device
 | Maqsad | `collect_diagnostics` vazifasi — qo'llab-quvvatlash uchun log paketi |
 | Ruxsat | `onec.settings.manage` |
 | So'rov | `{include_logs_days: 1..7}` |
-| Javob | `202 {task_id, warnings}`; tayyor bo'lgach W-08 da `attachment_id`; agent jim bo'lsa `warnings: [ONEC_AGENT_OFFLINE]` (W-06 kabi) |
+| Javob | `202 {task_id, warnings}`; tayyor bo'lgach W-08 da `code='diagnostics_ready'` yozuvi, `context.attachment_id`; vazifaning `created_by` = so'rovchi (A-07 `attachments.uploaded_by`); agent jim bo'lsa `warnings: [ONEC_AGENT_OFFLINE]` (W-06 kabi) |
 | Xatolar | — |
 | Idempotentlik | Majburiy |
 | Offline | Yo'q |
@@ -2763,7 +2893,7 @@ Jami **55** veb endpoint + **10** agent endpoint (§9.3) + OAuth (`/oauth/device
 | Maqsad | Agent loglari + server voqealari (BO-22 «Jurnal») |
 | Ruxsat | `onec.view` |
 | So'rov | `?level__in=warn,error&base_id=&at__gte=&cursor=&limit=` |
-| Javob | `200 {items:[{id, at, level, code, message, base_id, task_id, context, source: "agent"\|"server"}], next_cursor}` (`onec_agent_logs` ∪ `onec_events`) |
+| Javob | `200 {items:[{id, at, level, code, message, message_key, base_id, task_id, context, source: "agent"\|"server"}], next_cursor}` (`onec_agent_logs` ∪ `onec_events`). Birlashtirish xaritasi: `level` — server voqeasida `warning → warn` (yagona to'plam `debug`/`info`/`warn`/`error`; `level__in` filtri shu to'plamda); `message_key` — server voqeasida `onec_events.message_key`, agent logida `null` (`message` — agent matni); `context` — agent logida `context`, server voqeasida `params`; diagnostika tayyor — `code='diagnostics_ready'`, `context.attachment_id` |
 | Xatolar | — |
 | Idempotentlik | Kerak emas |
 | Offline | Yo'q |
@@ -2799,7 +2929,7 @@ Jami **55** veb endpoint + **10** agent endpoint (§9.3) + OAuth (`/oauth/device
 
 | | |
 |---|---|
-| Maqsad | Nom, server qulfi (`write_enabled`), profil (`unknown` → `bp30_uz` qo'lda faqat `config_supported=warn` bo'lsa) |
+| Maqsad | Nom, server qulfi (`write_enabled`), profil (`unknown` → `bp30_uz` qo'lda — faqat `config_supported=fail` va `metadata_profile=pass` bo'lsa; Egasi) |
 | Ruxsat | `onec.settings.manage` |
 | So'rov | `{version, name?, write_enabled?, profile_code?}` |
 | Javob | `200 OneCBase` |
@@ -2838,7 +2968,7 @@ Jami **55** veb endpoint + **10** agent endpoint (§9.3) + OAuth (`/oauth/device
 
 | | |
 |---|---|
-| Maqsad | Yangi PK/agentga bazani o'tkazish (eski agent `revoked` yoki `ONEC_BASE_DUPLICATE` holati) — GUID nomlar fazosi, moslashtirishlar, `onec_object_refs` saqlanadi |
+| Maqsad | Yangi PK/agentga bazani o'tkazish (§5.3: `onboarding`/`ready`/`error`/`disabled` → `onboarding`; eski agent `revoked` yoki yangi agent A-02 da `ONEC_BASE_DUPLICATE` olgan) — GUID nomlar fazosi, moslashtirishlar, `onec_object_refs` saqlanadi |
 | Ruxsat | `onec.settings.manage` |
 | So'rov | `{agent_id, local_id}` (yangi agent A-02 bilan yuborgan, `409` olgan baza) |
 | Javob | `200 OneCBase` (`status='onboarding'`, tekshiruvlar qayta) |
@@ -3036,7 +3166,7 @@ Jami **55** veb endpoint + **10** agent endpoint (§9.3) + OAuth (`/oauth/device
 | Maqsad | Ommaviy saqlash (to'lov turi → ВидОплаты, QQS, hisoblar, statyalar, …) |
 | Ruxsat | `onec.mapping.edit` |
 | So'rov | `{base_id, items:[{kind, erp_value, onec_guid?\|onec_enum?}]}` |
-| Javob | `200 {saved, warnings:[{kind, erp_value, code}]}` — masalan `payment_method` hisobi 5710 emas → `ONEC_PAYMENT_ACCOUNT_NOT_TRANSIT` ogohlantirishi |
+| Javob | `200 {saved, warnings:[{code, params:{kind, erp_value}}]}` — masalan `payment_method` hisobi 5710 emas → `ONEC_PAYMENT_ACCOUNT_NOT_TRANSIT` ogohlantirishi |
 | Xatolar | `422 VALIDATION_ERROR` (lug'atda yo'q `erp_value`, ikkalasi/hech biri berilmagan) |
 | Idempotentlik | Majburiy |
 | Offline | Yo'q |
@@ -3075,8 +3205,8 @@ Jami **55** veb endpoint + **10** agent endpoint (§9.3) + OAuth (`/oauth/device
 | Maqsad | Tasdiqlash → `write_object` (Catalog) vazifalari; natijada `onec_mappings(created_by_erp)` |
 | Ruxsat | `onec.refs.create` |
 | So'rov | `{ids:[…] (≤ 500)}` |
-| Javob | `202 {approved: n, task_ids:[…]}` |
-| Xatolar | `409 ONEC_BATCH_INVALID_STATE` (so'rov `proposed`/`failed` emas — qator darajasida `errors[]`); `409 ONEC_WRITE_DISABLED`; `403 ONEC_REF_CREATE_FORBIDDEN` |
+| Javob | `202 {approved: n, task_ids:[…], errors:[{id, code}]}` — `task_ids` — darhol navbatga qo'yilgan vazifalar (qolganlari §5.10 yaratish tartibi bo'yicha keyinroq); `errors[]` — yaroqsiz qatorlar (masalan `proposed`/`failed` emas → `ONEC_BATCH_INVALID_STATE`) |
+| Xatolar | `409 ONEC_BATCH_INVALID_STATE` — faqat so'rovdagi **hamma** `id` yaroqsiz bo'lsa; `409 ONEC_WRITE_DISABLED`; `403 ONEC_REF_CREATE_FORBIDDEN` |
 | Idempotentlik | Majburiy |
 | Offline | Yo'q |
 | Bog'liq | US-M19-05; audit `onec.ref_create.approved` |
@@ -3140,7 +3270,7 @@ Jami **55** veb endpoint + **10** agent endpoint (§9.3) + OAuth (`/oauth/device
 | Maqsad | Preview, tayyorlik, progress, natija — BO-23 asosiy manbasi |
 | Ruxsat | `onec.view` |
 | So'rov | — |
-| Javob | `200 ExportBatch` (`preview` bilan, `readiness` 5 daqiqadan eski bo'lsa qayta baholanadi; `agent: {online, name, last_poll_at}`) |
+| Javob | `200 ExportBatch` (`preview` bilan, `readiness` 5 daqiqadan eski bo'lsa qayta baholanadi; `agent: {online, name, agent_version, last_poll_at}`) |
 | Xatolar | — |
 | Idempotentlik | Kerak emas |
 | Offline | Yo'q |
@@ -3166,7 +3296,7 @@ Jami **55** veb endpoint + **10** agent endpoint (§9.3) + OAuth (`/oauth/device
 | Maqsad | Item tafsiloti: manba hujjatlar, urinishlar, 1C xabarlari, `ObjectSpec` (90 kun), tuzatish maslahati |
 | Ruxsat | `onec.view` |
 | So'rov | — |
-| Javob | `200 ExportItem + {sources:[{doc_type, doc_id, number, doc_date}], attempts_history:[{task_id, attempt, outcome, error, duration_ms, received_at, late}], op_spec, fix_hint_key}` |
+| Javob | `200 ExportItem + {sources:[{doc_type, doc_id, number, doc_date}], attempts_history:[{task_id, attempt, outcome, error, duration_ms, received_at, late}], op_spec, fix_hint_key, preview_result: null \| {task_id, outcome, data, error, received_at}}` — `preview_result` — shu itemning oxirgi `preview_object` vazifasining `onec_task_results` yozuvi (`data` — §9.5 `preview_object` natijasi) |
 | Xatolar | — |
 | Idempotentlik | Kerak emas |
 | Offline | Yo'q |
@@ -3179,7 +3309,7 @@ Jami **55** veb endpoint + **10** agent endpoint (§9.3) + OAuth (`/oauth/device
 | Maqsad | 1C'da yozmasdan sinab ko'rish (`preview_object` — before/after, 1C to'ldirgan maydonlar); pilot va yangi profil sozlashda |
 | Ruxsat | `onec.export.prepare` |
 | So'rov | — |
-| Javob | `202 {task_id, warnings}`; natija W-39 `preview_result`; agent jim bo'lsa `warnings: [ONEC_AGENT_OFFLINE]` (W-06 kabi) |
+| Javob | `202 {task_id, warnings}`; natija W-39 `preview_result` maydonida (oxirgi `preview_object` vazifasining `onec_task_results` yozuvi); agent jim bo'lsa `warnings: [ONEC_AGENT_OFFLINE]` (W-06 kabi) |
 | Xatolar | `409 ONEC_BATCH_INVALID_STATE` (`sending/verifying`) |
 | Idempotentlik | Majburiy |
 | Offline | Yo'q |
@@ -3254,11 +3384,11 @@ Jami **55** veb endpoint + **10** agent endpoint (§9.3) + OAuth (`/oauth/device
 
 | | |
 |---|---|
-| Maqsad | `failed` (yoki `pending/queued`) itemni o'tkazib yuborish — 1C'ga yozilmaydi |
+| Maqsad | `failed`, `pending`, `queued` yoki `retry_wait` itemni o'tkazib yuborish — 1C'ga yozilmaydi (§7.5) |
 | Ruxsat | `onec.export.correct` |
 | So'rov | `{note}` (≥ 10 belgi) |
 | Javob | `200 ExportItem` (`skipped`, `skip_reason='user'`); bog'liq itemlar `skipped (dependency)` |
-| Xatolar | `409 ONEC_BATCH_INVALID_STATE` (item `sending/written/verified`) |
+| Xatolar | `409 ONEC_BATCH_INVALID_STATE` (item `sending`/`unknown`/`written`/`verified`/`mismatch`/`skipped` — `unknown` 1C'da yozilgan bo'lishi mumkin, avval §8.3 tekshiruvi) |
 | Idempotentlik | Majburiy |
 | Offline | Yo'q |
 | Bog'liq | US-M19-09; audit `onec.export.item_skipped` |
@@ -3297,7 +3427,7 @@ Jami **55** veb endpoint + **10** agent endpoint (§9.3) + OAuth (`/oauth/device
 | Ruxsat | `onec.export.correct` |
 | So'rov | `{correction_date, reason}` (standart — bugun) |
 | Javob | `202 {id, kind:"correction", status:"draft"}` |
-| Xatolar | `422 ONEC_DATE_PROHIBITED` (`correction_date ≤ date_prohibition`); `422 ONEC_NOTHING_TO_EXPORT` (farq yo'q); `409 ONEC_BATCH_INVALID_STATE` |
+| Xatolar | `409 ONEC_DATE_PROHIBITED` (`correction_date ≤ date_prohibition`); `422 ONEC_NOTHING_TO_EXPORT` (farq yo'q); `409 ONEC_BATCH_INVALID_STATE` |
 | Idempotentlik | Majburiy |
 | Offline | Yo'q |
 | Bog'liq | US-M19-12; audit `onec.export.correction_created` |
@@ -3309,7 +3439,7 @@ Jami **55** veb endpoint + **10** agent endpoint (§9.3) + OAuth (`/oauth/device
 | Maqsad | `read_totals` ni qayta ishga tushirish (`done/partial/mismatch` partiyada; masalan buxgalter 1C'da tuzatgandan keyin) |
 | Ruxsat | `onec.export.prepare` |
 | So'rov | — |
-| Javob | `202 {reconciliation_id, task_id, warnings}`; natijada `mismatch → done` bo'lishi mumkin; agent jim bo'lsa `warnings: [ONEC_AGENT_OFFLINE]` (W-06 kabi) |
+| Javob | `202 {reconciliation_id, task_id, warnings}`; natija §7.1 T17/T17b bo'yicha — natijada `mismatch → done` (T17) yoki `done → mismatch` (T17b) bo'lishi mumkin; agent jim bo'lsa `warnings: [ONEC_AGENT_OFFLINE]` (W-06 kabi) |
 | Xatolar | `409 ONEC_BATCH_INVALID_STATE` |
 | Idempotentlik | Majburiy |
 | Offline | Yo'q |
@@ -3322,7 +3452,7 @@ Jami **55** veb endpoint + **10** agent endpoint (§9.3) + OAuth (`/oauth/device
 | Maqsad | Partiya voqealari (progress lentasi) |
 | Ruxsat | `onec.view` |
 | So'rov | `?at__gt=&cursor=&limit=` |
-| Javob | `200 {items:[{id, at, level, code, message_key, params, item_id, actor}], next_cursor}` |
+| Javob | `200 {items:[{id, at, level, code, message_key, params, item_id, actor_user_id, actor_name}], next_cursor}` |
 | Xatolar | — |
 | Idempotentlik | Kerak emas |
 | Offline | Yo'q |
@@ -3361,7 +3491,7 @@ Jami **55** veb endpoint + **10** agent endpoint (§9.3) + OAuth (`/oauth/device
 | Maqsad | ERP hujjati qaysi 1C obyektiga tushgan (sotuv/kirim va h.k. ekranlarida «1C da: ОРП № 0000-000123, 15.10.2026, o'tkazilgan») |
 | Ruxsat | `onec.view` |
 | So'rov | `?doc_type=&doc_id=` yoki `?base_id=&kind=&erp_key=` |
-| Javob | `200 {items:[{base_id, base_name, kind, onec_type, onec_guid, onec_number, onec_date, posted, deletion_mark, state, last_written_at, batch_id}]}` (`onec_export_item_sources` orqali) |
+| Javob | `200 {items:[{base_id, base_name, kind, onec_type, onec_guid, onec_number, onec_date, posted, deletion_mark, state, last_written_at, last_batch_id}]}` (`onec_export_item_sources` orqali) |
 | Xatolar | — |
 | Idempotentlik | Kerak emas |
 | Offline | Yo'q |
@@ -3374,7 +3504,7 @@ Jami **55** veb endpoint + **10** agent endpoint (§9.3) + OAuth (`/oauth/device
 | Maqsad | Umumiy holat: BO-14 «Integratsiyalar» jadvalidagi «1C» qatori, BO-23 sarlavhasi, dashboard ogohlantirishi |
 | Ruxsat | `onec.view` |
 | So'rov | — |
-| Javob | `200 {state: "green"\|"yellow"\|"red"\|"none", agents_online, agents_total, bases:[{id, name, status, write_enabled, last_done_date, pending_days, failed_items, blocking}], last_success_at}` — 🟢 agent onlayn va kecha `done`; 🟡 navbatda ≥ 2 kun yoki ogohlantirish; 🔴 `error`/`failed`/`mismatch`; ⚪ sozlanmagan |
+| Javob | `200 {state: "green"\|"yellow"\|"red"\|"none", agents_online, agents_total, agents:[{id, name, agent_version, online}], bases:[{id, name, status, write_enabled, last_done_date, pending_days, failed_items, blocking}], last_success_at}` — 🟢 agent onlayn va kecha `done`; 🟡 navbatda ≥ 2 kun yoki ogohlantirish; 🔴 `error`/`failed`/`mismatch`; ⚪ sozlanmagan |
 | Xatolar | — |
 | Idempotentlik | Kerak emas |
 | Offline | Yo'q |
@@ -3875,7 +4005,7 @@ Natijalar `profiles/bp30_uz/names.yaml`, `queries.yaml` va shu faylning *taxmin*
 
 ### 16.2 Ochiq savollar — tashqi javob kerak (`26` Jadval B)
 
-Faqat tashqi javob talab qiladigan bandlar; har biri `26-ochiq-savollar-reestri.md` Jadval B («Tashqi javob kerak») dagi raqam bilan. Javob kelguncha vaqtinchalik qaror kodda sozlama ortida, Bosqich 7 ni bloklamaydi (#105 bundan mustasno).
+Faqat tashqi javob talab qiladigan bandlar; har biri `26-ochiq-savollar-reestri.md` Jadval B («Tashqi javob kerak») dagi raqam bilan. Javob kelguncha vaqtinchalik qaror kodda sozlama ortida. #105, #132, #133 (P-03…P-07, P-12) Bosqich 7 kodini bloklaydi; qolganlari bloklamaydi.
 
 | `26` | Savol | Kim | Vaqtinchalik qaror |
 |---|---|---|---|
@@ -3892,7 +4022,7 @@ Faqat tashqi javob talab qiladigan bandlar; har biri `26-ochiq-savollar-reestri.
 | #104 | Bir tovar kun ichida turli narxda sotilganda ОРП'da bitta qator (o'rtacha `Цена`) maqbulmi | Pilot do'kon buxgalteri | Bitta qator (`product × QQS`) |
 | #105 | Authenticode OV kod-imzolash sertifikati — CA, narx, yuridik shaxs nomi (qaror #38) | Asoschi + CA | Olinmaguncha agent faqat ichki sinovda (Bosqich 7 kirish sharti) |
 | #132 (OQ-049) | БП UZ 3.0.64 metadata nomlari (ОРП jadval qismlari, `Касса`, ИКПУ/«Упаковка (ЭДО)», `СтавкиНДС`, `ВидыОплатОрганизаций`, qaytarish hujjatlari) | Real БП UZ baza (P-03, P-04, P-08, P-09) | Profil `bp30_uz` standart nomlari, `read_metadata` tekshiradi |
-| #133 (OQ-050) | ОРП o'tkazish xulqi: hisoblarni to'ldirish, provodkalar qo'lda kiritilganga tengligi, `Возвраты`, yaxlitlash | Real baza + buxgalter «oltin namuna» (P-05, P-06, P-07, P-12) | `fill_accounts=true`, `orp_returns_section`; Bosqich A gacha kod yozilmaydi |
+| #133 (OQ-050) | ОРП o'tkazish xulqi: hisoblarni to'ldirish, provodkalar qo'lda kiritilganga tengligi, `Возвраты`, yaxlitlash | Real baza + buxgalter «oltin namuna» (P-05, P-06, P-07, P-12) | `fill_accounts=true`, `orp_returns_section`; §16.1 pilot oldi testlari o'tguncha kod yozilmaydi |
 | #135 (OQ-054) | Yozish tezligi (100/300/1 500 qatorli ОРП, fayl baza) | Real baza, odatiy do'kon PK'si (P-19) | §15.1 taxminlari, `timeout_s` formulasi |
 | #136 (OQ-055) | COM o'tkazish fiskal uskunaga murojaat qilmasligi («По кассам» bilan/siz) | Real baza (P-21) | Murojaat qilmaydi deb hisoblanadi |
 | #137 (OQ-056) | Antivirus HTTPS skanerlashi bilan long-poll va imzo tekshiruvi | Pilot PK'lar (P-22) | Long-poll + qisqa poll zaxira |
@@ -3912,22 +4042,21 @@ Faqat tashqi javob talab qiladigan bandlar; har biri `26-ochiq-savollar-reestri.
 
 **Maqsad:** pilot do'konlar ERP'dagi kunlik sotuv va boshqa hujjatlarni o'z kompyuteridagi «Бухгалтерия для Узбекистана 3.0» bazasiga bir tugma bilan, takrorsiz va tekshirilgan holda yozadi (qaror #36–#42).
 
-**Kirish shartlari:** Bosqich 6 «Tayyor ta'rifi» bajarilgan; §16.1 pilot oldi testlari P-01…P-22 real bazada o'tkazilgan va `profiles/bp30_uz/*.yaml` qotirilgan; Authenticode OV kod-imzolash sertifikati olingan (qaror #38); `agent_update` ildiz kaliti oflayn yaratilgan.
+**Kirish shartlari:** Bosqich 6 «Tayyor ta'rifi» bajarilgan; Bosqich 5 da Do'kon agenti infratuzilmasi qurilgan (qaror #66: `0028 store_agent`, OAuth `onec-agent` mijozi, A-01, A-03…A-10, imzoli vazifa navbati, avto-yangilanish, W-01…W-05, W-07, W-08); §16.1 pilot oldi testlari P-01…P-22 real bazada o'tkazilgan va `profiles/bp30_uz/*.yaml` qotirilgan; Authenticode OV kod-imzolash sertifikati olingan (qaror #38).
 
 **Vazifalar:**
-- [ ] DB: `onec_integration` revizioni (§5), 12/14/16 dagi o'zgarishlar (§5.22), 6 ta SECURITY DEFINER funksiya, RLS CI ro'yxati
-- [ ] OAuth: `onec-agent` mijozi, `/oauth/device_authorization`, device grant, `client_credentials` + `private_key_jwt`, `aud=urn:erp:onec-agent` tokeni (§9.2)
-- [ ] Agent API A-01…A-10, long-poll + Redis wake, lease/heartbeat/sweeper, Ed25519 vazifa imzosi va kalitlar to'plami (§9)
-- [ ] Windows agenti (`34-1c-agent.md`): supervisor, x86/x64 COM worker, DPAPI, ulash, bazalarni topish, «saqlash=sinash», §8.3 yozish algoritmi, `results.jsonl` outbox, imzoli avto-yangilanish
+- [ ] DB: `0029 onec_integration` revizioni (§5; 1C ga xos jadvallar, `onec_agent_tasks` ga kechiktirilgan FK'lar), 12/16 dagi o'zgarishlar (§5.22; `devices.kind` va `signing_keys.purpose` — Bosqich 0 da, qaror #58c), RLS CI ro'yxati. OAuth `onec-agent` mijozi, device grant, `private_key_jwt`, A-01, A-03…A-10, lease/heartbeat/sweeper, Ed25519 vazifa imzosi — Bosqich 5 da qurilgan (qaror #66), bu yerda faqat 1C vazifa turlari (§9.5) ulanadi
+- [ ] Agent API A-02 (`bases`), 1C vazifa turlari (§9.5 13 tur)
+- [ ] Windows agentining 1C moduli (`34-1c-agent.md` §1–§13): x86/x64 COM worker, bazalarni topish, «saqlash=sinash», §8.3 yozish algoritmi
 - [ ] Onboarding tekshiruvlari (§2.3), metadata snapshot, `bp30_uz` profili
 - [ ] Moslashtirish ustasi: `read_refs` keshi, auto-match, qiymat moslashtirishlari, `onec_ref_create_requests` (BO-22)
 - [ ] `BatchBuilder` — §6.2 barcha turlari (A-qism: `goods_receipt`, `retail_sales_report`, qoldiq preflight; B-qism: qaytarishlar, `credit_sale` + to'lovlar, `debt_payment`, ko'chirish, hisobdan chiqarish, inventarizatsiya, kassa hujjatlari), invariantlar, preview/xesh
 - [ ] Holat mashinalari (§7), tayyorlik (§7.3, `16` §9 qurilma qoidasi + `outbox_state`), dispetcher, verify (§8.10)
 - [ ] Revision, kech ma'lumot (`OneCChangeTracker` barcha posting xizmatlarida), bekor qilish, tuzatuvchi partiya, drift (§8)
 - [ ] Jadval (`on_shift_close`, `at_time`), avto-tasdiq (faqat Egasi)
-- [ ] Veb API W-01…W-55, BO-22, BO-23, BO-14 «1C» qatori, hujjat ekranlarida «1C da» belgisi
+- [ ] Veb API W-06, W-09…W-55 (W-01…W-05, W-07, W-08 — Bosqich 5), BO-22, BO-23, BO-14 «1C» qatori, hujjat ekranlarida «1C da» belgisi
 - [ ] Ruxsatlar (§11), audit, Telegram shablonlari (§13.3), xato kodlari (§12) i18n
-- [ ] Qabul testlari (`31`): §14 qabul mezonlari, GUID test vektorlari, P-20 dublikatsizlik, 7 kunlik offline navbat
+- [ ] Qabul testlari (`31` M19; shu fayl §14 qabul mezonlari): GUID test vektorlari, P-20 dublikatsizlik, 7 kunlik offline navbat
 
 **O'qiladigan spec fayllari:** `33-1c-integratsiya.md` (shu fayl), `34-1c-agent.md`, `01` (#36–#42), `12` §1/§4, `14` §2/§5/§6, `16` §9, `17`, `23`.
 
@@ -3944,7 +4073,7 @@ Faqat tashqi javob talab qiladigan bandlar; har biri `26-ochiq-savollar-reestri.
 | `06-ekranlar-umumiy.md`, `07-ekran-tafsilotlari.md` | BO-22, BO-23 (§13.1–13.2); BO-14 «1C» qatori; hujjat ekranlarida «1C da» belgisi (W-54) |
 | `08-dizayn-tizimi.md` | `onec.*` i18n matnlari, kalendar ranglari (§13.2) |
 | `11-malumotlar-modeli.md` | §5 jadvallari (mantiqiy model) |
-| `12-db-sxema.md` | §2.11 DDL (`0028 onec_integration`), §4.2 RLS, §4.4 grantlar (jadval nomi bilan), §4.5 6 SECURITY DEFINER funksiya, §5.22 o'zgarishlar (`devices.kind`, `devices.outbox_*`, `signing_keys.purpose`, `oauth_clients` seed, `attachments.kind`), CI ro'yxatlari — DDL matni bo'yicha `12` ustun (§5.1) |
+| `12-db-sxema.md` | §2.11 DDL (`0028 store_agent` — umumiy agent jadvallari, Bosqich 5; `0029 onec_integration` — 1C ga xos jadvallar, Bosqich 7), §4.2 RLS, §4.4 grantlar (jadval nomi bilan), §4.5 SECURITY DEFINER funksiyalar (§5.18), §5.22 o'zgarishlar (`devices.kind`, `devices.outbox_*`, `signing_keys.purpose`, `oauth_clients` seed, `attachments.kind`), CI ro'yxatlari — DDL matni bo'yicha `12` ustun (§5.1) |
 | `13-provodka-qoidalari.md` | O'zgarish yo'q (1C'ga provodka yuborilmaydi); §2.14/§2.18a ga havola |
 | `14-autentifikatsiya-oauth2.md` | §2 mijoz `onec-agent`; §3 grant'lar (device code, `client_credentials`+`private_key_jwt`); §5 `aud=urn:erp:onec-agent` tokeni; §6 `signing_keys.purpose` `onec_task`/`agent_update`; §10 scope `onec` (foydalanuvchi) va `onec.agent` (agent); §16 — lokautda agent tokeni beriladi, API cheklaydi (§9.1); §20 `/oauth/device_authorization` |
 | `15-xavfsizlik-va-audit.md` | §2.1 `onec.*` 7 kod, §2.2 matritsa (§11.2), §6.1 audit voqealari (§11.3), §3.3 CI ro'yxati |

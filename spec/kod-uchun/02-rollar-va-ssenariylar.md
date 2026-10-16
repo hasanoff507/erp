@@ -38,7 +38,7 @@ Bozor tadqiqoti shuni ko'rsatadi: 1-3 xodimli do'konlarda alohida "buxgalter" yo
 
 ### Og'riqlar (manba bilan)
 - Mavjud buxgalteriya/ERP tizimlarining litsenziyasi va joriy etish narxi yuqori, qo'shimcha foydalanuvchi uchun alohida to'lov.
-- Markirovka (Asl belgisi) jarimasi — bitta xodimning xatosi butun brendga 2-20% jarima va **"100% bankrotlik xavfi"** keltirishi mumkin (`research_notes/texnik/11-raqobatchilar-kamchiliklari.md`).
+- Markirovka (Asl belgisi) jarimasi — bitta xodimning xatosi butun brendga 2-20% jarima va **"100% bankrotlik xavfi"** keltirishi mumkin (`research_notes/texnik/11-raqobatchilar-kamchiliklari.md`) (raqobatchi sharhlari, qonuniy manba tasdiqlanmagan).
 - Fiskal kassa buzilishlari (chek bermaslik, naqdsiz to'lovni qabul qilmaslik) davlat tekshiruvida 400+ holatda aniqlangan — obro' va jarima xavfi (`research_notes/texnik/11-raqobatchilar-kamchiliklari.md`, kun.uz manbasi).
 - Hisob-kitob ko'p tizim (Excel + WhatsApp + qog'oz) orasida tarqoq, yagona manzara yo'q (`research_notes/AI ERP startap Ozbekistonda/04_sohalar.md`).
 
@@ -109,7 +109,7 @@ Back-office PWA (asosiy); zarurat bo'lganda veb-kassada kassir sifatida ham ishl
 
 ### Og'riqlar (manba bilan)
 - Markirovka skanerlari amalda **muntazam ishlamaydi**, uskuna o'rnatish qiyin — bu kassada navbatni to'xtatadi va mijoz noroziligini keltiradi (`research_notes/texnik/11-raqobatchilar-kamchiliklari.md`, gazeta.uz 2026-04-14 iqtibosi).
-- Internet uzilganda savdo to'xtab qolishi xavfi (offline-first yo'q bo'lgan tizimlarda) — O'zbekistonda internet uzilishlari tarixi tufayli bu kundalik xavf (`spec/README.md`, offline-first qarori). Offline savdo qonuniy, lekin OFD tasdig'ini olmagan eng eski chekdan 48 soat o'tsa kassa avtomatik bloklanadi (VMQ-943 2-ilova 6-band) — tizim 24/40/46 soatda ogohlantiradi (qaror #43).
+- Internet uzilganda savdo to'xtab qolishi xavfi (offline-first yo'q bo'lgan tizimlarda) — O'zbekistonda internet uzilishlari tarixi tufayli bu kundalik xavf (offline-first — qaror #21, #43). Offline savdo qonuniy, lekin OFD tasdig'ini olmagan eng eski chekdan 48 soat o'tsa kassa avtomatik bloklanadi (VMQ-943 2-ilova 6-band) — tizim 24/40/46 soatda ogohlantiradi (qaror #43).
 - Fiskal modul/OFD texnik xatosi tufayli chek bermaslik holatlari — bu kassirning shaxsiy javobgarligiga aylanishi mumkin (`research_notes/texnik/11-raqobatchilar-kamchiliklari.md`).
 
 ### Qurilma
@@ -197,7 +197,7 @@ Back-office PWA (yagona ish muhiti).
 
 **Oylik**
 1. Oy yakunida moliyaviy hisobotlarni (foyda-zarar, balans) shakllantiradi (**M11**, **M12**).
-2. Oyning 10-sanasigacha davlat hisobotiga kiradigan interaktiv ma'lumotlarni (aylanma — soliq solinmaydigan daromad, chegirmalar, imtiyozlar; QQS — hisobga olinadigan QQS tuzatishlari) tizim tayyorlagan raqamlar asosida kabinetga kiritadi (**M10**).
+2. Har oyning 10-sanasi — ichki eslatma sanasi (sozlanadi), qonuniy muddat emas — davlat hisobotiga kiradigan interaktiv ma'lumotlarni (aylanma — soliq solinmaydigan daromad, chegirmalar, imtiyozlar; QQS — hisobga olinadigan QQS tuzatishlari) tizim tayyorlagan raqamlar asosida kabinetga kiritadi (**M10**).
 3. Davlat qo'mitasi tuzgan QQS/aylanma/boshqa hisobot faylini my.soliq.uz kabinetidan yuklab olib tizimga yuklaydi va ichki hisob bilan solishtiradi (QQS — e-faktura darajasida va yig'indi; aylanma — 5 manba bo'yicha yig'indi); farq topilsa **5 ish kuni** ichida (topshirish muddatidan kechiktirmay) kabinetda tasdiqlaydi yoki tuzatib taqdim etadi, Egasiga yakuniy natijani tasdiqlash uchun yuboradi (**M10**). Javob berilmasa, hisobot davlat shakllantirgan ko'rinishda topshirilgan hisoblanadi (Soliq kodeksi 81-moddasi, O'RQ-1108 — [lex.uz/docs/-7944527](https://lex.uz/docs/-7944527)); muddatdan keyin — SK 83-modda bo'yicha aniqlashtirilgan hisobot. Tizim 1-, 3- va 4-ish kunida Buxgalterga, 3-ish kunidan Egasiga ham ogohlantiradi (qaror #50).
 4. Davr oxirida server hisoblagan soliq hisob-kitobi hujjatini (`tax_settlements`, ST: QQS hisobga olish yoki aylanma solig'i) ko'rib o'tkazadi (**M10**, **M11**).
 5. Inventarizatsiya natijasini (**M05**, ko'rish) buxgalteriya yozuviga aks ettiradi (**M11**, yaratish).
@@ -216,7 +216,7 @@ Belgilar: **K** = ko'rish, **Y** = yaratish, **T** = tasdiqlash. "–" = huquq y
 | M04 Ombor qoldig'i | K, Y, T | K | K | Y | K |
 | M05 Inventarizatsiya | K, Y, T | Y, T | – | Y | K |
 | M06 Ko'chirish | K, Y, T | Y, T | – | Y | K |
-| M07 Xarid | K, Y, T | Y, T | – | Y | K, Y |
+| M07 Xarid | K, Y, T | Y | – | Y | K, Y |
 | M08 Nasiya | K, Y, T | Y, T | Y | – | K |
 | M09 Narxlar | K, Y, T | Y | K | K | K |
 | M10 QQS | K, Y, T | K | – | – | Y, T |
@@ -252,7 +252,7 @@ Tashqi javob kerak bo'lgan band yo'q — rollar va ssenariylar bo'yicha savollar
 
 ## Manbalar
 
-- `spec/README.md` — asosiy qarorlar
+- `01-qarorlar.md` — asosiy qarorlar
 - `research_notes/texnik/00-xulosa-va-ochiq-savollar.md`
 - `research_notes/texnik/01-erp-modullar-va-malumot-modeli.md`
 - `research_notes/texnik/02-kassa-ofd-markirovka.md`

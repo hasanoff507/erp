@@ -60,7 +60,7 @@ Barcha so'rovlarda yozuvchi amallar uchun **`Idempotency-Key`** majburiy (`24-fr
 
 ### 1.5 Ro'yxatdan o'tishda avtomatik yaratiladigan obyektlar (tenant provisioning)
 
-Ro'yxatdan o'tish (US-M17-01) **bitta tranzaksiyada** quyidagilarni yaratadi: `tenants`, `subscriptions` (`status=trial`, 30 kun), Egasi uchun `memberships` (barcha filialga — bo'sh `branch_ids`), 5 standart tizim roli + ularning `role_permissions` (§2.2 standart matritsa), standart filial + standart ombor + standart kassa (`cash_registers`), `doc_sequences` boshlang'ich qatorlari, standart xarajat toifalari (`expense_categories`, `27-backlog.md` seed ro'yxati bilan bir xil), `tenants.settings.valuation_method='AVECO'` (standart). Hisob rejasi, `units`, `plans` — **global**, tenant uchun nusxalanmaydi; MXIK katalogi — tasnif.soliq.uz orqali tashqi manba, tenant ichida saqlanmaydi.
+Ro'yxatdan o'tish (US-M17-01) **bitta tranzaksiyada** quyidagilarni yaratadi: `tenants`, `subscriptions` (`status=trial`, 30 kun), Egasi uchun `memberships` (barcha filialga — bo'sh `branch_ids`), 5 standart tizim roli + ularning `role_permissions` (§2.2 standart matritsa), standart filial + standart ombor + standart kassa (`cash_registers`), `doc_sequences` boshlang'ich qatorlari, standart xarajat toifalari (`expense_categories`, `27-backlog.md` seed ro'yxati bilan bir xil), `valuation_method_history(method='aveco', valid_from=go_live_date)` qatori (standart baholash usuli — AVECO). Foydalanish shartlari aksepti — signup'da (`accepted_terms_version`, `accepted_terms_at`, `accepted_terms_ip`; `14-autentifikatsiya-oauth2.md` §20 `/auth/signup`). Hisob rejasi, `units`, `plans` — **global**, tenant uchun nusxalanmaydi; MXIK katalogi — tasnif.soliq.uz orqali tashqi manba, tenant ichida saqlanmaydi.
 
 ---
 
@@ -105,7 +105,7 @@ Har bir kod `role_permissions.permission_code` sifatida saqlanadi, zarur bo'lsa 
 | `catalog.manage` | M09 | Mahsulot/kategoriya/shtrix-kod (ichki kod generatsiyasi) CRUD, mahsulot importi, ombor sozlamalari (`stock-settings`) | — |
 | `tax.vat.view` | M10 | Ichki QQS hisobini ko'rish | — |
 | `tax.compare.review` | M10 | Davlat hisoboti bilan farqni ko'rib chiqish | — |
-| `tax.correction.submit` | M10 | Tuzatish/e'tiroz yuborish (E-IMZO) | — |
+| `tax.correction.submit` | M10 | Davlat hisobotiga tuzatish yoki tasdiqni qayd etish (tuzatish my.soliq.uz kabinetida kiritiladi; tizimda imzosiz qayd) | — |
 | `accounting.post` | M11 | Buxgalteriya yozuvini ko'rish/qo'lda tuzatish | — |
 | `accounting.period.close` | M11 | Hisob davrini yopish | — |
 | `stock.opening.manage` | M04, M08 | Boshlang'ich tovar qoldig'i va boshlang'ich qarz (qo'lda va `import-jobs`) | — |
@@ -124,7 +124,7 @@ Har bir kod `role_permissions.permission_code` sifatida saqlanadi, zarur bo'lsa 
 | `cash.count.shift` | M16 | Smena yopishda naqdni sanash | — |
 | `devices.revoke` | M13 | BO-11 «Qurilmalar» tabi: qurilmalar ro'yxatini ko'rish (`GET /devices`) va qurilmani bekor qilish (`POST /devices/{id}/revoke`) (qaror #56) | — |
 | `bank_settlements.manage` | M11, M16 | Bank tushumi tasdig'i (`bank_settlements`, hujjat kodi `BT`): bank ko'chirmasi bo'yicha 5710 → 5110 o'tkazmasini yaratish, ko'rish, o'tkazish (`post`) va bekor qilish (`13-provodka-qoidalari.md` §2.18a, qaror #42) | — |
-| `billing.manage` | M17 | Tarif tanlash, to'lov, obuna holati | **faqat Egasi** |
+| `billing.manage` | M17 | Obuna to'lovi (oy/yil), qo'shimcha kassa, to'lovlar tarixi | **faqat Egasi** |
 | `notifications.manage` | M18 | Telegram/ogohlantirish sozlamalari | — |
 | `telegram.link` | M18 | O'z Telegram akkauntini ulash | — |
 | `ai.chat.use` | AI-01 | AI yordamchi chatdan foydalanish | — |
@@ -151,7 +151,7 @@ Quyidagi jadval `02-rollar-va-ssenariylar.md` (6-bo'lim) dagi K/Y/T matritsasi b
 | `sales.create` | ✓ | ✓ | ✓ | – | – |
 | `shift.open/close` | ✓ | ✓ | ✓ | – | – |
 | `returns.create` | ✓ | ✓ | ✓ | – | – |
-| `returns.approve` | ✓ | ✓ | – | – | – |
+| `returns.approve` | ✓ | ✓ | ✓(limit, 100 000) | – | – |
 | `discount.give` | ✓ | ✓(limit) | ✓(limit, past) | – | – |
 | `discount.approve` | ✓ | ✓ | – | – | – |
 | `stock.count.create` | ✓ | ✓ | – | ✓ | – |
@@ -171,7 +171,7 @@ Quyidagi jadval `02-rollar-va-ssenariylar.md` (6-bo'lim) dagi K/Y/T matritsasi b
 | `prices.edit` | ✓ | ✓ | – | – | – |
 | `prices.approve` | ✓ | – | – | – | – |
 | `tax.vat.view` | ✓ | – | – | – | ✓ |
-| `tax.compare.review` / `tax.correction.submit` | ✓ (yakuniy) | – | – | – | ✓ |
+| `tax.compare.review` / `tax.correction.submit` | ✓ | – | – | – | ✓ |
 | `accounting.post` | ✓ | – | – | – | ✓ |
 | `accounting.period.close` | ✓ | – | – | – | ✓ |
 | `reports.finance.view` | ✓ | ✓ | – | – | ✓ |
@@ -222,10 +222,10 @@ Quyidagi jadval `02-rollar-va-ssenariylar.md` (6-bo'lim) dagi K/Y/T matritsasi b
 
 1. Kassir/Omborchi amal bajaradi (masalan chegirma, qaytarish, nasiya) — kod avval `role_permissions.limit_value` bilan solishtiradi.
 2. Limit ichida bo'lsa — amal darhol yakunlanadi.
-3. Limitdan oshsa — amal **"kutilmoqda"** holatiga o'tadi:
+3. Limitdan oshsa — `approval_requests(status='pending')` yaratiladi, hujjat `draft` da qoladi (qaror #25; yagona istisno — `price_changes` → `pending_approval`):
    - Agar Menejer/Egasi fizik yaqinda (kassada) bo'lsa — PIN kiritib **inline** tasdiqlaydi (POS-06, POS ekranida bottom-sheet, `06-ekranlar-umumiy.md`);
    - Aks holda — **BO-16 Tasdiqlash navbati** ekraniga tushadi, Menejer/Egasi PWA'dan ko'rib tasdiqlaydi/rad etadi.
-4. Offline holatda: limit tekshiruvi oxirgi sinxronlangan ma'lumot asosida, Menejer PIN'i **lokal** tasdiqlaydi, server qayta tekshiradi; limitdan oshgan bo'lsa ham PIN bilan tasdiqlangan amal qabul qilinadi, `limit_exceeded=true` bayrog'i + M18 xabar (`16-offline-sync.md` §5).
+4. Offline holatda: limit tekshiruvi oxirgi sinxronlangan ma'lumot asosida, Menejer PIN'i **lokal** tasdiqlaydi, server qayta tekshiradi; limitdan oshgan bo'lsa ham PIN bilan tasdiqlangan amal qabul qilinadi — `sync_exceptions(kind='approval_limit_exceeded_offline')` + `doc_approvals` + M18 xabar (`16-offline-sync.md` §5).
 5. Har bir tasdiqlash/rad etish `audit_log`ga yoziladi (kim, qachon, limit, natija).
 
 **Standart limitlar (Kassir uchun)** (qaror #23 — tavsiya #1):
@@ -370,7 +370,7 @@ Har bir sir yozuvida: `tenant_id`, `kind` (masalan `click_secret`, `didox_token`
 - Ma'lumot eksporti (`reports.export`, tenant bo'yicha to'liq eksport, 7.3-bo'lim).
 - To'lovdan oldin chek qatori/chekni bekor qilish (`sale.draft_voided`), chekni qayta chop etish (`receipt.reprinted`), qurilmani bekor qilish va PIN majburiy almashtirish.
 - **OAuth/autentifikatsiya voqealari** (to'liq ro'yxat `14-autentifikatsiya-oauth2.md` §14'da): `login_success`/`login_failed`/`account_locked`, `otp_requested`/`otp_verified`/`otp_failed`, `password_changed`/`password_reset`, `pin_changed`/`pin_reset_forced`, `refresh_token_reuse_detected`, `session_revoked`/`all_sessions_revoked`, `tenant_switched`, `subscription_lockout_triggered`/`subscription_restored`, `signing_key_rotated`.
-- **Qo'shimcha voqealar**: `sync_drain_started`/`sync_drain_completed` (lokautdan oldingi offline cheklarni drenaj qilish, `14-autentifikatsiya-oauth2.md` §16.4), `data_export_during_restriction` (lokaut paytida to'lov-sahifa orqali eksport, §16.5), `platform_admin_mfa_failed` (§18.1).
+- **Qo'shimcha voqealar**: `sync_drain_started`/`sync_drain_completed` (lokautdan oldingi offline cheklarni drenaj qilish, `14-autentifikatsiya-oauth2.md` §16.4), `data_export_during_restriction` (lokaut paytida to'lov-sahifa orqali eksport, `14` §16.5), `platform_admin_mfa_failed` (`14` §18.1).
 - **1C integratsiyasi voqealari** (`33-1c-integratsiya.md` §11.3, `entity` — tegishli `onec_*` jadvali): `onec.agent.paired`, `onec.agent.revoked`, `onec.agent.unpaired`, `onec.agent.machine_changed`, `onec.agent.updated`; `onec.base.registered`, `onec.base.updated`, `onec.base.write_enabled_changed`, `onec.base.reassigned`, `onec.base.archived`; `onec.binding.changed`; `onec.settings.changed`, `onec.auto_approve.changed`; `onec.mapping.confirmed`, `onec.mapping.removed`, `onec.value_mapping.changed`; `onec.ref_create.approved`, `onec.ref_create.rejected`, `onec.ref_create.created`; `onec.export.prepared`, `onec.export.approved`, `onec.export.auto_approved`, `onec.export.cancelled`, `onec.export.resent`, `onec.export.item_skipped`, `onec.export.accepted`, `onec.export.revision_created`, `onec.export.correction_created`, `onec.export.devices_excluded`; `onec.item.written`, `onec.item.failed`, `onec.item.unposted_marked`; `onec.verify.mismatch`, `onec.drift.detected`; `onec.task.rejected` (xavfsizlik signali — alert, `33-1c-integratsiya.md` §15.4); `onec.diagnostics.requested`. Agent amallari `user_id`siz, `device_id` (agent qurilmasi) bilan yoziladi.
 - **Bank tushumi tasdig'i** (`bank_settlements`, `bank_settlements.manage`): yaratish, o'tkazish va bekor qilish (sabab bilan) — `entity='bank_settlements'`, `after`: `method`, `gross_amount`, `commission_amount`, `bank_ref`.
 - **Markirovkalangan tovar offline audit voqealari**: `marking.offline_sold` (actor_user_id, device_id, code, sale_id, price_source=`cache`, created_at), `marking.offline_refused_no_price`, `marking.verify_failed` (sinxronlanishdan keyin: noto'g'ri/takroriy kod yoki CRPT xatosi — Egasi/Buxgalterga M18 ogohlantirishi bilan birga), `marking.manual_entry` (DataMatrix kodi qo'lda kiritildi — faqat online, `POST /marking-codes/verify` bilan; actor_user_id, device_id, code), `marking.precheck_failed` (`MARKING_PRECHECK=warn`da oldindan tekshiruv o'tmadi yoki CRPT javob bermadi, sotuv davom etdi — qaror #62), `marking.duplicate_rejected` (lokal takror-kod tekshiruvi) — to'liq siyosat `16-offline-sync.md` §7'da.
@@ -405,8 +405,8 @@ Har bir sir yozuvida: `tenant_id`, `kind` (masalan `click_secret`, `didox_token`
 
 ### 7.3 Tenant bo'yicha eksport
 
-- Har bir tenant o'z ma'lumotini **istalgan vaqtda** eksport qila oladi: Excel/PDF hisobotlar (`reports.export`, BO-09, US-M12-03) — bu `active`/`grace` holatda ishlaydi. `restricted`/`closed` holatda oddiy `reports.export` **yopiq** (US-M17-03/US-M17-05, `14-autentifikatsiya-oauth2.md` §16.1.1). Buning o'rniga lokaut paytida ma'lumot eksporti (qaror #20) **faqat** login/to'lov sahifasidagi alohida "Ma'lumotlarimni yuklab olish" yo'li orqali — parol tasdiqlash + SMS OTP (`purpose=data_export`) + tenant bo'yicha 1 marta/24 soat rate-limit + `data_export_during_restriction` audit yozuvi bilan (to'liq mexanizm `14-autentifikatsiya-oauth2.md` §16.5).
-- **To'liq tenant eksporti formati** (qaror #51): ZIP — har jadval alohida CSV (UTF-8, sarlavha qatori, pul — o'nlik satr) + `manifest.json` (`schema_version`, `generated_at`, `tenant_id`, jadval → qatorlar soni) + ixtiyoriy hujjat PDF'lari. Tayyorlash ≤ 24 soat (SAQ job), yuklab olish — signed URL 24 soat, tenant uchun 1 so'rov / 24 soat (`14-autentifikatsiya-oauth2.md` §16.5); javob `{status, download_url, expires_at}` (`20-api-moliya-admin.md`). Lokaut holatida — 01 #20 yo'li. Har eksport `audit_log`ga yoziladi (§6.1). Mahsulot talabi — US-M17-05.
+- Har bir tenant o'z ma'lumotini **istalgan vaqtda** eksport qila oladi: Excel/PDF hisobotlar (`reports.export`, BO-09, US-M12-03) — bu `active`/`grace` holatda ishlaydi. `restricted`/`closed` holatda oddiy `reports.export` **yopiq** (US-M17-03/US-M17-05, `14-autentifikatsiya-oauth2.md` §16.1.1). Buning o'rniga lokaut paytida ma'lumot eksporti (qaror #20) **faqat** login/to'lov sahifasidagi alohida "Ma'lumotlarimni yuklab olish" yo'li orqali — parol tasdiqlash + OTP (`purpose=data_export`; Telegram birinchi, SMS zaxira — qaror #34; faqat `billing.manage` — Egasi) + tenant bo'yicha 1 marta/24 soat rate-limit + `data_export_during_restriction` audit yozuvi bilan (to'liq mexanizm `14-autentifikatsiya-oauth2.md` §16.5).
+- **To'liq tenant eksporti formati** (qaror #51): ZIP — har jadval alohida CSV (UTF-8, sarlavha qatori, pul — o'nlik satr) + `manifest.json` (`schema_version`, `generated_at`, `tenant_id`, jadval → qatorlar soni) + ixtiyoriy hujjat PDF'lari. Tayyorlash ≤ 24 soat (SAQ job), yuklab olish — signed URL 24 soat, tenant uchun 1 so'rov / 24 soat (`14-autentifikatsiya-oauth2.md` §16.5); javob `{status, file_url, expires_at}` (`17-api-umumiy.md` §13, `20-api-moliya-admin.md`). Lokaut holatida — 01 #20 yo'li. Har eksport `audit_log`ga yoziladi (§6.1). Mahsulot talabi — US-M17-05.
 
 ---
 

@@ -13,7 +13,7 @@ Bu fayl **ikkinchi darajali manba**: ziddiyat bo'lsa `01-qarorlar.md` → mavzu 
 
 ## 1. Repo tuzilmasi
 
-Uchta kod papkasi: `backend/` (`23-backend-arxitekturasi.md` §1), `web/` (`24-frontend-arxitekturasi.md` §1) va Bosqich 7 dan — `agent-1c/` (Do'kon agenti — fiskal ko'prik, printer, tarozi, 1C; .NET Framework 4.8; 1.3-band, `34-1c-agent.md`). Hujjatlar — `spec/kod-uchun/` (bu repo ichida, kod bilan bir joyda). Umumiy test-vektorlar — repo ildizidagi `shared/` (6.3-band).
+Uchta kod papkasi: `backend/` (`23-backend-arxitekturasi.md` §1), `web/` (`24-frontend-arxitekturasi.md` §1) va Bosqich 5 dan — `agent-1c/` (Do'kon agenti — fiskal ko'prik, printer, tarozi, 1C (1C qismi Bosqich 7 da); .NET Framework 4.8; 1.3-band, `34-1c-agent.md`). Hujjatlar — `spec/kod-uchun/` (bu repo ichida, kod bilan bir joyda). Umumiy test-vektorlar — repo ildizidagi `shared/` (6.3-band).
 
 ### 1.1 Backend (`backend/`)
 
@@ -32,6 +32,8 @@ backend/
 │   │   ├── pagination.py        # fastapi-pagination sozlamasi
 │   │   ├── logging.py           # structlog sozlamasi
 │   │   └── telemetry.py         # OpenTelemetry, prometheus-client, sentry-sdk
+│   ├── shared/
+│   │   └── debt_allocation.py   # qarz to'lovi allokatsiyasi va debt_settlement chek qatorlari (TS juftligi — web shared/lib/debt-allocation)
 │   ├── modules/
 │   │   └── <modul>/             # masalan sales, returns, inventory, debts, vat, accounting, …
 │   │       ├── domain/            # entity/value object, biznes qoida — pure Python, SQLAlchemy'siz
@@ -203,7 +205,7 @@ Ikki alohida nomlash tizimi, aralashtirilmaydi:
 
 ## 3. Pul/son/sana qoidalari
 
-**Manba — `01-qarorlar.md` #26, `08-dizayn-tizimi.md` §0.1, `11-malumotlar-modeli.md` §1, `17-api-umumiy.md` §3.** Bu fayl faqat jamlaydi, yangi raqam kiritmaydi.
+**Manba — `01-qarorlar.md` #26, `08-dizayn-tizimi.md` §0 (1-band), `11-malumotlar-modeli.md` §1, `17-api-umumiy.md` §3.** Bu fayl faqat jamlaydi, yangi raqam kiritmaydi.
 
 ### 3.1 Saqlash (PostgreSQL)
 
@@ -222,7 +224,7 @@ Python `decimal.Decimal` — pul/miqdor bilan ishlaydigan har qanday kodda majbu
 
 ### 3.3 Frontend hisob-kitob
 
-Pul hisob-kitobi **standart holatda frontendda qilinmaydi** — backend tayyor summalarni qaytaradi. Istisno — **faqat ikki holat** (`08-dizayn-tizimi.md` §0.1): (a) offline POS'da chek jamini/qaytimni/kutilgan naqdni hali serverga yuborilmasdan hisoblash, (b) submit'dan oldingi forma jami (masalan yangi chek qatori qo'shilganda oraliq ko'rsatish). Bu ikki holatda ham:
+Pul hisob-kitobi **standart holatda frontendda qilinmaydi** — backend tayyor summalarni qaytaradi. Istisno — **faqat ikki holat** (`08-dizayn-tizimi.md` §0 (1-band)): (a) offline POS'da chek jamini/qaytimni/kutilgan naqdni hali serverga yuborilmasdan hisoblash, (b) submit'dan oldingi forma jami (masalan yangi chek qatori qo'shilganda oraliq ko'rsatish). Bu ikki holatda ham:
 
 - `Number`/`parseFloat` bilan pul hisoblash **taqiqlanadi** (lint bilan majburlanadi, qaror #57: ESLint `no-restricted-syntax` + custom rule — `Number(`, `parseFloat(`, `parseInt(` chaqiruvlari va `Money` tipidagi qiymatlarda `+ - * /` operatorlari taqiqlangan; istisno faqat `shared/lib/money` ichida, `eslint-disable` izohi bilan).
 - `decimal.js`/`big.js` — satr-satr amal, `shared/lib/money` ichida bitta joyda.
@@ -344,7 +346,7 @@ Manba — `23-backend-arxitekturasi.md` §6, `24-frontend-arxitekturasi.md` §4,
 | Kontrakt | `schemathesis` | Ishga tushirilgan `/openapi.json`'idan avtomatik so'rov — orval generatsiyasi bilan mos kelishini kafolatlaydi |
 | E2E (tanlab) | `httpx.AsyncClient` + `pytest-asyncio` | Bitta oqim boshidan oxirigacha: sotuv → qaytarish → buxgalteriya → hisobot |
 
-**Majburiy har PR'da** (posting/registr/huquq o'zgarsa): tegishli bitlik test + (registr o'zgargan bo'lsa) integratsiya testi yangilangan/qo'shilgan; CI'da `ruff`, `mypy app`, `pytest`, Alembic `upgrade head`, `schemathesis` — barchasi yashil.
+**Majburiy har PR'da** (posting/registr/huquq o'zgarsa): tegishli bitlik test + (registr o'zgargan bo'lsa) integratsiya testi yangilangan/qo'shilgan; CI'da `ruff`, `mypy --strict app`, `pytest`, Alembic `upgrade head`, `schemathesis` — barchasi yashil.
 
 ### 6.2 Frontend
 
@@ -359,6 +361,7 @@ Manba — `23-backend-arxitekturasi.md` §6, `24-frontend-arxitekturasi.md` §4,
 ### 6.3 Umumiy
 
 - Pul hisob-kitobi test-vektorlari (`shared/money-vectors.json`) — backend va frontend **bitta fayldan** o'qiydi (3.2–3.3-bo'lim), ikki tomonda alohida qo'lda yozilmaydi.
+- Qarz to'lovi allokatsiyasi va `debt_settlement` chek qatorlari (qaror #67; `18-api-kassa.md` §12.2) — TS `shared/lib/debt-allocation` (offline POS) va Python `app/shared/debt_allocation.py` (server posting) bitta formulani amalga oshiradi; test-vektorlar `shared/debt-allocation-vectors.json` — `shared/money-vectors.json` bilan bir xil qoida: ikki tomon bitta fayldan o'qiydi, CI'da ikkalasi bir xil natija beradi.
 - Yangi ruxsat kodi qo'shilsa — standart matritsa testi (`15-xavfsizlik-va-audit.md` §2.2) yangilanadi.
 - 1C integratsiyasi (Bosqich 7): server testlari 1C'siz — protokol darajasidagi soxta agent bilan (`31-qabul-testlari.md` M19); real 1C bazadagi tekshiruv — faqat pilot oldi testlari P-01…P-22 (`33` §16.1), CI'da emas.
 
@@ -374,7 +377,7 @@ Spec bu mavzuda aniq qoida belgilamagan (`23`/`24`da CI bosqichlari bor, lekin b
 |---|---|---|
 | Yangi funksiya | `feat/<qisqa-tavsif>` | `feat/debt-writeoff-posting` |
 | Xato tuzatish | `fix/<qisqa-tavsif>` | `fix/shift-variance-rounding` |
-| Faqat spec | `spec/<qisqa-tavsif>` | `spec/kod-uchun-atamalar` (joriy branch nomi shu uslubga mos) |
+| Faqat spec | `spec/<qisqa-tavsif>` | `spec/kod-uchun-atamalar` |
 | Texnik qarz/refaktor | `chore/<qisqa-tavsif>` | `chore/ruff-strict` |
 
 ### 7.2 Commit xabari — Conventional Commits, ingliz tilida — taklif
@@ -470,7 +473,7 @@ Faqat tashqi javob kerak bo'lgan bandlar:
 - `spec/kod-uchun/15-xavfsizlik-va-audit.md` — RLS, ruxsat kodlari, audit, sirlar.
 - `spec/kod-uchun/11-malumotlar-modeli.md`, `12-db-sxema.md`, `13-provodka-qoidalari.md` — ma'lumot modeli, DB konventsiyasi, provodka.
 - `spec/kod-uchun/01-qarorlar.md` #24, #26 — resurs nomlash va pul/decimal qarori.
-- `spec/kod-uchun/08-dizayn-tizimi.md` §0.1 — pul hisob-kitobi frontend qoidasi.
+- `spec/kod-uchun/08-dizayn-tizimi.md` §0 (1-band) — pul hisob-kitobi frontend qoidasi.
 - `spec/kod-uchun/27-backlog.md` — "tayyor" ta'rifi, bosqich tushunchasi.
 - `spec/kod-uchun/29-atamalar-lugati.md` — atama↔kod nomi xaritasi.
 - `spec/kod-uchun/33-1c-integratsiya.md` §4, §9, §15; `34-1c-agent.md` — `onec_integration` moduli va `agent-1c/` repo konventsiyasi.

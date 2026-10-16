@@ -25,7 +25,7 @@
 - Given kassir smena ochgan, When tovar shtrix-kodi skanerlanadi yoki qo'lda tanlanadi, Then tovar chekka narx va MXIK kodi bilan qo'shiladi.
 - Given chekda bir yoki bir nechta tovar bor, When kassir to'lovni tanlaydi (naqd/karta/yagona QR (UzQR, bank)/Payme/Click/Uzum yoki aralash), Then chek yakunlanadi va fiskal belgi+QR-kod bilan **chop etiladi** (standart — bosma chek; chekda to'lov shakli: naqd / bank kartalari / QR-kodli to'lov / aralash — VMQ-943 1-ilova 7-band). To'lov qaysi usulda bo'lmasin (shu jumladan Click/Payme/Uzum/UzQR), fiskal chekni bizning kassa chiqaradi (VMQ-943 1-ilova 6-band; 1a-ilova 2-band).
 - Given printer ishlamayapti yoki xaridor elektron chek so'radi, When kassir "Elektron chek"ni tasdiqlaydi, Then chek ekranda `ofd.soliq.uz` QR havolasi (yoki Telegram/SMS havola) sifatida beriladi, `fiscal_receipts.delivery='electronic'` va `delivery_reason` audit qilinadi; elektron chek — faqat zahira.
-- (qaror #30) **Istisno — "Nasiya" to'lov turi**: to'lov to'liq nasiya bo'lsa, Then sotuv hujjati (qoldiq −, mijoz qarzi +) yoziladi, lekin **fiskal chek shu zahotda chiqarilmaydi** (`fiscal_receipts` yaratilmaydi, sotuv holati `deferred`) — batafsil qoida va sabab `M08 — Nasiya` bo'limida.
+- (qaror #30) **Istisno — "Nasiya" to'lov turi**: to'lov to'liq nasiya bo'lsa, Then sotuv hujjati (qoldiq −, mijoz qarzi +) yoziladi, lekin **fiskal chek shu zahotda chiqarilmaydi** (sotuv `posted`, fiskal holat `deferred` (javobdagi `fiscal.status`), `fiscal_receipts` yozuvi yo'q) — batafsil qoida va sabab `M08 — Nasiya` bo'limida.
 - (qaror #23, tavsiya #6) Given do'konda mustaqil (bankka to'g'ridan-to'g'ri ulangan) karta terminali bor, lekin u veb-kassaga integratsiyalanmagan, When kassir "Karta" to'lov turini qo'lda belgilaydi (online va offline'da ham ruxsat), Then kassir terminal chekidan karta turini (`card_type`: `personal|corporate|social|unknown`, `method='card'` da majburiy — har to'lovda so'raladi) tanlaydi, ixtiyoriy `card_mask` (`NNNN****NNNN`) va `rrn` (terminal operatsiya raqami) kiritadi — **ijtimoiy kartada `card_mask` va `rrn` majburiy** (qaror #64); chek "bank kartalari" to'lov shakli va karta turi bilan yakunlanadi; smena yopilganda Z-hisobotda "karta" jami alohida chiqadi (M16, US-M16-02/03), Egasi kun oxirida bank ko'chirmasi bilan solishtiradi.
 
 **US-M01-02**: Kassir sifatida internet bo'lmaganda ham savdo qilishni, keyin avtomatik sinxronlanishini istayman.
@@ -122,7 +122,7 @@ Oddiy (markirovkalanmagan) tovar uchun qaytarish offline rejimda mahalliy jurnal
 
 ## M03 — Chegirma
 
-**Maqsad**: chegirma va promo aksiyalarini nazoratli tarzda qo'llash. (Loyallik/bonus kartasi dasturi — **keyingi bosqich**, CRM/sodiqlik moduli bilan birga; MVP'da emas — `spec/README.md`, `research_notes/texnik/00-xulosa-va-ochiq-savollar.md`, 2-band.)
+**Maqsad**: chegirma va promo aksiyalarini nazoratli tarzda qo'llash. (Loyallik/bonus kartasi dasturi — **keyingi bosqich**, CRM/sodiqlik moduli bilan birga; MVP'da emas — `research_notes/texnik/00-xulosa-va-ochiq-savollar.md`, Asosiy xulosa #2; `05-mvp-chegarasi.md` §1.3.)
 
 ### Foydalanuvchi hikoyalari
 
@@ -238,7 +238,7 @@ Mobil skanerlash (Android POS) offline ishlashi kerak (ombor sharoitida internet
 
 **US-M06-01**: Omborchi sifatida boshqa do'kon/omborga tovar yuborish hujjatini yaratishni istayman.
 - Given tovar boshqa filialga kerak, When Omborchi ko'chirish hujjatini yaratadi (tovar, miqdor, manzil), Then yuboruvchi ombor balansi "yo'lda" holatiga o'tadi.
-- (qaror #63) Given ko'chirish avtotransportda (`transfers.transport_mode='vehicle'`, standart), When hujjat jo'natiladi (`post`), Then "Ombordan omborga" turidagi e-TTN (`ettn_documents`, `transport_type=warehouse_to_warehouse`) yaratiladi va EDO operatori orqali E-IMZO bilan yuboriladi, `transfers.ettn_ref` saqlanadi; e-TTN rasmiylashtirilmaguncha tashish boshlanmasligi haqida ogohlantirish ko'rsatiladi (VM 249 31-ilova 13, 16-band). `transport_mode='on_foot_or_public'` (qo'lda/jamoat transportida) — e-TTN talab qilinmaydi (24-band).
+- (qaror #63) Given ko'chirish avtotransportda (`transfers.transport_mode='vehicle'`, standart), When hujjat jo'natiladi (`post`), Then "Ombordan omborga" turidagi e-TTN (`ettn_documents`, `transport_type=warehouse_to_warehouse`) yaratiladi va EDO operatori orqali E-IMZO bilan yuboriladi, `transfers.ettn_ref` saqlanadi; e-TTN `registered` bo'lmaguncha `send` rad etiladi (`409 ETTN_REQUIRED`) (VM 249 31-ilova 13, 16-band). `transport_mode='on_foot_or_public'` (qo'lda/jamoat transportida) — e-TTN talab qilinmaydi (24-band).
 
 **US-M06-02**: Qabul qiluvchi Omborchi sifatida kelgan tovarni tasdiqlab qabul qilishni istayman.
 - Given tovar manzilga yetib keldi, When qabul qiluvchi tomon miqdorni tasdiqlaydi, Then qabul qiluvchi ombor balansi oshadi, yuboruvchi ombordan "yo'lda" holati yopiladi va qabul qiluvchi filial e-TTN'ni tasdiqlaydi.
@@ -254,7 +254,7 @@ Qabul qiluvchi tomonda internet yo'q bo'lsa, qabul mahalliy qayd etilib keyin si
 
 ### Chekka holatlar
 - Yo'lda tovar yo'qolishi/buzilishi — qisman qabul qilish imkoniyati kerak.
-- Avtotransport ko'chirishi `ettn_ref`siz jo'natilgan bo'lsa — huquqiy xavf ogohlantirishi (BO-03 "Ko'chirishlar" tabi va M12 xavf ro'yxati).
+- Offline `transfer.sent` (avtotransport, e-TTN yo'q) — hujjat `posted` da qoladi, `warnings: ["ETTN_REQUIRED"]`; jo'natish e-TTN ro'yxatdan o'tgach online (BO-03 "Ko'chirishlar" tabi va M12 xavf ro'yxati).
 
 ---
 
@@ -268,7 +268,7 @@ Qabul qiluvchi tomonda internet yo'q bo'lsa, qabul mahalliy qayd etilib keyin si
 - Given kam qolgan tovarlar aniqlangan (M04), When Menejer xaridnoma yaratadi (yetkazib beruvchi, tovar, miqdor, narx), Then hujjat "yuborilgan" holatga o'tadi.
 
 **US-M07-02**: Omborchi sifatida kelgan tovarni xaridnoma bilan solishtirib qabul qilishni istayman.
-- Given tovar yetib keldi, When Omborchi haqiqiy miqdorni kiritib tasdiqlaydi, Then farq (kam/ko'p) belgilanadi va ombor balansi (M04) yangilanadi.
+- Given tovar yetib keldi, When Omborchi haqiqiy miqdorni kiritib tasdiqlaydi, Then farq (kam/ko'p) belgilanadi, kirim `draft` holatda saqlanadi; ombor balansi (M04) Buxgalter/Egasi `post` qilganda oshadi (qaror #49).
 
 **US-M07-03**: Buxgalter sifatida yetkazib beruvchining e-fakturasini tizimga kiritib, QQS kreditini hisoblashni istayman.
 - (qaror #23, tavsiya #4) **E-faktura operatori — MVP'da faqat Faktura.uz**; Didox — MVP'dan keyingi birinchi integratsiya (`EInvoicePort` ikki adapterga tayyor; Didox — ochiq API, platforma partner tokeni bilan; asoschi qayta ko'rishi tavsiya etiladi — 26 #167). Faktura.uz token `grant_type=password` bilan olinadi — tenantning Faktura.uz login/paroli va `client_id/client_secret` `tenant_secrets` da shifrlangan saqlanadi; kiruvchi hujjatlar faqat poll orqali (webhook yo'q).
@@ -299,7 +299,7 @@ E-faktura (Faktura.uz — MVP'da yagona operator, qaror #23 tavsiya #4; Didox �
 - Qisman yetkazib berish (buyurtma qilingan miqdordan kam/ko'p kelishi).
 - Narx farqi (xaridnomadagi narx bilan fakturadagi narx mos kelmasligi).
 - Markirovkalangan tovar xaridida kodlar CRPT xTrace API orqali tekshiriladi va qabul xabarnomasi imzolanadi (`MarkingPort`; real adapter — Ochiq savollar 11); qabul muddati yaqinlashsa ogohlantirish (yuqorida).
-- Yetkazib beruvchi bonus tovari (masalan "10 + 1 tekin") — kirim qatori **0 narx** bilan alohida partiya sifatida yoziladi; AVECO o'rtacha narxi shunga mos pasayadi.
+- Yetkazib beruvchi bonus tovari (masalan "10 + 1 tekin") — bonus miqdori kirim qatoriga qo'shiladi, partiya `unit_cost` = faktura summasi / (to'langan + bonus miqdor) (13 §2.6, BHMS №4); 0 narxli alohida partiya yo'q.
 
 ---
 
@@ -311,7 +311,7 @@ E-faktura (Faktura.uz — MVP'da yagona operator, qaror #23 tavsiya #4; Didox �
 
 **US-M08-01**: Kassir sifatida mijozga belgilangan limit ichida nasiyaga sotishni istayman.
 - Given mijoz tanlangan, When kassir "nasiya" to'lov turini tanlaydi, Then tizim mijozning joriy qarzi + yangi summa kredit limitidan oshmasligini tekshiradi.
-- Given limit yetarli, When kassir yakunlaydi, Then mijoz qarz balansi (M08) oshadi; (qaror #30) **fiskal chek bu paytda chiqarilmaydi** — sotuv hujjati (tovar qatorlari, qoldiq −, mijoz qarzi +) yoziladi, sotuv holati `deferred`; kassirga ekranda "Qarzga yozildi — chek qarz to'langanda chiqadi" ko'rsatiladi.
+- Given limit yetarli, When kassir yakunlaydi, Then mijoz qarz balansi (M08) oshadi; (qaror #30) **fiskal chek bu paytda chiqarilmaydi** — sotuv hujjati (tovar qatorlari, qoldiq −, mijoz qarzi +) yoziladi, sotuv `posted`, fiskal holat `deferred` (javobdagi `fiscal.status`), `fiscal_receipts` yozuvi yo'q; kassirga ekranda "Qarzga yozildi — chek qarz to'langanda chiqadi" ko'rsatiladi.
 - Given limit yetarli emas, When kassir yakunlashga harakat qiladi, Then operatsiya rad etiladi yoki Menejer tasdig'i so'raladi (online rejim). (qaror #23, tavsiya #7) Given offline rejim va oxirgi ma'lum qoldiq bo'yicha limitdan oshib ketish aniqlansa, When kassir shunga qaramay sotishni tanlaydi, Then sotuv **bloklanmaydi** — qarz yoziladi, bayroq qo'yiladi, internet qaytganda Egasiga xabar boradi (M08 Offline xatti-harakati bo'limiga qarang).
 
 **US-M08-02**: Menejer sifatida mijoz kredit limitini belgilash/o'zgartirishni istayman.
@@ -359,11 +359,11 @@ E-faktura (Faktura.uz — MVP'da yagona operator, qaror #23 tavsiya #4; Didox �
 
 **Qoidalar:**
 - Qarzga **foiz qo'shilmaydi** (MVP'da bunday funksiya yo'q).
-- (qaror #30) Qarzga sotuvda (to'lov turi: nasiya, BP-03) fiskal chek standart **berilmaydi** (`FiscalPolicy.credit_sale_receipt='none'`; `credit_type` — sotuv paytida "kredit" turidagi chek, OFD/hamkor tasdig'idan keyin yoqiladi, Ochiq savollar 14), sotuv qarz daftariga hujjat sifatida yoziladi, daromad/QQS shu kuni tan olinadi; **fiskal chek har bir qarz to'lovida** chiqariladi (yuqorida, US-M08-04). "Boshlang'ich qarz" (US-M08-07) bundan ham mustasno — u yangi sotuv emas, tovar tarkibisiz boshlang'ich qoldiq hujjati.
+- (qaror #30) Qarzga sotuvda (to'lov turi: nasiya, BP-03) fiskal chek standart **berilmaydi** (`FiscalPolicy.credit_sale_receipt='none'`; `credit_type` — sotuv paytida "kredit" turidagi chek, OFD/hamkor tasdig'idan keyin yoqiladi, 26 #9 (OQ-002)), sotuv qarz daftariga hujjat sifatida yoziladi, daromad/QQS shu kuni tan olinadi; **fiskal chek har bir qarz to'lovida** chiqariladi (yuqorida, US-M08-04). "Boshlang'ich qarz" (US-M08-07) bundan ham mustasno — u yangi sotuv emas, tovar tarkibisiz boshlang'ich qoldiq hujjati.
 - Mijoz telefon raqami shaxsiy ma'lumot: SMS/Telegram faqat mijoz roziligi bilan.
 
 ### Davlat tizimlari bog'liqligi
-Daromad/QQS — **sotuv kuni** (BHMS 2; SK 242, 78, 297, 463-modda; qaror #42), fiskal chek — qarz to'langan kuni (`debt_settlement`, VMQ-943 1-ilova 30-band, qaror #30, #45). Jismoniy shaxsga sotuvda chek berilsa e-faktura talab qilinmaydi (SK 47-m. 3-q., VM 489 3-band); yuridik shaxs va bank o'tkazmasi bilan to'laydigan YTT uchun e-faktura majburiy. Sotuv paytidagi "kredit" turidagi chek va OFD chek turi kodi — Ochiq savollar 14.
+Daromad/QQS — **sotuv kuni** (BHMS 2; SK 242, 78, 297, 463-modda; qaror #30), fiskal chek — qarz to'langan kuni (`debt_settlement`, VMQ-943 1-ilova 30-band, qaror #30, #45). Jismoniy shaxsga sotuvda chek berilsa e-faktura talab qilinmaydi (SK 47-m. 3-q., VM 489 3-band); yuridik shaxs va bank o'tkazmasi bilan to'laydigan YTT uchun e-faktura majburiy. Sotuv paytidagi "kredit" turidagi chek va OFD chek turi kodi — 26 #9 (OQ-002).
 
 ### Offline xatti-harakati
 Offline rejimda nasiya yaratish mumkin, lekin limit tekshiruvi faqat oxirgi sinxronlashgan ma'lumot asosida bo'ladi — bir mijozga bir nechta kassada parallel nasiya berilsa, limitdan oshib ketishi mumkin — quyidagi qoida bilan hal qilingan (qaror #23, tavsiya #7). (qaror #23 tavsiya #7; qaror #30) **Offline'da limitdan oshgan nasiya**: qurilma oxirgi ma'lum qoldiq bo'yicha ogohlantiradi, lekin kassir baribir sotishni tanlasa — sotuv **bekor qilinmaydi**, qarz limitdan oshgan holicha yoziladi, operatsiyaga **bayroq** qo'yiladi va internet qaytganda Egasiga xabar (M18) boradi; sabab — sotuv hujjati (tovar chiqimi, qarz ortishi) allaqachon amalga oshgan va uni orqaga qaytarish ombor/buxgalteriyani buzadi (fiskal chek bu bosqichda hali chiqarilmagan bo'lsa ham), nazorat xabar/audit orqali amalga oshadi.
@@ -412,7 +412,7 @@ Offline rejimda nasiya yaratish mumkin, lekin limit tekshiruvi faqat oxirgi sinx
 - Given bir chekda doimiy chegirma va boshqa chegirma (kassir/aksiya) manbai to'qnashsa, Then **faqat bittasi — mijozga eng katta foyda beradigani** qo'llaniladi, ikkisi yig'ilmaydi (M03 chekka holatlar bilan bir xil qoida, qaror #23 tavsiya #8).
 
 ### Davlat tizimlari bog'liqligi
-Narx QQS stavkasi (12%, 0%, ixtiyoriy 6%) bilan bog'liq — har bir tovar MXIK kodiga mos QQS toifasiga ega bo'lishi kerak (`research_notes/texnik/01-erp-modullar-va-malumot-modeli.md`, "QQS" bandi).
+Narx QQS stavkasi — QQS 12% (SK 258-modda), 0% / imtiyoz (`vat_exemption_code`) — bilan bog'liq — har bir tovar MXIK kodiga mos QQS toifasiga ega bo'lishi kerak (`research_notes/texnik/01-erp-modullar-va-malumot-modeli.md`, "QQS" bandi).
 
 ### Offline xatti-harakati
 Narxlar POS'ga oldindan sinxronlanadi (lokal keshda saqlanadi); offline paytida oxirgi sinxronlangan narx ishlatiladi — markazda narx o'zgargan bo'lsa, internet qaytguncha POS eski narxda sotishi mumkin (**chekka holat**).
@@ -432,23 +432,23 @@ Narxlar POS'ga oldindan sinxronlanadi (lokal keshda saqlanadi); offline paytida 
 ### Foydalanuvchi hikoyalari
 
 **US-M10-01**: Buxgalter sifatida har bir sotuvdan QQS avtomatik hisoblanishini istayman.
-- Given tovar MXIK kodiga mos QQS toifasi (12% standart, 0% imtiyozli, 6% ixtiyoriy) belgilangan, When sotuv amalga oshadi, Then QQS summasi avtomatik hisoblanib chekka va buxgalteriya yozuviga kiritiladi (12% standart stavka, Soliq kodeksi 258-modda). QQS har chek qatori uchun `ROUND_HALF_UP(line_total×r/(100+r), 2)`, chek QQSi — qatorlar yig'indisi; qonunda yaxlitlash qoidasi yo'q — bu muhandislik qarori (qaror #26).
+- Given tovar MXIK kodiga mos QQS toifasi — QQS 12% (SK 258-modda), 0% / imtiyoz (`vat_exemption_code`) — belgilangan, When sotuv amalga oshadi, Then QQS summasi avtomatik hisoblanib chekka va buxgalteriya yozuviga kiritiladi (12% standart stavka, Soliq kodeksi 258-modda). QQS har chek qatori uchun `ROUND_HALF_UP(line_total×r/(100+r), 2)`, chek QQSi — qatorlar yig'indisi; qonunda yaxlitlash qoidasi yo'q — bu muhandislik qarori (qaror #26).
 - Given QQS davri (oy) yopilmoqda, When server davr bo'yicha `tax_settlements` (`tax_kind='vat_offset'`, `period`, `base_amount`, `amount`) qoralamasini hisoblaydi, Then Buxgalter uni ko'rib tasdiqlaydi (`post`) — hisobga olinadigan QQS hisob-kitobga o'tkaziladi (`Dt 6410 / Kt 4410`, `13-provodka-qoidalari.md` §2.26); bekor qilish — `cancel`.
 
 **US-M10-02**: Buxgalter sifatida 2026-01-01'dan davlat tuzgan QQS hisobotini ichki hisob bilan **5 ish kuni** ichida solishtirishni istayman.
 
-**Huquqiy asos**: Soliq kodeksining 81-moddasi (O'RQ-1108-son Qonun, 2025-12-25, 2026-01-01 dan kuchda — [lex.uz/docs/-7944527](https://lex.uz/docs/-7944527)). Davlat (soliq organlari) QQS, aylanma solig'i, mol-mulk solig'i, yer solig'i, JShDS va ijtimoiy soliq hisobotlarini o'zida bor ma'lumot + shaxsiy kabinetning interaktiv xizmatiga soliq to'lovchi kiritgan ma'lumot asosida elektron shaklda shakllantiradi. **Foyda solig'i bu ro'yxatga kirmaydi.** Agar davlat shakllantirgan ma'lumot korxona hisobidan farq qilsa, korxona **5 ish kuni** ichida (SK 5-modda 7-qism; hisobot shaxsiy kabinetga joylashtirilgan kundan keyingi kundan, lekin hisobot topshirish muddatidan kechiktirmay — QQS: keyingi oyning 20-sanasi, SK 273-modda; aylanma: 15-sana, SK 470-modda) tuzatish kiritadi. **Mexanizm** (VM 736 3¹-ilova 11-band; SK 81-modda 6–8-qism): my.soliq.uz shaxsiy kabinetida "tasdiqlash" yoki "tuzatish kiritib taqdim etish" — alohida e'tiroz arizasi yo'q; javob berilmasa hisobot topshirish muddati tugagan kun davlat shakllantirgan ko'rinishda taqdim etilgan hisoblanadi; muddat o'tgach — SK 83-modda bo'yicha aniqlashtirilgan hisobot. Tizim ichki hisob va farqlar ro'yxatini tayyorlaydi, Buxgalter kabinetda tuzatadi/imzolaydi (avtomatik yuborish yo'q).
+**Huquqiy asos**: Soliq kodeksining 81-moddasi (O'RQ-1108-son Qonun, 2025-12-25, 2026-01-01 dan kuchda — [lex.uz/docs/-7944527](https://lex.uz/docs/-7944527)). Davlat (soliq organlari) QQS, aylanma solig'i, mol-mulk solig'i, yer solig'i, JShDS va ijtimoiy soliq hisobotlarini o'zida bor ma'lumot + shaxsiy kabinetning interaktiv xizmatiga soliq to'lovchi kiritgan ma'lumot asosida elektron shaklda shakllantiradi. **Foyda solig'i bu ro'yxatga kirmaydi.** Agar davlat shakllantirgan ma'lumot korxona hisobidan farq qilsa, korxona **5 ish kuni** ichida (SK 5-modda 7-qism; hisobot shaxsiy kabinetga joylashtirilgan kundan keyingi kundan, lekin hisobot topshirish muddatidan kechiktirmay — QQS: keyingi oyning 20-sanasi, SK 273-modda; aylanma: 15-sana, SK 470-modda) tuzatish kiritadi. **Mexanizm** (VM 736 3¹-ilova 11-band; SK 81-modda 6–8-qism): my.soliq.uz shaxsiy kabinetida "tasdiqlash" yoki "tuzatish kiritib taqdim etish" — alohida e'tiroz arizasi yo'q; javob berilmasa hisobot topshirish muddati tugagan kun davlat shakllantirgan ko'rinishda taqdim etilgan hisoblanadi; muddat o'tgach — SK 83-modda bo'yicha aniqlashtirilgan hisobot. Tizim ichki hisob va farqlar ro'yxatini tayyorlaydi; tuzatish/tasdiq my.soliq.uz kabinetida kiritiladi, tizim uni faqat qayd etadi (imzosiz, avtomatik yuborish yo'q).
 
 **Qamrov** (MVP): faqat **QQS va aylanma solig'i** — bu ikkisi uchun tizimda to'liq ichki ma'lumot bor (M01, M07, M09, M10, M11 dan). Mol-mulk, yer, JShDS va ijtimoiy soliq — davlat ularni ham o'zi tuzadi, lekin tizimda ichki solishtirish uchun kerakli ma'lumot (asosiy vositalar hisobi, kadrlar/ish haqi) MVP modullari qatorida yo'q, shuning uchun bu to'rttasi MVP'da faqat "davlat ko'rsatgan raqam" sifatida ko'rsatiladi, ichki solishtirish qilinmaydi (keyingi bosqich). Foyda solig'i — davlat o'zi tuzmaydi, tizimda ham alohida modul yo'q, MVP'dan tashqarida, korxonaning o'zi tayyorlaydigan hisobot sifatida qoladi.
 
-**Holat mashinasi**: `kutilmoqda` (davlat hisoboti hali e'lon qilinmagan) → davlat hisoboti e'lon qilinishi bilan avtomatik solishtirish ishga tushadi → `mos keladi` (farq yo'q) YOKI `farq topildi` (tolerance'dan tashqari farq) → Buxgalter farqni ko'rib chiqadi → `tuzatish yuborildi` (Buxgalter kabinetda tuzatishni taqdim etgan va shuni tizimda belgilagan) YOKI `avtomatik qabul qilingan` (5 ish kuni ichida javob berilmagan).
+**Holat mashinasi** (`state_reports.status`): `uploaded` (Buxgalter davlat hisoboti faylini yukladi) → `compared` (avtomatik solishtirish bajarildi) → `match` (farq yo'q yoki tolerance ichida) YOKI `diff_found` (tolerance'dan tashqari farq) → Buxgalter farqni ko'rib chiqadi → `correction_sent` (tuzatish kabinetda kiritilgan, tizimda izoh bilan qayd etilgan) YOKI `confirmed` ("Tasdiqlandi" — kabinetda tasdiqlangan) YOKI `auto_accepted` (5 ish kuni ichida javob berilmagan).
 
-- Given hisobot davri yopildi, When har oyning 10-sanasigacha, Then tizim Buxgalterga shaxsiy kabinetning interaktiv xizmatiga kiritiladigan ma'lumotlar eslatmasini va tayyor raqamlarni beradi (aylanma — soliq solinmaydigan daromad, chegirmalar, imtiyozlar; QQS — hisobga olinadigan QQS tuzatishlari, imtiyozlar).
+- Given hisobot davri yopildi, When har oyning 10-sanasi — ichki eslatma sanasi (sozlanadi), qonuniy muddat emas — kelganda, Then tizim Buxgalterga shaxsiy kabinetning interaktiv xizmatiga kiritiladigan ma'lumotlar eslatmasini va tayyor raqamlarni beradi (aylanma — soliq solinmaydigan daromad, chegirmalar, imtiyozlar; QQS — hisobga olinadigan QQS tuzatishlari, imtiyozlar).
 - Given my.soliq.uz'da davlat tomonidan tuzilgan QQS/aylanma hisoboti e'lon qilingan (kabinetdan fayl — PDF/Excel — sifatida yuklab olinadi; ommaviy API yo'q, ichki my.soliq.uz endpoint'lari ishlatilmaydi), When Buxgalter faylni tizimga yuklaydi, Then tizim ichki hisob bilan avtomatik solishtiradi: **QQS** — e-faktura darajasida (STIR + faktura raqami + sana bo'yicha moslashtirish) va yig'indi darajasida; **aylanma** — faqat yig'indi darajasida, manba (e-faktura / NKM / marketplace / eksport / boshqa — 0101–0105 satrlari) va stavka bo'yicha (ichki hisobot ham shu 5 manba bo'yicha bo'linadi: fiskal chek → 0102, e-faktura → 0101); **5 ish kunlik hisoblagich** hisobot joylashtirilgan kundan keyingi kundan, lekin shu soliq turining hisobot topshirish muddatidan oshmaydigan tarzda ishga tushadi.
-- (qaror #50) Given farq `tenants.settings.vat_diff_tolerance_amount` (standart `"1000.00"` so'm; ichki UX chegarasi, har qanday farq baribir ko'rsatiladi) dan katta, Then holat `farq topildi`ga o'tadi va **1-, 3- va 4-ish kunida** Buxgalterga eslatma yuboriladi; 3-ish kunigacha yopilmasa BO-10 banneri Egasiga ham ko'rinadi (26 #3).
-- Given Buxgalter 5 ish kuni ichida farqni kabinetda tasdiqlagan yoki tuzatib taqdim etgan, When buni tizimda belgilaydi, Then holat `tuzatish yuborildi`ga o'tadi va natija Egasiga yakuniy ko'rsatish uchun yuboriladi. Given 5 ish kuni ichida javob berilmagan, When muddat tugaydi, Then holat **`avtomatik qabul qilingan`**ga o'tadi (SK 81-modda).
+- (qaror #50) Given farq `tenants.settings.vat_diff_tolerance_amount` (standart `"1000.00"` so'm; ichki UX chegarasi, har qanday farq baribir ko'rsatiladi) dan katta, Then holat `diff_found` ga o'tadi va **1-, 3- va 4-ish kunida** Buxgalterga eslatma yuboriladi; 3-ish kunigacha yopilmasa BO-10 banneri Egasiga ham ko'rinadi (26 #3).
+- Given Buxgalter 5 ish kuni ichida farqni kabinetda tasdiqlagan yoki tuzatib taqdim etgan, When buni tizimda qayd etadi, Then holat `correction_sent` (tuzatilgan) yoki `confirmed` (tasdiqlangan) ga o'tadi va natija Egasiga yakuniy ko'rsatish uchun yuboriladi. Given 5 ish kuni ichida javob berilmagan, When muddat tugaydi, Then holat **`auto_accepted`** ga o'tadi (SK 81-modda).
 
-**US-M10-03**: Buxgalter sifatida yuqori xavfli (AI risk-scoring "qizil") fakturalarning QQS kreditiga ta'sirini kuzatishni istayman.
+**US-M10-03**: Buxgalter sifatida yuqori xavfli (davlat xavf-baholashi (VM 830) / qo'lda belgi "qizil"; `unknown` — qizil kabi) fakturalarning QQS kreditiga ta'sirini kuzatishni istayman.
 - Given faktura "qizil" deb belgilangan (M07), When Buxgalter QQS hisobotini tayyorlaydi, Then bu fakturalar alohida ko'rsatiladi va ularning krediti hali tasdiqlanmagani belgilanadi (VM Qarori №830, 2025-12-26, 6- va 8-moddalar — `research_notes/texnik/03-efaktura-va-tolov.md`, 1.2-bo'lim).
 
 **US-M10-04**: Buxgalter sifatida QQS to'lamaydigan, aylanma solig'i rejimidagi biznes uchun ham davlat tuzgan aylanma solig'i hisobotini ichki hisob bilan solishtirishni istayman.
@@ -457,7 +457,7 @@ Narxlar POS'ga oldindan sinxronlanadi (lokal keshda saqlanadi); offline paytida 
 - Given oy yopilmoqda, When server `tax_settlements` (`tax_kind='turnover_tax'`, `period`, `base_amount`, `rate`, `amount`) qoralamasini hisoblaydi, Then Buxgalter uni tasdiqlaydi (`post`) — `Dt 9430 / Kt 6410` (`13-provodka-qoidalari.md` §4.3).
 - Given jami daromad 1 mlrd so'm chegarasiga yetdi yoki tenant import qildi, Then tizim QQS rejimiga o'tish ogohlantirishini ko'rsatadi (461-modda 2-qism, 462-modda 7, 13-qism).
 
-*Qamrov chegarasi: MVP faqat **QQS va aylanma solig'i** hisobotlarini solishtiradi. Mol-mulk, yer, JShDS va ijtimoiy soliq hisobotlari ham 2026-01-01'dan davlat tomonidan avtomatik tuziladi, lekin bular MVP'dan **tashqarida** qoladi — sabab: JShDS/ijtimoiy soliq xodim/ish haqi hisobini, mol-mulk solig'i esa asosiy vositalar hisobini talab qiladi, ikkisi ham MVP 18 moduliga kiritilmagan (`spec/README.md`).*
+*Qamrov chegarasi: MVP faqat **QQS va aylanma solig'i** hisobotlarini solishtiradi. Mol-mulk, yer, JShDS va ijtimoiy soliq hisobotlari ham 2026-01-01'dan davlat tomonidan avtomatik tuziladi, lekin bular MVP'dan **tashqarida** qoladi — sabab: JShDS/ijtimoiy soliq xodim/ish haqi hisobini, mol-mulk solig'i esa asosiy vositalar hisobini talab qiladi, ikkisi ham MVP 18 moduliga kiritilmagan (qaror #52 — ish haqi hisoblash moduli yo'q; `research_notes/texnik/00-xulosa-va-ochiq-savollar.md`, Asosiy xulosa #2).*
 
 ### Davlat tizimlari bog'liqligi
 my.soliq.uz (davlat hisoboti), e-faktura/EDO (QQS bazasi manbai — MVP'da Faktura.uz, Didox keyinroq), VM Qarori №830 (2025-12-26, AI xavf-baholash), Soliq kodeksi 81-moddasi/O'RQ-1108 (davlat hisobot shakllantirish va 5 ish kunlik tuzatish huquqi — lex.uz/docs/-7944527), VM 736 3¹-ilova (yagona kanal — shaxsiy kabinet). Ommaviy o'qish API'si yo'q — davlat hisoboti fayl sifatida yuklanadi (26 #41 (OQ-014)). Aylanma solig'i stavkalari — Soliq kodeksi 467-moddasi (O'RQ-1108 tahririda, 2026-01-01'dan), to'lovchilar va 1 mlrd so'm chegarasi — 461-modda ([lex.uz/docs/4674902](https://lex.uz/docs/4674902)).
@@ -508,7 +508,7 @@ Markazlashtirilgan serverda ishlaydi, offline kiritilmaydi; faqat sotuv/xarid ma
 - Avtomatik provodkada xato aniqlansa, qo'lda tuzatish imkoniyati (audit-trail bilan) kerak — yopilgan oyda esa faqat joriy ochiq oyda tuzatuvchi yozuv orqali (yuqoridagi US-M11-02).
 - Ko'p filialli (M14) konsolidatsiyalangan balans.
 - Naqdsiz tushum bankka hali tushmagan (bank tushumi tasdig'i yaratilmagan) — summa 5710 da qoladi; «yo'ldagi pul» qoldig'i to'lov usuli va filial bo'yicha BO-24 da ko'rinadi. Bank ko'chirmasi faylidan import (`source='statement_import'`) faqat `draft` hujjat yaratadi — Buxgalter tekshirib `post` qiladi.
-- To'liq NSBU hisob rejasi (asosiy vositalar, ish haqi) MVP'dan tashqarida — faqat savdo/ombordan kelib chiqadigan asosiy hisoblar avtomatlashtiriladi (`spec/README.md`).
+- To'liq NSBU hisob rejasi (asosiy vositalar, ish haqi) MVP'dan tashqarida — faqat savdo/ombordan kelib chiqadigan asosiy hisoblar avtomatlashtiriladi (qaror #52; `research_notes/texnik/00-xulosa-va-ochiq-savollar.md`, Asosiy xulosa #2).
 
 ---
 
@@ -613,7 +613,7 @@ Rol/huquqlar markazdan sinxronlanadi; offline rejimda faqat oxirgi sinxronlangan
 Dastur (versiya) Davlat reyestriga bir marta kiritiladi (VMQ-943 4-ilova 3-band). **Har bir `cash_register`** savdodan oldin shoxobcha manzili bo'yicha TXKM orqali soliq organida alohida ro'yxatdan o'tadi (1-ilova 16–20-band: bepul, ≈4+8 ish soati) va alohida fiskal modulga ega bo'ladi (2-ilova 6-band); `cash_registers.tax_registered_at`, `outlet_address_snapshot`, `txkm_contract_ref`. Ro'yxatdan o'tmagan (`ofd_status` `registered`/`active` emas) kassada fiskal chek chiqarilmaydi (SK 221-modda 2-qism). Filial manzili o'zgarsa — shu filial kassalari uchun **3 ish kunida** qayta ariza eslatmasi (25-band).
 
 ### Offline xatti-harakati
-Har bir filial o'z offline event-log'iga ega; filiallar o'zaro real-time sinxronlanmaydi, markaziy serverga ulanganda sinxronlanadi (`spec/README.md`, offline-first qarori).
+Har bir filial o'z offline event-log'iga ega; filiallar o'zaro real-time sinxronlanmaydi, markaziy serverga ulanganda sinxronlanadi (offline-first; qaror #12, #43).
 
 ### Chekka holatlar
 - Filiallar orasida bir xil tovarga turli narx siyosati (ruxsat etiladimi — biznes qoidasi).
@@ -630,7 +630,7 @@ Har bir filial o'z offline event-log'iga ega; filiallar o'zaro real-time sinxron
 
 **US-M15-01**: Egasi/Menejer sifatida xarajatni 10 soniyada yozishni istayman.
 - Given "Xarajat qo'shish" ochildi, When summa, toifa, to'lov manbai (kassa naqdi / bank / karta) va (ixtiyoriy) izoh kiritiladi, Then xarajat saqlanadi; manba "kassa naqdi" bo'lsa, M16'da avtomatik "kassadan chiqim" yozuvi yaratiladi.
-- Toifalar standart ro'yxat bilan keladi (Ijara, Kommunal, Ish haqi, Transport, Soliq va yig'imlar, Ta'mirlash, Boshqa); Egasi o'zgartira oladi.
+- Toifalar standart ro'yxat bilan keladi — `13` §2.17 seed xaritasi (21 kod, ish haqi 9410/9420 alohida); Egasi o'zgartira oladi.
 - Chek/hujjat fotosini biriktirish mumkin (ixtiyoriy).
 
 **US-M15-02**: Egasi sifatida doimiy xarajatlarni (oylik ijara) har oy qayta kiritmaslikni istayman.
@@ -689,6 +689,7 @@ To'liq offline ishlaydi (M01 bilan bir xil append-only jurnal).
 ### Foydalanuvchi hikoyalari
 
 **US-M17-01**: Do'kon egasi sifatida 2 daqiqada ro'yxatdan o'tishni istayman.
+- Vaqt mezoni: ro'yxatdan o'tish ≤ 2 daqiqa; 500 tovar Excel importi bilan birga ≤ 10 daqiqa (`27` Bosqich 1 tayyor ta'rifi, QT-NFR-SIGNUP-01).
 - (qaror #34) Given sayt ochildi, When Egasi ro'yxatdan o'tish/kirish usulini tanlaydi, Then ikki yo'l mavjud: (1) **telefon raqami + parol** (ro'yxatdan o'tishda telefon bir martalik kod bilan tasdiqlanadi — kod birinchi navbatda **Telegram bot** orqali, agar foydalanuvchi hali botga ulanmagan bo'lsa, bot havolasi ko'rsatilib shu yerda tasdiqlanadi; Telegram mavjud bo'lmasa **SMS zaxira**), yoki (2) **"Google bilan kirish"** — bizning OAuth 2.0 authorization serverimizda Google OIDC tashqi provayder sifatida ulangan, alohida parol/kod talab qilinmaydi. Ikkala yo'ldan keyin ham do'kon nomi, faoliyat turi va huquqiy shakl (`tenants.legal_form`: `llc|jsc|private_enterprise|sole_proprietor`) so'raladi; STIR, OFD, e-faktura ulash keyinroq (sozlamalarda, bosqichma-bosqich yo'riqnoma bilan).
 - (qaror #61) Given ro'yxatdan o'tish formasi (BO-21), When Egasi davom etadi, Then **foydalanish shartlari** (o'zbek tilida) bilan tanishib roziligini belgilashi majburiy — `tenants.accepted_terms_version`, `accepted_terms_at`, `accepted_terms_ip` saqlanadi; **chegaradan tashqariga uzatishga (AI — Anthropic, AQSh) alohida rozilik** ixtiyoriy belgi sifatida so'raladi (`consents`, `purpose='ai_cross_border'`); rozilik berilmaguncha `settings.ai_cross_border_enabled=false` — AI-03 rasmlari yuborilmaydi (AI-03 o'chiq), matnli AI faqat maskalangan ma'lumot bilan ishlaydi. Rozilikni Egasi keyin BO-14'da berishi yoki qaytarib olishi mumkin.
 - Ro'yxatdan o'tgach **30 kunlik bepul sinov** boshlanadi (qaror #22 — yagona tarifning to'liq imkoniyatlari bilan).
@@ -880,7 +881,7 @@ Server va agent tomonida ishlaydi; agent faqat chiquvchi HTTPS bilan vazifa tort
 
 ## Manbalar
 
-- `spec/README.md` — asosiy qarorlar
+- `01-qarorlar.md` — asosiy qarorlar
 - `research_notes/texnik/00-xulosa-va-ochiq-savollar.md`
 - `research_notes/texnik/01-erp-modullar-va-malumot-modeli.md`
 - `research_notes/texnik/02-kassa-ofd-markirovka.md`

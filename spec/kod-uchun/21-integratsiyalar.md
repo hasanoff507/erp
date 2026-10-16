@@ -46,7 +46,7 @@ stateDiagram-v2
     failed --> [*]: O'lik xat (dead-letter) — qo'lda ko'rib chiqiladi
 ```
 
-- **Jadval**: `outbox_jobs(tenant_id, kind, payload, status, attempts, next_run_at, last_error, idempotency_key)` (`11-malumotlar-modeli.md`, 10-bo'lim). `kind` ro'yxati: `ofd_send` (faqat hamkor bulut rejimida, 1-bo'lim), `einvoice_send`, `einvoice_accept`, `poa_send` (e-ishonchnoma, 6-bo'lim), `ettn_send`, `marking_verify`, `marking_accept` (kirim qabul xabarnomasi), `marking_supplier_return`, `marking_writeoff`, `sms`, `telegram`, `ai`, `billing_webhook_reconcile`, `state_report_reminder`. Chakana sotuv/qaytarish uchun alohida markirovka job'i yo'q — kod fiskal chek bilan ketadi (qaror #62). Ro'yxat `11-malumotlar-modeli.md` 10-bo'limida rasmiylashtiriladi.
+- **Jadval**: `outbox_jobs(tenant_id, kind, payload, status, attempts, next_run_at, last_error, idempotency_key)` (`11-malumotlar-modeli.md`, 10-bo'lim). `kind` ro'yxati (17 ta): `ofd_send` (faqat `partner_cloud` rejimida — lokal ko'prikda chekni FM imzolaydi va natija POS voqeasi bilan keladi; 1-bo'lim), `einvoice_send`, `einvoice_accept`, `ettn_send`, `ettn_accept`, `poa_send` (e-ishonchnoma, 6-bo'lim), `marking_verify`, `marking_accept` (kirim qabul xabarnomasi), `marking_supplier_return`, `marking_writeoff`, `state_report_reminder`, `sms`, `telegram`, `ai`, `report_export`, `label_pdf`, `billing_webhook_reconcile`. Chakana sotuv/qaytarish uchun alohida markirovka job'i yo'q — kod fiskal chek bilan ketadi (qaror #62). Ro'yxat `11-malumotlar-modeli.md` 10-bo'limida rasmiylashtiriladi.
 - **Qayta urinish siyosati (umumiy formula)**: eksponensial backoff + jitter: `next_run_at = now() + min(cap, base * 2^attempts) + random(0, jitter)`. Har integratsiya o'z `base`/`cap`/`max_attempts`ini SLA'siga qarab belgilaydi (pastda har bo'limda).
 - **O'lik xat (dead-letter)**: `max_attempts` tugagach `status=failed`; job **o'chirilmaydi**, `last_error` va to'liq `payload` saqlanadi — qo'lda tekshirish/qayta urinish/bekor qilish uchun. Fiskal va e-faktura kabi huquqiy oqibati bor ishlarda `failed` holati **audit_log**ga ham yoziladi.
 - **Idempotentlik**: har job `idempotency_key` bilan (odatda `client_event_id` + `kind`, yoki tashqi tizim talab qilgan `merchant_trans_id`/`provider_tx_id`). Worker va tashqi tizim ikkisi ham qayta yuborilgan so'rovni xavfsiz rad etishi/bir xil natija qaytarishi kerak — bu ayniqsa offline sinxronlashda (bir xil chek ikki marta yuborilishi) va to'lov webhook'larida (bank ikki marta qayta yuborishi) muhim.
@@ -94,7 +94,7 @@ Ikkala real rejimda ham port, payload va natija bir xil — adapter almashtirish
 class FiscalPort(Protocol):
     async def open_shift(self, register: CashRegisterRef) -> FiscalShiftResult: ...
     async def close_shift(self, register: CashRegisterRef) -> ZReport: ...
-    async def register_sale(self, receipt: FiscalReceiptPayload) -> FiscalResult: ...   # kind: sale | debt_settlement
+    async def register_sale(self, receipt: FiscalReceiptPayload) -> FiscalResult: ...   # kind: sale | debt_settlement | credit_sale
     async def register_refund(self, receipt: FiscalReceiptPayload, refund_ref: RefundInfo) -> FiscalResult: ...
     async def get_device_status(self, register: CashRegisterRef) -> FiscalDeviceStatus: ...   # fm_state, pending, oldest_unacked_at
     async def list_unsent(self, register: CashRegisterRef) -> list[UnsentReceipt]: ...
@@ -113,13 +113,13 @@ Port chegarasida pul — **tiyin `int64`**; ichki o'nlik satrdan (qaror #26) kon
 
 **Idempotentlik kaliti**: `cash_register_id + shift_id + receipt_seq` (qurilma ichida ketma-ket, offline ham beriladi); FM tomonida `fm_terminal_id + fm_receipt_seq` UNIQUE — bir xil sotuv ikki marta fiskallashtirilmaydi (agent FM'ga yuborishdan oldin `receipt_seq` bo'yicha lokal jurnalni tekshiradi).
 
-**48 soat va bloklash (qaror #43)**: hisob `ofd_acked_at IS NULL` bo'lgan eng eski fiskal chekning vaqtidan. **24 soat** — POS status panelida 🟡 sariq; **40 soat** — 🔴 qizil + Egasiga M18 (Telegram); **46 soat** — har yangi chek oldidan yopib bo'lmaydigan modal ("2 soat qoldi — internetga ulaning"); **48 soat** — **kassa bloklanadi**: yangi fiskal chek chiqarilmaydi, sotuv to'xtaydi, faqat sinxron va yuborilmagan cheklarni yuborish ruxsat (`FISCAL_OFFLINE_48H_BLOCKED`), `audit_log` + Egasiga zudlik xabari; to'plangan cheklar OFD'ga yetgach blok yechiladi (VMQ-943 2-ilova 6-band — "48 соат оффлайн режимида ишлагандан сўнг автоматик блоклаш"). Konstantalar `OFFLINE_WARN_HOURS = (24, 40, 46)`, `OFFLINE_LEGAL_LIMIT_HOURS = 48`. FM'ning o'zi bloklansa (`fm_state='locked'` — OFD bloklagan yoki tasdiqlanmagan chek muddati o'tgan) — `FISCAL_DEVICE_LOCKED`, sotuv to'xtaydi (FM imzolamaydi).
+**48 soat va bloklash (qaror #43)**: hisob `ofd_acked_at IS NULL` bo'lgan eng eski fiskal chekning vaqtidan. **24 soat** — POS status panelida 🟡 sariq; **40 soat** — 🔴 qizil + Egasiga M18 (Telegram); **46 soat** — har yangi chek oldidan yopib bo'lmaydigan modal ("2 soatdan keyin kassa bloklanadi — internetga ulaning", "Tushundim" bilan yopiladi; sotuv to'xtamaydi); **48 soat** — **kassa bloklanadi**: yangi fiskal chek (sotuv, qaytarish, kredit cheki, `debt_settlement`) shakllantirilmaydi, sotuv to'xtaydi (`FISCAL_OFFLINE_48H_BLOCKED`); ruxsat etilgan — sinxronizatsiya (`/sync/push`, `/sync/pull`), FM/OFD'ga qayta yuborish, fiskal bo'lmagan amallar (qoldiqni ko'rish, smenani yopish, naqd sanash) (`16-offline-sync.md` §6); `audit_log` + Egasiga zudlik xabari; to'plangan cheklar OFD'ga yetgach blok yechiladi (VMQ-943 2-ilova 6-band — "48 соат оффлайн режимида ишлагандан сўнг автоматик блоклаш"). Konstantalar `OFFLINE_WARN_HOURS = (24, 40, 46)`, `OFFLINE_BLOCK_HOURS = 48`. FM'ning o'zi bloklansa (`fm_state='locked'` — OFD bloklagan yoki tasdiqlanmagan chek muddati o'tgan) — `FISCAL_DEVICE_LOCKED`, sotuv to'xtaydi (FM imzolamaydi).
 
 **Qayta urinish/backoff**: *lokal ko'prik* — yuborishni FM/hamkor xizmati o'zi bajaradi; Do'kon agenti har 5 daqiqada `get_device_status` va kerak bo'lsa `resend_unsent` chaqiradi va holatni serverga hisobot qiladi (`fiscal.status` vazifasi, 16-bo'lim). *Hamkor bulut* — `outbox_jobs(kind=ofd_send)`: `base=30s, factor=2, cap=15 daqiqa`, 40 soatdan keyin har 2 daqiqa; job 48 soatlik oyna davomida to'xtamaydi.
 
 **Xato UX**: 48 soatgacha kassir chekni normal chop etadi ("offline" belgisi bilan), sotuv to'xtamaydi. Lokal ko'prik rejimida fiskal modul yoki Do'kon agenti umuman javob bermasa — POS "Fiskal modul ulanmagan" holatini ko'rsatadi va chekni yopmaydi (fiskal cheksiz savdo — SK 221-modda 1-qism, 5 mln so'm jarima); kassir agentni qayta ishga tushirish yo'riqnomasini ko'radi.
 
-**Offline**: lokal ko'prik rejimida FM chekni **tarmoqsiz imzolaydi** — chekdagi fiskal belgi va QR darhol haqiqiy, OFD'ga yetkazish internet qaytganda; `fiscal_receipts` sinxron orqali `fiscalized` holatda keladi, yetkazilganlik `cash_registers.fm_receipts_pending`/`last_unacked_receipt_at` orqali kuzatiladi. Hamkor bulut rejimida offline chek `status=pending`, `offline_since` bilan qoladi va internet qaytganda worker yuboradi. **Lokaut (obuna to'xtagan)** holatida lokautdan oldin yaratilgan chek cheklangan `sync.drain` scope orqali serverga topshiriladi (`16-offline-sync.md` §3.5, D1); FM'dagi yuborilmagan cheklarni yuborish lokautda ham ishlaydi (fiskal majburiyat do'konda, qaror #15).
+**Offline**: lokal ko'prik rejimida FM chekni **tarmoqsiz imzolaydi** — chekdagi fiskal belgi va QR darhol haqiqiy, OFD'ga yetkazish internet qaytganda; `fiscal_receipts` sinxron orqali `fiscalized` holatda keladi, yetkazilganlik `cash_registers.fm_receipts_pending`/`last_unacked_receipt_at` orqali kuzatiladi. Lokal ko'prikda FM natijasi (`fm_terminal_id`, `fm_receipt_seq`, `fiscal_sign`, `qr_url`, `fiscal_at`) POS voqeasidagi `fiscal_result` bilan keladi (`18-api-kassa.md` §4.1; qaror #68); OFD tasdig'i — `fiscal.status` agent vazifasi natijasidagi `acked[]` → `fiscal_receipts.ofd_acked_at` (16-bo'lim). Hamkor bulut rejimida offline chek `status=pending`, `offline_since` bilan qoladi va internet qaytganda worker yuboradi. **Offline qarz to'lovi cheki** (`debt_settlement`, qaror #67): tovar qatorlarini qurilma lokal keshdagi `open_debt_docs[]` bo'yicha `shared/lib/debt-allocation` bilan hisoblaydi (allokatsiya tartibi, proporsiya va yaxlitlash — `18-api-kassa.md` §12.2); server postingda allokatsiyani qayta hisoblaydi, FM imzolagan chek payload'i o'zgarmaydi, farq — `sync_exceptions(kind='debt_allocation_mismatch')`. **Lokaut (obuna to'xtagan)** holatida lokautdan oldin yaratilgan chek cheklangan `sync.drain` scope orqali serverga topshiriladi (`16-offline-sync.md` §3.5, D1); FM'dagi yuborilmagan cheklarni yuborish lokautda ham ishlaydi (fiskal majburiyat do'konda, qaror #15).
 
 **SLA**: **48 soat**, keyin avtomatik blok (VMQ-943, 1-ilova 31-band; 2-ilova 6-band, [lex.uz/docs/4603329](https://lex.uz/docs/4603329)).
 
@@ -153,9 +153,10 @@ sequenceDiagram
         FM-->>AG: terminal_id, fm_receipt_seq, fiscal_sign, qr_url
         AG-->>POS: FiscalResult → chek chop etiladi (QR bilan)
         FM-)OFD: paket yuborish (internet bo'lganda; yuborilmaganlar ro'yxati)
-        POS->>API: POST /sync/push {sale.created + fiskal natija}
-        API-->>POS: accepted (fiscal_receipts.status=fiscalized)
-        AG->>API: fiscal.status hisobot (fm_state, pending, oldest_unacked_at)
+        POS->>API: POST /sync/push {sale.created + fiscal_result}
+        API-->>POS: accepted (fiscal_receipts.status=fiscalized, ofd_acked_at=NULL)
+        AG->>API: fiscal.status natijasi (fm_state, pending_count, oldest_unacked_at, acked[])
+        API->>API: acked[] → fiscal_receipts.ofd_acked_at (tenant_id, fm_terminal_id, fm_receipt_seq)
     else Hamkor bulut (partner_cloud)
         POS->>API: POST /sync/push {sale.created}
         API->>API: hujjat + registrlar + outbox_jobs(kind=ofd_send)
@@ -189,7 +190,7 @@ class EInvoicePort(Protocol):
     async def send_outgoing(self, einvoice_id: UUID, signature: Pkcs7Signature) -> EInvoiceResult: ...
     async def get_status(self, operator_doc_id: str) -> EInvoiceStatus: ...
     async def get_risk_flag(self, operator_doc_id: str) -> RiskFlag: ...   # green|red|unknown; Didox: scoring, Faktura.uz: unknown
-    async def send_power_of_attorney(self, poa_id: UUID, signature: Pkcs7Signature) -> PoaResult: ...   # 6-bo'lim
+    async def send_power_of_attorney(self, poa_id: UUID, signed_payload: Pkcs7Signature) -> PoaResult: ...   # 6-bo'lim; powers_of_attorney dan o'qiydi
     async def send_ettn(self, ettn_id: UUID, signature: Pkcs7Signature) -> ETtnResult: ...   # 3-bo'lim
 ```
 
@@ -396,11 +397,11 @@ Server tomonidagi PKCS#7 tekshiruvi — E-IMZO-SERVER (shartnoma bo'yicha) orqal
 
 **API holati**: TMZ ishonchnomasi — EDO operatori hujjati (Faktura.uz `PowerOfAttorney` = 20, Didox `Empowerment`) — `EInvoicePort.send_power_of_attorney` (2-bo'lim); alohida adapter yo'q. Vakolat.uz (VM 825) — davlat xizmatlari uchun, yuridik shaxslar uchun ixtiyoriy, TMZ qabulida talab qilinmaydi; Vakolat reyestri faqat ommaviy veb-qidiruv (`vakolat.adliya.uz/search`) — integratsiya yo'q.
 
-**Yo'nalish va trigger**: chiquvchi — Menejer/Buxgalter ishonchnoma yaratadi (yetkazib beruvchi, tovar, muddat, ishonchli shaxs), Omborchi imzolaydi → `outbox_jobs(kind=poa_send)`.
+**Yo'nalish va trigger**: chiquvchi — ishonchnoma `POST /powers-of-attorney` bilan yaratiladi (yetkazib beruvchi, ixtiyoriy xarid buyurtmasi, muddat, ishonchli shaxs — odatda Omborchi; ruxsat `purchases.create`) → `pending_signature`; `einvoice.sign` ruxsati egasi (Egasi/Buxgalter) E-IMZO bilan imzolaydi (`sign-challenge` → `submit-signed`) → `sending`, `outbox_jobs(kind='poa_send')` → `EInvoicePort.send_power_of_attorney(poa_id, signed_payload)`; operator qabul qilgach `sent` (`number`, `operator_doc_id`), yetkazib beruvchi javobi poll orqali → `accepted`/`rejected` (`19-api-ombor.md` §8a).
 
-**Ma'lumot moslashtirish**: `goods_receipts.poa_number` (e-ishonchnoma raqami, operator orqali); EHF'da `doverennost_number`, `doverennost_date`.
+**Ma'lumot moslashtirish**: `powers_of_attorney(tenant_id, branch_id, purchase_order_id, supplier_id, employee_user_id, doc_date, valid_from, valid_to, number, operator_doc_id, status, signed_at, sent_at, responded_at, reject_reason)`; holatlar `draft → pending_signature → sending → sent → accepted | rejected`, `sending → failed → sending`, `draft | pending_signature → cancelled` (`11-malumotlar-modeli.md`); `goods_receipts.poa_id` → `powers_of_attorney`, `goods_receipts.poa_number` (poa'dan to'ldiriladi yoki qo'lda); EHF'da `doverennost_number`, `doverennost_date`.
 
-**Idempotentlik kaliti**: `poa_number + tenant_id`.
+**Idempotentlik kaliti**: `powers_of_attorney.id + tenant_id`.
 
 **Qayta urinish/backoff**: e-faktura bilan bir xil.
 
@@ -526,7 +527,7 @@ class PaymentPort(Protocol):
 
 **Xato UX**:
 - Do'kon sotuvida: to'lov muvaffaqiyatsiz bo'lsa kassir boshqa usul (naqd/karta) taklif qiladi — sotuv to'xtamaydi.
-- Bizning billingda: to'lov o'tmasa — 24 soatlik imtiyozdan keyin (US-M17-03) tenant uchun kirish **to'liq to'xtaydi**: barcha faol sessiya/tokenlar bekor qilinadi, har bir ochiq ekran login sahifasiga qaytariladi, login sahifasida "Obuna muddati tugagan" xabari + Click/Payme to'lov havolasi, yangi login rad etiladi. To'lov kelgach darhol qayta ochiladi. Offline qurilma — mahalliy imzolangan litsenziya (`subscription_end + 24 soat`) muddati tugaganda o'zi qulflanadi. Xizmat shartlarida do'konning kirish to'xtatilgan davrdagi fiskal/soliq majburiyatlari uchun o'zi javobgar ekani yoziladi (qaror #15). Ikki tor istisno (`16-offline-sync.md` §3.5): **D1** — lokautdan oldin yaratilgan fiskal voqealar cheklangan `sync.drain` scope orqali baribir yetkaziladi (1-bo'lim); **D2** — lokautda ma'lumot eksporti faqat to'lov sahifasidan, SMS OTP tasdig'i bilan.
+- Bizning billingda: to'lov o'tmasa — 24 soatlik imtiyozdan keyin (US-M17-03) tenant uchun kirish **to'liq to'xtaydi**: barcha faol sessiya/tokenlar bekor qilinadi, har bir ochiq ekran login sahifasiga qaytariladi, login sahifasida "Obuna muddati tugagan" xabari + Click/Payme to'lov havolasi, yangi login rad etiladi. To'lov kelgach darhol qayta ochiladi. Offline qurilma — mahalliy imzolangan litsenziya (`subscription_end + 24 soat`) muddati tugaganda o'zi qulflanadi. Xizmat shartlarida do'konning kirish to'xtatilgan davrdagi fiskal/soliq majburiyatlari uchun o'zi javobgar ekani yoziladi (qaror #15). Ikki tor istisno (`16-offline-sync.md` §3.5): **D1** — lokautdan oldin yaratilgan fiskal voqealar cheklangan `sync.drain` scope orqali baribir yetkaziladi (1-bo'lim); **D2** — lokautda ma'lumot eksporti faqat to'lov sahifasidan, OTP tasdig'i bilan (Telegram birinchi, SMS zaxira — qaror #34).
 
 **Offline**: Click/Payme/Uzum va UzQR (statik ham, dinamik ham) — **faqat online** (qaror #64; `16-offline-sync.md` — to'lov turlarining offline siyosati). Mustaqil terminal (`card`) — qo'lda tasdiqlanadigan to'lov turi (9.2), online va offline'da ruxsat.
 
@@ -577,7 +578,7 @@ Adapterlar: `UzqrStubAdapter` (MVP — dinamik QR o'chiq), real adapter — POS 
 
 **Huquqiy asos**: VMQ-943 1-ilova 6-band — terminal cheki + kassa fiskal cheki qonuniy model. Chekda majburiy (7-band, 2026-10-22 dan): to'lov shakli "bank kartalari" va **karta turi** (shaxsiy/korporativ/ijtimoiy); ijtimoiy kartada — karta niqobi (birinchi va oxirgi 4 raqam) va tranzaksiya unikal raqami (VMQ-610). Noto'g'ri belgilash (masalan karta to'lovini "naqd") — MJtK 175-modda (mansabdor shaxslarga 100 BHM).
 
-**Qaror (qaror #64)**: ruxsat etiladi, **online va offline'da**. `sale_payments.method='card'` tanlanganda kassir terminal chekidan kiritadi: `card_type` (majburiy, standart `personal`; noma'lum bo'lsa `unknown`), ijtimoiy kartada `card_mask` (`^[0-9]{4}\*+[0-9]{4}$`) va `rrn` — majburiy. Z-hisobotda (M16) "karta" jami alohida qatorda; tushum 5710 → `bank_settlements` (BO-24) bilan solishtiriladi (qaror #42).
+**Qaror (qaror #64)**: ruxsat etiladi, **online va offline'da**. `sale_payments.method='card'` tanlanganda kassir terminal chekidan kiritadi: `card_type` (majburiy; standart qiymat yo'q — kassir har to'lovda terminal chekiga qarab tanlaydi, qaror #64; aniqlab bo'lmasa `unknown`), ijtimoiy kartada `card_mask` (`^[0-9]{4}\*+[0-9]{4}$`) va `rrn` — majburiy. Z-hisobotda (M16) "karta" jami alohida qatorda; tushum 5710 → `bank_settlements` (BO-24) bilan solishtiriladi (qaror #42).
 
 **Nega**: bozorda standart amaliyot; integratsiyalangan bank terminali veb-kassaga ochiq protokol bilan ulanmaydi. Reyestr talabi (VMQ-393: karta/QR to'lovini qurilmaning o'zida qabul qilish **imkoniyati**) har do'konda integratsiyalangan terminalni majburlamaydi.
 
@@ -769,7 +770,7 @@ class TelegramAdapter(Protocol):
 
 Tanlov mezoni: (a) ochiq API/test muhiti birinchi, (b) qonuniy bosim (48 soat OFD) ustunlik beradi, (c) tashqi javobni kutayotganlar port + stub ortida, real adapter javobdan keyin.
 
-1. **`FiscalPort` + `FakeFiscalAdapter`/`FakeLocalBridge`** — Bosqich 0 dan; offline-first, 48 soatlik shkala va blok, `fm_state` shu atrofda quriladi. Reyestr arizasi va yt.uz arizasi — Bosqich 0.
+1. **`FiscalPort` + `FakeFiscalAdapter`/`FakeLocalBridge`** — Bosqich 3 dan; offline-first, 48 soatlik shkala va blok, `fm_state` shu atrofda quriladi. Reyestr arizasi va yt.uz arizasi — Bosqich 0.
 2. **MXIK (tasnif.soliq.uz)** — chekning oldingi sharti.
 3. **E-IMZO** — brauzer ↔ E-IMZO ↔ backend oqimi (TestCA).
 4. **Faktura.uz** (e-faktura, kiruvchi EHF+TTN, e-ishonchnoma) — `EInvoicePort`; Didox adapteri — operator tanlovi qayta ko'rilsa.
@@ -819,7 +820,7 @@ Tanlov mezoni: (a) ochiq API/test muhiti birinchi, (b) qonuniy bosim (48 soat OF
 | **1C** | COM faqat Windows jarayonidan | `33-1c-integratsiya.md` §9.5 vazifalari | Bosqich 7 |
 
 **Ikki kanal**:
-1. **Lokal API (POS ↔ agent)** — `http://127.0.0.1:<port>/v1/*`, faqat loopback interfeysida tinglaydi (port agent sozlamasida, POS-16 «Uskunalar sozlamasi»da ko'rsatiladi). Kim ishlatadi: veb-kassa — sotuv paytidagi fiskal chek va xom printerga chop etish; internetsiz ham ishlaydi (offline savdoning asosiy sharti). Yo'llar:
+1. **Lokal API (POS ↔ agent)** — `http://127.0.0.1:47110/v1/*` (standart port `47110`, agent sozlamasida o'zgaradi, POS-16 «Uskunalar sozlamasi»da ko'rsatiladi), faqat loopback interfeysida tinglaydi. Kim ishlatadi: veb-kassa — sotuv paytidagi fiskal chek va xom printerga chop etish; internetsiz ham ishlaydi (offline savdoning asosiy sharti). Yo'llar (so'rov/javob sxemalari, xato shakli va HTTP kodlari — §16.1):
 
    | Yo'l | Vazifa |
    |---|---|
@@ -832,25 +833,45 @@ Tanlov mezoni: (a) ochiq API/test muhiti birinchi, (b) qonuniy bosim (48 soat OF
    **Himoya** (uchalasi birga majburiy): (a) faqat `127.0.0.1` — tashqi interfeysda port ochilmaydi; (b) **`Origin` oq ro'yxati** — faqat `https://app.<domen>` (dev'da `http://localhost:<vite-port>`), boshqa `Origin` yoki `Origin`siz so'rov → `403`; CORS preflight va Private Network Access javobi (`Access-Control-Allow-Private-Network: true`) faqat ro'yxatdagi `Origin` uchun; (c) **qurilmaga bog'langan lokal token** — `Authorization: Bearer <local_token>` har so'rovda. Bog'lash: agent tray'da 6 raqamli bir martalik kodni ko'rsatadi (5 daqiqa amal qiladi), kassir POS-16 da kiritadi → `POST /v1/pair {code, device_id}` → agent tasodifiy 256-bit `local_token` qaytaradi va uni POS `devices.id` bilan juft qilib DPAPI ostida saqlaydi; POS tokenni Dexie'da saqlaydi. Token boshqa `device_id` bilan ishlamaydi; tray «Ulangan kassalar» ro'yxatidan bog'lanish o'chiriladi; POS qurilmasi serverda bekor qilinsa (`POST /devices/{id}/revoke`) POS o'zi qulflanadi. Server bu tokenni ko'rmaydi va saqlamaydi. Chrome 142+ da sahifa loopback'ga birinchi murojaatda foydalanuvchidan ruxsat so'raydi (Local Network Access) — onboarding yo'riqnomasida.
 
    **POS holati «Fiskal modul ulanmagan»**: lokal ko'prik rejimida (`FISCAL_PROVIDER` = `multikassa_local`/`fiscaldrive_local`) `GET /v1/status` javob bermasa, token rad etilsa yoki `fm_state` noma'lum bo'lsa — POS (`$agentStatus != online`, `24-frontend-arxitekturasi.md` §6.4) chekni **yopmaydi**, savatni saqlaydi va agentni qayta ishga tushirish yo'riqnomasini ko'rsatadi; bu lokal holat, server xato kodi emas. `fm_state='locked'` → `FISCAL_DEVICE_LOCKED`, 48 soat → `FISCAL_OFFLINE_48H_BLOCKED` (1-bo'lim).
-2. **Bulut kanali (agent ↔ server)** — `33-1c-integratsiya.md` §9 dagi **bir xil** identifikatsiya va protokol: OAuth mijozi `onec-agent` (RFC 8628 device grant bilan ulash, keyin `client_credentials` + `private_key_jwt`, access token 10 daqiqa), yo'llar `/api/v1/onec-agent/*` (long-poll pull, Ed25519 imzoli vazifalar, lease/heartbeat). Bitta do'kon PK'si — bitta agent yozuvi (`devices.kind='onec_agent'`), imkoniyatlar sozlamada yoqiladi.
+2. **Bulut kanali (agent ↔ server)** — `33-1c-integratsiya.md` §9 dagi **bir xil** identifikatsiya va protokol: OAuth mijozi `onec-agent` (RFC 8628 device grant bilan ulash, keyin `client_credentials` + `private_key_jwt`, access token 10 daqiqa), yo'llar `/api/v1/onec-agent/*` (long-poll pull, Ed25519 imzoli vazifalar, lease/heartbeat). Bitta do'kon PK'si — bitta agent yozuvi (`devices.kind='onec_agent'`), imkoniyatlar sozlamada yoqiladi. **Agent infratuzilmasi — Bosqich 5** (qaror #66): agent ro'yxati, ulash, token, vazifa navbati va imzo — umumiy registr jadvallari `onec_agents` (`capabilities JSONB`), `onec_agent_tasks`, `onec_task_results`, `auth.onec_device_authorizations`, migratsiya `0028 store_agent`; 1C ga xos qism — Bosqich 7 (`0029 onec_integration`). A-01 `hello` so'rovi `capabilities` ni yuboradi (`34-1c-agent.md` §14.2 sxemasi, `X-Agent-Protocol: 2`), server uni `onec_agents.capabilities` ga yozadi.
+   - **Kassa bog'lanishi**: lokal ko'prik kassasi `cash_registers.fiscal_agent_id` (xizmat qiluvchi agent) + `fiscal_local_device_id` (agent `capabilities.fiscal.devices[].local_id`) orqali bog'lanadi; `fiscal_agent_id` berilsa `fiscal_local_device_id` majburiy. Sozlash — BO-12 kassa qatorida "Fiskal agent" (`PATCH /cash-registers/{id}`, ruxsat `settings.branches`).
+   - **Imkoniyat tekshiruvi**: vazifa faqat agent `capabilities` da yoqilgan (`capabilities.<oila>.enabled = true`) oilaga qo'yiladi, aks holda `AgentTaskPort.enqueue` → `409 AGENT_CAPABILITY_DISABLED`.
 
-**Bulut vazifa turlari — Bosqich 5 kengaytmasi** (`33` §9.5 oq ro'yxatiga qo'shiladi; `base_id = null`, 1C bazasi talab qilinmaydi):
+**Bulut vazifa turlari — Bosqich 5** (`33` §9.5 oq ro'yxatida; `purpose='device_service'`, `base_id = null`, 1C bazasi talab qilinmaydi):
 
-| `kind` | Vazifa | Natija |
-|---|---|---|
-| `fiscal.status` | FM holati: `fm_state`, yuborilmagan cheklar soni, eng eski yuborilmagan chek vaqti | `cash_registers.fm_state`, `fm_receipts_pending`, `last_unacked_receipt_at` yangilanadi |
-| `fiscal.resend_unsent` | Yuborilmagan cheklarni qayta yuborish (40 soatdan keyin server avtomatik qo'yadi, BO-14'da qo'lda ham) | `ResendResult` |
-| `fiscal.zreport` | Smena yopilishida Z-hisobotni FM'dan olish (POS yopiq bo'lsa) | `ZReport` |
-| `print.raw` | Back-office'dan LAN printerga chop etish (masalan qayta chek nusxasi, kassa hisoboti) | yuborildi / printer xatosi |
-| `scale.plu_upload` | PLU ro'yxatini yorliqli taroziga yuklash | yuklangan qatorlar soni / xato |
+| `kind` | Vazifa | Payload | Natija | Bosqich |
+|---|---|---|---|---|
+| `fiscal.status` | FM holati va OFD tasdiqlari (har 5 daqiqada) | `{cash_register_id}` | `{cash_register_id, fm_state, pending_count, oldest_unacked_at, acked:[{fm_terminal_id, fm_receipt_seq, acked_at}]}` → `cash_registers.fm_state`, `fm_receipts_pending`, `last_unacked_receipt_at`; `acked[]` → `fiscal_receipts.ofd_acked_at` (`tenant_id, fm_terminal_id, fm_receipt_seq` bo'yicha) | Bosqich 5 |
+| `fiscal.resend_unsent` | Yuborilmagan cheklarni qayta yuborish (40 soatdan keyin server avtomatik qo'yadi, BO-14'da qo'lda ham) | `{cash_register_id}` | `ResendResult {sent, failed, acked[]}` (`acked[]` — `fiscal.status` dagidek) | Bosqich 5 |
+| `fiscal.zreport` | Smena yopilishida Z-hisobotni FM'dan olish (POS yopiq bo'lsa) | `{cash_register_id, shift_id}` | `ZReport` → `fiscal_receipts(kind='z_report')` | Bosqich 5 |
+| `print.raw` | Back-office'dan LAN printerga chop etish (masalan qayta chek nusxasi, kassa hisoboti) | `{printer_local_id, data_base64, encoding: "cp866"\|"raster"}` | yuborildi / printer xatosi | Bosqich 5 |
+| `scale.plu_upload` | PLU ro'yxatini yorliqli taroziga yuklash | `{scale_local_id, items:[{plu, name, price, barcode_prefix}]}` | yuklangan qatorlar soni / xato | MVP'dan keyin |
 
 Bu ro'yxat `23-backend-arxitekturasi.md` §4.2, `33-1c-integratsiya.md` §9.5 va `34-1c-agent.md` §14 bilan aynan bir xil. Imkoniyat yoqilmagan agentga bu turdagi vazifa berilmaydi; agent noma'lum turni `33` §9.11 qoidasi bo'yicha rad etadi. Sotuv paytidagi fiskallashtirish va chek chop etish **bulut vazifasi emas** — POS ularni lokal API orqali bajaradi (internetga bog'liq emas). 1C protokoli (`33` §9) o'zgarmaydi — bu turlar o'sha imzoli vazifa konvertida keladi.
 
 **Sirlar**: FM/hamkor lokal xizmat siri, 1C paroli, agent Ed25519 maxfiy kaliti — faqat PK'da (DPAPI `CurrentUser`); serverga chiqmaydi.
 
-**Kod-imzolash**: agent `.exe` va o'rnatuvchi Authenticode OV sertifikati bilan imzolanadi (`34-1c-agent.md` §4.5); lokal ko'prik tanlansa sertifikat Bosqich 5 dan oldin kerak.
+**Kod-imzolash**: agent `.exe` va o'rnatuvchi Authenticode OV sertifikati bilan imzolanadi (`34-1c-agent.md` §4.5); lokal ko'prik tanlansa — Bosqich 5/6 pilot tarqatishidan oldin (qaror #38).
 
 **Platforma oqibati**: lokal ko'prik rejimida veb-kassa — **Windows PK (Chrome/Edge) + Do'kon agenti**; Android Chrome va iOS'da fiskal kassa faqat hamkor bulut rejimida (1-bo'lim).
+
+### 16.1 Lokal API sxemalari
+
+Standart port `47110` (agent sozlamasida o'zgaradi). Barcha so'rov/javob JSON, pul — butun son tiyin (`int64`), vaqt — ISO 8601 UTC.
+
+| Yo'l | So'rov | Javob |
+|---|---|---|
+| `GET /v1/status` | — | `{agent_version, capabilities:{fiscal:{enabled, provider}, print:{enabled}}, fiscal_devices:[{local_id, fm_state, pending_count, oldest_unacked_at}]}` |
+| `POST /v1/pair` | `{code, device_id}` | `{local_token, expires_at:null}` |
+| `POST /v1/fiscal/open-shift` | `{cash_register: CashRegisterRef, shift_no, cashier_name}` | `FiscalShiftResult {fm_terminal_id, opened_at}` |
+| `POST /v1/fiscal/close-shift` | `{cash_register, shift_no}` | `ZReport {fm_terminal_id, z_number, totals:{sale, return, by_payment_form}, closed_at}` |
+| `POST /v1/fiscal/sale`, `/refund` | `FiscalReceiptPayload {cash_register, receipt_seq, kind, items:[{name, mxik, package_code, unit_code, qty_milli, price_tiyin, amount_tiyin, vat_rate, vat_tiyin, marking_codes[]}], payments:{payment_form, cash_tiyin, card_tiyin, qr_tiyin, card_type, card_mask, rrn}, refund_info?:{fm_terminal_id, fm_receipt_seq, fiscal_sign}}` | `FiscalResult {fm_terminal_id, fm_receipt_seq, fiscal_sign, qr_url, fiscal_at}` |
+| `GET /v1/fiscal/device-status` | `?local_id=` | `FiscalDeviceStatus {fm_state, pending_count, oldest_unacked_at}` |
+| `GET /v1/fiscal/unsent` | `?local_id=` | `{items: [UnsentReceipt {fm_receipt_seq, fiscal_at, amount_tiyin}]}` |
+| `POST /v1/fiscal/resend` | `{local_id}` | `ResendResult {sent, failed, acked:[{fm_terminal_id, fm_receipt_seq, acked_at}]}` |
+| `POST /v1/print/raw` | `{printer_local_id, data_base64, encoding}` | `{status:"sent"}` |
+
+`CashRegisterRef = {cash_register_id, local_id}`. Xato shakli `{code, message_key, params?}`; HTTP: `401` (lokal token yo'q/noto'g'ri), `403` (`Origin` ro'yxatda yo'q), `409` (`FISCAL_SHIFT_STATE`, `FISCAL_DEVICE_LOCKED`), `423` (`FISCAL_OFFLINE_48H_BLOCKED`), `502` (`FISCAL_PROVIDER_ERROR`); hamkorga xos maydonlar adapter ichida qoladi. `FakeLocalBridge` shu sxemalarga tayanadi.
 
 ---
 

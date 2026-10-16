@@ -465,7 +465,7 @@ Qoidalar:
 | 23 | Markirovka o'qilmadi | Markirovka kodi o'qilmadi, qayta urinilmoqda... | Код маркировки не считан, повторная попытка... | `errors.marking_code_invalid` |
 | 24 | Offlaynda sotib bo'lmaydi | Offlaynda sotib bo'lmaydi — narx noma'lum | Нельзя продать офлайн — цена неизвестна | `errors.marking_price_unknown_offline` |
 | 25 | Offlayn sotildi (markirovka) | Offlayn sotildi, kod chek bilan OFD'ga yuboriladi | Продано офлайн, код уйдёт в ОФД вместе с чеком | `marking.offline_pending_verification` |
-| 26 | Qaytarish offlaynda yopiq | Qaytarish uchun internet kerak | Для возврата нужен интернет | `errors.return_requires_online` |
+| 26 | Asl chek lokal keshda yo'q (offline qaytarish) | Bu chekni qaytarish uchun internet kerak | Для возврата этого чека нужен интернет | `errors.return_requires_online` |
 | 27 | Printer topilmadi | Printer topilmadi. Printerni tekshiring yoki elektron chek bering | Принтер не найден. Проверьте принтер или выдайте электронный чек | — |
 | 28 | Smena ochildi | Smena ochildi | Смена открыта | — |
 | 29 | Smena yopildi | Smena yopildi, Z-hisobot tayyor | Смена закрыта, Z-отчёт готов | — |
@@ -475,7 +475,8 @@ Qoidalar:
 | 33 | AI javob bera olmadi | Bu savolga aniq javob topa olmadim | Не удалось найти точный ответ на этот вопрос | — |
 | 34 | Eksport tayyor | Eksport fayli tayyor, yuklab olish boshlandi | Файл экспорта готов, загрузка началась | — |
 | 35 | Xodim bloklandi | Xodim bloklandi | Сотрудник блокирован | — |
-| 36 | OTP yuborildi | Kod SMS orqali yuborildi | Код отправлен по SMS | — |
+| 36 | OTP yuborildi (Telegram; `channel_used='telegram'`) | Kod Telegram orqali yuborildi | Код отправлен в Telegram | `otp_sent_telegram` |
+| 36a | OTP yuborildi (SMS; `channel_used='sms'`) | Kod SMS orqali yuborildi | Код отправлен по SMS | `otp_sent_sms` |
 | 37 | OTP noto'g'ri | Kod noto'g'ri yoki eskirgan | Код неверный или устарел | `errors.otp_invalid` (shuningdek `errors.otp_expired`ni ham qamrab oladi) |
 | 38 | Davlat hisoboti mos keldi | Davlat hisoboti ichki hisob bilan mos keldi | Отчёт государства совпал с внутренним учётом | `tax.reconciliation_matched` |
 | 39 | Davlat hisobotida farq | Farq topildi — ko'rib chiqing | Обнаружено расхождение — проверьте | `tax.reconciliation_diff_found` |
@@ -503,7 +504,7 @@ Qoidalar:
 | 60 | Markirovka kodi takror | Bu markirovka kodi allaqachon sotilgan | Этот код маркировки уже продан | `errors.marking_code_already_sold` |
 | 61 | Elektron chek berildi | Elektron chek yuborildi (sabab: {sabab}) | Электронный чек отправлен (причина: {причина}) | — |
 
-Qator `26\*` — №26 ("Qaytarish offlaynda yopiq") dan farqli, maxsus holat: markirovkalangan tovarni offline qaytarish umuman taqiqlanadi (oddiy qaytarish faqat internet talab qiladi, lekin markirovka uchun bu qattiqroq qoida). Raqamlash ketma-ketligi 1–39 o'zgarmasin degan maqsadda bu qator jadval oxirida qo'shildi.
+Qator `26\*` — №26 (asl chek lokal POS chek tarixida — 90 kun, qaror #54 — topilmaganda) dan farqli, markirovkali tovar uchun maxsus holat: faqat markirovkali qaytarish online (qaror #23); markirovkasiz tovarni qaytarish offline ruxsat etiladi. Raqamlash ketma-ketligi 1–39 o'zgarmasligi uchun bu qator jadval oxirida turadi. OTP xabari (№36/36a) kalit bo'yicha `channel_used` qiymatiga qarab tanlanadi.
 
 ---
 
@@ -531,10 +532,13 @@ Adapter: `shared/lib/printer` — `WebUsbPrinterAdapter` / `WebSerialPrinterAdap
 ----------------------------------------
   1. Non / Хлеб "Bekhurmon"
      2 x 12 000                        24 000
+     MXIK 10202001001000000 · dona · 4780000123456 · QQS 12%: 2 571,43
   2. Coca-Cola 1.5L                    ← name_ru yo'q, faqat bir qator
      1 x 18 000                        18 000
+     MXIK <mxik> · dona · <shtrix kod> · QQS 12%: 1 928,57
   3. Sut / Молоко "Oltin" 1L
      3 x 9 000                         27 000
+     MXIK <mxik> · dona · <shtrix kod> · QQS 12%: 2 892,86
 ----------------------------------------
   Jami / Итого:                      69 000 so'm
   Chegirma / Скидка:                     0 so'm
@@ -551,9 +555,9 @@ Adapter: `shared/lib/printer` — `WebUsbPrinterAdapter` / `WebSerialPrinterAdap
       Rahmat! Yana kuting. / Спасибо! Ждём вас.
       [NUSXA / КОПИЯ] ← faqat qayta chop etishda
 ```
-MXIK, o'lchov birligi va shtrix kod har tovar qatori ostida kichik shrift bilan chiqariladi (rekvizitlar ro'yxati yuqorida). 58mm'da qator kengligi 24 belgi (nom ikkinchi qatorga tushishi mumkin — ikki tilli nom uzun bo'lsa ruscha qism alohida qatorga tushadi), 80mm'da 32 belgi.
+MXIK, o'lchov birligi, shtrix kod va **QQS stavkasi/summasi** (qator darajasida, qaror #26 formulasi) har tovar qatori ostida kichik shrift bilan chiqariladi (rekvizitlar ro'yxati yuqorida; 1-qator: 24 000 × 12/112 = 2 571,43). QQSsiz qatorda: `· QQSsiz (imtiyoz: <kod>)`. Chek oxiridagi "QQS / НДС (12%, ichida)" jami qatori — qator QQSlari yig'indisi. 58mm'da qator kengligi 24 belgi (nom ikkinchi qatorga tushishi mumkin — ikki tilli nom uzun bo'lsa ruscha qism alohida qatorga tushadi), 80mm'da 32 belgi.
 
-**To'lov shakli yorliqlari (ikki tilda)**: Naqd/Наличные; Bank kartalari/Банковские карты (+ karta turi: shaxsiy/личная, korporativ/корпоративная, ijtimoiy/социальная); QR-kodli to'lov/Оплата по QR-коду (UzQR, Payme, Click, Uzum — provayder nomi qavsda); Aralash/Смешанная (bir chekda bir nechta shakl); Nasiya/В долг (faqat `debt_settlement` chekida ko'rinadi, oddiy sotuv chekida "Nasiya" qatori chiqmaydi — Q3, nasiya sotuvida bu shablonning o'zi chiqarilmaydi).
+**To'lov shakli yorliqlari (ikki tilda)**: Naqd/Наличные; Bank kartalari/Банковские карты (+ karta turi: shaxsiy/личная, korporativ/корпоративная, ijtimoiy/социальная, noma'lum/не определён); QR-kodli to'lov/Оплата по QR-коду (UzQR, Payme, Click, Uzum — provayder nomi qavsda); Aralash/Смешанная (bir chekda bir nechta shakl). `debt_settlement` chekida to'lov shakli `debt_payments.method` dan; chek sarlavhasi «Qarz to'lovi / Погашение долга» (nasiya sotuvida bu shablonning o'zi chiqarilmaydi).
 
 > **QQS qatori aniqligi** (qaror #26): qog'ozda QQS 2 xonali kasr bilan (`formatMoney(value, { precision: 2 })`); fiskal adapter OFD/hamkorga butun son tiyinda uzatadi — hamkor protokoli bilan tasdiqlanadi (26 #109 (OQ-012)).
 

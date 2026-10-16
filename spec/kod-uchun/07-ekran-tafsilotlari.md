@@ -48,7 +48,7 @@
 |---|---|---|---|---|---|---|---|
 | `branchId` | Filial | Филиал | Faqat ko'rsatish (matn) | — | — | `devices.cash_register_id` orqali avtomatik aniqlangan filial | — |
 | `pin` | PIN kod | PIN-код | `PinPad` (4–6 raqam) | Ha | Faqat raqam, 4–6 ta | — | 6 |
-| `openingCash` | Boshlang'ich naqd | Начальная наличность | `MoneyInput` | Ha (`shift.open` bor foydalanuvchida smena ochishda) | ≥0, butun son | Oxirgi yopilgan smenaning sanalgan naqd qoldig'i (yo'q bo'lsa 0) | 9 999 999 999 |
+| `openingCash` | Boshlang'ich naqd | Начальная наличность | `MoneyInput` | Ha (`shift.open` bor foydalanuvchida smena ochishda) | ≥0, 2 kasr xonasi | Oxirgi yopilgan smenaning sanalgan naqd qoldig'i (yo'q bo'lsa 0) | 9 999 999 999 |
 
 - **Amallar**:
 
@@ -80,7 +80,7 @@
 | `customerId` | Mijoz | Клиент | `Combobox` | Yo'q | Mavjud mijoz yoki yangi | Bo'sh (anonim) | — |
 | `barcode` | Skanerlash/qidiruv | Сканирование/поиск | `BarcodeField` | — | Katalogda mavjud kod | — | 64 belgi |
 | `lines[].qty` | Miqdor | Количество | `QtyInput` | Ha | >0, o'lchov birligiga mos kasr | 1 | 99 999 |
-| `discountPercent` | Chegirma % | Скидка % | `Input` (number) | Yo'q | 0–100, PIN'siz ≤5% (standart, M13 orqali sozlanadi) | 0 | 100 |
+| `discountPercent` | Chegirma % | Скидка % | `Input` (number) | Yo'q | 0–100, PIN'siz ≤5% (standart, M13 orqali sozlanadi); butun chek chegirmasi qatorlarga `line_gross` ulushida taqsimlanadi (qoldiq eng katta qatorga), har qatorda `discount_source='manual'`; limit `Σ discount_manual / Σ line_gross × 100` | 0 | 100 |
 
 - **Amallar**:
 
@@ -90,7 +90,7 @@
 | Qidirish | `sales.create` | Yo'q | `Combobox` natija ro'yxati |
 | CHEGIRMA | `discount.give` (>5% — `discount.approve`, `ApprovalDialog`) | >5%da Menejer/Egasi PIN | Chek summasi qayta hisoblanadi |
 | BEKOR (qator/chek) | `sales.void` | "Haqiqatan bekor qilasizmi?" (#15) | `sale.draft_voided` audit voqeasi, fiskal chek yo'q |
-| TO'LOV ▶ | `sales.create` | 46–48 soat oralig'ida — offline modal (qaror #43); 48 soatdan keyin tugma o'chiq | POS-03ga o'tish |
+| TO'LOV ▶ | `sales.create` | Yo'q (46 soat modali — POS-03 "TASDIQLASH" oldidan); 48 soatdan keyin tugma o'chiq (qaror #43) | POS-03ga o'tish |
 | + Mijoz | `debts.create` yoki `sales.create` | Yo'q | Mijoz tanlash/yaratish bottom sheet; "+ Mijoz" bosilganda `counterparty.created` voqeasi |
 
 - **Markirovka** (qaror #62): markirovka kodi chakana sotuvda **fiskal chek ichida** OFD orqali Asl belgisiga uzatiladi (`sale_lines[].marking_code` → `FiscalPort` `items[].marking_codes[]`) — kassa CRPT'ni alohida chaqirmaydi. Skanerda: (1) **lokal takror-kod nazorati** har doim (online va offline) — shu chekda dublikat yoki tenantda avval sotilgan kod (sinxronlangan `marking_codes`) bo'lsa qator **rad etiladi**; kodsiz markirovkali qator bilan chek yopilmaydi; (2) online bo'lsa sotuvdan oldingi tekshiruv `POST /api/v1/marking-codes/verify` — tenant sozlamasi `MARKING_PRECHECK` (`off` | `warn` | `block`, standart `warn`, BO-14): `warn` — muvaffaqiyatsiz javobda sariq ogohlantirish + audit `marking.precheck_failed`, sotuv davom etadi; `block` — qator rad etiladi; offline — tekshiruv o'tkazib yuboriladi, kod chekda FM tomonidan imzolanadi. Tashqi tasdiq — 26 #40 (OQ-025).
@@ -112,12 +112,12 @@
 
 | Maydon | Label (uz) | Label (ru) | Tur/komponent | Majburiy | Validatsiya | Default | Max |
 |---|---|---|---|---|---|---|---|
-| `paymentMethod` | To'lov usuli | Способ оплаты | Tugmalar guruhi | Ha | `cash\|card_manual\|uzqr\|payme\|click\|uzum\|debt` | — | — |
+| `paymentMethod` | To'lov usuli | Способ оплаты | Tugmalar guruhi | Ha | `cash\|card\|uzqr\|payme\|click\|uzum\|debt` (`card` yorlig'i — "Karta (qo'lda)") | — | — |
 | `cashReceived` | Olingan naqd | Полученная наличность | `MoneyInput` | Ha (naqd bo'lsa) | ≥ to'lanadigan summa | To'lanadigan summa | 9 999 999 999 |
 | `cardType` | Karta turi | Тип карты | `SegmentedControl` (Shaxsiy / Korporativ / Ijtimoiy / Noma'lum) | Ha (karta bo'lsa) | `personal\|corporate\|social\|unknown` | — (har safar so'raladi, qaror #64) | — |
 | `cardMask` | Karta raqami (niqob) | Маска карты | `Input` (`8600****1234`) | Ijtimoiy kartada — ha; boshqada — yo'q | `^[0-9]{4}\*+[0-9]{4}$` (terminal chekidan) | — | 19 |
 | `rrn` | Tranzaksiya raqami (RRN) | Номер транзакции (RRN) | `Input` | Ijtimoiy kartada — ha; boshqada — yo'q | Max 40 belgi | — | 40 |
-| `qrType` | UzQR turi | Тип UzQR | `SegmentedControl` (Statik / Dinamik) | Ha (UzQR bo'lsa) | `static\|dynamic` | Tenant sozlamasi | — |
+| `qrType` | UzQR turi | Тип UzQR | `SegmentedControl` (Statik / Dinamik) | Ha (UzQR bo'lsa) | `static\|dynamic` | `static` | — |
 | `terminalRef` | To'lov/terminal raqami | Номер операции | `Input` | Yo'q (ixtiyoriy; statik UzQR to'lov raqami ham shu yerga) | Max 40 belgi | — | 40 |
 
 - **Amallar**:
@@ -126,7 +126,7 @@
 |---|---|---|---|
 | NAQD/KARTA/UzQR/Payme/Click/Uzum/NASIYA | `sales.create` | Nasiya limitdan oshsa `ApprovalDialog` | To'lov biriktiriladi |
 | To'lov qabul qilindi (statik UzQR) | `sales.create` | "Mijoz to'lovini ko'rdingizmi?" | Kassir qo'lda tasdiqlaydi, faqat online; `provider_tx_id` talab qilinmaydi (`qr_type='static'`) |
-| TASDIQLASH | `sales.create` | 46–48 soat oralig'ida offline modal (qaror #43) | `sale.created` outbox, POS-04ga o'tish |
+| TASDIQLASH | `sales.create` | 46–48 soat oralig'ida offline modal (qaror #43) | `sale.created` outbox, POS-04ga o'tish; javobdagi `fiscal.status` ∈ `pending\|fiscalized\|deferred` (lokal ko'prikda chek FM'da imzolanadi va `fiscal_result` voqeaga qo'shiladi, qaror #68) |
 
 - **To'lov rekvizitlari** (qaror #64): mustaqil bank terminali bilan karta to'lovi qonuniy — kassir terminal chekidan `cardType` (har doim), `cardMask` va `rrn` (ijtimoiy kartada majburiy) ni kiritadi → `sale_payments.card_type/card_mask/rrn`. Fiskal chekdagi to'lov shakli (`fiscal_receipts.payment_form`): naqd → `cash` "naqd"; karta → `card` "bank kartalari" (+ karta turi); UzQR/Click/Payme/Uzum → `qr` "QR-kodli to'lov"; bir nechta usul → `mixed` "aralash". **UzQR**: statik QR — kassa bilan integratsiyasiz, to'lov faktini kassir qo'lda tasdiqlaydi; dinamik QR — `UzqrPort` orqali (real adapter POS API hujjatidan keyin, hozir stub), `provider_tx_id` majburiy — 26 #49 (OQ-032). Yakka tadbirkor tenantda (`tenants.legal_form='sole_proprietor'`) "UzQR" tugmasi o'rniga to'lov tashkiloti maxsus QR'i (Click/Payme/Uzum) ishlatiladi. Har qanday to'lov usulida fiskal chekni **bizning kassa** chiqaradi; provayderga faqat chek havolasi uzatiladi (Click — `submit_qrcode`).
 - **Ma'lumot manbai**: `POST /api/v1/payments/checkouts` (`provider` tanada; dinamik UzQR/Click/Payme/Uzum, statik UzQR — checkout'siz) → poll `GET /api/v1/payments/checkouts/{checkout_ref}` (webhook — server tomoni, ekran o'zi chaqirmaydi); outbox `sale.created` (`sale_payments.method`, `card_type`, `card_mask`, `rrn`, `qr_type`, `terminal_ref`).
@@ -159,19 +159,20 @@
 ```
 
 - **Maydonlar**: yo'q (faqat ko'rsatish ekrani) — `ReceiptPreview` komponenti chekni render qiladi (`08-dizayn-tizimi.md` §13.1). (qaror #29) `ReceiptPreview` har bir tovar qatorini **ikki tilda** chiqaradi: `"{name} / {name_ru}"` (`name_ru` bo'sh bo'lsa faqat `name`), shuningdek sarlavha/yakun matnlari ikki tilda ("Jami / Итого", "Naqd / Наличные" va h.k., to'liq ro'yxat — `08-dizayn-tizimi.md` chek shabloni bo'limi).
-- (qaror #30) **Nasiyaga sotuvda bu ekran ochilmaydi**: to'lov usuli to'liq "Nasiya" bo'lgan sotuvda fiskal chek shu zahotda chiqarilmaydi (`fiscal_receipts` yaratilmaydi, holat `deferred`) — POS-03 to'g'ridan-to'g'ri POS-06 (yoki POS-02'ga qaytish) ga o'tadi, bu ekran faqat **naqd/karta qismi bo'lgan** (to'liq yoki aralash to'lovning naqd qismi) sotuvlarda ko'rsatiladi. Qarz to'langanda chiqariladigan fiskal chek — alohida oqim, POS-13/BO-06 (`debt_settlement`). Daromad va QQS sotuv kuni tan olinadi, chek — to'lov kuni; sotuv paytidagi "kredit" turidagi chek (`kind='credit_sale'`) `FiscalPolicy.credit_sale_receipt` ortida (standart `none`) — 26 #9 (OQ-002).
+- (qaror #30) **Nasiyaga sotuvda bu ekran ochilmaydi**: to'lov usuli to'liq "Nasiya" bo'lgan sotuvda fiskal chek shu zahotda chiqarilmaydi (`fiscal_receipts` yaratilmaydi; sotuv `posted`, `fiscal.status='deferred'` (fiskal chek yo'q)) — POS-03 to'g'ridan-to'g'ri POS-06 (yoki POS-02'ga qaytish) ga o'tadi, bu ekran faqat **naqd/karta qismi bo'lgan** (to'liq yoki aralash to'lovning naqd qismi) sotuvlarda ko'rsatiladi. Qarz to'langanda chiqariladigan fiskal chek — alohida oqim, POS-13/BO-06 (`debt_settlement`). Daromad va QQS sotuv kuni tan olinadi, chek — to'lov kuni; sotuv paytidagi "kredit" turidagi chek (`kind='credit_sale'`) `FiscalPolicy.credit_sale_receipt` ortida (standart `none`) — 26 #9 (OQ-002).
 - **Amallar**:
 
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
 |---|---|---|---|
 | Chop etish | `sales.create` | Yo'q | `shared/lib/printer` runtime tanlovi: Chromium (Windows/Android) — WebUSB/Serial/Bluetooth/tarmoq; **iOS o'rnatilgan PWA — faqat `CloudPrintAdapter`** (Star CloudPRNT/Epson Server Direct Print klassi); LAN (raw 9100) printer — Do'kon agenti orqali (qaror #60); hech biri sozlanmagan bo'lsa "Elektron chek (zahira)" va "Uskunalarni sozlash" ko'rsatiladi |
-| Elektron chek (zahira) | `sales.create` | Sabab tanlash: "Printer ishlamayapti" / "Xaridor so'radi" | Ekranda `ofd.soliq.uz` QR havolasi yoki Telegram/SMS havola; `fiscal_receipts.delivery='electronic'`, `delivery_reason`, audit `receipt.electronic_issued` |
+| Elektron chek (zahira) | `sales.create` | Sabab tanlash: "Printer ishlamayapti" / "Xaridor so'radi" | Ekranda `ofd.soliq.uz` QR havolasi yoki Telegram/SMS havola; `sale.created.delivery='electronic'` va `delivery_reason` (`printer_failure\|customer_request`) → `fiscal_receipts.delivery`, audit `receipt.electronic_issued` |
 | Uskunalarni sozlash | — | Yo'q | POS-16 (printer xatosida ko'rsatiladi) |
 | Qayta chop etish | `sales.create` | Yo'q | "NUSXA" belgisi bilan chop, `receipt.reprinted` audit |
 | Yangi chek boshlash | `sales.create` | Yo'q | POS-02ga qaytish |
 
 - **Chek berish siyosati**: standart — **bosma chek** (`delivery='printed'`); elektron chek faqat (a) printer ishlamay qolganda yoki (b) xaridor o'zi so'raganda, kassir tasdig'i bilan zahira (`delivery='electronic'`, `delivery_reason` audit qilinadi). Do'kon savdosida faqat-elektron chekka rasmiy ruxsat — 26 #112 (OQ-018).
-- **Ma'lumot manbai**: `GET /api/v1/fiscal-receipts?sale_id=` (online), lokal Dexie (offline); event `receipt.reprinted`.
+- **Fiskal holat** (qaror #68): `pending` (server/hamkor bulut chekni chiqarmoqda — "Fiskal belgi kutilmoqda") · `fiscalized` (fiskal belgi va QR ko'rsatiladi; lokal ko'prik rejimida chek FM'da imzolangan va `fiscal_result` `sale.created` voqeasiga qo'shilgan) · `deferred` (faqat-qarz sotuv — chek yo'q, bu ekran ochilmaydi).
+- **Ma'lumot manbai**: `GET /api/v1/fiscal-receipts?sale_id=` yoki `?debt_payment_id=` (online, qayta chop etish uchun ham), lokal Dexie (offline); voqea `receipt.reprinted {fiscal_receipt_id}`.
 - **Holatlar**: `loading` (fiskal belgi kutilmoqda — online) · `empty` — yo'q · `error` (printer ulanmagan/qog'oz tugagan → "Elektron chek (zahira)" va "Uskunalarni sozlash" (POS-16) taklifi, #27) · `offline` (chek lokal saqlanadi, "offlayn" belgisi, fiskal belgi keyin) · `no-permission` — qayta chop etish huquqi yo'q bo'lsa tugma ko'rinmaydi · `subscription-restricted` — bu ekranga kirilmaydi · **iOS, bulut printer sozlanmagan** — «Chop etish uchun bulut-printerni ulang» + `/install#cloud-print` havolasi; elektron chek zahira rejimi ogohlantirish bilan.
 - **Klaviatura**: `Ctrl+P` qayta chop etish, `Enter` yangi chek.
 - **Audit/analitika**: `receipt.reprinted`, `receipt.electronic_issued`, `receipt_printed`, `receipt_print_failed`, `electronic_receipt_sent`.
@@ -192,7 +193,7 @@
 | `receiptQuery` | Chekni qidirish | Поиск чека | `Input`/skaner | Ha | Chek raqami yoki QR | — | 40 |
 | `lines[].selected` | Qaytariladigan qator | Возвращаемая строка | `Checkbox` | Ha (≥1) | — | Belgilanmagan | — |
 | `reason` | Sabab | Причина | `Select` | Ha | `defective` (Nuqsonli) / `wrong_item` (Mos kelmadi) / `customer_changed_mind` (Fikri o'zgardi) / `other` (Boshqa) | — | — |
-| `refundMethod` | Qaytarish usuli | Способ возврата | Tugmalar | Ha | `cash\|card\|debt_adjustment` | Asl to'lov usuli | — |
+| `refundMethod` | Qaytarish usuli | Способ возврата | Tugmalar | Ha | `cash\|card\|uzqr\|click\|payme\|uzum\|debt_adjustment`; Click/Payme/Uzum pulni qaytarish provayder kabinetida qo'lda, tizim qayd etadi | Asl to'lov usuli | — |
 | `lines[].restock` | Sotuvga qaytadi | Вернуть в продажу | `Checkbox` | — | Muddati o'tgan tovar (`expiry_date < bugun`) — majburan `false`, o'zgartirilmaydi | `true` | — |
 
 - **Amallar**:
@@ -201,8 +202,9 @@
 |---|---|---|---|
 | QAYTARISHNI TASDIQLA | `returns.create` | 100 000 so'mdan yuqori, chek topilmagan yoki muddati o'tgan tovar qatori bor — `ApprovalDialog` (`returns.approve`, Menejer/Egasi PIN) | `return.created` outbox, ombor/qarz/pul tuzatiladi; muddati o'tgan qator `restock=false` — qoldiqqa qaytmaydi, avtomatik `write_offs` qoralamasi (sabab `expired_return`) yaratiladi (qaror #48) |
 
-- **Ma'lumot manbai**: `GET /api/v1/sales?number=` (online) yoki lokal keshi; outbox `return.created`.
-- **Holatlar**: `loading` · `empty` (chek topilmagan, #20) · `error` ("Bu chek allaqachon qaytarilgan") · `offline` — oddiy tovar lokal yoziladi; **markirovkalangan tovar qatori uchun "Qaytarish" tugmasi bloklanadi** ("Qaytarish uchun internet kerak", #26 — kodli qaytarish cheki faqat online) · `fiscal-blocked` (48 soat, qaror #43) — qaytarish cheki yaratilmaydi · `no-permission` — ekran ochilmaydi · `subscription-restricted` — kirilmaydi.
+- **Qaytarish summasi va chek**: qarzli sotuvni qaytarishda avval shu sotuvning ochiq qarzi kamayadi (`debt_part = min(return_amount, open_debt_of_sale)`, chek yo'q, `Kt 4010`); qolgan `money_part = return_amount − debt_part` `refundMethod` bo'yicha pul bilan qaytariladi va faqat shu qismga `kind='return'` chek chiqadi (`fiscal_refund ≤ fiscalized_amount(sale) − already_fiscally_refunded(sale)`). `money_part = 0` bo'lsa `return.created.receipt_seq = null`, chek yo'q. Qator summasi server tomonidan hisoblanadi: `refund_line = ROUND_HALF_UP(sale_line.line_total × ret_qty / sale_line.qty, 0)`, qatorning oxirgi qaytarilishi qoldiqni oladi. Markirovkasiz tovarni qaytarish offline ham ruxsat (lokal Menejer/Egasi PIN limit qoidasi bilan); markirovkali qaytarish — faqat online (qaror #23).
+- **Ma'lumot manbai**: `GET /api/v1/sales?number=` → tanlangach `GET /api/v1/sales/{id}` (qatorlar, `returned_qty`) (online) yoki lokal keshi; outbox `return.created`.
+- **Holatlar**: `loading` · `empty` (chek topilmagan, #20) · `error` ("Bu chek allaqachon qaytarilgan") · `offline` — markirovkasiz tovar lokal yoziladi; **markirovkalangan tovar qatori uchun "Qaytarish" tugmasi bloklanadi** ("Qaytarish uchun internet kerak", #26 — markirovkali qaytarish faqat online, qaror #23) · `fiscal-blocked` (48 soat, qaror #43) — qaytarish cheki yaratilmaydi · `no-permission` — ekran ochilmaydi · `subscription-restricted` — kirilmaydi.
 - **Klaviatura**: `F6` (global) ekranni ochadi, `Enter` chekni qidiradi.
 - **Audit/analitika**: `return.created`, `return_blocked_offline_marking`.
 - **Bog'liq US**: US-M02-01, US-M02-02.
@@ -221,16 +223,16 @@
 |---|---|---|---|---|---|---|---|
 | `customerId` | Mijoz | Клиент | `Combobox` + `+ Yangi` | Ha | Mavjud yoki yangi (ism+telefon) | — | — |
 | `promiseDate` | Va'da sanasi | Обещанная дата оплаты | `Calendar` + tezkor tugmalar (7/14/30 kun) | Yo'q | ≥ bugun | Bo'sh | — |
-| `note` | Izoh | Комментарий | `Textarea` | Yo'q | — | — | 200 |
+| `comment` | Izoh | Комментарий | `Textarea` | Yo'q | — | — | 1000 |
 
 - **Amallar**:
 
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
 |---|---|---|---|
-| NASIYAGA RASMIYLASHTIR | `debts.create` | Limitdan oshsa `ApprovalDialog` (Menejer PIN; offlaynda bayroq bilan davom) | `sale.created` (`sale_payments.method=debt`, `due_date`=`promiseDate`), holat `deferred` — (qaror #30) **fiskal chek chiqarilmaydi**, POS-04 ekrani ochilmaydi; chek qarz to'langanda (POS-13/BO-06, `debt_settlement`) chiqadi |
+| NASIYAGA RASMIYLASHTIR | `debts.create` | Limitdan oshsa `ApprovalDialog` (Menejer PIN; offlaynda bayroq bilan davom) | `sale.created` (`sale_payments.method=debt`, `due_date`=`promiseDate`); sotuv `posted`, `fiscal.status='deferred'` (fiskal chek yo'q) — (qaror #30) **fiskal chek chiqarilmaydi**, POS-04 ekrani ochilmaydi; chek qarz to'langanda (POS-13/BO-06, `debt_settlement`) chiqadi |
 
-- **Ma'lumot manbai**: `customers`/`debt_balances` (lokal, `16-offline-sync.md` §1); mijoz B2B bo'lsa `POST /api/v1/einvoices` (`direction=out`) (BO-15da imzolanadi).
-- **Holatlar**: `loading` · `empty` (mijoz tanlanmagan) · `error` ("Limitdan oshdi — Menejer PIN kiriting") · `offline` (limit oxirgi sinxron ma'lumot asosida, sotuv **bloklanmaydi**, `limit_exceeded=true` bayrog'i) · `no-permission` — tugma ko'rinmaydi · `subscription-restricted` — kirilmaydi.
+- **Ma'lumot manbai**: lokal `customers` (`receivable_balance`, `16-offline-sync.md` §1); B2B mijozda server `sale.created` postingida `einvoices(direction='out', status='draft', related_doc_type='sales')` ni o'zi yaratadi (BO-15da imzolanadi); POS chaqirmaydi.
+- **Holatlar**: `loading` · `empty` (mijoz tanlanmagan) · `error` ("Limitdan oshdi — Menejer PIN kiriting") · `offline` (limit oxirgi sinxron ma'lumot asosida, sotuv **bloklanmaydi**, server `sales.debt_limit_exceeded=true` bayrog'ini qo'yadi) · `no-permission` — tugma ko'rinmaydi · `subscription-restricted` — kirilmaydi.
 - **Klaviatura**: `F5` (global) ochadi.
 - **Audit/analitika**: `debt_sale_created`, `debt_limit_exceeded_offline`.
 - **Bog'liq US**: US-M08-01, US-M08-02, US-M01-06 (B2B e-faktura eslatmasi).
@@ -282,17 +284,17 @@
 | Maydon | Label (uz) | Label (ru) | Tur/komponent | Majburiy | Validatsiya | Default | Max |
 |---|---|---|---|---|---|---|---|
 | `purchaseOrderId` | Xaridnoma | Заказ на закупку | `Select` | Ha | Ochiq xaridnomalardan biri | — | — |
-| `lines[].receivedQty` | Kelgan miqdor | Полученное количество | `QtyInput` | Ha | ≥0 | Buyurtma miqdori | — |
-| `lines[].discrepancyReason` | Nomuvofiqlik sababi | Причина несоответствия | `Select` | Farq bo'lsa Ha | — | — | — |
-| `poaNumber` | E-ishonchnoma | Эл. доверенность | Faqat ko'rsatish (BO-04'da berilgan) | — | — | Xaridnomaga bog'langan e-ishonchnoma raqami/sanasi | — |
+| `lines[].receivedQty` | Kelgan miqdor | Полученное количество | `QtyInput` | Ha | >0; 0 bo'lsa qator yuborilmaydi | Buyurtma miqdori | — |
+| `lines[].discrepancyReason` | Nomuvofiqlik sababi | Причина несоответствия | `Select` (`short\|excess\|damaged\|wrong_item\|other`) | Farq bo'lsa Ha | → API `lines[].discrepancy_reason` | — | — |
+| `poaNumber` | E-ishonchnoma | Эл. доверенность | `Input` | Yo'q | — | `GET /api/v1/powers-of-attorney?purchase_order_id=` dagi `sent\|accepted` yozuvning `number`i; saqlanadi `goods_receipts.poa_id`/`poa_number` | — |
 
-- **E-ishonchnoma va qabul muddati**: yetkazib beruvchidan tovar olish uchun ishonchnomani **do'kon o'z Omborchisiga** EDO operatori orqali e-fakturadan oldin beradi (BO-04, qaror #63); ekranda faqat holati ko'rsatiladi, ishonchnoma yo'qligi qabulni bloklamaydi (e-fakturani Buxgalter imzolaydi). Markirovkalangan tovar qabulida Asl belgisi qabul xabarnomasi (EHF) tovar guruhi muddatida imzolanishi kerak — umumiy **3 ish kuni**, ayrim guruhlarda (suv/ichimlik, dori, o'simlik yog'i) **72 soat** (tovar guruhi bo'yicha sozlanadigan muddat, qaror #63); ekran qolgan vaqtni hisoblagich bilan ko'rsatadi, muddat yaqinlashsa ogohlantiradi, bloklamaydi.
+- **E-ishonchnoma va qabul muddati**: yetkazib beruvchidan tovar olish uchun ishonchnomani **do'kon o'z Omborchisiga** EDO operatori orqali e-fakturadan oldin beradi (BO-04, qaror #63); ekranda uning raqami oldindan to'ldiriladi (`poaNumber`), ishonchnoma yo'qligi qabulni bloklamaydi (e-fakturani Buxgalter imzolaydi). Markirovkalangan tovar qabulida Asl belgisi qabul xabarnomasi (EHF) tovar guruhi muddatida imzolanishi kerak — umumiy **3 ish kuni**, ayrim guruhlarda (suv/ichimlik, dori, o'simlik yog'i) **72 soat** (tovar guruhi bo'yicha sozlanadigan muddat, qaror #63); ekran qolgan vaqtni hisoblagich bilan ko'rsatadi, muddat yaqinlashsa ogohlantiradi, bloklamaydi.
 
 - **Amallar**:
 
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
 |---|---|---|---|
-| Markirovkani skanerlash | `purchases.receive` | 2–3 urinishdan keyin qo'lda MXIK maydoni | Kod `marking_codes` ga yoziladi |
+| Markirovkani skanerlash | `purchases.receive` | 2–3 urinishdan keyin DataMatrix kodini qo'lda kiritish | Kod `POST/PATCH /goods-receipts` `lines[].marking_codes[]` ga (soni = qty, GS ajratgichlari aynan) |
 | QABULNI YAKUNLASH | `purchases.receive` | Farq bo'lsa "Nomuvofiqlik bilan yakunlaysizmi?" | `POST /goods-receipts` (draft) → Buxgalter BO-04 "Kirimlar" tabida `POST /goods-receipts/{id}/post` (`purchases.post`) bilan o'tkazadi — qoldiq shu paytda oshadi |
 
 - **Ma'lumot manbai**: `GET /api/v1/purchase-orders/{id}` → `POST /api/v1/goods-receipts` (`po_id` bilan) → `PATCH /api/v1/goods-receipts/{id}` → `POST /api/v1/goods-receipts/{id}/post` (online); offline outbox voqeasi yo'q; `marking_codes`.
@@ -327,21 +329,23 @@
 
 | Maydon | Label (uz) | Label (ru) | Tur/komponent | Majburiy | Validatsiya | Default | Max |
 |---|---|---|---|---|---|---|---|
-| `fromBranchId` | Manba ombor | Склад-источник | `Select` | Ha | ≠ `toBranchId` | Joriy filial | — |
-| `toBranchId` | Manzil ombor | Склад-назначение | `Select` | Ha | ≠ `fromBranchId` | — | — |
+| `fromWarehouseId` | Manba ombor | Склад-источник | `Select` (MVP: filial tanlanadi, ombor avtomatik — qaror #54) | Ha | ≠ `toWarehouseId` | Joriy filial ombori | — |
+| `toWarehouseId` | Manzil ombor | Склад-назначение | `Select` (MVP: filial tanlanadi, ombor avtomatik — qaror #54) | Ha | ≠ `fromWarehouseId` | — | — |
 | `lines[].qty` | Miqdor | Количество | `QtyInput` | Ha | ≤ mavjud qoldiq (overselling ogohlantiradi, bloklamaydi) | — | — |
 | `transportMode` | Tashish usuli | Способ перевозки | `SegmentedControl` (Avtotransport / Piyoda yoki jamoat transporti) | Ha | `vehicle\|on_foot_or_public` | `vehicle` | — |
+| `vehiclePlate` | Avtomobil raqami | Госномер | `Input` | `transportMode=vehicle` da Ha | — | — | 16 |
+| `driverName` | Haydovchi | Водитель | `Input` | Yo'q | — | — | — |
 
-- **E-TTN** (qaror #63): o'z filiallari/omborlari orasidagi ko'chirishda ham e-TTN **majburiy** ("Ombordan omborga" turi). `transportMode=vehicle` bo'lsa ko'chirish jo'natilganda (`post`) server `ettn_documents` (`transfer_id`, `transport_type=warehouse_to_warehouse`) yaratadi va EDO operatori orqali yuboradi (outbox `ettn_send`), `transfers.ettn_ref` to'ldiriladi; qabul qiluvchi filial e-TTN'ni tasdiqlaydi. `on_foot_or_public` — e-TTN talab qilinmaydi. Offline yaratilgan ko'chirish tashish boshlanishidan oldin (internet qaytgach) e-TTN bilan rasmiylashtirilishi kerak — ekran "Tashishdan oldin e-TTN kerak" ogohlantirishini ko'rsatadi. Ichki ko'chirish CRPT'ga xabar qilinmaydi, muddat yo'q.
+- **E-TTN** (qaror #63): o'z filiallari/omborlari orasidagi ko'chirishda ham e-TTN **majburiy** ("Ombordan omborga" turi). `transportMode=vehicle` bo'lsa server `post`da `ettn_documents(status='pending_signature')` (`transfer_id`, `transport_type=warehouse_to_warehouse`) yaratadi; Egasi/Buxgalter BO-03 «Ko'chirishlar» tabida E-IMZO bilan imzolaydi; Omborchi ekranida holat «E-TTN imzo kutilmoqda»; qabul tomonida e-TTN BO-03 da tasdiqlanadi. `on_foot_or_public` — e-TTN talab qilinmaydi. Offline yaratilgan ko'chirish tashish boshlanishidan oldin (internet qaytgach) e-TTN bilan rasmiylashtirilishi kerak — ekran "Tashishdan oldin e-TTN kerak" ogohlantirishini ko'rsatadi. Ichki ko'chirish CRPT'ga xabar qilinmaydi, muddat yo'q.
 
 - **Amallar**:
 
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
 |---|---|---|---|
-| YUBORISH | `transfer.create` | Qoldiq yetarli emasligida ogohlantirish (davom etish mumkin) | `transfer.sent`, manba ombor "yo'lda"; online bo'lsa e-TTN yaratiladi |
+| YUBORISH | `transfer.create` | Qoldiq yetarli emasligida ogohlantirish (davom etish mumkin) | `transfer.sent`; `vehicle` va e-TTN `registered` emas → hujjat `posted`, holat «E-TTN imzo kutilmoqda» (jo'natish e-TTN ro'yxatdan o'tgach) |
 | QABUL QILISH (qabul tomonda) | `transfer.receive` | Yo'q | `transfer.received`, manzil ombor oshadi; e-TTN qabul tomonida tasdiqlanadi |
 
-- **Ma'lumot manbai**: `GET /api/v1/stock-balances?warehouse_id=`; offline — event `transfer.sent`/`transfer.received` (payload — `19-api-ombor.md` §13); online — `POST /api/v1/transfers` → `/send`, `POST /api/v1/transfers/{id}/receive`.
+- **Ma'lumot manbai**: `GET /api/v1/stock-balances?warehouse_id=`; offline — event `transfer.sent`/`transfer.received` (payload — `19-api-ombor.md` §13); online — `POST /api/v1/transfers` → `POST /api/v1/transfers/{id}/post` → (e-TTN `registered`) → `POST /api/v1/transfers/{id}/send`; `POST /api/v1/transfers/{id}/receive`.
 - **Holatlar**: `loading` · `empty` (ombor tanlanmagan) · `error` (qoldiq yetarli emas) · `offline` (markirovkalangan tovar ham o'z filiallar orasida offline ko'chirilishi **ruxsat etiladi**, audit bilan; e-TTN holati "kutilmoqda" — tashishdan oldin online rasmiylashtiriladi) · `no-permission` — kirilmaydi · `subscription-restricted` — kirilmaydi.
 - **Klaviatura**: `F1` skaner fokus.
 - **Audit/analitika**: `transfer.created`, `transfer.received`, `marking.transfer_offline`, `ettn.created`, `ettn.confirmed`.
@@ -426,7 +430,7 @@
 
 ## POS-13 — Qarz daftari (tezkor)
 
-- **Maqsad**: mijoz qarzini ism/telefon bo'yicha tezkor ko'rish, to'lov qabul qilish; yangi qarz yozish endi POS-02 orqali normal (tovar qatorlari bilan) sotuv sifatida amalga oshadi — tovarsiz, erkin summali qarz yo'q. (qaror #30) Fiskal chek bu bosqichda **chiqarilmaydi** (holat `deferred`) — chek faqat qarz to'langanda chiqadi (pastda, TO'LOV QABUL QILISH).
+- **Maqsad**: mijoz qarzini ism/telefon bo'yicha tezkor ko'rish, to'lov qabul qilish; yangi qarz POS-02 orqali oddiy sotuv sifatida (tovar qatorlari bilan) yoziladi — tovarsiz, erkin summali qarz yo'q. (qaror #30) Fiskal chek bu bosqichda **chiqarilmaydi** (sotuv `posted`, `fiscal.status='deferred'` (fiskal chek yo'q)) — chek faqat qarz to'langanda chiqadi (pastda, TO'LOV QABUL QILISH).
 - **Rollar/ruxsat**: Kassir, Egasi (`debts.create` yoki `debts.payment.accept` — ko'rish; `debts.create` — yozish; `debts.payment.accept` — to'lov qabul qilish).
 - **Route**: `/pos/debts`
 - **Maket**:
@@ -447,8 +451,8 @@
 | Maydon | Label (uz) | Label (ru) | Tur/komponent | Majburiy | Validatsiya | Default | Max |
 |---|---|---|---|---|---|---|---|
 | `search` | Ism yoki telefon | Имя или телефон | `Combobox` | Ha | — | — | 64 |
-| `payment.amount` | To'lov summasi | Сумма платежа | `MoneyInput` | Ha (to'lovda) | >0, ≤ joriy qarz (ortig'i rad — `debt_payment_exceeds_balance`, qaytim naqd; qaror #45) | — | — |
-| `payment.method` | To'lov usuli | Способ оплаты | Tugmalar | Ha (to'lovda) | `cash\|card\|uzqr\|payme\|click\|uzum` | `cash` | — |
+| `payment.amount` | To'lov summasi | Сумма платежа | `MoneyInput` | Ha (to'lovda) | >0; online — ≤ joriy qarz (ortig'i rad — `debt_payment_exceeds_balance`, qaytim naqd; qaror #45); offline — oxirgi sinxron qoldiq bo'yicha ogohlantirish, ortig'ini server `debt_payments.unallocated_amount` ga yozadi (qaror #67) | — | — |
+| `payment.method` | To'lov usuli | Способ оплаты | Tugmalar | Ha (to'lovda) | `cash\|card\|uzqr\|click\|payme\|uzum` (`bank` yo'q — bank o'tkazmasi faqat BO-06) | `cash` | — |
 | `payment.cardType` / `cardMask` / `rrn` / `qrType` | Karta turi / niqob / RRN / UzQR turi | — | POS-03 bilan bir xil | POS-03 qoidasi (qaror #64) | POS-03 qoidasi | — | — |
 | `promiseDate` | Yangi va'da sanasi | Новая обещанная дата | `Calendar` | Yo'q (qoldiq qolsa ixtiyoriy) | ≥ bugun | Bo'sh | — |
 
@@ -458,13 +462,15 @@ Tovarsiz, erkin summali qarz yozish yo'q — qarzga sotuv tovar qatorlari bilan 
 
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
 |---|---|---|---|
-| QARZ YOZISH | `debts.create` | Yo'q | POS-02ni shu mijoz tanlangan holda ochadi, to'lov usuli oldindan `debt` (POS-06 oqimi); natija — `sale.created` (`payments[].method=debt`), holat `deferred` — (qaror #30) **fiskal chek bu bosqichda chiqarilmaydi** |
-| TO'LOV QABUL QILISH | `debts.payment.accept` | Yo'q | `debt_payment.created` → `/post`, eng eski qarzdan yopiladi; qoldiq qolsa `promiseDate` bilan joriy va'da yangilanadi. (qaror #30) **To'langan summaga fiskal chek chiqariladi** (`fiscal_receipts.kind=debt_settlement`): bitta to'lov — **bitta** chek, tovar qatorlari yopilgan sotuv(lar)dan proporsional (qaror #45); natijada POS-04 (chek) ekraniga o'tiladi |
+| QARZ YOZISH | `debts.create` | Yo'q | POS-02ni shu mijoz tanlangan holda ochadi, to'lov usuli oldindan `debt` (POS-06 oqimi); natija — `sale.created` (`payments[].method=debt`); sotuv `posted`, `fiscal.status='deferred'` (fiskal chek yo'q) — (qaror #30) **fiskal chek bu bosqichda chiqarilmaydi** |
+| TO'LOV QABUL QILISH | `debts.payment.accept` | Yo'q | `debt_payment.created` — server darhol o'tkazadi (alohida `/post` yo'q); qoldiq qolsa `promiseDate` bilan joriy va'da yangilanadi. (qaror #30) **To'langan summaga fiskal chek chiqariladi** (`fiscal_receipts.kind=debt_settlement`) shu kassa FM'ida: bitta to'lov — **bitta** chek, tovar qatorlari yopilgan sotuv(lar)dan proporsional (qaror #45); natijada POS-04 (chek) ekraniga o'tiladi |
 
-Tovarsiz "eski qarz"ni kiritish faqat BO-06 → "Boshlang'ich qarz" (`POST /api/v1/debt-openings`, faqat Egasi) orqali amalga oshadi.
+- **Allokatsiya va chek qatorlari** (qaror #67): qurilmada `shared/lib/debt-allocation` bilan (offline ham) lokal `customers.open_debt_docs[]` bo'yicha hisoblanadi — avval `sales` + `debt_openings` ochiq qoldiqlari `ORDER BY COALESCE(due_date, doc_date), doc_date, doc_id`, keyin `debt_writeoffs`; ekranda to'lov qaysi sotuvlarni (to'liq/qisman) yopishi ko'rsatiladi. Chek qatorlari: `ratio = alloc_amount / sales.total_amount`, `amt_i = ROUND_HALF_UP(line_total_i × ratio, 2)` (≤ `line_total_i − settled_amount_i`, yaxlitlash qoldig'i eng katta `line_total` qatoriga), sotuvni to'liq yopuvchi chekda — qolgan summa va miqdor; markirovka kodi faqat qatorni to'liq yopuvchi chekda; `debt_openings`/`debt_writeoffs` qismi — bitta umumiy qator "Qarz to'lovi (boshlang'ich qoldiq) / Погашение долга (начальный остаток)". `debt_payment.created` voqeasida: `branch_id`, `cash_register_id`, `shift_id`, `receipt_seq`, `allocations[]`, `fiscal_lines[]`, `fiscal_result` (lokal ko'prik rejimida, qaror #68). Server registrlarni o'z allokatsiyasi bo'yicha qayta hisoblaydi; farq — `sync_exceptions(kind='debt_allocation_mismatch')`.
 
-- **Ma'lumot manbai**: lokal `customers`/`debt_balances` + online `GET /api/v1/counterparties/{id}/debt-ledger`; event `debt_payment.created`.
-- **Holatlar**: `loading` · `empty` (qarzdor yo'q) · `error` (telefon formati noto'g'ri, #13; "To'lov joriy qarzdan oshmasligi kerak" — `debt_payment_exceeds_balance`) · `offline` (to'liq ishlaydi) · `fiscal-blocked` (48 soat, qaror #43) — TO'LOV QABUL QILISH o'chiq (`debt_settlement` cheki yaratilmaydi), ko'rish ishlaydi · `no-permission` — kirilmaydi · `subscription-restricted` — kirilmaydi.
+Tovarsiz "eski qarz"ni kiritish faqat BO-06 → "Boshlang'ich qarz" (`POST /api/v1/debt-openings`; ruxsat `stock.opening.manage` yoki `debts.limit.manage`, `18-api-kassa.md` §12.4) orqali amalga oshadi.
+
+- **Ma'lumot manbai**: lokal `customers` (`receivable_balance`, `open_debt_docs[]`) + online `GET /api/v1/counterparties/{id}/debt-ledger`; voqea `debt_payment.created`.
+- **Holatlar**: `loading` · `empty` (qarzdor yo'q) · `error` (telefon formati noto'g'ri, #13; online: "To'lov joriy qarzdan oshmasligi kerak" — `debt_payment_exceeds_balance`) · `offline` (to'liq ishlaydi; qarzdan ortiq summa qabul qilinadi — server `sync_exceptions(kind='debt_overpayment_offline')` va Egasiga M18, hal qilish BO-06 da) · `fiscal-blocked` (48 soat, qaror #43) — TO'LOV QABUL QILISH o'chiq (`debt_settlement` cheki yaratilmaydi), ko'rish ishlaydi · `no-permission` — kirilmaydi · `subscription-restricted` — kirilmaydi.
 - **Klaviatura**: `F7` (global) ochadi.
 - **Audit/analitika**: `debt_sale_created` (POS-02/06 oqimi orqali), `debt_payment_collected`.
 - **Bog'liq US**: US-M08-05, US-M08-06, US-M08-09, US-M08-11.
@@ -480,10 +486,10 @@ Tovarsiz "eski qarz"ni kiritish faqat BO-06 → "Boshlang'ich qarz" (`POST /api/
 
 ```
 ┌───────────────────────────────────────┐
-│  [ Pul qo'yish ]   [ Pul olish ]       │
+│ [ Pul qo'yish ] [ Pul olish ] [Xarajat]│
 ├───────────────────────────────────────┤
 │  Summa:  [        ]                    │
-│  Sabab:  [ Xarajat to'lovi      ▾ ]    │
+│  Sabab:  [ Inkasso              ▾ ]    │
 │  Izoh:   [                      ]      │
 │          [  TASDIQLASH  ]              │
 └───────────────────────────────────────┘
@@ -495,20 +501,23 @@ Tovarsiz "eski qarz"ni kiritish faqat BO-06 → "Boshlang'ich qarz" (`POST /api/
 |---|---|---|---|---|---|---|---|
 | `direction` | Yo'nalish | Направление | Tugmalar | Ha | `in\|out` | — | — |
 | `amount` | Summa | Сумма | `MoneyInput` | Ha | >0 | — | 9 999 999 999 |
-| `reason` | Sabab | Причина | `Select` | Ha | `owner_withdrawal` (Egasi oldi) / `collection` (Inkasso) / `deposit` (Qo'yish) / `expense` (Xarajat to'lovi) / `other` (Boshqa) | — | — |
-| `expenseCategoryId` | Xarajat toifasi | Категория расхода | `Select` (`GET /expense-categories` keshidan) | Ha (`reason=expense`da) | — | — | — |
-| `note` | Izoh | Комментарий | `Textarea` | Reason="Boshqa"da Ha | — | — | 200 |
+| `reason` | Sabab | Причина | `Select` | Ha (pul harakati rejimida) | `owner_withdrawal` (Egasi oldi) / `collection` (Inkasso) — faqat `out`; `deposit` (Qo'yish) — faqat `in`; `other` (Boshqa) — ikkalasi | — | — |
+| `founderId` | Ta'sischi | Учредитель | `Select` (`counterparties.is_founder=true`) | `reason=owner_withdrawal` da va `tenants.legal_form ≠ sole_proprietor` bo'lsa Ha | → payload `counterparty_id` | — | — |
+| `account` | Hisob | Счёт | `Select` (`9430`/`9390`/`6310`/`4010`/`4730`) | Yo'q (faqat `reason=other`, faqat Buxgalter/Egasi uchun ko'rinadi) | `6310`/`4010` da `counterparty_id`, `4730` da `employee_id` majburiy | Yo'nalishga ko'ra: `out` → `9430`, `in` → `9390` | — |
+| `expenseCategoryId` | Xarajat toifasi | Категория расхода | `Select` (`GET /expense-categories` keshidan) | Ha (faqat "Xarajat" rejimida) | — | — | — |
+| `comment` | Izoh | Комментарий | `Textarea` | `reason=other` da Ha | — | — | 1000 |
 
 - **Amallar**:
 
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
 |---|---|---|---|
-| TASDIQLASH | `cash.deposit` (qo'yish) / `cash.withdraw` (olish) | >50 000 so'm olishda `ApprovalDialog` (tasdiqlovchining `cash.withdraw` limiti summani qoplashi shart) | `cash_movement.created`; `reason=expense` → server bir tranzaksiyada `expenses(source=cash, status=posted)` yozadi (M15, K1-06) |
+| TASDIQLASH | `cash.deposit` (qo'yish) / `cash.withdraw` (olish) | >50 000 so'm olishda `ApprovalDialog` (tasdiqlovchining `cash.withdraw` limiti summani qoplashi shart) | `cash_movement.created` |
+| Xarajat (alohida tugma/rejim) | `cash.withdraw` (limit, standart 50 000 so'm — qaror #23) | Limitdan oshsa `ApprovalDialog` (`kind='cash_withdrawal_over_limit'`) | `expense.created` voqeasi (`source='cash'`; `category_id`, `amount`, `comment`, `tax_type?`, `approval?`) — server `ExpensePostingService` bilan darhol `posted` (`expenses` + `cash_moves`); Kassirda `expenses.create` yo'q — bu yo'l faqat `source='cash'` uchun |
 
-- **Ma'lumot manbai**: outbox `cash_movement.created`.
+- **Ma'lumot manbai**: outbox `cash_movement.created` / `expense.created`.
 - **Holatlar**: `loading` · `empty` — yo'q · `error` (PIN noto'g'ri) · `offline` (to'liq ishlaydi; kassa pul harakati fiskal hujjat emas, OFD'ga yuborilmaydi) · `no-permission` — kirilmaydi · `subscription-restricted` — kirilmaydi.
 - **Klaviatura**: raqamlar summa kiritadi, `Enter` tasdiqlaydi.
-- **Audit/analitika**: `cash_movement.created`.
+- **Audit/analitika**: `cash_movement.created`, `expense.created`.
 - **Bog'liq US**: US-M16-01.
 
 ---
@@ -556,7 +565,7 @@ Tovarsiz "eski qarz"ni kiritish faqat BO-06 → "Boshlang'ich qarz" (`POST /api/
 ## POS-16 — Uskunalar sozlamasi (printer, skaner, tarozi)
 
 - **Maqsad**: shu kassa qurilmasida chek printerini tanlash va sinash, skanerni tekshirish, tarozi shtrix-kod shablonlari va Do'kon agenti holatini ko'rish.
-- **Rollar/ruxsat**: kassaga kirgan har qanday POS foydalanuvchisi — printer tanlash/sinov (qurilma-lokal sozlama, serverga yozilmaydi, ruxsat talab qilinmaydi); tarozi prefikslari va Do'kon agenti — faqat ko'rish, o'zgartirish BO-14 da (`settings.tenant`, Egasi).
+- **Rollar/ruxsat**: kassaga kirgan har qanday POS foydalanuvchisi — printer tanlash/sinov (qurilma-lokal sozlama, serverga yozilmaydi, ruxsat talab qilinmaydi); tarozi prefikslari va Do'kon agenti — faqat ko'rish; tarozi prefikslarini o'zgartirish BO-14 da (`catalog.manage`, `PATCH /stock-settings`), Do'kon agentini boshqarish BO-14 "Do'kon agenti" blokida (`onec.settings.manage`).
 - **Route**: `/pos/settings/devices` (kirish — POS-01 "⚙ Uskunalar" va POS-04 printer xatosidagi "Uskunalarni sozlash").
 - **Maket**:
 
@@ -647,7 +656,7 @@ Tovarsiz "eski qarz"ni kiritish faqat BO-06 → "Boshlang'ich qarz" (`POST /api/
 | KIRISH | — | Yo'q | Front-channel Authorization Code+PKCE (`14-autentifikatsiya-oauth2.md` §2.1) → BFF cookie |
 | **Google bilan kirish** | — | Yo'q | Google OIDC'ga redirect (bizning OAuth AS'da tashqi provayder) → qaytgach BFF cookie; birinchi marta kirishda hisob telefon raqami bilan bog'lanishi so'raladi (STIR/fiskal uchun) |
 | Parolni unutdim | — | Yo'q | OTP oynasi (`purpose=recovery`) — kod birinchi navbatda **Telegram bot**ga, Telegram ulanmagan bo'lsa **SMS**ga (zaxira) → yangi parol o'rnatish |
-| Ma'lumotlarimni yuklab olish (faqat `subscription-restricted`da ko'rinadi) | — | OTP (`purpose=data_export`) — Telegram bot birinchi, SMS zaxira | Bir martalik eksport havolasi (15 daqiqa, D2) |
+| Ma'lumotlarimni yuklab olish (faqat `subscription-restricted`da ko'rinadi) | — | OTP (`purpose=data_export`) — Telegram bot birinchi, SMS zaxira | Bir martalik eksport havolasi (24 soat, qaror #51) |
 | To'lash (Click/Payme, faqat `subscription-restricted`da) | — | Yo'q | `pay_url`ga o'tish |
 
 - **Ma'lumot manbai**: `POST /auth/login`, `GET /auth/google/start` → `GET /auth/google/callback` (qaror #34), `POST /auth/otp/request`, `POST /auth/otp/verify`, `GET /billing/pay`, `POST /billing/export-my-data`.
@@ -678,20 +687,24 @@ Tovarsiz "eski qarz"ni kiritish faqat BO-06 → "Boshlang'ich qarz" (`POST /api/
 
 - **Maqsad**: qoldiqni ko'rish/boshqarish, ko'chirishlar va ularning e-TTN holatini kuzatish, inventarizatsiya farqini tasdiqlash, hisobdan chiqarish. MVP UI'da filialda bitta ombor (avtomatik tanlanadi, qaror #54).
 - **Inventarizatsiya farqi** (qaror #53): har qator uchun `expected = snapshot_qty(started_at) + Σ stock_moves(started_at < moved_at ≤ counted_at)` (`count_lines.counted_at` — qator sanalgan qurilma vaqti, offline sanashda ham, `server_time` ofseti bilan tuzatilgan), farq `counted − expected`; sanash davomidagi sotuv/kirim farqqa kirmaydi.
-- **Rollar/ruxsat**: Menejer, Omborchi (`stock.view`); ko'chirish ro'yxati — `stock.view`; ko'chirish yaratish — `transfer.create`; hisobdan chiqarish — `stock.writeoff`; inventarizatsiya farqini tasdiqlash — `stock.count.post`.
+- **Rollar/ruxsat**: Menejer, Omborchi (`stock.view`); ko'chirish ro'yxati — `stock.view`; ko'chirish yaratish/jo'natish — `transfer.create`; e-TTN imzolash — `einvoice.sign` (Egasi/Buxgalter); hisobdan chiqarish — `stock.writeoff`; inventarizatsiya farqini tasdiqlash — `stock.count.post`.
 - **Route**: `/app/warehouse/stock`
-- **Maket**: `06-ekranlar-umumiy.md` §6 BO-03 wireframe'i + "Ko'chirishlar" tab (holat: yo'lda/qabul qilindi/farq bilan; **e-TTN ustuni** — `transfers.ettn_ref` va holat: yuborildi / qabul tomon tasdiqladi / kutilmoqda / talab qilinmaydi (`transport_mode='on_foot_or_public'`), qaror #63) + **"Inventarizatsiyalar" tab**: ro'yxat `GET /api/v1/stock-counts?status=review`, qator — kutilgan/sanalgan/farq/summa; tugmalar "Farqni tasdiqlash" (`stock.count.post`, `POST /stock-counts/{id}/post`, dialog «Kamomad X so'm, ortiqcha Y so'm hisobga olinadi») va "Bekor qilish" (`POST /stock-counts/{id}/cancel`).
+- **Maket**: `06-ekranlar-umumiy.md` §6 BO-03 wireframe'i + "Ko'chirishlar" tab (holat: yo'lda/qabul qilindi/farq bilan; **e-TTN ustuni** — `transfers.ettn_ref` va `ettn_documents.status`: imzo kutilmoqda (`pending_signature`) / yuborilmoqda (`sending`) / ro'yxatdan o'tdi (`registered`) / qabul tomon tasdiqladi (`accepted`) / rad etildi (`rejected`) / xato (`failed`) / talab qilinmaydi (`transport_mode='on_foot_or_public'`), qaror #63) + **"Inventarizatsiyalar" tab**: ro'yxat `GET /api/v1/stock-counts?status=review`, qator — kutilgan/sanalgan/farq/summa; tugmalar "Farqni tasdiqlash" (`stock.count.post`, `POST /stock-counts/{id}/post`, dialog «Kamomad X so'm, ortiqcha Y so'm hisobga olinadi») va "Bekor qilish" (`POST /stock-counts/{id}/cancel`).
 - **Maydonlar**: `search` — Qidirish — Поиск — `Input` — yo'q — max 64; `branchId` — Ombor/filial — Склад/филиал — `Select` (**"Barchasi" varianti bor**, bo'sh = konsolidatsiya) — ha — default joriy filial; `lowStockOnly` — Faqat kam qoldiq — Только низкий остаток — `Switch` — yo'q — default o'chiq; `expiringWithinDays` — "Muddati 7 kunda tugaydi" filtri — `GET /stock-lots?expiring_within_days=7` — yo'q — default o'chiq.
 - **Amallar**:
 
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
 |---|---|---|---|
 | Ko'chirish | `transfer.create` | Yo'q | BO-04 uslubidagi forma/sheet |
-| Inventarizatsiya | `stock.count.create` | "Inventarizatsiyani boshlaysizmi?" | Sanash varag'i yaratiladi (POS-10ga tushadi) |
-| Hisobdan chiqarish | `stock.writeoff` | — | Partiya, miqdor, sabab (`expired\|damaged\|gift\|other`; `expired_return` — POS-05 dan avtomatik qoralama) → `POST /write-offs` → `/post`; faqat online (qaror #54) |
+| E-TTN imzolash ("Ko'chirishlar" tabi, `posted` ko'chirish qatorida) | `einvoice.sign` | E-IMZO kalit tanlash | `POST /api/v1/ettn-documents/{id}/sign-challenge` → E-IMZO → `POST /api/v1/ettn-documents/{id}/submit-signed` |
+| Qo'lda ro'yxatga olish | `transfer.create` | Operator hujjat raqami va sanasi | `POST /api/v1/ettn-documents/{id}/register-manual` (`{operator_doc_id, doc_date}`) |
+| Jo'natish | `transfer.create` | Yo'q | `POST /api/v1/transfers/{id}/send` — faqat e-TTN `registered` yoki `transport_mode='on_foot_or_public'` |
+| E-TTN tasdiqlash / rad etish (qabul tomonida) | `transfer.receive` + `einvoice.sign` | E-IMZO; rad etishda sabab | `POST /api/v1/ettn-documents/{id}/sign-challenge?action=accept\|reject` → `POST /api/v1/ettn-documents/{id}/accept` \| `/reject` |
+| Inventarizatsiya | `stock.count.create` | "Inventarizatsiyani boshlaysizmi?" | `POST /api/v1/stock-counts` (`{warehouse_id, doc_date, product_ids?, responsible_user_id?}`, `stock.count.create`) → POS-10 |
+| Hisobdan chiqarish | `stock.writeoff` | — | Partiya, miqdor, sabab (`expired\|damaged\|gift\|other`; `expired_return` — POS-05 dan avtomatik qoralama); `reason=gift` tanlanganda `giftKind` (`promo_justified\|other`, standart `other`) va `promoOrderRef` (`promo_justified` da majburiy) → `POST /write-offs` → `/post`; faqat online (qaror #54) |
 | Eksport | `reports.export` | Yo'q | `POST /api/v1/reports/stock/export` → poll `GET /api/v1/reports/export-jobs/{job_id}` |
 
-- **Ma'lumot manbai**: `GET /api/v1/stock-balances?warehouse_id=&low_stock=&search=`; "Barchasi" filial — `GET /api/v1/reports/stock?branch_id=` (bo'sh = konsolidatsiya); `GET /api/v1/transfers?status=`; "Inventarizatsiyalar" tab — `GET /api/v1/stock-counts?status=review`; `GET /stock-lots?expiring_within_days=7`.
+- **Ma'lumot manbai**: `GET /api/v1/stock-balances?warehouse_id=&low_stock=&search=`; "Barchasi" filial — `GET /api/v1/reports/stock?branch_id=` (bo'sh = konsolidatsiya); `GET /api/v1/transfers?status=`, `GET /api/v1/ettn-documents?transfer_id=`; "Inventarizatsiyalar" tab — `GET /api/v1/stock-counts?status=review`; `GET /stock-lots?expiring_within_days=7`.
 - **Holatlar**: `loading` · `empty` (ombor bo'sh — yangi filial) · `error` (ma'lumot sinxron emas, "Oxirgi yangilanish") · `offline` (faqat ko'rish, IndexedDB oxirgi nusxa; hisobdan chiqarish o'chiq) · `no-permission` — Kassir/Buxgalterga faqat ko'rish (K), yaratish/tasdiqlash yopiq · `subscription-restricted` — kirilmaydi.
 - **Klaviatura**: `Ctrl+K` qidiruv.
 - **Audit/analitika**: `stock_viewed`, `transfer_list_viewed`, `stock_count_review_viewed`, `stock_count.posted`, `write_off.posted`.
@@ -702,7 +715,7 @@ Tovarsiz "eski qarz"ni kiritish faqat BO-06 → "Boshlang'ich qarz" (`POST /api/
 ## BO-04 — Xaridnoma yaratish, yetkazib beruvchiga to'lov/qaytarish
 
 - **Maqsad**: xarid buyurtmasi yaratish, AI-03 OCR orqali qog'oz hujjat kiritish, to'lov va qaytarish qayd etish, kirimlarni o'tkazish, yetkazib beruvchiga bo'lgan qarzni ko'rish.
-- **Rollar/ruxsat**: Menejer, Omborchi, Buxgalter (`purchases.create`, `purchases.pay`, `purchases.return`, `purchases.post`); AI-03 tugmasi — qo'shimcha `ai.ocr.use`.
+- **Rollar/ruxsat**: Menejer — `purchases.create`; Omborchi — `purchases.receive`; Buxgalter — `purchases.post`, `purchases.pay`, `purchases.return`; AI-03 tugmasi — `purchases.receive` + `ai.ocr.use`.
 - **Route**: `/app/purchases`
 - **Maket**:
 
@@ -731,18 +744,22 @@ Beshinchi tab **"Men qarzdorman"** — yetkazib beruvchiga bo'lgan qarzimiz ro'y
 | `lines[].qty` | Miqdor | Количество | `QtyInput` | Ha | >0 | — | — |
 | `lines[].price` | Narx | Цена | `MoneyInput` | Ha | >0 | — | — |
 | `ocrPhoto` | Hujjat fotosi | Фото документа | Fayl yuklash (`POST /attachments`) | Yo'q | JPEG/PNG, ≤10MB (`17-api-umumiy.md` §12) | — | — |
-| `payment.source` | To'lov manbai | Источник платежа | `Select` | Ha (to'lov tabida) | `cash\|bank` | — | — |
-| `payment.cashRegisterId` | Kassa | Касса | `Select` | Ha (`source=cash`da) | — | — | — |
+| `payment.method` | To'lov usuli | Способ оплаты | `Select` | Ha (to'lov tabida) | `cash\|bank` | — | — |
+| `payment.cashRegisterId` | Kassa | Касса | `Select` | Ha (`method=cash`da) | — | — | — |
+| `payment.shiftId` | Smena | Смена | `Select` | Ha (`method=cash`da) | Tanlangan kassaning ochiq smenasi | Ochiq smena | — |
 | `payment.allocations[]` | Taqsimot (kirim hujjati + summa) | Распределение | Jadval | Ha | Standart — eng eskisidan avtomatik | Avtomatik | — |
 | `payment.docDate` | Hujjat sanasi | Дата документа | `Calendar` | Ha | — | Bugun | — |
 | `payment.amount` | To'lov summasi | Сумма платежа | `MoneyInput` | Ha (to'lov tabida) | >0; qarzdan oshsa — ogohlantirish bilan ruxsat, ortig'i avans (4310); `settings.supplier_overpay_policy='block'` bo'lsa `422 SUPPLIER_OVERPAY_BLOCKED` (qaror #47) | — | — |
 | `poa.employeeId` | Ishonchli shaxs (xodim) | Доверенное лицо | `Select` (xodimlar) | Ha (e-ishonchnoma berishda) | Tenant xodimi | Xaridnomadagi Omborchi | — |
 | `poa.validTo` | Amal qilish muddati | Срок действия | `Calendar` | Ha (e-ishonchnoma berishda) | ≥ bugun | +10 kun | — |
-| `return.reason` | Qaytarish sababi | Причина возврата | `Select` | Ha (qaytarish tabida) | — | — | — |
+| `return.receiptId` | Kirim hujjati | Документ поступления | `Select` (`goods_receipts`, `posted`) | Ha (qaytarish tabida) | — | — | — |
+| `return.docDate` | Hujjat sanasi | Дата документа | `Calendar` | Ha (qaytarish tabida) | — | Bugun | — |
+| `return.lines[]` | Qaytariladigan qatorlar (`receiptLineId`, `lotId`, `qty`) | Строки возврата | Jadval | Ha (≥1) | `qty` >0, ≤ partiya qoldig'i | — | — |
+| `return.reason` | Qaytarish sababi | Причина возврата | `Select` | Ha (qaytarish tabida) | `expired\|damaged\|excess\|other` | — | — |
 
 AI-03 sariq belgi chegarasi: summa <95%, sana <90%, miqdor/nom <80%; past ishonch — xato emas, `200` javobdagi `low_confidence_fields[]` bo'yicha maydon sariq (qaror #55); model — Haiku 5.5, past ishonchda Sonnet 5.5 ga ko'tariladi; **har bir hujjat** foydalanuvchi "Tasdiqlash" bosmaguncha saqlanmaydi. Tugma ko'rinishi: `ai.ocr_enabled=false` (aniqlik sinovi o'tilmaguncha — 26 #19 (OQ-078)) bo'lsa ko'rinmaydi; tenant AI xizmatiga chet elga uzatishga rozilik bermagan bo'lsa (`settings.ai_cross_border_enabled=false`, qaror #61) tugma o'chiq va «Rasmni AI'ga yuborish uchun BO-14 da rozilik bering» izohi ko'rsatiladi.
 
-**E-ishonchnoma** (qaror #63): yetkazib beruvchidan tovar olish uchun do'kon **o'z xodimiga** (odatda Omborchi) EDO operatori orqali (Faktura.uz PowerOfAttorney) e-ishonchnoma beradi — e-fakturadan **oldin**; yetkazib beruvchi uni tekshirib e-fakturani shu asosda shakllantiradi, e-fakturani ishonchli shaxs E-IMZO bilan imzolaydi. Ishonchnoma bo'lmasa e-fakturani Buxgalter (rahbar ERI) imzolaydi — tizim bloklamaydi. Saqlanadi: `goods_receipts.poa_number`.
+**E-ishonchnoma** (qaror #63): yetkazib beruvchidan tovar olish uchun do'kon **o'z xodimiga** (odatda Omborchi) EDO operatori orqali (Faktura.uz PowerOfAttorney) e-ishonchnoma beradi — e-fakturadan **oldin**; yetkazib beruvchi uni tekshirib e-fakturani shu asosda shakllantiradi, e-fakturani ishonchli shaxs E-IMZO bilan imzolaydi. Ishonchnoma bo'lmasa e-fakturani Buxgalter (rahbar ERI) imzolaydi — tizim bloklamaydi. Saqlanadi: `powers_of_attorney` (holatlar `draft → pending_signature → sending → sent → accepted | rejected`; `sending → failed → sending`; `draft | pending_signature → cancelled`), kirimda `goods_receipts.poa_id`/`poa_number`.
 
 **Kirim muddati (markirovka)**: markirovkalangan tovar kirimida Asl belgisi qabul xabarnomasi tovar guruhi muddatida imzolanishi kerak — umumiy 3 ish kuni, ayrim guruhlarda (suv/ichimlik, dori, o'simlik yog'i) 72 soat; "Kirimlar" tabida qolgan vaqt ustuni va ogohlantirish, bloklamaydi.
 
@@ -752,15 +769,16 @@ AI-03 sariq belgi chegarasi: summa <95%, sana <90%, miqdor/nom <80%; past ishonc
 
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
 |---|---|---|---|
-| Qog'oz hujjatdan o'qish (AI-03) | `purchases.create` + `ai.ocr.use` | Past-ishonchli maydonlar sariq, foydalanuvchi "Tasdiqlash" bosmaguncha saqlanmaydi | `POST /api/v1/attachments` → `POST /api/v1/ai/ocr/jobs` (`doc_type_hint=purchase`) → poll `GET /api/v1/ai/ocr/jobs/{job_id}` → `POST /api/v1/ai/ocr/jobs/{job_id}/confirm` |
+| Qog'oz hujjatdan o'qish (AI-03) | `purchases.receive` + `ai.ocr.use` | Past-ishonchli maydonlar sariq, foydalanuvchi "Tasdiqlash" bosmaguncha saqlanmaydi | `POST /api/v1/attachments` → `POST /api/v1/ai/ocr/jobs` (`doc_type_hint=purchase`) → poll `GET /api/v1/ai/ocr/jobs/{job_id}` → `POST /api/v1/ai/ocr/jobs/{job_id}/confirm` |
 | XARIDNOMANI YUBORISH | `purchases.create` | Yo'q | `POST /api/v1/purchase-orders` → `POST /api/v1/purchase-orders/{id}/send` |
 | O'tkazish (Kirimlar tabida) | `purchases.post` | Yo'q | `GET /goods-receipts?status=draft` dan tanlangan hujjatni `POST /goods-receipts/{id}/post` bilan o'tkazadi — qoldiq shu paytda oshadi |
 | E-fakturadan kirim | `purchases.receive` | Yo'q | BO-15'dan `POST /goods-receipts/from-einvoice/{einvoice_id}` |
 | To'lov qayd etish | `purchases.pay` | Qarzdan oshsa: «Ortiqcha {summa} avans sifatida yoziladi» | `POST /api/v1/supplier-payments`, kreditorlik kamayadi |
-| E-ishonchnoma berish | `purchases.create` | Xodim + muddat; E-IMZO imzo | EDO operatoriga ishonchnoma yuboriladi (`EInvoicePort.send_power_of_attorney`), raqam/sana xaridnomaga bog'lanadi |
-| Yetkazib beruvchiga qaytarish | `purchases.return` | "Qaytarishni tasdiqlaysizmi?" | `POST /api/v1/supplier-returns` → `POST /api/v1/supplier-returns/{id}/post`, ombor/kreditorlik tuzatiladi |
+| E-ishonchnoma berish | `purchases.create` (yaratish), `einvoice.sign` (imzo) | Xodim + muddat; E-IMZO imzo | `POST /api/v1/powers-of-attorney` (`purchases.create`) → `sign-challenge` → E-IMZO → `submit-signed` (`einvoice.sign`); raqam operator qabul qilgach (`sent`) xaridnomaga bog'lanadi |
+| Qaytarish qoralamasi | `purchases.return` | Yo'q | `POST /api/v1/supplier-returns` (qoralama) |
+| Qaytarishni o'tkazish | `purchases.post` | "Qaytarishni tasdiqlaysizmi?" | `POST /api/v1/supplier-returns/{id}/post`, ombor/kreditorlik tuzatiladi |
 
-- **Ma'lumot manbai**: `GET/POST /api/v1/purchase-orders` + `POST /api/v1/purchase-orders/{id}/send`; `GET /api/v1/counterparties?is_supplier=true`, `GET /api/v1/counterparties/{id}/debt-balance`; `GET /api/v1/goods-receipts`, `POST /api/v1/goods-receipts/{id}/post`; `POST /api/v1/attachments` → `POST /api/v1/ai/ocr/jobs` (`doc_type_hint=purchase`) → poll → `/confirm` (AI-03); `POST /api/v1/supplier-payments`; `POST /api/v1/supplier-returns` + `POST /api/v1/supplier-returns/{id}/post`; `GET /api/v1/reports/debts-aging?direction=payable`.
+- **Ma'lumot manbai**: `GET/POST /api/v1/purchase-orders` + `POST /api/v1/purchase-orders/{id}/send`; `GET /api/v1/counterparties?is_supplier=true`, `GET /api/v1/counterparties/{id}/debt-balance`; `GET /api/v1/goods-receipts`, `POST /api/v1/goods-receipts/{id}/post`; `POST /api/v1/attachments` → `POST /api/v1/ai/ocr/jobs` (`doc_type_hint=purchase`) → poll → `/confirm` (AI-03); `POST /api/v1/supplier-payments`; `POST /api/v1/supplier-returns` + `POST /api/v1/supplier-returns/{id}/post`; `POST /api/v1/powers-of-attorney` + `/sign-challenge` + `/submit-signed`; `GET /api/v1/reports/debts-aging?direction=payable`.
 - **Holatlar**: `loading` · `empty` (yangi xaridnoma) · `error` (AI OCR noto'g'ri o'qidi — qo'lda tuzatish shart; `SUPPLIER_OVERPAY_BLOCKED`) · `offline` (PWA'da yangi xaridnoma yaratish cheklangan, internet talab qilinadi) · `no-permission` — Kassir/Omborchiga to'lov/qaytarish yopiq (faqat Omborchi — qabul, bu ekranda emas POS-08da) · `subscription-restricted` — kirilmaydi.
 - **Klaviatura**: `Ctrl+K`.
 - **Audit/analitika**: `purchase_order.created`, `ai_ocr_used`, `goods_receipt.posted`, `supplier_payment.created`, `supplier_return.created`, `power_of_attorney.issued`.
@@ -785,13 +803,14 @@ AI-03 sariq belgi chegarasi: summa <95%, sana <90%, miqdor/nom <80%; past ishonc
 └──────────────────────────────────────────────────┘
 ```
 
+- **"Chegirma qoidalari" bloki** (`rule.*` maydonlari, "Qoida yaratish" amali, `discount-rules` manbai) — **MVP'dan keyin** (qaror #33, US-M03-02); MVP'da tab ko'rsatilmaydi.
 - **Maydonlar**:
 
 | Maydon | Label (uz) | Label (ru) | Tur/komponent | Majburiy | Validatsiya | Default | Max |
 |---|---|---|---|---|---|---|---|
 | `newPrice` | Yangi narx | Новая цена | `MoneyInput` | Ha | >0 | Joriy narx | — |
 | `effectiveFrom` | Amal qilish sanasi | Дата применения | `Calendar` | Ha | ≥ bugun | Bugun | — |
-| `nameRu` (qaror #29) | Rus tilidagi nomi | Название на русском | `Input` | Yo'q (ixtiyoriy) | Max 200 | Bo'sh | 200 — chekda "{name} / {nameRu}" ko'rinishida chiqadi (bo'sh bo'lsa faqat `name`), `products.name_ru` |
+| `nameRu` (qaror #29) | Rus tilidagi nomi | Название на русском | `Input` | Yo'q (ixtiyoriy) | Max 255 | Bo'sh | 255 — chekda "{name} / {nameRu}" ko'rinishida chiqadi (bo'sh bo'lsa faqat `name`), `products.name_ru` |
 | `rule.category` | Kategoriya | Категория | `Select` | Ha (qoida) | — | — | — |
 | `rule.percent` | Chegirma % | Скидка % | `Input` number | Ha (qoida) | 0–100 | — | 100 |
 | `rule.startDate`/`endDate` | Boshlanish/tugash | Начало/Конец | `Calendar` | Ha (qoida) | `endDate` ≥ `startDate` | — | — |
@@ -800,8 +819,8 @@ AI-03 sariq belgi chegarasi: summa <95%, sana <90%, miqdor/nom <80%; past ishonc
 
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
 |---|---|---|---|
-| SAQLASH (narx) | `prices.edit` | Limitdan katta o'zgarishda `pending_approval` → BO-16 | `POST /api/v1/price-changes` → `POST /api/v1/price-changes/{id}/post` (javob `posted` yoki `pending_approval`) — eski narx tarixga, yangi narx saqlanadi |
-| SAQLASH (`nameRu`) (qaror #29) | `prices.edit` | Yo'q | `PATCH /api/v1/products/{id}` (`name_ru`) — tasdiqlash shart emas, darhol kuchga kiradi |
+| SAQLASH (narx) | `prices.edit` | Limitdan katta o'zgarishda `pending_approval` → BO-16 | `POST /api/v1/price-changes` → `POST /api/v1/price-changes/{id}/post` (javob `posted` yoki `pending_approval`; BO-16 da rad etilsa — `rejected`) — eski narx tarixga, yangi narx saqlanadi |
+| SAQLASH (`nameRu`) (qaror #29) | `catalog.manage` | Yo'q | `PATCH /api/v1/products/{id}` (`name_ru`) — tasdiqlash shart emas, darhol kuchga kiradi |
 | Qoida yaratish | `discount.rule.manage` | Yo'q | `discount_rule.created` |
 
 - **Ma'lumot manbai**: `GET /api/v1/products/{id}/prices` (tarix) + `POST /api/v1/price-changes` → `POST /api/v1/price-changes/{id}/post`; `GET/POST /api/v1/discount-rules` (+ `PATCH /{id}`, `POST /{id}/archive`).
@@ -828,7 +847,9 @@ AI-03 sariq belgi chegarasi: summa <95%, sana <90%, miqdor/nom <80%; past ishonc
 └──────────────────────────────────────────────────┘
 ```
 
-- **Maydonlar**: `periodFilter` — `Select`; **"Bugun/o'tgan va'da" tab** — `due_date ≤ bugun` (US-M08-09); **"60+ kun" tab** — eslatma ro'yxati, tizim avtomatik belgilamaydi (US-M08-10, tavsiya #9); `limit_exceeded_offline=true` filtri (Egasi); `payment.amount` — To'lov summasi — Сумма платежа — `MoneyInput` — ha — >0, ≤ joriy qarz (ortig'i rad — `debt_payment_exceeds_balance`, qaytim naqd; qaror #45); `payment.method` va karta/UzQR rekvizitlari (`card_type`, `card_mask`, `rrn`, `qr_type`) — POS-03 qoidasi bilan (qaror #64).
+- **Maydonlar**: `periodFilter` — `Select`; **"Bugun/o'tgan va'da" tab** — `due_date ≤ bugun` (US-M08-09); **"60+ kun" tab** — eslatma ro'yxati, tizim avtomatik belgilamaydi (US-M08-10, tavsiya #9); `limit_exceeded_offline=true` filtri (Egasi); `payment.amount` — To'lov summasi — Сумма платежа — `MoneyInput` — ha — >0, ≤ joriy qarz (ortig'i rad — `debt_payment_exceeds_balance`; qaror #45); `payment.method` — faqat `bank` (bank o'tkazmasi, kassasiz, fiskal chek yo'q — qaror #67; naqd/karta/QR qarz to'lovi — faqat POS-13); `payment.docDate`, `payment.branchId` (majburiy).
+
+  **"Ortiqcha to'lovlar" bloki** (qaror #67): offline POS qarz to'lovida qarzdan ortiq qabul qilingan summalar — `sync_exceptions(kind='debt_overpayment_offline')` ro'yxati (mijoz, `debt_payments.unallocated_amount`, sana, kassa); ortig'i `Kt 6310` (olingan bo'nak) da turadi; amallar "Qaytarish" va "Keyingi qarzga hisoblash" (Buxgalter/Egasi, `accounting.post`).
 
   **"Mijoz kartasi" Sheet**: `name`, `phone`, `kind` (`person|company`), `stir`, `legal_address`, `bank_account`, `bank_mfo` (B2B e-faktura uchun), `creditLimit` (`MoneyInput`, bo'sh = limitsiz), `standingDiscountPct` (0–100), `notifyConsent` (`Switch`); saqlash — `PATCH /api/v1/counterparties/{id}` (`version` bilan), ruxsat `debts.limit.manage`.
 
@@ -836,13 +857,15 @@ AI-03 sariq belgi chegarasi: summa <95%, sana <90%, miqdor/nom <80%; past ishonc
 
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
 |---|---|---|---|
-| AI eslatmani ko'rish/yuborish | `debts.remind` | Yo'q (matn ko'rib chiqiladi, keyin yuboriladi) | (qaror #34) Telegram orqali birinchi navbatda, SMS — zaxira |
-| TO'LOV QABUL QILISH | `debts.payment.accept` | Yo'q | `POST /debt-payments` → `POST /debt-payments/{id}/post` — (qaror #30) to'langan summaga **bitta** fiskal chek chiqariladi (`fiscal_receipts.kind=debt_settlement`), tovar qatorlari yopilgan sotuv(lar)dan proporsional (qaror #45); daromad/QQS sotuv kuni allaqachon tan olingan, to'lovda faqat pul harakati va chek |
+| AI eslatmani ko'rish/yuborish | qoralama — `ai.chat.use`; yuborish — `debts.remind` | Yo'q (matn ko'rib chiqiladi, keyin yuboriladi) | (qaror #34) Telegram orqali birinchi navbatda, SMS — zaxira |
+| TO'LOV QABUL QILISH (bank o'tkazmasi) | `debts.payment.accept` | Yo'q | `POST /debt-payments` (`method='bank'`; boshqa qiymat → `422 VALIDATION_ERROR`, `validation.debt_payment_backoffice_bank_only`) — kassasiz, **fiskal chek yo'q**, provodka `Dt 5110 / Kt 4010` (qaror #67); daromad/QQS sotuv kuni allaqachon tan olingan. Naqd/karta/QR qarz to'lovi va uning `debt_settlement` cheki — POS-13 |
+| Ortiqcha to'lovni qaytarish ("Ortiqcha to'lovlar" bloki) | `accounting.post` | Summa va sabab | POS-14 yoki `POST /api/v1/cash-movements` (`reason='other'`, `direction='out'`, `account='6310'`, `counterparty_id`) |
+| Keyingi qarzga hisoblash ("Ortiqcha to'lovlar" bloki) | `accounting.post` | «{summa} keyingi qarzga hisoblanadi» | `POST /api/v1/ledger-adjustments` (`Dt 6310 / Kt 4010`, `analytics.counterparty_id`) |
 | Shubhali deb belgilash | `debts.forgive` (faqat Egasi) | Sabab majburiy | `POST /debt-doubtful-flags` — provodka **yo'q**, faqat belgi |
 | Belgini olib tashlash | `debts.forgive` | Yo'q | `POST /debt-doubtful-flags/{id}/unflag` |
 | Qarzni kechish (hisobdan chiqarish) | `debts.forgive` (faqat Egasi) | Sabab majburiy + "Bu amal provodka yaratadi" | `POST /debt-writeoffs` → `/post` |
 
-- **Ma'lumot manbai**: `GET /api/v1/reports/debts-aging?direction=receivable&bucket=` (+ `limit_exceeded_offline=`, `branch_id=`); `POST /api/v1/ai/debt-reminders/draft` → `POST /api/v1/ai/debt-reminders/send` (AI-06); `POST /api/v1/debt-payments` → `/post`; `POST /api/v1/debt-doubtful-flags`, `POST /api/v1/debt-doubtful-flags/{id}/unflag`; `GET /api/v1/counterparties/{id}/debt-ledger`; `PATCH /api/v1/counterparties/{id}`.
+- **Ma'lumot manbai**: `GET /api/v1/reports/debts-aging?direction=receivable&bucket=` (+ `limit_exceeded_offline=`, `branch_id=`); `POST /api/v1/ai/debt-reminders/draft` → `POST /api/v1/ai/debt-reminders/send` (AI-06); `POST /api/v1/debt-payments` (`method='bank'`); `GET /api/v1/sync-exceptions?kind=debt_overpayment_offline`, `POST /api/v1/cash-movements`, `POST /api/v1/ledger-adjustments`; `POST /api/v1/debt-doubtful-flags`, `POST /api/v1/debt-doubtful-flags/{id}/unflag`; `GET /api/v1/counterparties/{id}/debt-ledger`; `PATCH /api/v1/counterparties/{id}`.
 - **Holatlar**: `loading` · `empty` (qarzdor yo'q) · `error` (aloqa ma'lumoti yo'q; `debt_payment_exceeds_balance`) · `offline` (faqat ko'rish) · `no-permission` — Kassir/Omborchiga yopiq · `subscription-restricted` — kirilmaydi.
 - **Klaviatura**: `Ctrl+K`.
 - **Audit/analitika**: `debt_reminder_sent`, `debt_payment.created`, `debt_doubtful_flagged`, `debt_doubtful_unflagged`, `debt_writeoff.posted`.
@@ -903,17 +926,17 @@ AI-03 sariq belgi chegarasi: summa <95%, sana <90%, miqdor/nom <80%; past ishonc
 └──────────────────────────────────────────────────┘
 ```
 
-- **"Qayta hisoblash navbati" bloki** (qaror #56 c): `recost_jobs` ro'yxati — ustunlar `product`, `warehouse`, `status`, `queued_at`, `finished_at`, `error`; navbatda ish bo'lsa "Davrni yopish" readiness'ida `recost_pending` bloker sifatida ko'rinadi. Manba — `GET /api/v1/recost-jobs?status=`; xato bo'lgan ish uchun "Qayta urinish" — `POST /api/v1/recost-jobs/{id}/retry` (`accounting.post`).
-- **Maydonlar**: `dateFrom`/`dateTo` — `Calendar`; `accountFilter` — `Select` — majburiy emas; `adjustment.entryDate` — Tuzatuvchi yozuv sanasi — faqat joriy **ochiq** davr — ha (tuzatuvchi yozuvda); `adjustment.comment` — Izoh — majburiy (tuzatuvchi yozuvda).
+- **"Qayta hisoblash navbati" bloki** (qaror #56 c): `recost_jobs` ro'yxati — ustunlar (`19-api-ombor.md` §18 `GET /recost-jobs` javobi) `product_id`, `warehouse_id`, `from_date`, `status`, `attempts`, `created_at`, `finished_at`, `last_error`; navbatda ish bo'lsa "Davrni yopish" readiness'ida `recost_pending` bloker sifatida ko'rinadi. Manba — `GET /api/v1/recost-jobs?status=`; xato bo'lgan ish uchun "Qayta urinish" — `POST /api/v1/recost-jobs/{id}/retry` (`accounting.post`).
+- **Maydonlar**: `dateFrom`/`dateTo` — `Calendar`; `accountFilter` — `Select` — majburiy emas; `adjustment.docDate` — Tuzatuvchi yozuv sanasi — faqat joriy **ochiq** davr (istisno — `0000` hisobli boshlang'ich balans yozuvi `go_live_date − 1`) — ha (tuzatuvchi yozuvda); `adjustment.accountDt`, `adjustment.accountKt` — Debet/Kredit hisobi — 4 raqam, majburiy, `≠`; `adjustment.amount` — Summa — `MoneyInput`, >0, majburiy; `adjustment.branchId` — Filial — majburiy, standart joriy filial; `adjustment.correctionOfPeriod` — Tuzatilayotgan davr — ixtiyoriy, `YYYY-MM`; `adjustment.comment` — Izoh — majburiy (tuzatuvchi yozuvda).
 - **Amallar**:
 
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
 |---|---|---|---|
-| Eksport | `reports.export` | Yo'q | CSV/Excel yuklash |
-| Davrni yopish | `accounting.period.close` | Avval `GET /period-closings/{period}/readiness` (bloker: `recost_pending`, `fiscal_pending`); so'ng «{oy} yopiladi. Yopilgan oy **qayta ochilmaydi** — keyingi tuzatishlar joriy ochiq oyda tuzatuvchi yozuv bilan kiritiladi» | `POST /period-closings` |
-| Tuzatuvchi yozuv | `accounting.post` | Yo'q | `POST /ledger-adjustments` (`entry_date` faqat ochiq davr, `comment` majburiy) |
+| Eksport | `reports.export` | Yo'q | `POST /api/v1/reports/ledger-entries/export` (`format: xlsx\|pdf`) → poll `GET /api/v1/reports/export-jobs/{job_id}` |
+| Davrni yopish | `accounting.period.close` | Faqat **eng eski ochiq oy** tanlanadi (aks holda `409 PERIOD_CLOSE_OUT_OF_ORDER`). Avval `GET /period-closings/{period}/readiness` (qaror #69): blokerlar `recost_pending`, `fiscal_pending`, `devices_unsynced` (sinxronlanmagan qurilmalar ro'yxati — `cash_register_name`, `outbox_pending_count`, `outbox_oldest_pending_at`; "Qurilmani bekor qilish" havolasi BO-11 ga) — bloker bo'lsa tugma o'chiq; ogohlantirishlar (`tax_settlement_missing`, `opening_0000_nonzero`, `open_shifts`, `drafts_in_period`, `devices_not_synced_after_period_end`) tasdiqlash dialogida ro'yxat bilan; so'ng «{oy} yopiladi. Yopilgan oy **qayta ochilmaydi** — keyingi tuzatishlar joriy ochiq oyda tuzatuvchi yozuv bilan kiritiladi» | `POST /period-closings` |
+| Tuzatuvchi yozuv | `accounting.post` | Yo'q | `POST /ledger-adjustments` (`doc_date` faqat ochiq davr, `account_dt`, `account_kt`, `amount`, `branch_id`, `correction_of_period?`, `comment` majburiy) |
 
-- **Ma'lumot manbai**: `GET /api/v1/ledger-entries?doc_date__gte=&doc_date__lte=&account_dt=&account_kt=`; `GET /period-closings/{period}/readiness`, `POST /period-closings`, `POST /ledger-adjustments`.
+- **Ma'lumot manbai**: `GET /api/v1/ledger-entries?entry_date__gte=&entry_date__lte=&account_dt=&account_kt=`; `GET /period-closings/{period}/readiness`, `POST /period-closings`, `POST /ledger-adjustments`, `POST /api/v1/reports/ledger-entries/export`.
 - **Holatlar**: `loading` · `empty` (yozuv yo'q) · `error` (balans mos kelmadi, `PERIOD_CLOSED` — tuzatish yopilgan davrga kiritilmoqchi bo'lsa) · `offline` (faqat ko'rish) · `no-permission` — faqat Buxgalterda to'liq, boshqa rollarda yopiq · `subscription-restricted` — kirilmaydi.
 - **Klaviatura**: `Ctrl+K`.
 - **Audit/analitika**: `ledger_viewed`, `ledger_exported`, `period_closing.posted`, `ledger_adjustment.posted`.
@@ -935,7 +958,7 @@ AI-03 sariq belgi chegarasi: summa <95%, sana <90%, miqdor/nom <80%; past ishonc
 └──────────────────────────────────────────────────┘
 ```
 
-- **Maydonlar**: `reportType` — Hisobot turi — Тип отчёта — `Select` — ha (ro'yxatda **"Kassa/smena tarixi"**, **"QQS registri (qaytarishlar bilan)"** va rasmiy shakl tayyorlov eksportlari — QQS (DSQ №3221 1-ilova), aylanma solig'i (9-ilova), moliyaviy hisobot (MEF №181 1-/2-ilova): satr kodlari bilan Excel/PDF, topshirish emas — Buxgalter shaxsiy kabinetda topshiradi); `period` — `Calendar range` — ha.
+- **Maydonlar**: `reportType` — Hisobot turi — Тип отчёта — `Select` — ha (ro'yxatda **"Kassa/smena tarixi"**, **"QQS registri (qaytarishlar bilan)"** (`tax.vat.view` — Buxgalter/Egasi; Menejerda ko'rinmaydi) va rasmiy shakl tayyorlov eksportlari — QQS (DSQ №3221 1-ilova), aylanma solig'i (9-ilova), moliyaviy hisobot (MEF №181 1-/2-ilova): satr kodlari bilan Excel/PDF, topshirish emas — Buxgalter shaxsiy kabinetda topshiradi); `period` — `Calendar range` — ha.
 - **Amallar**: PDF/Excel eksport (`reports.export`).
 - **Ma'lumot manbai**: hisobotga qarab — `sales`/`top-products` — `?date_from=&date_to=`; `trial-balance`/`profit-and-loss` — `?period=`; `balance-sheet`/`debts-aging` — `?as_of=`; **"Kassa/smena tarixi"** — `GET /api/v1/cash-registers/{id}/cash-history`; **"QQS registri (qaytarishlar bilan)"** — `GET /api/v1/vat-moves?doc_type=returns`; eksport — `POST /api/v1/reports/{report-kod}/export` + poll `GET /api/v1/reports/export-jobs/{job_id}`.
 - **Holatlar**: `loading` · `empty` (ma'lumot yo'q) · `error` (eksport muvaffaqiyatsiz) · `offline` (faqat oxirgi keshlangan hisobot) · `no-permission` — Kassir (faqat o'z smenasi), Omborchi (faqat ombor) cheklangan ko'rinishda · `subscription-restricted` — kirilmaydi.
@@ -949,12 +972,12 @@ AI-03 sariq belgi chegarasi: summa <95%, sana <90%, miqdor/nom <80%; past ishonc
 
 - **Maqsad**: davlat hisobotini (fayl yuklash orqali) tizimga kiritish, QQS/aylanma solig'i hisobotini ichki hisob bilan **5 ish kuni** ichida (hisobot shaxsiy kabinetga joylashtirilgan kundan keyingi kundan, hisobot topshirish muddatidan kechiktirmay — QQS: keyingi oyning 20-sanasi, aylanma: 15-sana) solishtirish, AI-05 bilan farqni tushuntirish.
 - **Mexanizm**: Buxgalter my.soliq.uz shaxsiy kabinetida hisobotni **tasdiqlaydi** yoki **tuzatish kiritib taqdim etadi** (alohida e'tiroz arizasi yo'q); 5 ish kunida javob bo'lmasa hisobot davlat shakllantirgan ko'rinishda qabul qilingan hisoblanadi; muddatdan keyin — aniqlashtirilgan hisobot (SK 83-modda). Tizim ichki hisob va farqlar ro'yxatini tayyorlaydi, avtomatik yuborish yo'q. Davlat hisoboti fayli kabinetdan yuklab olinib qo'lda yuklanadi — ommaviy API yo'q, 26 #41 (OQ-014).
-- **Granulyarlik**: QQS — hujjat darajasida (e-faktura reyestri: STIR + faktura raqami + sana bo'yicha moslashtirish) va yig'indi darajasida; aylanma solig'i — faqat yig'indi darajasida, 5 manba satri (0101 e-faktura / 0102 NKM (fiskal chek) / 0103 marketplace / 0104 eksport / 0105 boshqa) va stavka bo'yicha.
+- **Granulyarlik**: QQS — hujjat darajasida (e-faktura reyestri: STIR + faktura raqami + sana bo'yicha moslashtirish) va yig'indi darajasida; aylanma solig'i — faqat yig'indi darajasida, 5 manba satri (0101 e-faktura / 0102 NKM (fiskal chek) / 0103 marketplace / 0104 eksport / 0105 boshqa) va stavka bo'yicha. Ichki 0102 = Σ `fiscal_receipts` (`sale`/`return`/`debt_settlement`) chek sanasi bo'yicha; ledger bilan farq — «qarzga sotuv vaqt farqi» izoh qatori.
 - **Eslatmalar** (qaror #50): farq chegarasi `tenants.settings.vat_diff_tolerance_amount` (standart `"1000.00"` so'm — har qanday farq ko'rsatiladi, "farq topildi" holati shu chegaradan boshlanadi); Buxgalterga eslatma 1-, 3- va 4-ish kunida; 3-ish kunida yopilmagan farq bo'lsa Egasiga ham eskalatsiya banneri. **"10-sanagacha interaktiv ma'lumotlar"** bloki — har oy 10-sanagacha kabinetga kiritiladigan ma'lumotlar uchun tizim tayyorlagan raqamlar: aylanma — soliq solinmaydigan daromad, chegirmalar, imtiyozlar; QQS — hisobga olinadigan QQS tuzatishlari, imtiyozlar.
-- **Rollar/ruxsat**: Buxgalter (`tax.compare.review` — ko'rish/farq/yuklash, `tax.correction.submit` — tuzatish yuborish), Egasi (`tax.vat.view`, yakuniy tasdiq).
+- **Rollar/ruxsat**: Buxgalter va Egasi — `tax.compare.review` (ko'rish/farq/yuklash), `tax.correction.submit` (tuzatish/tasdiqni qayd etish).
 - **Route**: `/app/tax/reconciliation`
 - **Maket**: `06-ekranlar-umumiy.md` §6 BO-10 wireframe'i.
-- **Maydonlar**: `taxTypeTab` — `Tabs` (**QQS/Aylanma** — `tax_type` API'da faqat `vat|turnover`; mol-mulk/yer/JShDS/ijtimoiy soliq tablari MVP'da yo'q, 06 §1.3 Won't); `uploadForm.taxType` — `vat|turnover`; `uploadForm.period` — `YYYY-MM`; `uploadForm.publishedAt` — sana (5 ish kunlik hisoblagich keyingi kundan boshlanadi); `uploadForm.file` — PDF/XLSX ≤5MB; `correctionNote` — Tuzatish izohi — Комментарий к исправлению — `Textarea` — tuzatish yuborilganda ha — max 1000.
+- **Maydonlar**: `taxTypeTab` — `Tabs` (**QQS/Aylanma** — `tax_type` API'da faqat `vat|turnover`; mol-mulk/yer/JShDS/ijtimoiy soliq tablari MVP'da yo'q, 05 §1.3 Won't); `uploadForm.taxType` — `vat|turnover`; `uploadForm.period` — `YYYY-MM`; `uploadForm.publishedAt` — sana (5 ish kunlik hisoblagich keyingi kundan boshlanadi); `uploadForm.file` — PDF/XLSX ≤5MB; `comment` — Tuzatish izohi — Комментарий к исправлению — `Textarea` — tuzatish qayd etilganda ha — max 1000; `portalRef` — Kabinetdagi hujjat raqami — Номер в кабинете — `Input` — ixtiyoriy.
 - **Amallar**:
 
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
@@ -962,11 +985,12 @@ AI-03 sariq belgi chegarasi: summa <95%, sana <90%, miqdor/nom <80%; past ishonc
 | Davlat hisobotini yuklash | `tax.compare.review` | Yo'q | `POST /state-reports` → avtomatik `POST /state-reports/{id}/compare` |
 | Farqni ko'rib chiqish | `tax.compare.review` | Yo'q | Hujjat darajasidagi farq ro'yxati ochiladi |
 | Farqni tushuntirish (AI-05) | `tax.compare.review` | Yo'q | `POST /ai/vat-diffs/{diff_id}/explain`; matn ostida «AI tushuntirish — raqamlar tizim hisobidan» belgisi |
-| Tuzatish qayd etish | `tax.correction.submit` | Yo'q | Kabinetda kiritilgan tuzatish izohi va holati tizimda qayd etiladi — holat `tuzatish yuborildi`; my.soliq.uz kabinetiga havola (tuzatish kabinetda kiritiladi) |
-| Tasdiqlangan deb belgilash | `tax.correction.submit` | Yo'q | Holat `tasdiqlandi` (farqsiz yoki tolerance ichida) |
+| Tuzatish qayd etish | `tax.correction.submit` | Yo'q | `POST /api/v1/state-reports/{id}/correction` `{comment, portal_ref?}` (imzosiz qayd) — holat `correction_sent`; my.soliq.uz kabinetiga havola (tuzatish kabinetda kiritiladi) |
+| Tasdiqlangan deb belgilash | `tax.correction.submit` | Yo'q | `POST /api/v1/state-reports/{id}/confirm` `{comment?}` — `match`/`diff_found` (tolerance ichida) holatdan; holat `confirmed` ("Tasdiqlandi") |
 
-- **Ma'lumot manbai**: `GET /api/v1/state-reports?tax_type=&period=` + `GET /api/v1/state-reports/{id}` + `GET /api/v1/state-reports/{id}/diffs`; `POST /api/v1/state-reports` (fayl yuklash), `POST /api/v1/state-reports/{id}/compare`, `POST /api/v1/state-reports/{id}/correction`, `POST /api/v1/ai/vat-diffs/{diff_id}/explain`.
-- **Holatlar**: `loading` · `empty` (davlat hisoboti hali e'lon qilinmagan, "Kutilmoqda") · `error` ("⚠ Farq topildi") · `offline` (faqat ichki ustun ko'rinadi, davlat ustuni "internet kerak") · `no-permission` — Egasida faqat K (ko'rish+yakuniy tasdiq), boshqa rollarga yopiq · `subscription-restricted` — kirilmaydi. Qo'shimcha holat: **"Muddat o'tdi — avtomatik qabul qilindi"** (5 ish kuni ichida javob berilmagan); **3-ish kunida** yopilmagan farq bo'lsa Egasiga ham eskalatsiya banneri ko'rsatiladi (qaror #50).
+- **Holat nomlari** (`state_reports.status`): `uploaded` (Yuklandi), `compared` (Solishtirildi), `match` (Mos), `diff_found` (Farq topildi), `correction_sent` (Tuzatish qayd etildi), `confirmed` (Tasdiqlandi), `auto_accepted` (Avtomatik qabul qilindi).
+- **Ma'lumot manbai**: `GET /api/v1/state-reports?tax_type=&period=` + `GET /api/v1/state-reports/{id}` + `GET /api/v1/state-reports/{id}/diffs`; `POST /api/v1/state-reports` (fayl yuklash), `POST /api/v1/state-reports/{id}/compare`, `POST /api/v1/state-reports/{id}/correction`, `POST /api/v1/state-reports/{id}/confirm`, `POST /api/v1/ai/vat-diffs/{diff_id}/explain`.
+- **Holatlar**: `loading` · `empty` (davlat hisoboti hali e'lon qilinmagan, "Kutilmoqda") · `error` ("⚠ Farq topildi") · `offline` (faqat ichki ustun ko'rinadi, davlat ustuni "internet kerak") · `no-permission` — Buxgalter va Egasidan boshqa rollarga yopiq · `subscription-restricted` — kirilmaydi. Qo'shimcha holat: **"Muddat o'tdi — avtomatik qabul qilindi"** (5 ish kuni ichida javob berilmagan); **3-ish kunida** yopilmagan farq bo'lsa Egasiga ham eskalatsiya banneri ko'rsatiladi (qaror #50).
 - **Klaviatura**: `Ctrl+K`.
 - **Audit/analitika**: `state_report.uploaded`, `tax_reconciliation_viewed`, `tax_correction_submitted`, `tax_auto_accepted`, `ai_vat_diff_explained`, `tax_reconciliation_escalated_to_owner`.
 - **Bog'liq US**: US-M10-02, US-M10-04, AI-05.
@@ -992,7 +1016,7 @@ AI-03 sariq belgi chegarasi: summa <95%, sana <90%, miqdor/nom <80%; past ishonc
 
 **"Rollar" tab**: `GET /roles`, rol ichida `PUT /roles/{id}/permissions` — limitlar **rolga** bog'langan (`discount.give` limit 5%, `returns.approve` 100 000, `cash.withdraw` 50 000 — standart qiymatlar). Omborchi standart holatda kirimni faqat `draft` qiladi; ≤3 xodimli do'konda Egasi Omborchi roliga `purchases.post` ni qo'shishi mumkin (qaror #49).
 
-**"Qurilmalar" tab** (qaror #56 a): `devices` ro'yxati — `device_name`, `kind`, `last_sync_at`, `pending_events` (sinxronlanmagan voqealar soni); "Bekor qilish" (`devices.revoke`, Egasi/Menejer); `pending_events > 0` bo'lsa `has-pending` ogohlantirishi «Qurilmada N ta yuborilmagan voqea bor — avval sinxronlang» + `sync.drain` taklifi; "Yangi qurilma qo'shish" → `/install`.
+**"Qurilmalar" tab** (qaror #56 a): `devices` ro'yxati — `cash_register_name` (hisoblanadi), `kind`, `app_version`, `last_sync_at`, `outbox_pending_count` (sinxronlanmagan voqealar soni); "Bekor qilish" (`devices.revoke`, Egasi/Menejer); `outbox_pending_count > 0` bo'lsa `has-pending` ogohlantirishi «Qurilmada N ta yuborilmagan voqea bor — avval sinxronlang» + `sync.drain` taklifi; "Yangi qurilma qo'shish" → `/install`.
 
 - **Maydonlar**:
 
@@ -1014,9 +1038,9 @@ Limitlar "Rollar" tabida — xodim formasida faqat `roleIds`, `branchIds`.
 | Parolni tiklash | `settings.users` | Yo'q | (qaror #34) Tiklash kodi (`purpose=admin_reset`) — Telegram bot birinchi, SMS zaxira |
 | PINni qayta o'rnatish | `settings.users` | Yo'q | Eski PIN bekor, keyingi kirishda yangi PIN majburiy |
 | Seanslarni tugatish | `settings.users` | Yo'q | Tanlangan sessiya/barcha sessiya bekor |
-| Qurilmani bekor qilish | `devices.revoke` (Egasi/Menejer) | "Qurilmani bekor qilasizmi?"; `pending_events > 0` bo'lsa «Yuborilmagan voqealar yo'qolishi mumkin» ogohlantirishi | `devices.revoked_at`, token/litsenziya bekor |
+| Qurilmani bekor qilish | `devices.revoke` (Egasi/Menejer) | "Qurilmani bekor qilasizmi?" — `reason` (majburiy); `outbox_pending_count > 0` bo'lsa «Yuborilmagan voqealar yo'qolishi mumkin» ogohlantirishi va `confirm_pending_loss` checkbox (belgilanmaguncha tasdiqlash o'chiq) | `POST /api/v1/devices/{id}/revoke` (`{reason, confirm_pending_loss}`) → `devices.revoked_at`, token/litsenziya bekor |
 
-- **Ma'lumot manbai**: `POST /api/v1/admin/users`, `PATCH /api/v1/admin/users/{id}`, `GET /api/v1/admin/users/{id}/sessions`, `GET /api/v1/admin/users/{id}/devices`, `GET /api/v1/devices` (Qurilmalar tabi: `last_sync_at`, `pending_events`), `POST /api/v1/devices/{id}/revoke`, `POST /api/v1/admin/users/{id}/reset-password`, `POST /api/v1/admin/users/{id}/reset-pin`, `POST /api/v1/admin/users/{id}/revoke-sessions`; `GET /api/v1/roles`, `GET/PUT /api/v1/roles/{id}/permissions`, `GET /api/v1/permissions-catalog`.
+- **Ma'lumot manbai**: `POST /api/v1/admin/users`, `PATCH /api/v1/admin/users/{id}`, `GET /api/v1/admin/users/{id}/sessions`, `GET /api/v1/admin/users/{id}/devices`, `GET /api/v1/devices` (Qurilmalar tabi: `cash_register_name`, `kind`, `app_version`, `last_sync_at`, `outbox_pending_count`), `POST /api/v1/devices/{id}/revoke`, `POST /api/v1/admin/users/{id}/reset-password`, `POST /api/v1/admin/users/{id}/reset-pin`, `POST /api/v1/admin/users/{id}/revoke-sessions`; `GET /api/v1/roles`, `GET/PUT /api/v1/roles/{id}/permissions`, `GET /api/v1/permissions-catalog`.
 - **Holatlar**: `loading` · `empty` (faqat Egasi mavjud) · `error` (bir xil telefon takror) · `offline` (faqat ko'rish) · `no-permission` — faqat Egasida, boshqalarga butunlay yopiq · `subscription-restricted` — kirilmaydi.
 - **Klaviatura**: `Ctrl+K`.
 - **Audit/analitika**: `user_created`, `user_blocked`, `password_reset`, `pin_reset_forced`, `session_revoked`, `device_revoked`.
@@ -1046,20 +1070,23 @@ Limitlar "Rollar" tabida — xodim formasida faqat `roleIds`, `branchIds`.
 | `name` | Filial nomi | Название филиала | `Input` | Ha | 2–100 | — | 100 |
 | `address` | Manzil | Адрес | `Input` | Yo'q | — | — | 200 |
 | `settlementCategory` | Aholi punkti toifasi | Категория населённого пункта | `Select` | Ha | `city_100k_plus\|other\|remote_mountain` (chakana aylanma solig'i 4% / 2% / 1%, SK 467-modda; tog'li/borish qiyin hududni Egasi tanlaydi) | `city_100k_plus` (eng ehtiyotkor) | — |
-| `warehouses[].inventoryAccount` | Tovar hisobi | Счёт учёта товара | `Select` | Ha | `2910` (ombor) \| `2920` (savdo zali) | Do'kon → `2920`, ombor → `2910` | — |
+| `warehouseType` ("+ Filial qo'shish" dialogida) | Ombor turi | Тип склада | `SegmentedControl` | Ha | `store\|stock` | `store` | — |
+| `warehouses[].inventoryAccount` | Tovar hisobi | Счёт учёта товара | `Select` | Ha | `2910` (ombor) \| `2920` (savdo zali); saqlash — `PATCH /api/v1/warehouses/{id}` (`settings.branches`); omborda harakat bo'lsa `409 WAREHOUSE_ACCOUNT_LOCKED` | Server `type` dan qo'yadi: `store` → `2920`, `stock` → `2910` | — |
+| `cashRegisters[].fiscalAgent` | Fiskal agent | Фискальный агент | `Select` (shu tenant Do'kon agentlari, `capabilities.fiscal.devices[]` dan `local_id`) | Yo'q (lokal fiskal ko'prik kassasida Ha) | Agent tanlansa `local_id` majburiy | — | — |
 
-Filial ichida "Kassalar" ro'yxati: har bir kassa qatorida soliq ro'yxatidan o'tish holati (`tax_registered_at`, TXKM shartnomasi `txkm_contract_ref`), fiskal modul holati (`fm_state`) va "Arxivlash" amali. Har bir kassa savdodan oldin filial manzili bo'yicha alohida ro'yxatdan o'tadi; filial manzili o'zgartirilsa shu filial kassalari uchun «3 ish kunida qayta ro'yxatdan o'tkazing» eslatmasi chiqadi. Omborning tovar hisobi (`warehouses.inventory_account`) — Buxgalter/Egasi o'zgartiradi.
+Filial ichida "Kassalar" ro'yxati: har bir kassa qatorida soliq ro'yxatidan o'tish holati (`tax_registered_at`, TXKM shartnomasi `txkm_contract_ref`), fiskal modul holati (`fm_state`), "Fiskal agent" `Select` (lokal fiskal ko'prik kassasiga xizmat qiluvchi Do'kon agenti va uning fiskal qurilmasi — `cash_registers.fiscal_agent_id`, `fiscal_local_device_id`) va "Arxivlash" amali. Har bir kassa savdodan oldin filial manzili bo'yicha alohida ro'yxatdan o'tadi; filial manzili o'zgartirilsa shu filial kassalari uchun «3 ish kunida qayta ro'yxatdan o'tkazing» eslatmasi chiqadi. Omborning tovar hisobi (`warehouses.inventory_account`) — Buxgalter/Egasi o'zgartiradi.
 
 - **Amallar**:
 
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
 |---|---|---|---|
-| + Filial qo'shish | `settings.branches` | Yo'q | `branches.created` |
+| + Filial qo'shish | `settings.branches` | Yo'q | `POST /api/v1/branches` (`warehouse: {type: warehouseType}`) |
+| Fiskal agentni bog'lash (kassa qatori) | `cash_register.manage` | Yo'q | `PATCH /api/v1/cash-registers/{id}` `{fiscal_agent_id, fiscal_local_device_id, version}` (qaror #66) |
 | Tahrir/Saqlash | `settings.branches` | Toifa o'zgartirilsa "Yangi stavka faqat shu sanadan qo'llanadi"; manzil o'zgartirilsa — kassalarni qayta ro'yxatdan o'tkazish eslatmasi | `branch_tax_settings` yangi yozuv (`valid_from`) |
 | + Kassa qo'shish | `cash_register.manage` | `ADDON_REQUIRED` bo'lsa dialog «Qo'shimcha kassa — +39 000 so'm/oy. Obunaga qo'shasizmi?» → BO-19 | `POST /cash-registers` |
-| Arxivlash (kassa) | `cash_register.manage` | Yo'q | `PATCH /cash-registers/{id}` (`archived:true`) |
+| Arxivlash (kassa) | `cash_register.manage` | Yo'q | `POST /api/v1/cash-registers/{id}/archive` (`{}`) |
 
-- **Ma'lumot manbai**: `GET/POST /api/v1/branches`, `PATCH /api/v1/branches/{id}` + `GET/POST /api/v1/cash-registers`, `PATCH /api/v1/cash-registers/{id}`, `GET /api/v1/branches/{id}/tax-settings`.
+- **Ma'lumot manbai**: `GET/POST /api/v1/branches`, `PATCH /api/v1/branches/{id}` + `GET/POST /api/v1/cash-registers`, `PATCH /api/v1/cash-registers/{id}`, `POST /api/v1/cash-registers/{id}/archive`, `GET /api/v1/branches/{id}/tax-settings`, `GET /api/v1/warehouses?branch_id=`, `PATCH /api/v1/warehouses/{id}`.
 - **Holatlar**: `loading` · `empty` (bitta filial) · `error` — yo'q · `offline` (faqat ko'rish) · `no-permission` — faqat Egasida, boshqa rollar K · `subscription-restricted` — kirilmaydi.
 - **Klaviatura**: `Ctrl+K`.
 - **Audit/analitika**: `branch.created`, `branch_tax_category_changed`.
@@ -1111,23 +1138,28 @@ Filial ichida "Kassalar" ro'yxati: har bir kassa qatorida soliq ro'yxatidan o'ti
 | Maydon | Label (uz) | Label (ru) | Tur/komponent | Majburiy | Validatsiya | Default | Max |
 |---|---|---|---|---|---|---|---|
 | `storeName` | Do'kon nomi | Название магазина | `Input` | Ha | 2–100 | — | 100 |
-| `taxRegime` | Soliq rejimi | Налоговый режим | `Select` | Ha | `vat\|turnover` | — | — |
-| `costingMethod` | Zaxira baholash usuli | Метод оценки запасов | `Select` | Ha | `AVECO\|FIFO` | `AVECO` | — |
-| `crptApiKey` | Asl belgisi API kaliti | API-ключ Asl belgisi | `Input` (masked) | Yo'q | — | — | 256 |
-| `fakturaUzCredentials` | Faktura.uz login/parol | Логин/пароль Faktura.uz | `Input`×2 (masked) | Yo'q | — | — | — — parol serverda shifrlangan saqlanadi, qayta ko'rsatilmaydi |
+| `taxRegime` | Soliq rejimi | Налоговый режим | `Select` | Ha | `vat\|turnover`; saqlash — `POST /api/v1/tenant/tax-regimes` (40c, keyingi oydan) | — | — |
+| `costingMethod` | Zaxira baholash usuli | Метод оценки запасов | `Select` | Ha | `aveco\|fifo` (yorliq katta harfda: AVECO / FIFO) | `aveco` | — |
+| `crptApiKey` | Asl belgisi API kaliti | API-ключ Asl belgisi | `Input` (masked) | Yo'q | Saqlash — `PUT /api/v1/tenant/integrations/crpt` (40d) | — | 256 |
+| `fakturaUz.login` | Faktura.uz login | Логин Faktura.uz | `Input` (masked) | Yo'q | Saqlash — `PUT /api/v1/tenant/integrations/faktura-uz` (40d), to'rt maydon birga | — | — |
+| `fakturaUz.password` | Faktura.uz parol | Пароль Faktura.uz | `Input` (masked) | Yo'q | — | — | — — serverda shifrlangan saqlanadi, qayta ko'rsatilmaydi |
+| `fakturaUz.clientId` | Faktura.uz API mijozi ID | Client ID Faktura.uz | `Input` (masked) | Yo'q | — | — | — |
+| `fakturaUz.clientSecret` | Faktura.uz API mijozi siri | Client secret Faktura.uz | `Input` (masked) | Yo'q | — | — | — — qayta ko'rsatilmaydi |
 | `weightBarcodeTemplates[]` | Tarozi shtrix-kod shablonlari | Шаблоны весового штрихкода | Jadval (`prefixes`, `item_code_len` 4–6, `value_kind` WEIGHT/AMOUNT, `decimals`, `enabled`) | Yo'q | EAN-13 `PP CCCCC VVVVV K`, prefiks 20–29 | 22 / WEIGHT (gramm), 21 / AMOUNT (so'm) | — |
 | `markingPrecheck` | Markirovka tekshiruvi | Проверка маркировки | `Select` | Ha | `off\|warn\|block` (qaror #62) | `warn` | — |
-| `aiCrossBorderEnabled` | Ma'lumotni AI xizmatiga (chet elga) uzatishga rozilik | Согласие на передачу данных AI-сервису (за рубеж) | `Switch` | — | Yoqishda rozilik matni ko'rsatiladi; `POST /api/v1/tenant/consents` (`purpose=ai_cross_border`, `accepted`) — `PATCH` bilan o'zgartirilmaydi | O'chiq (BO-21 da berilmagan bo'lsa) | — |
-| `providerFiscalizationOff` | Provayder avto-fiskallashtirishi o'chirilgan | Автофискализация провайдера отключена | `Checkbox` (Click / Payme / Uzum alohida) | Ha (shu provayder yoqilganda) | Egasi merchant kabinetida tekshirganini tasdiqlaydi | O'chiq | — |
+| `aiCrossBorderEnabled` | Ma'lumotni AI xizmatiga (chet elga) uzatishga rozilik | Согласие на передачу данных AI-сервису (за рубеж) | `Switch` | — | Yoqishda rozilik matni ko'rsatiladi; `POST /api/v1/tenant/consents` (`purpose=ai_cross_border`, `terms_version`, `accepted`) — `PATCH` bilan o'zgartirilmaydi | O'chiq (BO-21 da berilmagan bo'lsa) | — |
+| `providerFiscalizationOff` | Provayder avto-fiskallashtirishi o'chirilgan | Автофискализация провайдера отключена | `Checkbox` (Click / Payme / Uzum alohida) | Ha (shu provayder yoqilganda) | Egasi merchant kabinetida tekshirganini tasdiqlaydi → API `provider_autofiscal_disabled_confirmed: true` (`PUT /api/v1/tenant/integrations/{click\|payme\|uzum}`, 40d, majburiy); belgilanmasa saqlash o'chiq | O'chiq | — |
 
-- **Amallar**: Saqlash (`settings.tenant`) → `PATCH /valuation-settings` (`valuation.settings.manage`), javobdagi `pending_change.effective_from`ni ko'rsatish; «1C» qatori (Bosqich 7, `onec.view` bo'lsa) — holat 🟢/🟡/🔴/⚪, oxirgi muvaffaqiyatli kun (`last_done_date`), navbatdagi kunlar (`pending_days`), xato hujjatlar (`failed_items`), «Tafsilot» → BO-23, ⚪ (sozlanmagan) bo'lsa «Sozlash» → BO-22; zaxira usulini o'zgartirish — "Bu o'zgarish faqat keyingi hisobot yili boshidan kuchga kiradi" tasdiqlash dialogi; tarozi shablonlari — `PATCH /stock-settings` (US-M09-06; PLU ro'yxati tarozi dasturiga BO-18 "PLU eksport (CSV)" orqali); "OFD: N ta chek yuborilmagan" qatori → ro'yxat + "Qayta urinish" (`POST /fiscal-receipts/{id}/retry`), kassalar fiskal modul holati (`fm_state`).
+- **Amallar**: Saqlash (`settings.tenant`) → `PATCH /tenant/settings`; soliq rejimi — `POST /tenant/tax-regimes` (40c); integratsiya kalitlari — `PUT /tenant/integrations/{provider}` (40d); zaxira usuli — `PATCH /valuation-settings` (`valuation.settings.manage`), javobdagi `pending_change.effective_from`ni ko'rsatish; «1C» qatori (Bosqich 7, `onec.view` bo'lsa) — holat 🟢/🟡/🔴/⚪, oxirgi muvaffaqiyatli kun (`last_done_date`), navbatdagi kunlar (`pending_days`), xato hujjatlar (`failed_items`), «Tafsilot» → BO-23, ⚪ (sozlanmagan) bo'lsa «Sozlash» → BO-22; zaxira usulini o'zgartirish — "Bu o'zgarish faqat keyingi hisobot yili boshidan kuchga kiradi" tasdiqlash dialogi; tarozi shablonlari — `PATCH /stock-settings` (US-M09-06; PLU ro'yxati tarozi dasturiga BO-18 "PLU eksport (CSV)" orqali); "OFD: N ta chek yuborilmagan" qatori → ro'yxat + "Qayta urinish" (`POST /fiscal-receipts/{id}/retry`), kassalar fiskal modul holati (`fm_state`).
 
 **Fiskal va to'lov integratsiyasi**: fiskal chek `FiscalPort` orqali — hamkor bulut API yoki do'kon Windows kompyuteridagi **Do'kon agenti** (fiskal modul ko'prigi, LAN printerlar va tarozi uchun ham — qaror #60); agent holati va ulash shu ekranda (1C moduli — shu agentning qo'shimcha imkoniyati, BO-22). Click/Payme/Uzum yoqilganda Egasi provayder kabinetida provayder tomonidagi avtomatik fiskallashtirish o'chirilganini tasdiqlaydi (`providerFiscalizationOff`) — aks holda bitta to'lovga ikki chek chiqadi; chekni har doim bizning kassa chiqaradi. UzQR: yuridik shaxs — bank UzQR (statik/dinamik, dinamik uchun kalit har kassa uchun alohida); yakka tadbirkor — to'lov tashkiloti maxsus QR'i.
+
+**"Do'kon agenti" bloki** (qaror #66, Bosqich 5): agentlar ro'yxati — `GET /api/v1/onec-agents` (W-01; nom, versiya, holat, `capabilities` — fiskal/printer); "Kompyuterni ulash" — ulash kodi bo'yicha PK ma'lumoti `GET /api/v1/onec-agents/pairing-requests/{user_code}` (W-03) → "Ulash" `POST /api/v1/onec-agents/pair` (W-04) yoki "Rad etish" `POST /api/v1/onec-agents/pairing-requests/{user_code}/deny` (agent poll'iga `access_denied`); "Uzish" — `POST /api/v1/onec-agents/{id}/revoke` (W-05); "Diagnostika" — `POST /api/v1/onec-agents/{id}/diagnostics-requests` (W-07); "Loglar" — `GET /api/v1/onec-agents/{id}/logs` (W-08). Ruxsatlar: ko'rish — `onec.view`, ulash/uzish/diagnostika — `onec.settings.manage` (Egasida bor, qaror #28). Kassaga bog'lash — BO-12 "Fiskal agent". BO-22 (1C) shu agentdan foydalanadi.
 
 **AI roziligi** (qaror #61): AI'ga shaxsiy maydonlar har doim maskalanadi (o'chirib bo'lmaydi); hujjat rasmlari (AI-03) maskalab bo'lmagani uchun faqat `ai_cross_border_enabled=true` bo'lsa yuboriladi — rozilik yo'q bo'lsa AI-03 o'chiq. Rozilikni faqat Egasi beradi/qaytarib oladi, har o'zgarish `consents` va audit'ga yoziladi. Rozilik va foydalanish shartlari matnining yuridik tasdig'i — 26 #127 (OQ-042).
 
 **"Sinxron istisnolari" bloki** (qaror #56 b): sinxronizatsiyada qabul qilingan, lekin istisno sifatida belgilangan voqealar (`sync_exceptions`) ro'yxati; har qator "Ko'rib chiqildi" — izoh majburiy (`POST /api/v1/sync-exceptions/{id}/review`, `reviewed_at/reviewed_by/review_note`, audit); provodkaga ta'sir qilmaydi. Shu yerda "Qayta hisoblash navbati" holat qatori (BO-08 ga havola).
-- **Ma'lumot manbai**: tenant sozlamalari — `GET/PATCH /api/v1/tenant/settings` (`marking_precheck`, `supplier_overpay_policy`, `vat_diff_tolerance_amount`; `ai_cross_border_enabled` — faqat o'qish, o'zgarishi `POST /api/v1/tenant/consents` orqali); zaxira usuli — `GET/PATCH /api/v1/valuation-settings`; tarozi — `GET/PATCH /api/v1/stock-settings`; OFD — `GET /api/v1/fiscal-receipts?status=failed` + `POST /api/v1/fiscal-receipts/{id}/retry`; sinxron istisnolari — `GET /api/v1/sync-exceptions`, `POST /api/v1/sync-exceptions/{id}/review`; 1C qatori — `GET /api/v1/onec-status` (W-55, `33-1c-integratsiya.md` §10).
+- **Ma'lumot manbai**: tenant sozlamalari — `GET/PATCH /api/v1/tenant/settings` (`marking_precheck`, `supplier_overpay_policy`, `vat_diff_tolerance_amount`; `ai_cross_border_enabled` — faqat o'qish, o'zgarishi `POST /api/v1/tenant/consents` orqali); soliq rejimi — `POST /api/v1/tenant/tax-regimes` (40c); integratsiyalar — `PUT /api/v1/tenant/integrations/{provider}` (40d); zaxira usuli — `GET/PATCH /api/v1/valuation-settings`; tarozi — `GET/PATCH /api/v1/stock-settings` (`catalog.manage`); Do'kon agenti — W-01, W-03, W-04, W-05, W-07, W-08 (`33-1c-integratsiya.md` §10); OFD — `GET /api/v1/fiscal-receipts?status=failed` + `POST /api/v1/fiscal-receipts/{id}/retry`; sinxron istisnolari — `GET /api/v1/sync-exceptions`, `POST /api/v1/sync-exceptions/{id}/review`; 1C qatori — `GET /api/v1/onec-status` (W-55, `33-1c-integratsiya.md` §10).
 - **Holatlar**: `loading` · `empty` (sozlanmagan) · `error` (integratsiya ulanmagan) · `offline` (faqat ko'rish) · `no-permission` — faqat Egasida · `subscription-restricted` — kirilmaydi.
 - **Klaviatura**: `Ctrl+K`.
 - **Audit/analitika**: `tenant_settings_updated`, `costing_method_change_scheduled`, `integration_connected`, `fiscal_receipt.retry_requested`, `consent.ai_cross_border_changed`, `sync_exception.reviewed`, `marking_precheck_changed`.
@@ -1138,26 +1170,30 @@ Filial ichida "Kassalar" ro'yxati: har bir kassa qatorida soliq ro'yxatidan o'ti
 ## BO-15 — Kiruvchi va chiquvchi e-faktura markazi
 
 - **Maqsad**: kiruvchi e-fakturalarni qabul/E-IMZO imzolash, chiquvchi (B2B nasiya + chekdan keyingi) e-fakturalarni boshqarish.
-- **Rollar/ruxsat**: Buxgalter (`purchases.post` — kiruvchi ro'yxat/qabul/rad, `einvoice.sign` — imzolash/chiquvchi, `purchases.receive` — e-fakturadan kirim).
+- **Rollar/ruxsat**: Buxgalter (`purchases.post` — kiruvchi ro'yxat/qabul/rad, `einvoice.create` — chiquvchi e-faktura yaratish, `einvoice.sign` — imzolash/yuborish/bekor qilish, `purchases.receive` — e-fakturadan kirim va kiruvchi e-TTN).
 - **Route**: `/app/einvoices`
 - **Maket**: `06-ekranlar-umumiy.md` §6 BO-15 wireframe'i.
 - **Maydonlar**: `receiptSearch` — Chekni qidirish (chekdan e-faktura chiqarishda) — Поиск чека — `Input` — ha — chek raqami/sana; `riskFlag` — Xavf darajasi — Уровень риска — `Select` (qo'lda belgilash, `unknown` bo'lganda) — `green|red`.
 - **Xavf darajasi** (VM 830): kiruvchi e-faktura `risk_flag` — `green` / `red` / `unknown` (standart). Faktura.uz API'si xavf maydonini qaytarmaydi — `unknown` QQS krediti uchun **qizil kabi** (to'lovgacha kechiktiriladi) hisoblanadi; Buxgalter my.soliq.uz kabinetidan ko'rib qo'lda `green`/`red` belgilaydi (audit). Operator tasdig'i — 26 #47 (OQ-019).
-- **Chiquvchi e-faktura**: jismoniy shaxsga chek berilgan sotuvda e-faktura kerak emas; yuridik shaxs (B2B) va bank o'tkazmasi bilan to'laydigan yakka tadbirkorga — majburiy.
+- **Chiquvchi e-faktura**: jismoniy shaxsga chek berilgan sotuvda e-faktura kerak emas; yuridik shaxsga (B2B, `counterparty.kind='company'`; STIR'li YaTT ham `company` sifatida kiritiladi) — majburiy.
 - **Qo'shimcha (salbiy) e-faktura**: yetkazib beruvchiga qaytarishda yetkazib beruvchi chiqargan qo'shimcha e-faktura (`factura_type=additional`, `related_einvoice_id` — asl e-faktura) shu yerda qabul qilinadi; qabul qilingan davrda kiruvchi QQS kamaytiriladi.
-- **E-ishonchnomalar**: do'kon bergan e-ishonchnomalar holati (yuborildi / yetkazib beruvchi tasdiqladi / rad) — BO-04 dan berilgan.
+- **E-ishonchnomalar**: do'kon bergan e-ishonchnomalar ro'yxati — manba `GET /api/v1/powers-of-attorney?status=`; holatlar `draft` (Qoralama), `pending_signature` (Imzo kutilmoqda), `sending` (Yuborilmoqda), `sent` (Yuborildi), `accepted` (Yetkazib beruvchi tasdiqladi), `rejected` (Rad etildi), `cancelled` (Bekor qilindi), `failed` (Xato — qayta imzolash/yuborish); BO-04 dan berilgan.
+- **Kiruvchi e-TTN**: `GET /api/v1/ettn-documents?direction=in` ro'yxati — "Tasdiqlash"/"Rad etish" amallari.
 - **Amallar**:
 
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
 |---|---|---|---|
 | Qabul qilish | `purchases.post` | Yo'q | `POST /api/v1/einvoices/{id}/accept` |
 | Rad etish | `purchases.post` | Sabab majburiy | `POST /api/v1/einvoices/{id}/reject` (`{reason}`) |
-| E-IMZO imzo | `einvoice.sign` | Sertifikat/parol | `POST /api/v1/einvoices/{id}/sign-challenge` → E-IMZO → `POST /api/v1/einvoices/{id}/submit-signed`, EDO operatoriga yuborish |
-| Chek asosida e-faktura chiqarish | `einvoice.sign` | Yo'q | `POST /api/v1/einvoices/from-receipt` — `{sale_id, counterparty_id}`; `einvoices.related_doc_type`/`related_doc_id` bilan chekka bog'langan yangi hujjat, QQS qayta hisoblanmaydi; xatolar `EINVOICE_ALREADY_LINKED`, `EINVOICE_AMOUNT_EXCEEDS_RECEIPT`, `EINVOICE_COUNTERPARTY_INCOMPLETE` (→ BO-06 "Mijoz kartasi"ga havola, E-06) |
+| E-IMZO imzo | `einvoice.sign` | Sertifikat/parol | `POST /api/v1/einvoices/{id}/sign-challenge` → E-IMZO → `POST /api/v1/einvoices/{id}/submit-signed` → `POST /api/v1/einvoices/{id}/send` |
+| Yuborish (chiquvchi) | `einvoice.sign` | Yo'q | `POST /api/v1/einvoices/{id}/send` |
+| Bekor qilish (chiquvchi) | `einvoice.sign` | Sabab majburiy | `POST /api/v1/einvoices/{id}/cancel` |
+| Kiruvchi e-TTN: Tasdiqlash / Rad etish | `purchases.receive` + `einvoice.sign` | E-IMZO; rad etishda sabab | `POST /api/v1/ettn-documents/{id}/sign-challenge?action=accept\|reject` → `POST /api/v1/ettn-documents/{id}/accept` \| `/reject` |
+| Chek asosida e-faktura chiqarish | `einvoice.create` | Yo'q | `POST /api/v1/einvoices/from-receipt` — `{sale_id, counterparty_id}`; `einvoices.related_doc_type`/`related_doc_id` bilan chekka bog'langan yangi hujjat, QQS qayta hisoblanmaydi; xatolar `EINVOICE_ALREADY_LINKED`, `EINVOICE_AMOUNT_EXCEEDS_RECEIPT`, `EINVOICE_COUNTERPARTY_INCOMPLETE` (→ BO-06 "Mijoz kartasi"ga havola, E-06) |
 | Kirim yaratish | `purchases.receive` | Yo'q | `POST /goods-receipts/from-einvoice/{einvoice_id}` (US-M07-03) |
-| Xavf darajasini belgilash | `purchases.post` | «Kabinetda tekshirdingizmi?» | `PATCH /api/v1/einvoices/{id}/risk-flag` (`risk_flag`), audit |
+| Xavf darajasini belgilash | `purchases.post` | «Kabinetda tekshirdingizmi?» + `note` (`Textarea`, majburiy) | `PATCH /api/v1/einvoices/{id}/risk-flag` (`{risk_flag, note}`), audit |
 
-- **Ma'lumot manbai**: `GET /api/v1/einvoices?direction=in|out`, `POST /api/v1/einvoices` (B2B nasiya sotuvdan avtomatik qoralama), `POST /api/v1/einvoices/{id}/sign-challenge` → `POST /api/v1/einvoices/{id}/submit-signed`, `POST /api/v1/einvoices/{id}/accept`/`reject`, `POST /api/v1/einvoices/from-receipt`, `POST /goods-receipts/from-einvoice/{einvoice_id}`.
+- **Ma'lumot manbai**: `GET /api/v1/einvoices?direction=in|out`, `POST /api/v1/einvoices` (`einvoice.create`; B2B sotuv qoralamasini server `sale.created` postingida o'zi yaratadi), `POST /api/v1/einvoices/{id}/sign-challenge` → `POST /api/v1/einvoices/{id}/submit-signed`, `POST /api/v1/einvoices/{id}/send`, `POST /api/v1/einvoices/{id}/cancel`, `POST /api/v1/einvoices/{id}/accept`/`reject`, `GET /api/v1/ettn-documents?direction=in`, `GET /api/v1/powers-of-attorney?status=`, `POST /api/v1/einvoices/from-receipt`, `POST /goods-receipts/from-einvoice/{einvoice_id}`.
 - **Holatlar**: `loading` · `empty` (faktura yo'q) · `error` (E-IMZO imzolashda xato — sertifikat/parol; `EINVOICE_ALREADY_LINKED`/`EINVOICE_AMOUNT_EXCEEDS_RECEIPT`/`EINVOICE_COUNTERPARTY_INCOMPLETE`) · `offline` (faqat ko'rish, imzolash internet talab qiladi) · `no-permission` — faqat Buxgalterda · `subscription-restricted` — kirilmaydi.
 - **Klaviatura**: `Ctrl+K`.
 - **Audit/analitika**: `einvoice_signed`, `einvoice_accepted`, `einvoice_rejected`, `einvoice_from_receipt_created`, `goods_receipt.created_from_einvoice`, `einvoice.risk_flag_set`.
@@ -1168,7 +1204,7 @@ Filial ichida "Kassalar" ro'yxati: har bir kassa qatorida soliq ro'yxatidan o'ti
 ## BO-16 — Tasdiqlash navbati (limitdan oshgan so'rovlar)
 
 - **Maqsad**: chegirma/qaytarish/nasiya/narx/katta pul olish/katta xarajat/limitdan katta hisobdan chiqarish so'rovlarini bitta navbatda ko'rish va PIN bilan tasdiqlash.
-- **Rollar/ruxsat**: Egasi, Menejer — `kind`ga mos: `discount.approve` / `returns.approve` / `debts.approve` / `prices.approve` / `cash.withdraw` (limit) / `expenses.approve`; foydalanuvchi faqat o'z `*.approve` huquqiga mos `kind`ni ko'radi.
+- **Rollar/ruxsat**: Egasi, Menejer — `kind`ga mos: `discount.approve` / `returns.approve` / `debts.approve` / `prices.approve` / `cash.withdraw` (limit) / `expenses.approve` / `stock.writeoff` (`write_off_over_limit`); foydalanuvchi faqat o'z `*.approve` huquqiga mos `kind`ni ko'radi.
 - **Route**: `/app/approvals`
 - **Maket**: `06-ekranlar-umumiy.md` §6 BO-16 wireframe'i + `kind` ustuni (chegirma/qaytarish/nasiya/narx/pul olish/**katta xarajat**/**limitdan katta hisobdan chiqarish**).
 - **Maydonlar**: `pin` — PIN — PIN — `Input` (4–6 raqam) — ha (tasdiqlashda) — raqam.
@@ -1208,13 +1244,14 @@ Filial ichida "Kassalar" ro'yxati: har bir kassa qatorida soliq ro'yxatidan o'ti
 |---|---|---|---|---|---|---|---|
 | `amount` | Summa | Сумма | `MoneyInput` | Ha | >0 | — | — |
 | `categoryId` | Toifa | Категория | `Select` (`GET /expense-categories`dan, UUID) | Ha | — | — | — |
-| `source` | To'lov manbai | Источник оплаты | `Select` | Ha | `bank\|card` (naqd xarajat BO-17'da emas — POS-14 `expense` orqali yoziladi) | — | — |
-| `note` | Izoh | Комментарий | `Textarea` | Yo'q | — | — | 200 |
+| `taxType` | Soliq turi | Вид налога | `Select` | Toifa `default_account=6410` bo'lsa Ha, aks holda yashirin | `vat\|turnover\|pit\|social\|property\|land\|other` | — | — |
+| `source` | To'lov manbai | Источник оплаты | `Select` | Ha | `bank\|card` (naqd xarajat BO-17'da emas — POS-14 "Xarajat" rejimi, `expense.created` orqali yoziladi) | — | — |
+| `comment` | Izoh | Комментарий | `Textarea` | Yo'q | — | — | 1000 |
 | `receiptPhoto` | Hujjat fotosi | Фото документа | Fayl yuklash (`POST /attachments`) | Yo'q | JPEG/PNG ≤10MB | — | — |
 | `period` | Takrorlanish davri | Период повторения | `Select` | Yo'q | `none\|month\|quarter\|year` | `none` | — |
 | `dayOfMonth` | Oyning kuni | День месяца | `Input` number | Takrorlanuvchida Ha | 1–28 | — | 28 |
 
-- **Amallar**: + Xarajat qo'shish (`expenses.create`); takrorlanuvchi xarajat eslatmasini tasdiqlash ("Ijara to'lash vaqti" — bir bosishda, `POST /api/v1/recurring-expenses/{id}/confirm`); O'tkazish (`POST /api/v1/expenses/{id}/post`, limitdan oshsa «Egasi tasdig'iga yuborildi»); Bekor qilish (`POST /api/v1/expenses/{id}/cancel`, sabab).
+- **Amallar**: + Xarajat qo'shish (`expenses.create`); takrorlanuvchi xarajat eslatmasini tasdiqlash ("Ijara to'lash vaqti" — bir bosishda, `POST /api/v1/recurring-expenses/{id}/confirm`); O'tkazish (`POST /api/v1/expenses/{id}/post`, limitdan oshsa «Egasi tasdig'iga yuborildi»); Bekor qilish (`POST /api/v1/expenses/{id}/cancel`, `cancel_reason` — majburiy, 3–500 belgi).
 - **Ma'lumot manbai**: `GET/POST /api/v1/expenses` + `POST /api/v1/expenses/{id}/post`, `POST /api/v1/expenses/{id}/cancel`, `GET /api/v1/expense-categories`, `POST /api/v1/attachments`; `GET/POST /api/v1/recurring-expenses`, `PATCH /{id}`, `POST /api/v1/recurring-expenses/{id}/confirm`.
 - **Holatlar**: `loading` · `empty` (xarajat yo'q) · `error` — standart validatsiya · `offline` (faqat ko'rish; kassadan to'langan xarajat POSda yoziladi) · `no-permission` — Kassir/Omborchiga yopiq · `subscription-restricted` — kirilmaydi.
 - **Klaviatura**: `Ctrl+K`.
@@ -1240,7 +1277,7 @@ Filial ichida "Kassalar" ro'yxati: har bir kassa qatorida soliq ro'yxatidan o'ti
 
 - **Maydonlar**: `template` — Shablon — Шаблон — `Select` (58×40 asosiy narx yorlig'i, 58×30, 43×25, 40×30, 30×20 mm; A4 varaq — 3×8 yoki 4×10 to'r, oddiy printer uchun) — ha — default 58×40; `selectedProducts` — `Checkbox` ro'yxat — ha (≥1).
 - **Chop etish usuli**: brauzerda HTML/SVG + `bwip-js` (shtrix moduli 203 dpi uchun butun nuqtaga yaxlitlanadi), CSS `@page { size: Wmm Hmm; margin: 0 }`, yorliq printerining tizim drayveri orqali (drayverda qog'oz o'lchami bir marta sozlanadi — onboarding yo'riqnomasi); xom TSPL/ZPL buyruqlari MVP'da yo'q. Server PDF — faqat >200 yorliq yoki iOS uchun (qaror #54).
-- **Amallar**: Ichki shtrix-kod yaratish (`catalog.manage`) → `POST /api/v1/products/{id}/barcodes/internal-generate`; CHOP ETISH (`labels.print`) → chop etilgandan keyin `POST /api/v1/label-print-queue/mark-printed`; **PLU eksport (CSV)** (`labels.print`) — tarozi uchun PLU ro'yxati (PLU kodi, nom, narx, yaroqlilik muddati) vendor dasturiga (CL-Works, Shtrih Loader, Rongta) import qilish uchun; to'g'ridan-to'g'ri tarozi yuklash brauzerdan mumkin emas.
+- **Amallar**: Ichki shtrix-kod yaratish (`catalog.manage`) → `POST /api/v1/products/{id}/barcodes/internal-generate`; CHOP ETISH (`labels.print`) → chop etilgandan keyin `POST /api/v1/label-print-queue/mark-printed`; **PLU eksport (CSV)** (`catalog.manage`) — tarozi uchun PLU ro'yxati (PLU kodi, nom, narx, yaroqlilik muddati) vendor dasturiga (CL-Works, Shtrih Loader, Rongta) import qilish uchun; to'g'ridan-to'g'ri tarozi yuklash brauzerdan mumkin emas.
 - **Ma'lumot manbai**: `GET /api/v1/label-print-queue`, `GET /api/v1/label-templates`, `POST /api/v1/products/{id}/barcodes/internal-generate`, `POST /api/v1/label-print-queue/mark-printed`, PLU eksport — `GET /api/v1/stock-settings/plu-export`; chop etish — `react-to-print` + `bwip-js` (frontendda); >200 yorliq yoki iOS — server PDF.
 - **Holatlar**: `loading` · `empty` (chop etiladigan yorliq yo'q) · `error` (printer topilmadi) · `offline` (lokal printer bilan ishlaydi) · `no-permission` — Kassir/Omborchiga yopiq · `subscription-restricted` — kirilmaydi.
 - **Klaviatura**: `Ctrl+K`.
@@ -1268,9 +1305,10 @@ Filial ichida "Kassalar" ro'yxati: har bir kassa qatorida soliq ro'yxatidan o'ti
 └──────────────────────────────────────────────────┘
 ```
 
-- **Maydonlar**: `billingCycle` — To'lov davri — Период оплаты — `Select` (`monthly\|yearly`, yillik −20%) — ha; `extraRegisters` — Qo'shimcha kassa soni — Количество дополнительных касс — **+/− stepper** — yo'q — ≥0.
+- **Maydonlar**: `billingCycle` — To'lov davri — Период оплаты — `Select` (`month\|year`; yillik −20% faqat asosiy tarifga) — ha; to'lov summasi (`amount_breakdown` dan, qaror #70): oy — `99000 + 39000 × extraRegisters`, yil — `950400 + 39000 × 12 × extraRegisters`; `extraRegisters` — Qo'shimcha kassa soni — Количество дополнительных касс — **+/− stepper** — yo'q — ≥0.
 - **Amallar**: + Qo'shimcha kassa — oshirish `POST /billing/addons` (`{addon_code:"extra_register", quantity}`); kamaytirish — `POST /billing/addons/extra_register/reduce` (`{quantity}`) (`requires_archiving` bo'lsa BO-12ga yo'naltirish); TO'LASH (Click/Payme checkout, tana `{provider:"click"|"payme", period:"month"|"year"}`); Kvitansiya — `GET /billing/invoices/{payment_id}`.
-- **Ma'lumot manbai**: `GET /api/v1/billing/addons`, `GET /api/v1/billing/plan`, `GET /api/v1/ai/usage` (`pct_used` — "AI limiti: {pct_used}% ishlatildi", token qaytaradi), `POST /billing/checkout`, `GET /api/v1/billing/invoices/{payment_id}`.
+- **Ma'lumot manbai**: `GET /api/v1/billing/addons`, `GET /api/v1/billing/plan`, `GET /api/v1/ai/usage` (`pct_used` — "AI limiti: {pct_used}% ishlatildi", token qaytaradi), `POST /billing/checkout` (javobda `amount`, `amount_breakdown = {plan, period, addons:[{code, qty, unit_price, months}], discount}`), `GET /api/v1/billing/subscription`, `GET /api/v1/billing/payments` (to'lovlar tarixi), `GET /api/v1/billing/invoices/{payment_id}`.
+- **Obuna holatlari** (qaror #70): `trial` (30 kun) → `grace` (24 soat) → `restricted`; to'lov → `active`; muvaffaqiyatli to'lovda `new_end = max(current_period_end, now()) + 1 oy | 12 oy`; `closed` — faqat platforma admini (avtomatik yo'q).
 - **Holatlar**: `loading` · `empty` — yo'q (har doim obuna mavjud) · `error` (to'lov o'tmadi) · `offline` (faqat ko'rish) · `no-permission` — faqat Egasida · `subscription-restricted` — bu ekran `restricted` holatda **ochilmaydi** — sessiya bekor qilingan; to'lov faqat BO-01'ning `reason=subscription_expired` variantidagi `GET /billing/pay` tor sahifasida · **`subscription-grace`** — to'liq ishlaydi.
 - **Klaviatura**: `Ctrl+K`.
 - **Audit/analitika**: `billing_checkout_started`, `subscription_payment_succeeded`, `extra_register_added`, `extra_register_removed`, `billing_invoice_viewed`.
@@ -1331,7 +1369,8 @@ Filial ichida "Kassalar" ro'yxati: har bir kassa qatorida soliq ro'yxatidan o'ti
 | ① | `signupMethod` | Usul | Способ | Tugmalar: "Telefon + parol" / "**Google bilan kirish**" | Ha | — | Telefon + parol | — |
 | ①-telefon | `phone` | Telefon | Телефон | `Input` mask | Ha (telefon yo'li) | `+998` | — | 17 |
 | ①-telefon | `otp` | Tasdiqlash kodi | Код подтверждения | `Input` 6 raqam | Ha (telefon yo'li) | 6 raqam, 5 daq TTL; kod **Telegram bot**ga yuboriladi, foydalanuvchi hali botga ulanmagan bo'lsa bot havolasi ko'rsatiladi; Telegram mavjud bo'lmasa **SMS** (zaxira) | — | 6 |
-| ①-telefon | `password` | Parol | Пароль | `Input type=password` | Ha (telefon yo'li) | ≥8 belgi | — | 128 — login telefon+parol bilan, parolsiz hisob kira olmaydi |
+| ①-telefon | `password` | Parol | Пароль | `Input type=password` | Ha (telefon yo'li) | 8–128 belgi (`14` §4) | — | 128 — login telefon+parol bilan, parolsiz hisob kira olmaydi |
+| ① | `ownerName` | Ism | Имя | `Input` | Ha | 2–100 | — | 100 |
 | ①-Google | — | — | — | Google OIDC redirect tugmasi | Ha (Google yo'li) | — | — | Qaytgandan keyin telefon raqami (STIR/fiskal uchun) so'raladi |
 | ② | `storeName` | Do'kon nomi | Название магазина | `Input` | Ha | 2–100 | — | 100 |
 | ② | `businessType` | Faoliyat turi | Вид деятельности | `Select` | Ha | Ro'yxatdan biri | — | — |
@@ -1348,15 +1387,15 @@ Filial ichida "Kassalar" ro'yxati: har bir kassa qatorida soliq ro'yxatidan o'ti
 
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
 |---|---|---|---|
-| Davom (① dan keyin) | — | Yo'q | `POST /auth/signup` (A-01) — tenant ①② dan keyin darhol yaratiladi, ③–⑥ dan oldin (aks holda import qiladigan tenant yo'q); ② da `tenants.accepted_terms_version/accepted_terms_at/accepted_terms_ip` va (rozilik berilgan bo'lsa) `POST /api/v1/tenant/consents` → `consents` yozuvi + `settings.ai_cross_border_enabled=true` (qaror #61) |
-| Davom (boshqa bosqich) | — | Yo'q | Keyingi bosqich |
+| Davom (② dan keyin) | — | Yo'q | `POST /auth/signup` `{phone\|google_id_token, otp, password, owner_name, store_name, business_type, legal_form, accepted_terms_version, ai_cross_border_consent}` — tenant ①② dan keyin darhol yaratiladi, ③–⑥ dan oldin (aks holda import qiladigan tenant yo'q); ② da `tenants.accepted_terms_version/accepted_terms_at/accepted_terms_ip` va (rozilik berilgan bo'lsa) `POST /api/v1/tenant/consents` → `consents` yozuvi + `settings.ai_cross_border_enabled=true` (qaror #61) |
+| Davom (①, ③–⑥ bosqichlarida) | — | Yo'q | Keyingi bosqich |
 | Orqaga | — | Yo'q | Oldingi bosqich |
 | O'tkazib yuborish (④,⑤,⑥ bosqichlarida) | — | Yo'q | Keyinroq sozlamalarda bajarish mumkin |
 | Yakunlash | — | Yo'q | 30 kunlik sinov boshlangan, BO-02ga yo'naltiriladi |
 
-- **UX-INSTALL (⑥ bosqich)**: `<InstallGuide embedded />` — bu bosqich endi alohida `/install` route'ini ichiga oladi (nusxasi emas), batafsil — yuqoridagi **UX-INSTALL** bo'limi.
+- **UX-INSTALL (⑥ bosqich)**: `<InstallGuide embedded />` — bu bosqich `/install` route'ini ichiga oladi (nusxasi emas), batafsil — yuqoridagi **UX-INSTALL** bo'limi.
 - **Owner Telegram link**: ⑤ bosqichda (yoki keyin BO-20 orqali) "Telegram botni ulash" tezkor havolasi — BO-20 bilan bir xil oqim, lekin onboarding ichida qisqartirilgan (faqat QR, batafsil sozlama BO-20da).
-- **Ma'lumot manbai**: `POST /auth/signup` (A-01, telefon yo'li) yoki `GET /auth/google/start` → `GET /auth/google/callback` (Google yo'li, qaror #34); `POST /auth/otp/request` (`purpose=signup`, Telegram bot birinchi/SMS zaxira) + `POST /auth/otp/verify`; Excel/CSV: `GET /api/v1/import-jobs/templates/products` → `POST /api/v1/import-jobs` (`kind=products`) → `/validate` → `/commit`; qo'lda — `POST /api/v1/products`; boshlang'ich qoldiq — `POST /api/v1/import-jobs` (`kind=opening_stock`) yoki qo'lda `POST /stock-openings`; boshlang'ich qarzlar — `POST /api/v1/import-jobs` (`kind=opening_debts`) → `/validate` → `/commit`, qo'lda — `POST /api/v1/debt-openings` → `/post`; AI-03 foto — `POST /api/v1/attachments` → `POST /api/v1/ai/ocr/jobs` (`doc_type_hint=catalog`), ruxsat `ai.ocr.use`.
+- **Ma'lumot manbai**: `POST /auth/signup` (telefon yo'li) yoki `GET /auth/google/start` → `GET /auth/google/callback` (Google yo'li, qaror #34); `POST /auth/otp/request` (`purpose=signup`, Telegram bot birinchi/SMS zaxira) + `POST /auth/otp/verify`; Excel/CSV: `GET /api/v1/import-jobs/templates/products` → `POST /api/v1/import-jobs` (`kind=products`) → `/validate` → `/commit`; qo'lda — `POST /api/v1/products`; boshlang'ich qoldiq — `POST /api/v1/import-jobs` (`kind=opening_stock`) yoki qo'lda `POST /stock-openings`; boshlang'ich qarzlar — `POST /api/v1/import-jobs` (`kind=opening_debts`) → `/validate` → `/commit`, qo'lda — `POST /api/v1/debt-openings` → `/post`; AI-03 foto — `POST /api/v1/attachments` → `POST /api/v1/ai/ocr/jobs` (`doc_type_hint=catalog`) → poll `GET /api/v1/ai/ocr/jobs/{id}` → `POST /api/v1/ai/ocr/jobs/{id}/confirm`, ruxsat `ai.ocr.use` + `catalog.manage`.
 - **Holatlar**: `loading` (OTP kutilmoqda — Telegram yoki SMS) · `empty` — yo'q (wizard har doim bo'sh boshlanadi) · `error` (OTP kelmadi — qayta yuborish/zaxira kanalga o'tish, `OTP_INVALID`, telefon allaqachon ro'yxatda — `VALIDATION_ERROR`; Google yo'lida — "Google autorizatsiyasi muvaffaqiyatsiz") · `offline` — wizard online talab qiladi (ro'yxatdan o'tish) · `no-permission` — yo'q · `subscription-restricted` — tegishli emas (hali obuna yo'q, 30 kun sinov avtomatik). (qaror #34)
 - **Klaviatura**: `Enter` keyingi bosqichga o'tadi.
 - **Audit/analitika**: `onboarding_started`, `onboarding_step_completed`, `onboarding_completed`, `onboarding_skipped_step`, `terms_accepted`, `consent.ai_cross_border_changed`.
@@ -1399,7 +1438,7 @@ Filial ichida "Kassalar" ro'yxati: har bir kassa qatorida soliq ro'yxatidan o'ti
 | Maydon | Label (uz) | Label (ru) | Tur/komponent | Majburiy | Validatsiya | Default | Max |
 |---|---|---|---|---|---|---|---|
 | `user_code` | Ulash kodi | Код подключения | `Input` (mask `XXXX-XXXX`) | Ha (ulashda) | 8 belgi, alifbo `BCDFGHJKLMNPQRSTVWXZ` | — | 9 |
-| `agent_name` | Kompyuter nomi | Имя компьютера | `Input` | Yo'q | — | `pc_name` | 64 |
+| `name` | Kompyuter nomi | Имя компьютера | `Input` | Yo'q | — | `pc_name` | 64 |
 | `write_enabled` | 1C ga yozishga ruxsat | Разрешить запись в 1С | `Switch` | — | faqat `ready`/`error` holatidagi bazada yoqiladi | o'chiq | — |
 | `branch_bindings[].base_id` | Filial → 1C bazasi | Филиал → база 1С | `Select` | Yo'q | bitta filial — bitta faol baza | — | — |
 | `bound_from` | Qaysi sanadan | С какой даты | `DatePicker` | Ha (bog'lashda) | ≥ `start_date` | — | — |
@@ -1508,8 +1547,8 @@ Filial ichida "Kassalar" ro'yxati: har bir kassa qatorida soliq ro'yxatidan o'ti
 | Qayta solishtirish | `onec.export.prepare` | Yo'q | `POST /api/v1/onec-export-batches/{id}/reconcile` (W-50) |
 | Moslash / 1C da yaratish | `onec.mapping.edit` / `onec.refs.create` | Yo'q | BO-22 `?tab=mapping` (`params.by_entity` filtri bilan) |
 
-- **Ma'lumot manbai**: `GET /api/v1/onec-export-batches` (W-34), `GET /api/v1/onec-export-batches/calendar` (W-35, oy kalendari), `GET /api/v1/onec-export-batches/{id}` (W-37 — `preview`, `readiness`, `blocking_issues`, `warnings`, `preview_hash`), `GET /api/v1/onec-export-batches/{id}/items` (W-38), `GET /api/v1/onec-export-batches/{id}/items/{item_id}` (W-39 — 1C ning asl xabari, o'zbekcha izoh, maslahat), `GET /api/v1/onec-export-batches/{id}/events` (W-51); progress — har 2 s so'rov, faqat `queued`/`sending`/`verifying` holatida (SSE — keyinroq); sarlavha chipi — `GET /api/v1/onec-status` (W-55).
-- **Holatlar**: `loading` · `empty` (`not_prepared` — «Kun tayyorlanmagan» + [Tayyorlash]; hujjat yo'q — «Bu kunda 1C ga yuboriladigan hujjat yo'q»; 1C bazasi ulanmagan — BO-22 ga havola) · `blocked` (`blocking_issues` — qizil checklist, «1C ga yuborish» o'chiq) · `waiting` (`approved`/`queued` — «Navbatda: oldingi kunlar / kompyuter o'chiq») · `progress` (`sending`/`verifying`, hujjat stepper: kutilmoqda / yozilmoqda / ✓ № … / ⚠ qayta urinish n/8 / ✗ xato + maslahat) · `success` (yashil banner, 1C raqamlari) · `partial` (sariq, xatolar ro'yxati, [Faqat xatolarni qayta yuborish]) · `mismatch` (ERP vs 1C farq jadvali) · `failed` · `stale` (`needs_resync` — «N ta kech hujjat — revision tavsiya etiladi») · `error` (API) · `offline` (faqat ko'rish) · `no-permission` (Kassir/Omborchi; Menejer — faqat ko'rish) · `subscription-restricted` (kirilmaydi). Kalendar ranglari (`08-dizayn-tizimi.md`): 🟩 `done`; 🟨 `partial`/`mismatch`/`failed`; 🟦 `approved`/`queued`/`sending`/`verifying`; 🟪 `preview` (tasdiq kutmoqda); 🟥 bloklangan (`blocking_issues`); ⬜ `not_prepared`; bo'sh — hujjat yo'q.
+- **Ma'lumot manbai**: `GET /api/v1/onec-export-batches` (W-34), `GET /api/v1/onec-export-batches/calendar` (W-35, oy kalendari), `GET /api/v1/onec-export-batches/{id}` (W-37 — `preview`, `readiness`, `blocking_issues`, `warnings`, `preview_hash`), `GET /api/v1/onec-export-batches/{id}/items` (W-38; ExportItem ustunlari stepper uchun `attempts`/`max_attempts` — «qayta urinish n/8», `progress` — yozish foizi), `GET /api/v1/onec-export-batches/{id}/items/{item_id}` (W-39 — 1C ning asl xabari, o'zbekcha izoh, maslahat), `GET /api/v1/onec-export-batches/{id}/events` (W-51); progress — har 2 s so'rov, faqat `queued`/`sending`/`verifying` holatida (SSE — keyinroq); sarlavha chipi — `GET /api/v1/onec-status` (W-55), agent nomi/versiyasi — W-37 `agent.name`, `agent.agent_version`.
+- **Holatlar**: `loading` · `empty` (`not_prepared` — «Kun tayyorlanmagan» + [Tayyorlash]; hujjat yo'q — «Bu kunda 1C ga yuboriladigan hujjat yo'q»; 1C bazasi ulanmagan — BO-22 ga havola) · `blocked` (`blocking_issues` — qizil checklist, «1C ga yuborish» o'chiq) · `waiting` (`approved`/`queued` — «Navbatda: oldingi kunlar / kompyuter o'chiq») · `progress` (`sending`/`verifying`, hujjat stepper: kutilmoqda / yozilmoqda / ✓ № … / ⚠ qayta urinish n/8 / ✗ xato + maslahat) · `success` (yashil banner, 1C raqamlari) · `partial` (sariq, xatolar ro'yxati, [Faqat xatolarni qayta yuborish]) · `mismatch` (ERP vs 1C farq jadvali) · `failed` · `stale` (`needs_resync` — «N ta kech hujjat — revision tavsiya etiladi») · `error` (API) · `offline` (faqat ko'rish) · `no-permission` (Kassir/Omborchi; Menejer — faqat ko'rish) · `subscription-restricted` (kirilmaydi). Kalendar ranglari (`08-dizayn-tizimi.md`): 🟩 `done`; 🟨 `partial`/`mismatch`/`failed`; 🟦 `approved`/`queued`/`sending`/`verifying`; 🟪 `preview` (tasdiq kutmoqda); 🟥 bloklangan (`blocking_issues`); ⬜ `not_prepared` / `draft` / `cancelled`; bo'sh — hujjat yo'q.
 - **Klaviatura**: `Ctrl+K`; `←/→` — oldingi/keyingi kun; `Ctrl+Enter` — «1C ga yuborish» dialogini ochish (faqat ruxsat va tayyorlik bo'lsa).
 - **Audit/analitika**: audit (`33` §11.3) — `onec.export.prepared`, `onec.export.approved`, `onec.export.auto_approved`, `onec.export.cancelled`, `onec.export.resent`, `onec.export.item_skipped`, `onec.export.accepted`, `onec.export.revision_created`, `onec.export.correction_created`, `onec.export.devices_excluded`, `onec.item.*`; analitika — `onec_export_approved` (soni, summa), `onec_export_duration_ms`.
 - **Bog'liq US**: US-M19-06, US-M19-07, US-M19-08, US-M19-09, US-M19-10, US-M19-11, US-M19-12, US-M19-14, US-M19-15, US-M19-16, US-M19-18.
@@ -1551,7 +1590,8 @@ Filial ichida "Kassalar" ro'yxati: har bir kassa qatorida soliq ro'yxatidan o'ti
 | `settled_to` | Davr oxiri | Период по | `DatePicker` | Ha | ≥ `settled_from` | kecha | — |
 | `gross_amount` | Yalpi summa (yo'ldagi puldan yopiladi) | Валовая сумма | `MoneyInput` | Ha | > 0; `post`da filial × usul bo'yicha `doc_date` holatidagi yo'ldagi pul qoldig'idan oshmaydi | tanlangan usul/filial yo'ldagi pul qoldig'i (taklif) | — |
 | `commission_amount` | Komissiya | Комиссия | `MoneyInput` | Ha | ≥ 0 va < `gross_amount` | `0.00` | — |
-| `net_amount` | Bankka tushgan (sof) | Поступило в банк | Faqat ko'rsatish | — | `gross_amount − commission_amount` (server generatsiya qiladi; formada `shared/lib/money` bilan ko'rsatiladi) | — | — |
+| `varianceAmount` | Farq (inkassa) | Расхождение (инкассация) | `MoneyInput` (±) | Yo'q | faqat `method=collection`; manfiy — kamomad, musbat — ortiqcha | `0.00` | — |
+| `net_amount` | Bankka tushgan (sof) | Поступило в банк | Faqat ko'rsatish | — | `net = gross − commission + variance` (server generatsiya qiladi; formada `shared/lib/money` bilan ko'rsatiladi) | — | — |
 | `bank_ref` | Bank hujjati raqami | Номер банковского документа | `Input` | Yo'q | — | — | 64 |
 | `attachment_id` | Ko'chirma fayli | Файл выписки | Fayl yuklash (`POST /api/v1/attachments`, `kind='import'`) | Yo'q | PDF/XLSX/CSV/JPEG/PNG ≤ 10 MB | — | — |
 | `comment` | Izoh | Комментарий | `Textarea` | Yo'q | — | — | 500 |
@@ -1562,12 +1602,12 @@ Filial ichida "Kassalar" ro'yxati: har bir kassa qatorida soliq ro'yxatidan o'ti
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
 |---|---|---|---|
 | + Yangi / Saqlash | `bank_settlements.manage` | Yo'q | `POST /api/v1/bank-settlements` (`draft`, `source='manual'`) |
-| Ko'chirmani yuklash | `bank_settlements.manage` | Fayl tanlash (`.txt`, 1CClientBankExchange) | `POST /api/v1/bank-settlements/imports` — parser faqat kirim qatorlarini o'qiydi va `bank_settlements` **qoralamalarini** (`source='statement_import'`) taklif qiladi: `method` to'lovchi (ekvayer bank / Click / Payme / Uzum / MUNIS STIR) va to'lov maqsadi bo'yicha aniqlanadi; `gross_amount` ni Buxgalter shu usul/filial bo'yicha yo'ldagi pul (5710) qoldig'idan tanlaydi, `commission_amount = gross − kirim`; qoralamalar odatdagi "O'tkazish" bilan tasdiqlanadi |
+| Ko'chirmani yuklash | `bank_settlements.manage` | Fayl tanlash (`.txt`, 1CClientBankExchange) | `POST /api/v1/bank-settlements/imports` — parser faqat kirim qatorlarini o'qiydi va `bank_settlements` **qoralamalarini** (`source='statement_import'`) taklif qiladi: `method` to'lovchi (ekvayer bank / Click / Payme / Uzum / MUNIS STIR) va to'lov maqsadi bo'yicha aniqlanadi; `gross_amount` ni server shu usul/filial bo'yicha yo'ldagi pul (5710) ochiq qoldig'idan FIFO bilan taklif qiladi (20 #55g), `commission_amount = gross − kirim`; natija dialogi — `drafts_created`, `duplicates`, `unmatched_lines`; qoralamani tahrirlash — `PATCH /api/v1/bank-settlements/{id}` (55h); qoralamalar odatdagi "O'tkazish" bilan tasdiqlanadi |
 | O'tkazish | `bank_settlements.manage` | «Bank hisobiga {net_amount} o'tkaziladi, komissiya {commission_amount} xarajatga yoziladi» | `POST /api/v1/bank-settlements/{id}/post` → `posted`, raqam `BT-…`; `422 VALIDATION_ERROR` (summa yo'ldagi pul qoldig'idan katta / komissiya ≥ yalpi) — maydon xatosi `gross_amount`/`commission_amount`; `PERIOD_CLOSED` — sana yopilgan davrda |
 | Bekor qilish | `bank_settlements.manage` | Sabab majburiy; «Storno yoziladi» | `POST /api/v1/bank-settlements/{id}/cancel` (`{reason}`) → `cancelled` |
 | Ko'chirma faylini ochish | `bank_settlements.manage` | Yo'q | `attachment_id` bo'yicha yuklab olish |
 
-- **Ma'lumot manbai**: `GET /api/v1/bank-settlements?branch_id=&method=&status=&doc_date__gte=&doc_date__lte=` (ro'yxat), `GET /api/v1/bank-settlements/{id}`, `POST /api/v1/bank-settlements`, `POST /api/v1/bank-settlements/{id}/post`, `POST /api/v1/bank-settlements/{id}/cancel` (`20-api-moliya-admin.md`); «Yo'ldagi pul» paneli — 5710 qoldig'i filial × `payment_method` bo'yicha: `GET /api/v1/bank-settlements/transit-balances?branch_id=&as_of=`; ko'chirma importi — `POST /api/v1/bank-settlements/imports`; `POST /api/v1/attachments`. 1C bog'langan bo'lsa — «1C da» belgisi (W-54; `bank_settlement` standart 1C ga yuborilmaydi, `send_bank_settlements`).
+- **Ma'lumot manbai**: `GET /api/v1/bank-settlements?branch_id=&method=&status=&doc_date__gte=&doc_date__lte=` (ro'yxat), `GET /api/v1/bank-settlements/{id}`, `POST /api/v1/bank-settlements`, `PATCH /api/v1/bank-settlements/{id}` (qoralama), `POST /api/v1/bank-settlements/{id}/post`, `POST /api/v1/bank-settlements/{id}/cancel` (`20-api-moliya-admin.md`); «Yo'ldagi pul» paneli — 5710 qoldig'i filial × `payment_method` bo'yicha: `GET /api/v1/bank-settlements/transit-balances?branch_id=&as_of=`; ko'chirma importi — `POST /api/v1/bank-settlements/imports`; `POST /api/v1/attachments`. 1C bog'langan bo'lsa — «1C da» belgisi (W-54; `bank_settlement` standart 1C ga yuborilmaydi, `send_bank_settlements`).
 - **Holatlar**: `loading` · `empty` (hujjat yo'q — «Bank ko'chirmasi kelganda yangi hujjat yarating») · `error` (`VALIDATION_ERROR` — maydon ostida; `PERIOD_CLOSED`; import fayli formati noto'g'ri — «Fayl 1CClientBankExchange formatida emas») · `offline` (faqat ko'rish, yaratish/o'tkazish o'chiq) · `no-permission` (Menejer/Kassir/Omborchi — `NoPermissionState`) · `subscription-restricted` (kirilmaydi). Holat belgilari: `draft` — «Qoralama», `posted` — «O'tkazilgan», `cancelled` — «Bekor qilingan»; `source='statement_import'` — «Importdan» belgisi.
 - **Klaviatura**: `Ctrl+K`; formada `Ctrl+S` — saqlash, `Ctrl+Enter` — o'tkazish dialogi.
 - **Audit/analitika**: audit `entity='bank_settlements'` — yaratish, import, o'tkazish, bekor qilish (`after`: `method`, `gross_amount`, `commission_amount`, `bank_ref`; `15-xavfsizlik-va-audit.md`); analitika — `bank_settlement_posted`, `bank_statement_imported`.

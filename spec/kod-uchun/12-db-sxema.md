@@ -19,7 +19,7 @@ Barcha quyidagi DDL'dan oldin uch DB rol mavjud bo'lishi kerak (parollar — muh
 -- Alembic migratsiyalarini ishga tushiruvchi, barcha ob'ektlarning egasi
 CREATE ROLE erp_migrator LOGIN NOSUPERUSER CREATEDB NOCREATEROLE;
 
--- FastAPI/worker/scheduler/bot ulanadigan rol — BYPASSRLS YO'Q (05-xavfsizlik §3.2)
+-- FastAPI/worker/scheduler/bot ulanadigan rol — BYPASSRLS YO'Q (`15` §3.2)
 CREATE ROLE erp_app LOGIN NOSUPERUSER NOBYPASSRLS;
 
 -- SECURITY DEFINER funksiyalarning egasi — BYPASSRLS, lekin LOGIN emas
@@ -49,7 +49,7 @@ ALTER SCHEMA platform OWNER TO erp_migrator;
 
 GRANT USAGE ON SCHEMA app TO erp_app, erp_system;
 GRANT USAGE ON SCHEMA platform TO erp_app, erp_system;
--- auth sxemasiga erp_app'ga USAGE HECH QACHON berilmaydi (05-xavfsizlik §3.3, 12-auth §19)
+-- auth sxemasiga erp_app'ga USAGE HECH QACHON berilmaydi (`15` §3.3, `14` §19)
 GRANT USAGE ON SCHEMA auth TO erp_system;
 
 ALTER ROLE erp_app SET search_path = app, platform, public;
@@ -235,6 +235,17 @@ CREATE TABLE platform.terms_versions (
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX uq_terms_versions_current ON platform.terms_versions (kind) WHERE is_current;
+
+-- Aylanma solig'i stavkalari (13 §4.3) — global ma'lumotnoma (RLS istisnosi), seed 5.1; erp_app — faqat SELECT.
+-- code: retail_<branches.settlement_category> (chakana), general, tobacco (products.turnover_tax_group),
+-- sole_proprietor (tenants.legal_form). Stavka o'zgarsa — yangi valid_from qatori.
+CREATE TABLE platform.turnover_tax_rates (
+  code       TEXT NOT NULL,
+  rate_pct   NUMERIC(5,2) NOT NULL CHECK (rate_pct BETWEEN 0 AND 100),
+  valid_from DATE NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (code, valid_from)
+);
 ```
 
 `platform_admins` — `app.users`ga FK bergani uchun 2.3-bo'limdan keyin (`users` yaratilgandan so'ng) joylashtiriladi.
@@ -362,7 +373,8 @@ CREATE TABLE app.tenants (
   -- ('9430'|'9410', standart '9430'), turnover_tax_account ('9430'|'9820', standart '9430'), fiscal_policy
   -- {debt_receipt_split: 'single'|'per_sale' (standart 'single', qaror #45), credit_sale_receipt: 'none'|'credit_type'
   -- (standart 'none')}, marking_precheck ('off'|'warn'|'block', standart 'warn', qaror #62), bank_account (20 raqam),
-  -- bank_mfo — tenantning yagona bank hisobi (qaror #49). Baholash usuli BU YERDA EMAS — valuation_method_history
+  -- bank_mfo — tenantning yagona bank hisobi (qaror #49), payment_providers.{click|payme|uzum}.autofiscal_off_confirmed_at
+  -- (ISO vaqt — provayder avtofiskalizatsiyasi o'chirilgani tasdig'i, 20 #40d). Baholash usuli BU YERDA EMAS — valuation_method_history
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   version       INT NOT NULL DEFAULT 1
@@ -397,7 +409,7 @@ CREATE TABLE app.user_identities (
 );
 CREATE INDEX idx_user_identities_user ON app.user_identities (user_id);
 
--- endi auth.* va platform.* jadvallardagi "pastda qo'shiladi" deb belgilangan FK'lar:
+-- auth.* va platform.* jadvallardagi "pastda qo'shiladi" deb belgilangan FK'lar:
 ALTER TABLE auth.user_credentials      ADD CONSTRAINT fk_uc_user      FOREIGN KEY (user_id) REFERENCES app.users(id);
 ALTER TABLE auth.authorization_codes   ADD CONSTRAINT fk_ac_user      FOREIGN KEY (user_id) REFERENCES app.users(id);
 ALTER TABLE auth.authorization_codes   ADD CONSTRAINT fk_ac_tenant    FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
@@ -441,9 +453,9 @@ CREATE TABLE app.warehouses (
   branch_id   UUID NOT NULL REFERENCES app.branches(id),
   name        TEXT NOT NULL,
   type        TEXT NOT NULL CHECK (type IN ('store','stock')),
-  inventory_account TEXT NOT NULL DEFAULT '2910' CHECK (inventory_account IN ('2910','2920')),
-              -- tovar hisobi (13 §1 inv_acct): yaratishda type='store' → '2920', type='stock' → '2910';
-              -- omborda stock_moves bo'lgandan keyin o'zgartirilmaydi (ilova tekshiradi)
+  inventory_account TEXT NOT NULL CHECK (inventory_account IN ('2910','2920')),
+              -- tovar hisobi (13 §1 inv_acct): yaratishda type='store' → '2920', type='stock' → '2910' (ilova qo'yadi);
+              -- omborda stock_moves bo'lgach o'zgartirilmaydi (409 WAREHOUSE_ACCOUNT_LOCKED)
   archived_at TIMESTAMPTZ NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -467,10 +479,14 @@ CREATE TABLE app.cash_registers (
   tax_registered_at       TIMESTAMPTZ NULL, -- TXKM orqali soliq organida ro'yxatga olingan vaqt (VMQ-943 1-ilova 16–20-band)
   outlet_address_snapshot TEXT NULL,        -- ro'yxatdagi savdo shoxobchasi manzili (o'zgarsa 3 ish kunida qayta ariza)
   txkm_contract_ref       TEXT NULL,        -- TXKM bilan xizmat shartnomasi raqami
+  fiscal_agent_id         UUID NULL,        -- lokal fiskal ko'prik kassasiga xizmat qiluvchi Do'kon agenti (qaror #66);
+                                            -- FK 0028 store_agent da: fk_cr_fiscal_agent → app.onec_agents(id)
+  fiscal_local_device_id  TEXT NULL,        -- agent capabilities.fiscal.devices[].local_id
   archived_at      TIMESTAMPTZ NULL,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-  version          INT NOT NULL DEFAULT 1
+  version          INT NOT NULL DEFAULT 1,
+  CHECK (fiscal_agent_id IS NULL OR fiscal_local_device_id IS NOT NULL)
 );
 
 CREATE TABLE app.devices (
@@ -491,8 +507,9 @@ CREATE TABLE app.devices (
   outbox_reported_at       TIMESTAMPTZ NULL, -- = now() o'sha push tranzaksiyasida
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CHECK (kind <> 'onec_agent' OR cash_register_id IS NULL) -- 1C agenti kassaga bog'lanmaydi
-  -- 'onec_agent' — yagona Do'kon agenti turi (qaror #60): fiskal ko'prik, printer, tarozi va 1C imkoniyatlari shu qurilmada
+  CHECK (kind <> 'onec_agent' OR cash_register_id IS NULL)
+  -- 'onec_agent' — Do'kon agenti (qaror #60): fiskal ko'prik, printer, tarozi va 1C imkoniyatlari shu qurilmada;
+  -- kassaga bog'lanish cash_registers.fiscal_agent_id orqali (qaror #66)
 );
 
 ALTER TABLE auth.refresh_tokens ADD CONSTRAINT fk_rt_device FOREIGN KEY (device_id) REFERENCES app.devices(id);
@@ -597,7 +614,8 @@ CREATE TABLE app.billing_payments (
   period                TEXT NOT NULL CHECK (period IN ('month','year')),
   covers_from           DATE NULL, -- success'da to'ldiriladi
   covers_to             DATE NULL,
-  amount_breakdown      JSONB NOT NULL DEFAULT '{}', -- {plan:"99000.00", addons:[{code,qty,price}]} snapshot
+  amount_breakdown      JSONB NOT NULL DEFAULT '{}', -- {plan, period, addons:[{code, qty, unit_price, months}], discount} snapshot
+                        -- (qaror #70: oy = 99000 + 39000 × extra; yil = 950400 + 39000 × 12 × extra — chegirma faqat asosiy tarifga)
   invoice_number        TEXT NULL,
   invoice_attachment_id UUID NULL, -- FK pastda (attachments yaratilgandan keyin) → app.attachments(id)
   created_by            UUID NULL REFERENCES app.users(id),
@@ -635,7 +653,7 @@ CREATE TABLE app.consents (
 CREATE INDEX idx_consents_tenant_purpose ON app.consents (tenant_id, purpose, at DESC);
 
 -- baholash usuli (FIFO/AVECO) tarixi — faqat yil boshidan o'zgaradi;
--- tenants.settings.valuation_method kaliti OLIB TASHLANADI, manba shu jadval. Signup: valid_from = joriy yil
+-- tenants.settings da valuation_method kaliti yo'q, manba shu jadval. Signup: valid_from = joriy yil
 -- 1-yanvar, method='aveco' (yoki tanlangan).
 CREATE TABLE app.valuation_method_history (
   id         UUID PRIMARY KEY DEFAULT app.uuidv7(),
@@ -677,6 +695,8 @@ CREATE TABLE app.products (
   is_marked        BOOLEAN NOT NULL DEFAULT false,
   marking_group_code TEXT NULL REFERENCES platform.marking_product_groups(code), -- is_marked=true bo'lsa majburiy (qabul muddati, qaror #63)
   is_weighed       BOOLEAN NOT NULL DEFAULT false,
+  turnover_tax_group TEXT NOT NULL DEFAULT 'general' CHECK (turnover_tax_group IN ('general','tobacco')),
+                   -- aylanma solig'i stavka guruhi (13 §4.3, platform.turnover_tax_rates); tamaki — alohida stavka
   min_stock        NUMERIC(18,3) NULL,
   archived_at      TIMESTAMPTZ NULL,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -907,10 +927,9 @@ CREATE TABLE app.shifts (
   cash_register_id   UUID NOT NULL REFERENCES app.cash_registers(id),
   device_id          UUID NOT NULL REFERENCES app.devices(id), -- bitta smena — bitta qurilma
   shift_no           INT  NOT NULL CHECK (shift_no > 0), -- qurilma beradi, kassa ichida ketma-ket (qaror #12)
-  status             TEXT NOT NULL CHECK (status IN ('open','closing','closed')) DEFAULT 'open',
+  status             TEXT NOT NULL CHECK (status IN ('open','closed')) DEFAULT 'open',
   opened_by          UUID NOT NULL REFERENCES app.users(id),
   opened_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-  closing_started_at TIMESTAMPTZ NULL,
   closed_by          UUID NULL REFERENCES app.users(id),
   closed_at          TIMESTAMPTZ NULL,
   opening_cash       NUMERIC(18,2) NOT NULL DEFAULT 0 CHECK (opening_cash >= 0),
@@ -928,8 +947,8 @@ CREATE TABLE app.shifts (
   CHECK (status <> 'closed' OR (counted_cash IS NOT NULL AND expected_cash IS NOT NULL)),
   CHECK (counted_cash IS NULL OR expected_cash IS NULL OR counted_cash = expected_cash OR variance_note IS NOT NULL)
 );
--- bitta kassada bir vaqtda faqat bitta ochiq/yopilayotgan smena
-CREATE UNIQUE INDEX uq_shifts_one_open ON app.shifts (cash_register_id) WHERE status IN ('open','closing');
+-- bitta kassada bir vaqtda faqat bitta ochiq smena
+CREATE UNIQUE INDEX uq_shifts_one_open ON app.shifts (cash_register_id) WHERE status = 'open';
 
 CREATE TABLE app.sales (
   id               UUID PRIMARY KEY DEFAULT app.uuidv7(),
@@ -981,8 +1000,12 @@ CREATE TABLE app.sale_lines (
   cost_amount        NUMERIC(18,2) NOT NULL DEFAULT 0,
   marking_code       TEXT NULL,
   lot_allocations    JSONB NOT NULL DEFAULT '[]',
+  settled_amount     NUMERIC(18,2) NOT NULL DEFAULT 0 CHECK (settled_amount >= 0),
+                     -- qarz to'lovi (debt_settlement) va aralash to'lovli sotuvning birinchi chekida fiskallangan
+                     -- kumulyativ summa; server posting'da yangilaydi (18 §12.2, qaror #67)
   created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (sale_id, line_no),
+  CHECK (settled_amount <= line_total),
   CHECK (marking_code IS NULL OR qty = 1), -- markirovkalangan tovarda qty=1 majburiy
   CHECK ((discount_amount = 0) = (discount_source IS NULL)),
   CHECK (discount_source IS DISTINCT FROM 'rule' OR discount_rule_id IS NOT NULL)
@@ -1030,7 +1053,9 @@ CREATE TABLE app.returns (
   cash_register_id UUID NOT NULL REFERENCES app.cash_registers(id),
   counterparty_id  UUID NULL REFERENCES app.counterparties(id), -- refund_method='debt_adjustment' uchun
   reason           TEXT NOT NULL CHECK (reason IN ('defective','wrong_item','customer_changed_mind','other')),
-  refund_method    TEXT NOT NULL CHECK (refund_method IN ('cash','card','debt_adjustment')),
+  refund_method    TEXT NOT NULL CHECK (refund_method IN ('cash','card','uzqr','click','payme','uzum','debt_adjustment')),
+                   -- standart — asl to'lov usuli; qarzli sotuvda avval sotuvning ochiq qarzi kamayadi (debt_adjustment
+                   -- qismi, chek yo'q), qolgani pul bilan (13 §2.5). Click/Payme/Uzum qaytarish — provayder kabinetida qo'lda
   is_offline       BOOLEAN NOT NULL DEFAULT false,
   approved_by      UUID NULL REFERENCES app.users(id),
   approved_at      TIMESTAMPTZ NULL,
@@ -1129,7 +1154,8 @@ CREATE TABLE app.goods_receipts (
   einvoice_id      UUID NULL, -- FK pastda; "qizil" faktura QQS kechiktirish shu orqali aniqlanadi
   ai_ocr_job_id    UUID NULL, -- FK pastda → app.ai_ocr_jobs(id)
   ettn_ref         TEXT NULL, -- qo'lda e-TTN belgisi
-  poa_number       TEXT NULL, -- qo'lda ishonchnoma raqami
+  poa_id           UUID NULL, -- FK pastda (powers_of_attorney yaratilgach, 0020) → app.powers_of_attorney(id)
+  poa_number       TEXT NULL, -- e-ishonchnoma raqami (powers_of_attorney.number dan yoki qo'lda)
   created_by       UUID NOT NULL REFERENCES app.users(id),
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -1160,6 +1186,8 @@ CREATE TABLE app.receipt_lines (
   vat_exemption_code TEXT NULL, -- imtiyoz kodi, products bo'linishi bilan izchil
   vat_amount         NUMERIC(18,2) NOT NULL DEFAULT 0,
   expiry_date        DATE NULL,
+  discrepancy_reason TEXT NULL CHECK (discrepancy_reason IN ('short','excess','damaged','wrong_item','other')),
+                     -- PO/e-faktura miqdoridan farq sababi (POS-08)
   created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (receipt_id, line_no)
 );
@@ -1222,8 +1250,9 @@ CREATE TABLE app.transfers (
   received_by      UUID NULL REFERENCES app.users(id),
   transport_mode   TEXT NOT NULL DEFAULT 'vehicle' CHECK (transport_mode IN ('vehicle','on_foot_or_public')),
                    -- vehicle — e-TTN ("Ombordan omborga") majburiy; on_foot_or_public — e-TTN talab qilinmaydi
-  ettn_ref         TEXT NULL, -- operator kabinetida rasmiylashtirilgan e-TTN raqami (bo'sh bo'lsa send'da ogohlantirish)
-  vehicle_plate    TEXT NULL, -- e-TTN rekviziti; transport_mode='vehicle' bo'lsa send'da shart (ilova tekshiradi)
+  ettn_ref         TEXT NULL, -- operator kabinetida rasmiylashtirilgan e-TTN raqami; send — transport_mode='vehicle' da
+                   -- e-TTN registered bo'lmaguncha rad (409 ETTN_REQUIRED)
+  vehicle_plate    TEXT NULL, -- e-TTN rekviziti; transport_mode='vehicle' bo'lsa post'da shart (ilova tekshiradi)
   driver_name      TEXT NULL, -- e-TTN rekviziti
   created_by       UUID NOT NULL REFERENCES app.users(id),
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -1468,6 +1497,10 @@ CREATE TABLE app.debt_payments (
   qr_type         TEXT NULL CHECK (qr_type IN ('static','dynamic')),
   checkout_ref    UUID NULL REFERENCES app.payment_checkouts(checkout_ref),
   promise_date    DATE NULL, -- qoldiq uchun yangi va'da sanasi (qarz daftari ko'rinishi oxirgisini oladi)
+  receipt_seq     INT NULL CHECK (receipt_seq IS NULL OR receipt_seq > 0),
+                  -- debt_settlement cheki raqami — qurilma beradi, smena ichida ketma-ket (qaror #12); bank'da NULL
+  unallocated_amount NUMERIC(18,2) NOT NULL DEFAULT 0 CHECK (unallocated_amount >= 0),
+                  -- offline ortiqcha summa (qarzdan katta, FM chekni imzolagan): Kt 6310 olingan bo'nak (13 §2.14, qaror #67)
   created_by      UUID NOT NULL REFERENCES app.users(id),
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -1480,14 +1513,17 @@ CREATE TABLE app.debt_payments (
   comment         TEXT NULL,
   UNIQUE (tenant_id, device_id, temp_number),
   UNIQUE (tenant_id, client_event_id),
-  CHECK (method <> 'cash' OR (cash_register_id IS NOT NULL AND shift_id IS NOT NULL)),
+  -- bank — kassasiz, fiskal cheksiz (faqat back-office POST /debt-payments); qolgan usullar — faqat POS
+  -- debt_payment.created voqeasi, ochiq smenali kassa va debt_settlement cheki bilan (qaror #67)
+  CHECK ((method = 'bank') = (cash_register_id IS NULL AND shift_id IS NULL AND receipt_seq IS NULL)),
   CHECK (method NOT IN ('click','payme','uzum') OR provider_tx_id IS NOT NULL),
   CHECK (method <> 'uzqr' OR qr_type IS NOT NULL),
   CHECK (method <> 'uzqr' OR qr_type = 'static' OR provider_tx_id IS NOT NULL),
   CHECK (qr_type IS NULL OR method = 'uzqr'),
   CHECK ((method = 'card') = (card_type IS NOT NULL)),
   CHECK (card_type IS DISTINCT FROM 'social' OR (card_mask IS NOT NULL AND rrn IS NOT NULL)),
-  CHECK (method = 'card' OR (card_mask IS NULL AND rrn IS NULL))
+  CHECK (method = 'card' OR (card_mask IS NULL AND rrn IS NULL)),
+  CHECK (unallocated_amount <= amount)
 );
 
 CREATE TABLE app.debt_payment_allocations (
@@ -1673,7 +1709,12 @@ CREATE TABLE app.cash_movements (
   amount          NUMERIC(18,2) NOT NULL CHECK (amount > 0),
   reason          TEXT NOT NULL CHECK (reason IN ('collection','deposit','owner_withdrawal','other')),
   counterparty_id UUID NULL REFERENCES app.counterparties(id),
-                  -- owner_withdrawal: ta'sischi (counterparties.is_founder) — legal_form ≠ sole_proprietor bo'lsa majburiy (ilova), Dt 4890 analitikasi
+                  -- owner_withdrawal: ta'sischi (counterparties.is_founder) — legal_form ≠ sole_proprietor bo'lsa majburiy (ilova), Dt 4890 analitikasi;
+                  -- other: account 6310/4010 da majburiy
+  account         TEXT NULL CHECK (account IS NULL OR account IN ('9430','9390','6310','4010','4730')),
+                  -- faqat reason='other' (Buxgalter/Egasi tanlaydi): out → Dt account / Kt 5010 (standart 9430);
+                  -- in → Dt 5010 / Kt account (standart 9390) — 13 §2.18
+  employee_id     UUID NULL REFERENCES app.users(id), -- account='4730' (xodim bilan hisob-kitob) da majburiy
   created_by      UUID NOT NULL REFERENCES app.users(id),
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -1686,7 +1727,12 @@ CREATE TABLE app.cash_movements (
   comment         TEXT NULL,
   UNIQUE (tenant_id, device_id, temp_number),
   UNIQUE (tenant_id, client_event_id),
-  CHECK (reason = 'owner_withdrawal' OR counterparty_id IS NULL)
+  CHECK (reason IN ('owner_withdrawal','other') OR counterparty_id IS NULL),
+  CHECK (reason = 'other' OR account IS NULL),
+  -- reason↔direction juftligi: collection/owner_withdrawal → out, deposit → in, other → ikkalasi
+  CHECK ((reason IN ('collection','owner_withdrawal') AND direction = 'out') OR (reason = 'deposit' AND direction = 'in') OR reason = 'other'),
+  CHECK (account IS DISTINCT FROM '4730' OR employee_id IS NOT NULL),
+  CHECK (account IS NULL OR account NOT IN ('6310','4010') OR counterparty_id IS NOT NULL)
 );
 
 -- bank ko'chirmasi importi (POST /bank-settlements/imports, 1CClientBankExchange .txt) — sinxron; natija
@@ -1764,7 +1810,8 @@ CREATE TABLE app.ledger_adjustments (
   branch_id            UUID NOT NULL REFERENCES app.branches(id),
   number               TEXT NULL,
   temp_number          TEXT NULL,
-  doc_date             DATE NOT NULL, -- = ledger_entries.entry_date, joriy ochiq davr
+  doc_date             DATE NOT NULL, -- = ledger_entries.entry_date, joriy ochiq davr; istisno — account_dt yoki account_kt
+                       -- = '0000' bo'lgan boshlang'ich balans yozuvi: go_live_date − 1 (shu davr yopilmagan bo'lsa; 13 §2.23)
   status               TEXT NOT NULL CHECK (status IN ('draft','posted','cancelled')) DEFAULT 'draft',
   account_dt           TEXT NOT NULL CHECK (account_dt ~ '^[0-9]{4}$'),
   account_kt           TEXT NOT NULL CHECK (account_kt ~ '^[0-9]{4}$'),
@@ -1787,8 +1834,9 @@ CREATE TABLE app.ledger_adjustments (
 );
 
 -- soliq davr hisob-kitobi (13-provodka-qoidalari.md §2.26, §4.3), doc_sequences kodi 'ST'. Faqat back-office.
--- vat_offset: Dt 6410 / Kt 4410 (tenant darajasida — standart filial); turnover_tax: Dt expense_account / Kt 6410
--- (har filial alohida, SK 468-modda 2-qism).
+-- vat_offset: Dt 6410 / Kt 4410 — (tenant, davr) bo'yicha, vat_moves tenant bo'yicha yig'iladi (qaror #31 — 1 tenant = 1 STIR);
+-- branch_id = tenantning is_default filiali (server yozadi). turnover_tax: Dt expense_account / Kt 6410 —
+-- (filial, davr) bo'yicha, branch_id majburiy (SK 468-modda 2-qism).
 CREATE TABLE app.tax_settlements (
   id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
   tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
@@ -1799,7 +1847,7 @@ CREATE TABLE app.tax_settlements (
   status          TEXT NOT NULL CHECK (status IN ('draft','posted','cancelled')) DEFAULT 'draft',
   tax_kind        TEXT NOT NULL CHECK (tax_kind IN ('vat_offset','turnover_tax')),
   period          DATE NOT NULL CHECK (extract(day FROM period) = 1),
-  base_amount     NUMERIC(18,2) NOT NULL CHECK (base_amount >= 0), -- vat_offset: Σ kiruvchi QQS; turnover_tax: 9020−9040−9050
+  base_amount     NUMERIC(18,2) NOT NULL CHECK (base_amount >= 0), -- vat_offset: Σ kiruvchi QQS; turnover_tax: (9020−9040−9050)+9390+8530 (13 §4.3)
   rate            NUMERIC(5,2) NULL CHECK (rate IS NULL OR rate BETWEEN 0 AND 100), -- faqat turnover_tax
   amount          NUMERIC(18,2) NOT NULL CHECK (amount >= 0),
   expense_account TEXT NULL CHECK (expense_account IN ('9430','9820')), -- faqat turnover_tax (settings.turnover_tax_account)
@@ -1817,8 +1865,11 @@ CREATE TABLE app.tax_settlements (
   UNIQUE (tenant_id, client_event_id),
   CHECK ((tax_kind = 'turnover_tax') = (rate IS NOT NULL AND expense_account IS NOT NULL))
 );
-CREATE UNIQUE INDEX uq_tax_settlements_active ON app.tax_settlements (tenant_id, branch_id, period, tax_kind)
-  WHERE status <> 'cancelled';
+-- bitta (tenant, davr) uchun bitta faol vat_offset; bitta (filial, davr) uchun bitta faol turnover_tax
+CREATE UNIQUE INDEX uq_tax_settlements_vat_offset ON app.tax_settlements (tenant_id, period)
+  WHERE tax_kind = 'vat_offset' AND status <> 'cancelled';
+CREATE UNIQUE INDEX uq_tax_settlements_turnover ON app.tax_settlements (tenant_id, branch_id, period)
+  WHERE tax_kind = 'turnover_tax' AND status <> 'cancelled';
 ```
 
 ### 2.7 Registrlar
@@ -1839,6 +1890,8 @@ CREATE TABLE app.stock_moves (
   line_id       UUID NULL,
   reversal_of_id UUID NULL REFERENCES app.stock_moves(id),
   moved_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+                -- hujjat biznes vaqti: POS voqeasida effective_created_at (16 §8), back-office hujjatda posted_at;
+                -- DEFAULT now() faqat zaxira
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_stock_moves_wh_prod ON app.stock_moves (tenant_id, warehouse_id, product_id, moved_at);
@@ -1858,13 +1911,16 @@ CREATE TABLE app.stock_lots (
   qty_in          NUMERIC(18,3) NOT NULL CHECK (qty_in >= 0),
   qty_left        NUMERIC(18,3) NOT NULL CHECK (qty_left >= 0),
   unit_cost       NUMERIC(18,4) NOT NULL CHECK (unit_cost >= 0),
+  blocked_qty     NUMERIC(18,3) NOT NULL DEFAULT 0 CHECK (blocked_qty >= 0 AND blocked_qty <= qty_left),
+                  -- qaytarilgan muddati o'tgan tovar (restock=false, qaror #48): sotuvga chiqmaydi; write_offs
+                  -- (expired_return) post'ida blocked_qty va qty_left birga kamayadi (13 §2.5)
   expiry_date     DATE NULL,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
--- FIFO: eng eski faol partiya birinchi — qisman indeks faqat qty_left>0 qatorlarni qamraydi
-CREATE INDEX idx_stock_lots_fifo ON app.stock_lots (tenant_id, warehouse_id, product_id, received_at)
-  WHERE qty_left > 0;
+-- FIFO: ORDER BY received_at, id; sotuvga ochiq miqdor — qty_left − blocked_qty (13 §3.1)
+CREATE INDEX idx_stock_lots_fifo ON app.stock_lots (tenant_id, warehouse_id, product_id, received_at, id)
+  WHERE qty_left > blocked_qty;
 
 ALTER TABLE app.stock_moves ADD CONSTRAINT fk_sm_lot FOREIGN KEY (lot_id) REFERENCES app.stock_lots(id);
 ALTER TABLE app.supplier_return_lines ADD CONSTRAINT fk_srl_lot FOREIGN KEY (lot_id) REFERENCES app.stock_lots(id);
@@ -1877,6 +1933,7 @@ CREATE TABLE app.avg_costs (
   product_id   UUID NOT NULL REFERENCES app.products(id),
   avg_cost     NUMERIC(18,4) NOT NULL DEFAULT 0,
   qty          NUMERIC(18,3) NOT NULL DEFAULT 0,
+  total_value  NUMERIC(18,2) NOT NULL DEFAULT 0, -- AVECO qiymat yig'indisi: avg = total_value / qty; qty ≤ 0 → 0 (13 §3.1)
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (tenant_id, warehouse_id, product_id)
 );
@@ -1890,7 +1947,7 @@ CREATE TABLE app.stock_balances (
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (tenant_id, warehouse_id, product_id)
 );
--- manfiy qoldiqlarni tezkor topish (offline overselling, 04-offline-sync §5)
+-- manfiy qoldiqlarni tezkor topish (offline overselling, `16` §5)
 CREATE INDEX idx_stock_balances_negative ON app.stock_balances (tenant_id, warehouse_id, product_id) WHERE qty < 0;
 
 CREATE TABLE app.debt_moves (
@@ -1992,7 +2049,9 @@ DO UPDATE SET balance = app.debt_balances.balance + EXCLUDED.balance, updated_at
 ```sql
 -- kind='z_report' — smena yopilganda Z-hisobot shu jadvalga yoziladi (sale_id/return_id/receipt_seq hammasi
 -- NULL, raqami = shifts.shift_no). kind='debt_settlement' — qarz to'lovida chiqariladigan chek, debt_payment_id
--- orqali bog'lanadi; cash_register_id/shift_id ixtiyoriy (bank/karta orqali to'lovda kassasiz). Chek
+-- orqali bog'lanadi; har doim cash_register_id, shift_id, receipt_seq bilan; bank o'tkazmasi orqali qarz to'lovida
+-- chek yaratilmaydi (qaror #67). Lokal ko'prik rejimida FM natijasi POS voqeasining fiscal_result'idan yoziladi
+-- (qaror #68); receipt_seq to'qnashuvida server qayta raqamlaydi, qurilma qiymati payload.device_receipt_seq da. Chek
 -- matni/payload ikki tilda chiqariladi (o'zbek + ixtiyoriy rus — `products.name_ru`, qaror #29).
 -- kind='credit_sale' — nasiya sotuvda "kredit" turidagi chek (QR va fiskal belgisiz, VMQ-943 1-ilova 7-band),
 -- faqat tenants.settings.fiscal_policy.credit_sale_receipt='credit_type' bo'lsa yaratiladi.
@@ -2006,9 +2065,9 @@ CREATE TABLE app.fiscal_receipts (
   sale_id          UUID NULL REFERENCES app.sales(id),
   return_id        UUID NULL REFERENCES app.returns(id),
   debt_payment_id  UUID NULL REFERENCES app.debt_payments(id), -- (qaror #30) kind='debt_settlement'da majburiy
-  cash_register_id UUID NULL REFERENCES app.cash_registers(id), -- debt_settlement + bank/karta to'lovda NULL mumkin
+  cash_register_id UUID NULL REFERENCES app.cash_registers(id), -- barcha turlarda majburiy (CHECK pastda)
   shift_id         UUID NULL REFERENCES app.shifts(id), -- xuddi shunday
-  receipt_seq      INT  NULL, -- qurilma beradi (qaror #12); z_report/debt_settlement'da NULL mumkin
+  receipt_seq      INT  NULL, -- qurilma beradi (qaror #12); faqat z_report'da NULL
   fm_terminal_id   TEXT NULL, -- fiskal modul (FM) seriya raqami — FiscalResult.terminal_id
   fm_receipt_seq   BIGINT NULL, -- FM bergan chek raqami (OFD ReceiptSeq); receipt_seq'dan alohida
   fiscal_at        TIMESTAMPTZ NULL, -- FM imzolagan vaqt (FiscalResult.fiscal_datetime)
@@ -2032,7 +2091,7 @@ CREATE TABLE app.fiscal_receipts (
        (kind IN ('sale','credit_sale') AND sale_id IS NOT NULL AND return_id IS NULL AND debt_payment_id IS NULL AND receipt_seq IS NOT NULL AND cash_register_id IS NOT NULL AND shift_id IS NOT NULL)
     OR (kind = 'return'          AND return_id IS NOT NULL AND sale_id IS NULL AND debt_payment_id IS NULL AND receipt_seq IS NOT NULL AND cash_register_id IS NOT NULL AND shift_id IS NOT NULL)
     OR (kind = 'z_report'        AND sale_id IS NULL AND return_id IS NULL AND debt_payment_id IS NULL AND receipt_seq IS NULL AND cash_register_id IS NOT NULL AND shift_id IS NOT NULL)
-    OR (kind = 'debt_settlement' AND debt_payment_id IS NOT NULL AND sale_id IS NULL AND return_id IS NULL)
+    OR (kind = 'debt_settlement' AND debt_payment_id IS NOT NULL AND sale_id IS NULL AND return_id IS NULL AND receipt_seq IS NOT NULL AND cash_register_id IS NOT NULL AND shift_id IS NOT NULL)
   ),
   UNIQUE (tenant_id, cash_register_id, shift_id, receipt_seq)
 );
@@ -2103,6 +2162,37 @@ ALTER TABLE app.goods_receipts ADD CONSTRAINT fk_gr_einvoice FOREIGN KEY (einvoi
 CREATE UNIQUE INDEX uq_gr_einvoice_active ON app.goods_receipts (tenant_id, einvoice_id)
   WHERE einvoice_id IS NOT NULL AND status <> 'cancelled';
 
+-- E-ishonchnoma (BO-04 → E-IMZO → operator, 19 §8a). Holatlar: draft → pending_signature → sending → sent →
+-- accepted | rejected; sending → failed → sending (qayta imzo/yuborish); draft | pending_signature → cancelled.
+-- Yuborish — outbox_jobs(kind='poa_send'), EInvoicePort.send_power_of_attorney.
+CREATE TABLE app.powers_of_attorney (
+  id               UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id        UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id        UUID NOT NULL REFERENCES app.branches(id),
+  purchase_order_id UUID NULL REFERENCES app.purchase_orders(id),
+  supplier_id      UUID NOT NULL REFERENCES app.counterparties(id),
+  employee_user_id UUID NOT NULL REFERENCES app.users(id),   -- ishonchli shaxs (odatda Omborchi)
+  doc_date         DATE NOT NULL,
+  valid_from       DATE NOT NULL,
+  valid_to         DATE NOT NULL,
+  number           TEXT NULL,                                -- operator bergan raqam
+  operator_doc_id  TEXT NULL,
+  status           TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','pending_signature','sending','sent',
+                     'accepted','rejected','cancelled','failed')),
+  last_error       TEXT NULL,
+  signed_at        TIMESTAMPTZ NULL,
+  sent_at          TIMESTAMPTZ NULL,
+  responded_at     TIMESTAMPTZ NULL,
+  reject_reason    TEXT NULL,
+  created_by       UUID NOT NULL REFERENCES app.users(id),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  version          INT NOT NULL DEFAULT 1,
+  CHECK (valid_to >= valid_from)
+);
+CREATE INDEX idx_poa_po ON app.powers_of_attorney (tenant_id, purchase_order_id);
+ALTER TABLE app.goods_receipts ADD CONSTRAINT fk_gr_poa FOREIGN KEY (poa_id) REFERENCES app.powers_of_attorney(id);
+
 -- e-TTN: kiruvchi xaridda EHF bilan birlashtirilgan (einvoice_id); ichki ko'chirishda ("Ombordan omborga")
 -- yozuvchi — transfer `post` (transfer_id; qaror #63, 19 §13).
 CREATE TABLE app.ettn_documents (
@@ -2113,12 +2203,19 @@ CREATE TABLE app.ettn_documents (
   transport_type  TEXT NOT NULL CHECK (transport_type IN ('warehouse_to_warehouse','seller_to_buyer','other')),
   direction       TEXT NOT NULL CHECK (direction IN ('in','out')),
   status          TEXT NOT NULL CHECK (status IN ('pending_signature','sending','registered','received','accepted',
-                    'rejected','cancelled')),
-                  -- chiquvchi: pending_signature → sending → registered → accepted/rejected; kiruvchi: received → accepted/rejected
+                    'rejected','cancelled','failed')),
+                  -- chiquvchi: pending_signature → sending → registered → accepted/rejected; sending → failed → sending
+                  -- (qayta imzo/yuborish); kiruvchi: received → accepted/rejected; cancelled
+  counterparty_id UUID NULL REFERENCES app.counterparties(id), -- kiruvchi: jo'natuvchi; chiquvchi (seller_to_buyer): oluvchi
+  receipt_id      UUID NULL REFERENCES app.goods_receipts(id), -- kiruvchi e-TTN bog'langan kirim
+  doc_date        DATE NULL,
+  payload         JSONB NOT NULL DEFAULT '{}',
+  signed_at       TIMESTAMPTZ NULL,
+  last_error      TEXT NULL,
   operator_doc_id TEXT NULL,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CHECK (einvoice_id IS NOT NULL OR transfer_id IS NOT NULL),
+  CHECK (direction = 'in' OR einvoice_id IS NOT NULL OR transfer_id IS NOT NULL),
   CHECK (transport_type <> 'warehouse_to_warehouse' OR transfer_id IS NOT NULL)
 );
 
@@ -2130,13 +2227,18 @@ CREATE TABLE app.state_reports (
   published_at       TIMESTAMPTZ NULL,
   deadline_at        TIMESTAMPTZ NULL, -- min(published_at + 5 ish kuni, topshirish muddati) (SK 5-modda 7-qism, 81-modda 6-qism)
   file_attachment_id UUID NULL REFERENCES app.attachments(id),
-  status             TEXT NOT NULL CHECK (status IN ('uploaded','compared','match','diff_found','correction_sent','auto_accepted')),
+  status             TEXT NOT NULL CHECK (status IN ('uploaded','compared','match','diff_found','correction_sent','confirmed',
+                       'auto_accepted')),
+                     -- uploaded → compared → match | diff_found → correction_sent | confirmed | auto_accepted
   state_amount         NUMERIC(18,2) NULL,
   our_amount           NUMERIC(18,2) NULL,
   diff_amount          NUMERIC(18,2) NULL,
   compared_at          TIMESTAMPTZ NULL,
   correction_sent_at   TIMESTAMPTZ NULL,
-  correction_signature TEXT NULL, -- E-IMZO PKCS#7 (base64)
+  correction_comment   TEXT NULL, -- my.soliq.uz kabinetida kiritilgan tuzatish izohi (tizim faqat qayd etadi, imzosiz)
+  correction_portal_ref TEXT NULL, -- kabinetdagi tuzatish raqami (ixtiyoriy)
+  confirmed_at         TIMESTAMPTZ NULL,
+  confirmed_by         UUID NULL REFERENCES app.users(id),
   uploaded_by          UUID NOT NULL REFERENCES app.users(id),
   created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -2185,8 +2287,10 @@ CREATE TABLE app.outbox_jobs (
   id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
   tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
   kind            TEXT NOT NULL CHECK (kind IN ('ofd_send','einvoice_send','einvoice_accept','ettn_send',
-                     'ettn_accept','marking_verify','marking_accept','marking_return',
-                     'state_report_reminder','sms','telegram','ai','report_export','label_pdf')),
+                     'ettn_accept','poa_send','marking_verify','marking_accept','marking_supplier_return',
+                     'marking_writeoff','state_report_reminder','sms','telegram','ai','report_export','label_pdf',
+                     'billing_webhook_reconcile')),
+                  -- ofd_send — faqat FISCAL_PROVIDER=partner_cloud rejimida (lokal ko'prikda chekni agent/FM yuboradi)
   payload         JSONB NOT NULL,
   status          TEXT NOT NULL CHECK (status IN ('queued','running','done','retry','failed')) DEFAULT 'queued',
   attempts        INT NOT NULL DEFAULT 0,
@@ -2215,13 +2319,17 @@ CREATE TABLE app.sync_receipts (
 );
 
 -- sinxron istisnolari (16-offline-sync.md §5): offline narx farqi, arxivlangan tovar, manfiy qoldiq, limitdan
--- oshgan nasiya va h.k. — axborot, provodkaga ta'sir yo'q; BO-14 "Sinxron istisnolari" (qaror #56)
+-- oshgan nasiya/tasdiq limiti, qarz to'lovi farqlari, yopilgan davrga kech kelgan voqea va h.k. — axborot, voqea
+-- rad etilmaydi; BO-14 "Sinxron istisnolari" (qaror #56)
 CREATE TABLE app.sync_exceptions (
   id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
   tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
   device_id       UUID NULL REFERENCES app.devices(id),
   client_event_id UUID NULL,
-  kind            TEXT NOT NULL, -- istisno kodi (16-offline-sync.md §5 ro'yxati)
+  kind            TEXT NOT NULL CHECK (kind IN ('price_mismatch','archived_product','stock_negative',
+                    'debt_limit_exceeded_offline','approval_limit_exceeded_offline','receipt_seq_conflict',
+                    'debt_overpayment_offline','debt_allocation_mismatch','late_in_closed_period','cost_unknown',
+                    'count_late_move')), -- 16 §5 ro'yxati
   doc_type        TEXT NULL,
   doc_id          UUID NULL,
   details         JSONB NOT NULL DEFAULT '{}',
@@ -2329,28 +2437,32 @@ CREATE TABLE app.ai_requests (
 );
 CREATE INDEX idx_ai_requests_tenant_month ON app.ai_requests (tenant_id, created_at);
 
--- AI hujjat yozmaydi — tasdiqdan keyin qoralama hujjat (goods_receipts/products/stock_openings/returns) yaratiladi.
+-- AI hujjat yozmaydi — tasdiqdan keyin qoralama hujjat (goods_receipts/stock_openings) yoki mahsulot kartochkalari
+-- (catalog — created_product_ids) yaratiladi. Qaytarish OCR orqali yaratilmaydi (returns faqat POS sync orqali).
 CREATE TABLE app.ai_ocr_jobs (
   id                    UUID PRIMARY KEY DEFAULT app.uuidv7(),
   tenant_id             UUID NOT NULL REFERENCES app.tenants(id),
   branch_id             UUID NULL REFERENCES app.branches(id),
   created_by            UUID NOT NULL REFERENCES app.users(id),
   attachment_id         UUID NOT NULL REFERENCES app.attachments(id),
-  doc_type_hint         TEXT NOT NULL DEFAULT 'purchase' CHECK (doc_type_hint IN ('purchase','catalog','return')), -- 20-api-moliya-admin.md #73–75
+  doc_type_hint         TEXT NOT NULL DEFAULT 'purchase' CHECK (doc_type_hint IN ('purchase','catalog')), -- 20-api-moliya-admin.md #73–75
   status                TEXT NOT NULL DEFAULT 'processing'
                           CHECK (status IN ('processing','done','failed','confirmed','expired')),
   fields                JSONB NULL, -- {header:{supplier_name:{value,confidence},...}, lines:[{...}]}
   low_confidence_fields TEXT[] NOT NULL DEFAULT '{}', -- masalan 'lines[0].product_name'
   error_code            TEXT NULL, -- 'OCR_IMAGE_UNREADABLE', 'AI_PROVIDER_UNAVAILABLE'
   ai_request_id         UUID NULL REFERENCES app.ai_requests(id),
-  created_doc_type      TEXT NULL, -- 'goods_receipts'|'products'|'stock_openings'|'returns' (#75 javobi)
+  created_doc_type      TEXT NULL CHECK (created_doc_type IN ('goods_receipts','stock_openings')), -- (#75 javobi)
   created_doc_id        UUID NULL,
+  created_product_ids   UUID[] NOT NULL DEFAULT '{}', -- catalog tasdig'ida yaratilgan mahsulotlar
   created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
   finished_at           TIMESTAMPTZ NULL,
   confirmed_at          TIMESTAMPTZ NULL,
   expires_at            TIMESTAMPTZ NOT NULL, -- created_at + 7 kun (standart, sozlanadi), keyin 'expired' va fields tozalanadi
-  CHECK (status <> 'confirmed' OR (created_doc_id IS NOT NULL AND confirmed_at IS NOT NULL))
+  CHECK (status <> 'confirmed' OR ((created_doc_id IS NOT NULL OR cardinality(created_product_ids) > 0)
+                                   AND confirmed_at IS NOT NULL)),
+  CHECK ((created_doc_type IS NULL) = (created_doc_id IS NULL))
 );
 CREATE INDEX idx_ai_ocr_jobs_expiry ON app.ai_ocr_jobs (expires_at) WHERE status IN ('processing','done');
 ALTER TABLE app.goods_receipts ADD CONSTRAINT fk_gr_ocr_job FOREIGN KEY (ai_ocr_job_id) REFERENCES app.ai_ocr_jobs(id);
@@ -2464,30 +2576,48 @@ BEGIN
 END $$;
 ```
 
-Bu blok — bitta martalik (0025-revizion). Undan keyingi revizionlar `updated_at`li yangi jadvallarga trigger'ni aniq yozadi. `0028 onec_integration` (2.11-bo'lim) — 13 jadval:
+Bu blok — bitta martalik (0025-revizion). Undan keyingi revizionlar `updated_at`li yangi jadvallarga trigger'ni aniq yozadi. `0028 store_agent` (2.11-bo'lim, Do'kon agenti umumiy registri) — 2 jadval:
 
 ```sql
 DO $$
 DECLARE t TEXT;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['onec_agents','onec_bases','onec_settings','onec_branch_bindings','onec_catalog_items',
-    'onec_mappings','onec_value_mappings','onec_ref_create_requests','onec_export_batches','onec_export_items',
-    'onec_object_refs','onec_agent_tasks','onec_reconciliations'] LOOP
+  FOREACH t IN ARRAY ARRAY['onec_agents','onec_agent_tasks'] LOOP
     EXECUTE format(
       'CREATE TRIGGER trg_set_updated_at BEFORE UPDATE ON app.%I FOR EACH ROW EXECUTE FUNCTION app.set_updated_at()', t);
   END LOOP;
 END $$;
 ```
 
-`updated_at`siz (faqat INSERT yoki o'zgarmas qator): `onec_metadata_snapshots`, `onec_export_item_sources`, `onec_task_results`, `onec_events`, `onec_agent_logs`, `auth.onec_device_authorizations`.
+`0029 onec_integration` (2.11-bo'lim, 1C ga xos jadvallar) — 11 jadval:
+
+```sql
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['onec_bases','onec_settings','onec_branch_bindings','onec_catalog_items',
+    'onec_mappings','onec_value_mappings','onec_ref_create_requests','onec_export_batches','onec_export_items',
+    'onec_object_refs','onec_reconciliations'] LOOP
+    EXECUTE format(
+      'CREATE TRIGGER trg_set_updated_at BEFORE UPDATE ON app.%I FOR EACH ROW EXECUTE FUNCTION app.set_updated_at()', t);
+  END LOOP;
+END $$;
+```
+
+`updated_at`siz (faqat INSERT yoki o'zgarmas qator): `onec_task_results`, `auth.onec_device_authorizations` (0028); `onec_metadata_snapshots`, `onec_export_item_sources`, `onec_events`, `onec_agent_logs` (0029).
 
 ### 2.11 1C integratsiyasi (`onec_*`)
 
-1C integratsiya moduli (qaror #36–#42, MVP'dan keyin Bosqich 7) jadvallari — manba `33-1c-integratsiya.md` §5. Jami **19 jadval**: `app` sxemasida 18 ta (`tenant_id NOT NULL`, oddiy `tenant_isolation` RLS) + `auth.onec_device_authorizations` (RFC 8628 device grant; tenant tasdiqqacha noma'lum, shuning uchun `auth` sxemasida, faqat `SECURITY DEFINER` funksiyalar orqali). Hammasi bitta Alembic revizionda — `0028 onec_integration` (6.1-bo'lim). Istisno (1.3-bo'limdan): 1C hujjat vaqti (`onec_export_items.doc_time`, `onec_object_refs.onec_date`) — `TIMESTAMP` (zonasiz, Asia/Tashkent mahalliy vaqti — 1C `Дата` shunday saqlaydi). DDL izohlaridagi `§` havolalari — `33-1c-integratsiya.md` bo'limlari («FK §5.21» — shu bo'lim oxiridagi kechiktirilgan FK bloki).
+Do'kon agenti va 1C integratsiya moduli jadvallari — manba `33-1c-integratsiya.md` §5. Jami **19 jadval**: `app` sxemasida 18 ta (`tenant_id NOT NULL`, oddiy `tenant_isolation` RLS) + `auth.onec_device_authorizations` (RFC 8628 device grant; tenant tasdiqqacha noma'lum, shuning uchun `auth` sxemasida, faqat `SECURITY DEFINER` funksiyalar orqali). Ikki Alembic revizion (6.1-bo'lim, qaror #66):
+
+- **`0028 store_agent` (Bosqich 5)** — Do'kon agenti umumiy registri (nomi 33 bilan moslik uchun `onec_` prefiksli): `onec_agents`, `onec_agent_tasks`, `onec_task_results`, `auth.onec_device_authorizations` + `cash_registers.fiscal_agent_id` FK'i (`fk_cr_fiscal_agent`). Agentni ulash, token, imzoli vazifa navbati, fiskal ko'prik/printer xizmat vazifalari shu revizionga tayanadi; `onec_agent_tasks` ning 1C ga ishora qiluvchi ustunlari (`base_id`, `batch_id`, `item_id`, `ref_create_request_id`, `reconciliation_id`) FK'siz yaratiladi.
+- **`0029 onec_integration` (Bosqich 7)** — qolgan 15 ta 1C ga xos jadval (`onec_bases` … `onec_agent_logs`), `onec_forbid_namespace_change` trigger'i va kechiktirilgan FK'lar, jumladan `onec_agent_tasks` ga `fk_oat_base`, `fk_oat_batch`, `fk_oat_item`, `fk_oat_ref_create`, `fk_oat_reconciliation`.
+
+Istisno (1.3-bo'limdan): 1C hujjat vaqti (`onec_export_items.doc_time`, `onec_object_refs.onec_date`) — `TIMESTAMP` (zonasiz, Asia/Tashkent mahalliy vaqti — 1C `Дата` shunday saqlaydi). DDL izohlaridagi `§` havolalari — `33-1c-integratsiya.md` bo'limlari («FK §5.21» — shu bo'lim oxiridagi kechiktirilgan FK bloki).
 
 | Jadval | Maqsad | Saqlash muddati |
 |---|---|---|
-| `onec_agents` | Ulangan agentlar (har PK — bitta), `devices` bilan 1:1 | Doimiy (revoke — holat) |
+| `onec_agents` | Ulangan Do'kon agentlari (har PK — bitta), `devices` bilan 1:1, imkoniyatlar (`capabilities`) | Doimiy (revoke — holat) |
 | `onec_bases` | Agent ulagan 1C bazalari, qulf №1, onboarding natijasi | Doimiy (arxiv — holat) |
 | `onec_settings` | Baza bo'yicha rejim, jadval, avto-tasdiq, siyosatlar | Doimiy |
 | `onec_branch_bindings` | Filial → baza yo'naltirish | Doimiy (arxiv) |
@@ -2500,7 +2630,7 @@ END $$;
 | `onec_export_items` | Partiyadagi har 1C obyekti (urinish, holat) | 5 yil (`op_spec` — 90 kun) |
 | `onec_export_item_sources` | Item ↔ ERP manba hujjatlari | 5 yil |
 | `onec_object_refs` | ERP yozgan har 1C obyektining daftari | 5 yil |
-| `onec_agent_tasks` | Imzolangan vazifalar navbati, lease | 5 yil (yozish), 30 kun (o'qish) |
+| `onec_agent_tasks` | Imzolangan vazifalar navbati (1C va qurilma xizmati), lease | 5 yil (yozish), 30 kun (o'qish va xizmat) |
 | `onec_task_results` | Har urinish natijasi (xom) | 5 yil (yozish), 30 kun (o'qish) |
 | `onec_reconciliations` | Solishtirish natijalari (partiya jamlari, drift, qoldiq) | 5 yil |
 | `onec_events` | Server voqealar lentasi (BO-23 progress, BO-22 jurnal) | 1 yil |
@@ -2508,6 +2638,8 @@ END $$;
 | `auth.onec_device_authorizations` | RFC 8628 device grant holati | 30 kun |
 
 Mavjud jadvallarga bog'liq qismlar: `devices.kind = 'onec_agent'` va `devices.outbox_*` (2.3), `attachments.kind = 'onec_diagnostics'` (2.6), `signing_keys.purpose` `'onec_task'`/`'agent_update'` (2.1), `oauth_clients` qatori `onec-agent` (5.1). `notification_settings.kind` — CHECK'siz `TEXT`; 1C turlari `onec_export_result`, `onec_problems` (33 §13.3).
+
+**`0028 store_agent` jadvallari** (Bosqich 5):
 
 #### `onec_agents`
 
@@ -2530,6 +2662,8 @@ CREATE TABLE app.onec_agents (
   public_key_thumbprint   TEXT NOT NULL,                 -- RFC 7638 JWK thumbprint (base64url)
   status                  TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','revoked')),
   update_channel          TEXT NOT NULL DEFAULT 'stable' CHECK (update_channel IN ('stable','pilot')),
+  capabilities            JSONB NOT NULL DEFAULT '{}',   -- 34 §14.2 sxemasi; A-01 hello'dan yangilanadi
+                                                         -- (vazifa faqat capabilities.<oila>.enabled = true bo'lsa navbatga qo'yiladi)
   paired_by               UUID NOT NULL REFERENCES app.users(id),
   paired_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
   paired_ip               INET NULL,
@@ -2550,7 +2684,129 @@ CREATE TABLE app.onec_agents (
   CHECK (status <> 'revoked' OR (revoked_at IS NOT NULL AND revoke_reason IS NOT NULL))
 );
 CREATE INDEX idx_onec_agents_tenant_status ON app.onec_agents (tenant_id, status);
+-- kassa ↔ agent bog'lanishi (lokal fiskal ko'prik, qaror #66); cash_registers.fiscal_agent_id 0002 da FK'siz
+ALTER TABLE app.cash_registers ADD CONSTRAINT fk_cr_fiscal_agent FOREIGN KEY (fiscal_agent_id) REFERENCES app.onec_agents(id);
 ```
+
+#### `onec_agent_tasks`
+
+Agent faqat shu jadvaldan vazifa oladi (pull, lease, imzo). Holat mashinasi — 33 §5.15. Xizmat vazifalari (`fiscal.*`, `print.raw`, `scale.plu_upload`; `purpose='device_service'`) — 1C bazasiz, payload'lari 34 §14.3. `base_id`, `batch_id`, `item_id`, `ref_create_request_id`, `reconciliation_id` FK'lari — `0029 onec_integration` da (kechiktirilgan FK bloki).
+
+```sql
+CREATE TABLE app.onec_agent_tasks (
+  id                     UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id              UUID NOT NULL REFERENCES app.tenants(id),
+  agent_id               UUID NOT NULL REFERENCES app.onec_agents(id),
+  base_id                UUID NULL,   -- NULL: agent darajasidagi vazifa; FK fk_oat_base (0029)
+  batch_id               UUID NULL,   -- FK fk_oat_batch (0029)
+  item_id                UUID NULL,   -- FK fk_oat_item (0029)
+  ref_create_request_id  UUID NULL,   -- FK fk_oat_ref_create (0029)
+  reconciliation_id      UUID NULL,   -- FK fk_oat_reconciliation (0029)
+  kind                   TEXT NOT NULL CHECK (kind IN ('probe','discover_bases','read_metadata','read_refs',
+                           'read_date_prohibition','read_totals','read_stock_balances','preview_object','write_object',
+                           'post_object','unpost_object','mark_delete_object','collect_diagnostics',
+                           'fiscal.status','fiscal.resend_unsent','fiscal.zreport','print.raw','scale.plu_upload')),
+  purpose                TEXT NOT NULL CHECK (purpose IN ('onboarding','mapping','export','reconcile','correction',
+                           'ref_create','diagnostics','user_test','device_service')),
+  is_write               BOOLEAN GENERATED ALWAYS AS
+                           (kind IN ('write_object','post_object','unpost_object','mark_delete_object')) STORED,
+  priority               SMALLINT NOT NULL DEFAULT 100,  -- kichik = birinchi: user_test/onboarding 10, mapping 30, ref_create 50, export 100, reconcile 150
+  payload                JSONB NOT NULL,                 -- §9.5 vazifa turi bo'yicha
+  payload_sha256         TEXT NOT NULL CHECK (payload_sha256 ~ '^[0-9a-f]{64}$'),  -- SHA-256(JCS(payload))
+  status                 TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','leased','done','failed','expired','cancelled')),
+  attempt                INT NOT NULL DEFAULT 1 CHECK (attempt >= 1),
+  timeout_s              INT NOT NULL CHECK (timeout_s BETWEEN 10 AND 1800),
+  not_before             TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at             TIMESTAMPTZ NULL,               -- shu vaqtgacha lease qilinmasa → expired (o'qish vazifalari)
+  lease_id               UUID NULL,
+  leased_at              TIMESTAMPTZ NULL,
+  lease_until            TIMESTAMPTZ NULL,
+  heartbeat_at           TIMESTAMPTZ NULL,
+  progress               JSONB NULL,                     -- {"stage":"posting","pct":40}
+  signing_kid            UUID NULL,                      -- platform.signing_keys.kid (purpose='onec_task')
+  signature              TEXT NULL,                      -- compact JWS (§9.4)
+  outcome                TEXT NULL CHECK (outcome IN ('done','failed','unknown')),
+  error_code             TEXT NULL,
+  finished_at            TIMESTAMPTZ NULL,
+  created_by             UUID NULL REFERENCES app.users(id),
+  created_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (status <> 'leased' OR (lease_id IS NOT NULL AND lease_until IS NOT NULL AND signature IS NOT NULL)),
+  CHECK (status NOT IN ('done','failed') OR outcome IS NOT NULL),
+  CHECK (base_id IS NOT NULL OR kind IN ('probe','discover_bases','collect_diagnostics',
+         'fiscal.status','fiscal.resend_unsent','fiscal.zreport','print.raw','scale.plu_upload')),
+  CHECK ((kind LIKE '%.%') = (purpose = 'device_service')),
+  CHECK (kind NOT LIKE '%.%' OR base_id IS NULL),
+  CHECK (NOT is_write OR base_id IS NOT NULL)
+);
+CREATE INDEX idx_onec_tasks_dispatch ON app.onec_agent_tasks (agent_id, priority, not_before) WHERE status = 'queued';
+CREATE INDEX idx_onec_tasks_lease ON app.onec_agent_tasks (lease_until) WHERE status = 'leased';
+-- bitta bazada bir vaqtda bitta lease (bitta COM sessiya, fayl bazada 1C qulflari)
+CREATE UNIQUE INDEX uq_onec_tasks_one_leased_per_base ON app.onec_agent_tasks (base_id)
+  WHERE status = 'leased' AND base_id IS NOT NULL;
+-- agent darajasidagi vazifadan bir vaqtda bittasi
+CREATE UNIQUE INDEX uq_onec_tasks_one_leased_agent_level ON app.onec_agent_tasks (agent_id)
+  WHERE status = 'leased' AND base_id IS NULL;
+CREATE INDEX idx_onec_tasks_item ON app.onec_agent_tasks (item_id) WHERE item_id IS NOT NULL;
+```
+
+#### `onec_task_results`
+
+Har urinishning xom natijasi; ilova faqat `INSERT` qiladi, o'qish natijalari 30 kundan keyin `onec_cleanup` bilan o'chiriladi (shuning uchun 3-bo'limdagi append-only ro'yxatda yo'q).
+
+```sql
+CREATE TABLE app.onec_task_results (
+  id             UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id      UUID NOT NULL REFERENCES app.tenants(id),
+  task_id        UUID NOT NULL REFERENCES app.onec_agent_tasks(id),
+  lease_id       UUID NOT NULL,
+  attempt        INT NOT NULL,
+  outcome        TEXT NOT NULL CHECK (outcome IN ('done','failed','unknown')),
+  data           JSONB NOT NULL DEFAULT '{}',   -- read_refs/read_metadata katta qismi o'z jadvaliga ko'chiriladi, bu yerda qisqartiriladi
+  data_trimmed   BOOLEAN NOT NULL DEFAULT false,
+  error          JSONB NULL,                    -- §9.10
+  duration_ms    INT NULL CHECK (duration_ms >= 0),
+  agent_version  TEXT NULL,
+  worker_bits    SMALLINT NULL CHECK (worker_bits IN (32,64)),
+  late           BOOLEAN NOT NULL DEFAULT false, -- lease muddati o'tgandan keyin keldi
+  received_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (task_id, lease_id)
+);
+```
+
+#### `auth.onec_device_authorizations`
+
+RFC 8628 device grant holati (agentni ulash, 30 kun saqlanadi). `erp_app`ga hech qanday grant yo'q — kirish faqat 4.5-bo'limdagi `onec_device_auth_*` funksiyalari orqali; RLS yoqilmaydi (boshqa `auth.*` kabi, 6.2 CI istisnosi).
+
+```sql
+CREATE TABLE auth.onec_device_authorizations (
+  id                     UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  device_code_hash       TEXT NOT NULL UNIQUE,      -- SHA-256(device_code); kodning o'zi saqlanmaydi
+  user_code              TEXT NOT NULL CHECK (user_code ~ '^[BCDFGHJKLMNPQRSTVWXZ]{8}$'),  -- chiziqchasiz, katta harf
+  client_id              TEXT NOT NULL DEFAULT 'onec-agent',
+  scope                  TEXT NOT NULL DEFAULT 'onec.agent',
+  public_jwk             JSONB NOT NULL,
+  public_key_thumbprint  TEXT NOT NULL,
+  machine_hash           TEXT NOT NULL,
+  pc_name                TEXT NOT NULL,
+  os_version             TEXT NULL,
+  agent_version          TEXT NULL,
+  request_ip             INET NULL,
+  status                 TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','denied','consumed','expired')),
+  tenant_id              UUID NULL REFERENCES app.tenants(id),
+  approved_by            UUID NULL REFERENCES app.users(id),
+  approved_at            TIMESTAMPTZ NULL,
+  agent_id               UUID NULL,                 -- tasdiqlanganda yaratilgan app.onec_agents.id
+  poll_interval_s        INT NOT NULL DEFAULT 5,
+  last_poll_at           TIMESTAMPTZ NULL,
+  expires_at             TIMESTAMPTZ NOT NULL,      -- created_at + 10 daqiqa
+  created_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (status NOT IN ('approved','consumed') OR (tenant_id IS NOT NULL AND agent_id IS NOT NULL AND approved_by IS NOT NULL))
+);
+CREATE UNIQUE INDEX uq_onec_device_auth_user_code_pending ON auth.onec_device_authorizations (user_code) WHERE status = 'pending';
+```
+
+**`0029 onec_integration` jadvallari** (Bosqich 7):
 
 #### `onec_bases`
 
@@ -3037,88 +3293,6 @@ CREATE TABLE app.onec_object_refs (
 CREATE INDEX idx_onec_object_refs_drift ON app.onec_object_refs (base_id, last_written_at DESC) WHERE state = 'active';
 ```
 
-#### `onec_agent_tasks`
-
-Agent faqat shu jadvaldan vazifa oladi (pull, lease, imzo). Holat mashinasi — 33 §5.15.
-
-```sql
-CREATE TABLE app.onec_agent_tasks (
-  id                     UUID PRIMARY KEY DEFAULT app.uuidv7(),
-  tenant_id              UUID NOT NULL REFERENCES app.tenants(id),
-  agent_id               UUID NOT NULL REFERENCES app.onec_agents(id),
-  base_id                UUID NULL REFERENCES app.onec_bases(id),   -- NULL: agent darajasidagi vazifa
-  batch_id               UUID NULL REFERENCES app.onec_export_batches(id),
-  item_id                UUID NULL REFERENCES app.onec_export_items(id),
-  ref_create_request_id  UUID NULL REFERENCES app.onec_ref_create_requests(id),
-  reconciliation_id      UUID NULL,                                 -- FK §5.21
-  kind                   TEXT NOT NULL CHECK (kind IN ('probe','discover_bases','read_metadata','read_refs',
-                           'read_date_prohibition','read_totals','read_stock_balances','preview_object','write_object',
-                           'post_object','unpost_object','mark_delete_object','collect_diagnostics')),
-  purpose                TEXT NOT NULL CHECK (purpose IN ('onboarding','mapping','export','reconcile','correction',
-                           'ref_create','diagnostics','user_test')),
-  is_write               BOOLEAN GENERATED ALWAYS AS
-                           (kind IN ('write_object','post_object','unpost_object','mark_delete_object')) STORED,
-  priority               SMALLINT NOT NULL DEFAULT 100,  -- kichik = birinchi: user_test/onboarding 10, mapping 30, ref_create 50, export 100, reconcile 150
-  payload                JSONB NOT NULL,                 -- §9.5 vazifa turi bo'yicha
-  payload_sha256         TEXT NOT NULL CHECK (payload_sha256 ~ '^[0-9a-f]{64}$'),  -- SHA-256(JCS(payload))
-  status                 TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','leased','done','failed','expired','cancelled')),
-  attempt                INT NOT NULL DEFAULT 1 CHECK (attempt >= 1),
-  timeout_s              INT NOT NULL CHECK (timeout_s BETWEEN 10 AND 1800),
-  not_before             TIMESTAMPTZ NOT NULL DEFAULT now(),
-  expires_at             TIMESTAMPTZ NULL,               -- shu vaqtgacha lease qilinmasa → expired (o'qish vazifalari)
-  lease_id               UUID NULL,
-  leased_at              TIMESTAMPTZ NULL,
-  lease_until            TIMESTAMPTZ NULL,
-  heartbeat_at           TIMESTAMPTZ NULL,
-  progress               JSONB NULL,                     -- {"stage":"posting","pct":40}
-  signing_kid            UUID NULL,                      -- platform.signing_keys.kid (purpose='onec_task')
-  signature              TEXT NULL,                      -- compact JWS (§9.4)
-  outcome                TEXT NULL CHECK (outcome IN ('done','failed','unknown')),
-  error_code             TEXT NULL,
-  finished_at            TIMESTAMPTZ NULL,
-  created_by             UUID NULL REFERENCES app.users(id),
-  created_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CHECK (status <> 'leased' OR (lease_id IS NOT NULL AND lease_until IS NOT NULL AND signature IS NOT NULL)),
-  CHECK (status NOT IN ('done','failed') OR outcome IS NOT NULL),
-  CHECK (base_id IS NOT NULL OR kind IN ('probe','discover_bases','collect_diagnostics')),
-  CHECK (NOT is_write OR base_id IS NOT NULL)
-);
-CREATE INDEX idx_onec_tasks_dispatch ON app.onec_agent_tasks (agent_id, priority, not_before) WHERE status = 'queued';
-CREATE INDEX idx_onec_tasks_lease ON app.onec_agent_tasks (lease_until) WHERE status = 'leased';
--- bitta bazada bir vaqtda bitta lease (bitta COM sessiya, fayl bazada 1C qulflari)
-CREATE UNIQUE INDEX uq_onec_tasks_one_leased_per_base ON app.onec_agent_tasks (base_id)
-  WHERE status = 'leased' AND base_id IS NOT NULL;
--- agent darajasidagi vazifadan bir vaqtda bittasi
-CREATE UNIQUE INDEX uq_onec_tasks_one_leased_agent_level ON app.onec_agent_tasks (agent_id)
-  WHERE status = 'leased' AND base_id IS NULL;
-CREATE INDEX idx_onec_tasks_item ON app.onec_agent_tasks (item_id) WHERE item_id IS NOT NULL;
-```
-
-#### `onec_task_results`
-
-Har urinishning xom natijasi; ilova faqat `INSERT` qiladi, o'qish natijalari 30 kundan keyin `onec_cleanup` bilan o'chiriladi (shuning uchun 3-bo'limdagi append-only ro'yxatda yo'q).
-
-```sql
-CREATE TABLE app.onec_task_results (
-  id             UUID PRIMARY KEY DEFAULT app.uuidv7(),
-  tenant_id      UUID NOT NULL REFERENCES app.tenants(id),
-  task_id        UUID NOT NULL REFERENCES app.onec_agent_tasks(id),
-  lease_id       UUID NOT NULL,
-  attempt        INT NOT NULL,
-  outcome        TEXT NOT NULL CHECK (outcome IN ('done','failed','unknown')),
-  data           JSONB NOT NULL DEFAULT '{}',   -- read_refs/read_metadata katta qismi o'z jadvaliga ko'chiriladi, bu yerda qisqartiriladi
-  data_trimmed   BOOLEAN NOT NULL DEFAULT false,
-  error          JSONB NULL,                    -- §9.10
-  duration_ms    INT NULL CHECK (duration_ms >= 0),
-  agent_version  TEXT NULL,
-  worker_bits    SMALLINT NULL CHECK (worker_bits IN (32,64)),
-  late           BOOLEAN NOT NULL DEFAULT false, -- lease muddati o'tgandan keyin keldi
-  received_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (task_id, lease_id)
-);
-```
-
 #### `onec_reconciliations`
 
 Solishtirish natijalari: `batch_totals`, `drift`, `stock_balance`, `opening_stock`.
@@ -3193,41 +3367,9 @@ CREATE TABLE app.onec_agent_logs (
 CREATE INDEX idx_onec_agent_logs_agent_time ON app.onec_agent_logs (agent_id, at DESC);
 ```
 
-#### `auth.onec_device_authorizations`
-
-RFC 8628 device grant holati (agentni ulash, 30 kun saqlanadi). `erp_app`ga hech qanday grant yo'q — kirish faqat 4.5-bo'limdagi `onec_device_auth_*` funksiyalari orqali; RLS yoqilmaydi (boshqa `auth.*` kabi, 6.2 CI istisnosi).
-
-```sql
-CREATE TABLE auth.onec_device_authorizations (
-  id                     UUID PRIMARY KEY DEFAULT app.uuidv7(),
-  device_code_hash       TEXT NOT NULL UNIQUE,      -- SHA-256(device_code); kodning o'zi saqlanmaydi
-  user_code              TEXT NOT NULL CHECK (user_code ~ '^[BCDFGHJKLMNPQRSTVWXZ]{8}$'),  -- chiziqchasiz, katta harf
-  client_id              TEXT NOT NULL DEFAULT 'onec-agent',
-  scope                  TEXT NOT NULL DEFAULT 'onec.agent',
-  public_jwk             JSONB NOT NULL,
-  public_key_thumbprint  TEXT NOT NULL,
-  machine_hash           TEXT NOT NULL,
-  pc_name                TEXT NOT NULL,
-  os_version             TEXT NULL,
-  agent_version          TEXT NULL,
-  request_ip             INET NULL,
-  status                 TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','denied','consumed','expired')),
-  tenant_id              UUID NULL REFERENCES app.tenants(id),
-  approved_by            UUID NULL REFERENCES app.users(id),
-  approved_at            TIMESTAMPTZ NULL,
-  agent_id               UUID NULL,                 -- tasdiqlanganda yaratilgan app.onec_agents.id
-  poll_interval_s        INT NOT NULL DEFAULT 5,
-  last_poll_at           TIMESTAMPTZ NULL,
-  expires_at             TIMESTAMPTZ NOT NULL,      -- created_at + 10 daqiqa
-  created_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CHECK (status NOT IN ('approved','consumed') OR (tenant_id IS NOT NULL AND agent_id IS NOT NULL AND approved_by IS NOT NULL))
-);
-CREATE UNIQUE INDEX uq_onec_device_auth_user_code_pending ON auth.onec_device_authorizations (user_code) WHERE status = 'pending';
-```
-
 #### Kechiktirilgan FK
 
-Aylana bog'liqliklar (`onec_agent_tasks` ↔ `onec_reconciliations`, `onec_export_items` ↔ `onec_object_refs` va h.k.) — barcha jadvallar yaratilgandan keyin, shu revizionda. O'qish vazifalari 30 kundan keyin `onec_cleanup` bilan o'chiriladi — ularga ishora qiluvchi uzoq yashovchi jadvallarning `task_id` FK'lari `ON DELETE SET NULL`:
+Aylana bog'liqliklar (`onec_agent_tasks` ↔ `onec_reconciliations`, `onec_export_items` ↔ `onec_object_refs` va h.k.) — `0029 onec_integration` revizionida, barcha jadvallar yaratilgandan keyin. O'qish vazifalari 30 kundan keyin `onec_cleanup` bilan o'chiriladi — ularga ishora qiluvchi uzoq yashovchi jadvallarning `task_id` FK'lari `ON DELETE SET NULL`:
 
 ```sql
 ALTER TABLE app.onec_metadata_snapshots  ADD CONSTRAINT fk_onec_meta_task        FOREIGN KEY (task_id)           REFERENCES app.onec_agent_tasks(id) ON DELETE SET NULL;
@@ -3236,7 +3378,12 @@ ALTER TABLE app.onec_export_items        ADD CONSTRAINT fk_onec_items_last_task 
 ALTER TABLE app.onec_object_refs         ADD CONSTRAINT fk_onec_refs_last_item   FOREIGN KEY (last_item_id)      REFERENCES app.onec_export_items(id);
 ALTER TABLE app.onec_ref_create_requests ADD CONSTRAINT fk_onec_rcr_task         FOREIGN KEY (task_id)           REFERENCES app.onec_agent_tasks(id);
 ALTER TABLE app.onec_ref_create_requests ADD CONSTRAINT fk_onec_rcr_batch        FOREIGN KEY (batch_id)          REFERENCES app.onec_export_batches(id);
-ALTER TABLE app.onec_agent_tasks         ADD CONSTRAINT fk_onec_tasks_recon      FOREIGN KEY (reconciliation_id) REFERENCES app.onec_reconciliations(id);
+-- onec_agent_tasks (0028 da FK'siz yaratilgan) — 1C jadvallariga FK'lar
+ALTER TABLE app.onec_agent_tasks         ADD CONSTRAINT fk_oat_base              FOREIGN KEY (base_id)               REFERENCES app.onec_bases(id);
+ALTER TABLE app.onec_agent_tasks         ADD CONSTRAINT fk_oat_batch             FOREIGN KEY (batch_id)              REFERENCES app.onec_export_batches(id);
+ALTER TABLE app.onec_agent_tasks         ADD CONSTRAINT fk_oat_item              FOREIGN KEY (item_id)               REFERENCES app.onec_export_items(id);
+ALTER TABLE app.onec_agent_tasks         ADD CONSTRAINT fk_oat_ref_create        FOREIGN KEY (ref_create_request_id) REFERENCES app.onec_ref_create_requests(id);
+ALTER TABLE app.onec_agent_tasks         ADD CONSTRAINT fk_oat_reconciliation    FOREIGN KEY (reconciliation_id)     REFERENCES app.onec_reconciliations(id);
 ```
 
 RLS uchligi — 4.2-bo'lim, grantlar — 4.4, `updated_at` trigger'lari — 2.10, `SECURITY DEFINER` funksiyalar — 4.5.
@@ -3328,15 +3475,29 @@ END $$;
 
 Bu blok — **bitta martalik** ijro (boshlang'ich migratsiyada, barcha jadvallar yaratilgandan keyin). Keyingi migratsiyalarda qo'shilgan har bir yangi `tenant_id`li jadval uchun **aniq** `ENABLE`/`FORCE`/`CREATE POLICY` uchligi o'z revizionida yozilishi shart — CI tekshiruvi (6-bo'lim) buni tasdiqlaydi.
 
-`0028 onec_integration` (2.11-bo'lim) — 18 ta `app.onec_*` jadvali, hammasi oddiy `tenant_isolation` (maxsus siyosat yo'q; `auth.onec_device_authorizations` — RLS'siz, 6.2 istisnosi):
+2.11-bo'lim jadvallari — hammasi oddiy `tenant_isolation` (maxsus siyosat yo'q; `auth.onec_device_authorizations` — RLS'siz, 6.2 istisnosi). `0028 store_agent` — 3 jadval:
 
 ```sql
 DO $$
 DECLARE t TEXT;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['onec_agents','onec_bases','onec_settings','onec_branch_bindings','onec_metadata_snapshots',
+  FOREACH t IN ARRAY ARRAY['onec_agents','onec_agent_tasks','onec_task_results'] LOOP
+    EXECUTE format('ALTER TABLE app.%I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format('ALTER TABLE app.%I FORCE ROW LEVEL SECURITY', t);
+    EXECUTE format('CREATE POLICY tenant_isolation ON app.%I USING (tenant_id = app.current_tenant_id()) WITH CHECK (tenant_id = app.current_tenant_id())', t);
+  END LOOP;
+END $$;
+```
+
+`0029 onec_integration` — 15 jadval:
+
+```sql
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['onec_bases','onec_settings','onec_branch_bindings','onec_metadata_snapshots',
     'onec_catalog_items','onec_mappings','onec_value_mappings','onec_ref_create_requests','onec_export_batches',
-    'onec_export_items','onec_export_item_sources','onec_object_refs','onec_agent_tasks','onec_task_results',
+    'onec_export_items','onec_export_item_sources','onec_object_refs',
     'onec_reconciliations','onec_events','onec_agent_logs'] LOOP
     EXECUTE format('ALTER TABLE app.%I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('ALTER TABLE app.%I FORCE ROW LEVEL SECURITY', t);
@@ -3384,12 +3545,12 @@ CREATE POLICY memberships_scope ON app.memberships
 
 ### 4.4 Global/platforma jadvallari — RLS o'rniga GRANT cheklovi
 
-`plans`, `addons`, `units`, `oauth_clients`, `signing_keys`, `label_templates`, `marking_product_groups`, `terms_versions`, `fx_rates` — `tenant_id`siz, RLS **yoqilmaydi**; o'rniga faqat `SELECT` beriladi (yozish — faqat `erp_migrator`/admin yo'li orqali). `platform_admins` — `erp_app`ga **umuman** grant yo'q (platforma admin BFF alohida, yuqori ishonchli yo'l orqali ishlaydi, `15-xavfsizlik-va-audit.md` §3.4).
+`plans`, `addons`, `units`, `oauth_clients`, `signing_keys`, `label_templates`, `marking_product_groups`, `terms_versions`, `turnover_tax_rates`, `fx_rates` — `tenant_id`siz, RLS **yoqilmaydi**; o'rniga faqat `SELECT` beriladi (yozish — faqat `erp_migrator`/admin yo'li orqali). `platform_admins` — `erp_app`ga **umuman** grant yo'q (platforma admin BFF alohida, yuqori ishonchli yo'l orqali ishlaydi, `15-xavfsizlik-va-audit.md` §3.4).
 
 ```sql
 GRANT SELECT ON platform.plans, platform.addons, platform.units,
                 platform.oauth_clients, platform.signing_keys, platform.label_templates,
-                platform.marking_product_groups, platform.terms_versions
+                platform.marking_product_groups, platform.terms_versions, platform.turnover_tax_rates
   TO erp_app;
 -- kurs scheduler'i (erp_app ulanishi) yozadi (qaror #55)
 GRANT SELECT, INSERT, UPDATE ON platform.fx_rates TO erp_app;
@@ -3403,16 +3564,22 @@ REVOKE ALL ON SCHEMA auth FROM PUBLIC, erp_app;
 GRANT ALL ON ALL TABLES IN SCHEMA auth TO erp_system;
 ```
 
-`ON ALL TABLES IN SCHEMA` grantlari faqat ijro paytidagi jadvallarga ta'sir qiladi va keyingi revizionda qayta ishlatilmaydi (append-only jadvallardagi `REVOKE UPDATE, DELETE`ni qaytarib beradi, 3-bo'lim). `0028 onec_integration` grantlarni jadval nomi bilan beradi:
+`ON ALL TABLES IN SCHEMA` grantlari faqat ijro paytidagi jadvallarga ta'sir qiladi va keyingi revizionda qayta ishlatilmaydi (append-only jadvallardagi `REVOKE UPDATE, DELETE`ni qaytarib beradi, 3-bo'lim). `0028 store_agent` va `0029 onec_integration` grantlarni jadval nomi bilan beradi:
 
 ```sql
+-- 0028 store_agent
+GRANT SELECT, INSERT, UPDATE, DELETE ON app.onec_agents, app.onec_agent_tasks, app.onec_task_results TO erp_app;
+GRANT ALL ON auth.onec_device_authorizations TO erp_system; -- erp_app'ga hech qanday grant yo'q
+```
+
+```sql
+-- 0029 onec_integration
 GRANT SELECT, INSERT, UPDATE, DELETE ON
-  app.onec_agents, app.onec_bases, app.onec_settings, app.onec_branch_bindings, app.onec_metadata_snapshots,
+  app.onec_bases, app.onec_settings, app.onec_branch_bindings, app.onec_metadata_snapshots,
   app.onec_catalog_items, app.onec_mappings, app.onec_value_mappings, app.onec_ref_create_requests,
   app.onec_export_batches, app.onec_export_items, app.onec_export_item_sources, app.onec_object_refs,
-  app.onec_agent_tasks, app.onec_task_results, app.onec_reconciliations, app.onec_events, app.onec_agent_logs
+  app.onec_reconciliations, app.onec_events, app.onec_agent_logs
   TO erp_app;
-GRANT ALL ON auth.onec_device_authorizations TO erp_system; -- erp_app'ga hech qanday grant yo'q
 ```
 
 ### 4.5 `SECURITY DEFINER` funksiyalar
@@ -3527,7 +3694,7 @@ GRANT EXECUTE ON FUNCTION app.public_statement_by_token(text) TO erp_app;
 ```
 Telegram ulash kodi (20-api-moliya-admin.md #66) — DB emas, Redis `tg_link:{code}` (TTL 10 daqiqa).
 
-`14-autentifikatsiya-oauth2.md` §7, §16.1.3, §19 dagi token oqimlari uchun 4 ta `SECURITY DEFINER` funksiya — xuddi shu naqsh bilan (`erp_system` egaligida, `SET search_path = app, auth, pg_temp`), `auth.*` jadvallarni yozadi/o'qiydi. Parol/OTP/sessiya yaratish kabi qolgan AS yozuvlari ham shu naqshda (`auth_` prefiksli funksiyalar) `auth` modulida qo'shiladi; CI ro'yxati (§6.2) quyidagi minimal to'plamni tekshiradi.
+`14-autentifikatsiya-oauth2.md` §7, §16.1.3, §19 dagi token oqimlari uchun 4 ta `SECURITY DEFINER` funksiya — xuddi shu naqsh bilan (`erp_system` egaligida, `SET search_path = app, auth, pg_temp`), `auth.*` jadvallarni yozadi/o'qiydi. AS yozuvlari to'liq ro'yxati — shu va keyingi blokda (14 §19 bilan aynan); CI ro'yxati (§6.2) hammasini tekshiradi.
 
 ```sql
 -- Authorization Code — bir martalik iste'mol (atomik): yaroqli bo'lsa used_at qo'yiladi va qator qaytadi,
@@ -3607,8 +3774,9 @@ AS $$
    WHERE tenant_id = p_tenant_id AND revoked_at IS NULL;
 $$;
 
--- Obuna lokauti (14 §16.1.3): p_suspend=true — suspended_at=now(), revoked_reason='subscription'
--- (to'liq bekor emas); p_suspend=false — to'lovdan keyin tozalash (§16.1.5).
+-- Obuna lokauti (14 §16.1.3): p_suspend=true — refresh_tokens.suspended_at=now(), revoked_reason='subscription'
+-- (to'liq bekor emas); p_suspend=false — to'lovdan keyin tozalash (§16.1.5). sessions o'zgarmaydi — kirish
+-- Redis sub_status orqali to'xtaydi.
 CREATE OR REPLACE FUNCTION app.auth_suspend_tenant(p_tenant_id uuid, p_suspend boolean)
 RETURNS void
 LANGUAGE sql SECURITY DEFINER
@@ -3635,9 +3803,360 @@ GRANT EXECUTE ON FUNCTION app.auth_revoke_tenant(uuid, text) TO erp_app;
 GRANT EXECUTE ON FUNCTION app.auth_suspend_tenant(uuid, boolean) TO erp_app;
 ```
 
-#### 1C integratsiyasi funksiyalari (`0028 onec_integration`)
+AS yozuvchi va sessiya funksiyalari (`14-autentifikatsiya-oauth2.md` §2, §4, §7, §16, §18, §19) — 14 ta, naqsh yuqoridagi bilan bir xil; `erp_app` `auth.*` jadvallariga faqat shu bo'limdagi funksiyalar orqali kiradi.
 
-6 ta funksiya — agentni ulash (RFC 8628 device grant, `auth.onec_device_authorizations`), agent tokeni (`private_key_jwt`) va SAQ cron fan-out uchun (`33-1c-integratsiya.md` §5.18, §4.4, §9.2). Naqsh yuqoridagi bilan bir xil: `erp_system` egaligida, `SET search_path = app, auth, pg_temp` (`auth`ga tegmaydiganlarida `app, pg_temp`), `erp_app`ga faqat `EXECUTE`.
+```sql
+-- Authorization Code berish (14 §4): TTL standart 60 s.
+CREATE OR REPLACE FUNCTION app.auth_issue_code(
+  p_code_hash text, p_client_id uuid, p_user_id uuid, p_tenant_id uuid, p_code_challenge text,
+  p_redirect_uri text, p_scope text, p_ttl_s int
+) RETURNS void
+LANGUAGE sql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+  INSERT INTO auth.authorization_codes
+    (code_hash, client_id, user_id, tenant_id, code_challenge, code_challenge_method, redirect_uri, scope, expires_at)
+  VALUES
+    (p_code_hash, p_client_id, p_user_id, p_tenant_id, p_code_challenge, 'S256', p_redirect_uri, p_scope,
+     now() + make_interval(secs => COALESCE(p_ttl_s, 60)));
+$$;
+
+-- Birinchi token juftligi (code almashinuvi yoki login): yangi refresh oilasi; p_with_session=true (BFF mijozlari) —
+-- sessions qatori ham (current_refresh_token_id = shu token). Android (public client) — false, session_id = NULL.
+CREATE OR REPLACE FUNCTION app.auth_issue_tokens(
+  p_user_id uuid, p_tenant_id uuid, p_client_id uuid, p_device_id uuid, p_refresh_token_hash text,
+  p_refresh_expires_at timestamptz, p_scope text, p_with_session boolean, p_idle_expires_at timestamptz,
+  p_absolute_expires_at timestamptz, p_ip inet, p_user_agent text
+) RETURNS TABLE (session_id uuid, refresh_token_id uuid, family_id uuid)
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+#variable_conflict use_column
+DECLARE
+  v_rt  uuid := app.uuidv7();
+  v_fam uuid := app.uuidv7();
+  v_sid uuid;
+BEGIN
+  INSERT INTO auth.refresh_tokens (id, token_hash, family_id, client_id, user_id, tenant_id, device_id, scope, expires_at)
+  VALUES (v_rt, p_refresh_token_hash, v_fam, p_client_id, p_user_id, p_tenant_id, p_device_id, p_scope, p_refresh_expires_at);
+  IF p_with_session THEN
+    INSERT INTO auth.sessions (user_id, tenant_id, client_id, device_id, current_refresh_token_id,
+                               idle_expires_at, absolute_expires_at, ip, user_agent)
+    VALUES (p_user_id, p_tenant_id, p_client_id, p_device_id, v_rt,
+            p_idle_expires_at, p_absolute_expires_at, p_ip, p_user_agent)
+    RETURNING id INTO v_sid;
+  END IF;
+  RETURN QUERY SELECT v_sid, v_rt, v_fam;
+END;
+$$;
+
+-- BFF __Host-sid bo'yicha sessiyani o'qish (Redis keshi bo'sh bo'lganda).
+CREATE OR REPLACE FUNCTION app.auth_session_by_id(p_session_id uuid)
+RETURNS TABLE (session_id uuid, user_id uuid, tenant_id uuid, client_id uuid, device_id uuid,
+               current_refresh_token_id uuid, idle_expires_at timestamptz, absolute_expires_at timestamptz,
+               revoked_at timestamptz)
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+  SELECT s.id, s.user_id, s.tenant_id, s.client_id, s.device_id, s.current_refresh_token_id,
+         s.idle_expires_at, s.absolute_expires_at, s.revoked_at
+  FROM auth.sessions s
+  WHERE s.id = p_session_id;
+$$;
+
+-- Sliding idle: last_seen_at = now(); idle_expires_at absolute_expires_at dan oshmaydi.
+CREATE OR REPLACE FUNCTION app.auth_touch_session(p_session_id uuid, p_idle_expires_at timestamptz)
+RETURNS void
+LANGUAGE sql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+  UPDATE auth.sessions s
+     SET last_seen_at = now(), idle_expires_at = LEAST(p_idle_expires_at, s.absolute_expires_at)
+   WHERE s.id = p_session_id AND s.revoked_at IS NULL;
+$$;
+
+-- OTP yaratish (TTL standart 300 s, qaror #54); shu (phone, purpose) dagi oldingi tasdiqlanmagan challenge'lar yopiladi.
+CREATE OR REPLACE FUNCTION app.auth_otp_create(
+  p_phone text, p_purpose text, p_channel text, p_code_hash text, p_ttl_s int
+) RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+DECLARE
+  v_id uuid;
+BEGIN
+  UPDATE auth.otp_challenges o
+     SET expires_at = now()
+   WHERE o.phone = p_phone AND o.purpose = p_purpose AND o.verified_at IS NULL AND o.expires_at > now();
+  INSERT INTO auth.otp_challenges (phone, purpose, channel, code_hash, expires_at)
+  VALUES (p_phone, p_purpose, p_channel, p_code_hash, now() + make_interval(secs => COALESCE(p_ttl_s, 300)))
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END;
+$$;
+
+-- OTP tekshiruvi: 'ok' | 'invalid' (attempts += 1; challenge topilmasa ham 'invalid') | 'expired' | 'locked' | 'used'.
+CREATE OR REPLACE FUNCTION app.auth_otp_verify(p_challenge_id uuid, p_code_hash text)
+RETURNS text
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+DECLARE
+  r auth.otp_challenges%ROWTYPE;
+BEGIN
+  SELECT * INTO r FROM auth.otp_challenges o WHERE o.id = p_challenge_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RETURN 'invalid';
+  END IF;
+  IF r.verified_at IS NOT NULL THEN
+    RETURN 'used';
+  END IF;
+  IF r.attempts >= r.max_attempts THEN
+    RETURN 'locked';
+  END IF;
+  IF r.expires_at <= now() THEN
+    RETURN 'expired';
+  END IF;
+  IF r.code_hash = p_code_hash THEN
+    UPDATE auth.otp_challenges o SET verified_at = now() WHERE o.id = r.id;
+    RETURN 'ok';
+  END IF;
+  UPDATE auth.otp_challenges o SET attempts = o.attempts + 1 WHERE o.id = r.id;
+  RETURN 'invalid';
+END;
+$$;
+
+-- Login urinishi qaydi (14 §2, qaror #54): muvaffaqiyatda hisoblagich nolga; xatoda +1, 15 daqiqalik oynada
+-- kamida 5 ta xato bo'lsa har 5-xatoda progressiv blok 1 → 5 → 15 → 60 daqiqa. Foydalanuvchi topilmasa — NULL'lar.
+CREATE OR REPLACE FUNCTION app.auth_record_login(
+  p_phone text, p_ip inet, p_success boolean, p_failure_reason text
+) RETURNS TABLE (failed_login_count int, locked_until timestamptz)
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+#variable_conflict use_column
+DECLARE
+  v_user   uuid;
+  v_fail   int;
+  v_recent int;
+  v_lock   timestamptz;
+BEGIN
+  INSERT INTO auth.login_attempts (phone, ip, success, failure_reason)
+  VALUES (p_phone, p_ip, p_success, CASE WHEN p_success THEN NULL ELSE p_failure_reason END);
+
+  SELECT u.id INTO v_user FROM app.users u WHERE u.phone = p_phone;
+  IF v_user IS NULL THEN
+    RETURN QUERY SELECT NULL::int, NULL::timestamptz;
+    RETURN;
+  END IF;
+
+  IF p_success THEN
+    UPDATE auth.user_credentials c
+       SET failed_login_count = 0, locked_until = NULL, updated_at = now()
+     WHERE c.user_id = v_user;
+    RETURN QUERY SELECT 0, NULL::timestamptz;
+    RETURN;
+  END IF;
+
+  UPDATE auth.user_credentials c
+     SET failed_login_count = c.failed_login_count + 1, updated_at = now()
+   WHERE c.user_id = v_user
+  RETURNING c.failed_login_count, c.locked_until INTO v_fail, v_lock;
+  IF NOT FOUND THEN
+    RETURN QUERY SELECT NULL::int, NULL::timestamptz;
+    RETURN;
+  END IF;
+
+  SELECT count(*) INTO v_recent
+    FROM auth.login_attempts a
+   WHERE a.phone = p_phone AND NOT a.success AND a.created_at > now() - interval '15 minutes';
+
+  IF v_recent >= 5 AND v_fail % 5 = 0 THEN
+    v_lock := now() + CASE LEAST(v_fail / 5, 4)
+                        WHEN 1 THEN interval '1 minute'
+                        WHEN 2 THEN interval '5 minutes'
+                        WHEN 3 THEN interval '15 minutes'
+                        ELSE interval '60 minutes' END;
+    UPDATE auth.user_credentials c SET locked_until = v_lock WHERE c.user_id = v_user;
+  END IF;
+  RETURN QUERY SELECT v_fail, v_lock;
+END;
+$$;
+
+-- Parol/PIN o'rnatish (UPSERT): NULL argument — o'sha maydon o'zgarmaydi; berilganda *_updated_at = now(),
+-- mos must_change_* = false.
+CREATE OR REPLACE FUNCTION app.auth_set_credentials(p_user_id uuid, p_password_hash text, p_pin_hash text)
+RETURNS void
+LANGUAGE sql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+  INSERT INTO auth.user_credentials AS c
+    (user_id, password_hash, password_updated_at, pin_hash, pin_updated_at)
+  VALUES
+    (p_user_id, p_password_hash, CASE WHEN p_password_hash IS NOT NULL THEN now() END,
+     p_pin_hash, CASE WHEN p_pin_hash IS NOT NULL THEN now() END)
+  ON CONFLICT (user_id) DO UPDATE SET
+    password_hash        = COALESCE(p_password_hash, c.password_hash),
+    password_updated_at  = CASE WHEN p_password_hash IS NOT NULL THEN now() ELSE c.password_updated_at END,
+    must_change_password = CASE WHEN p_password_hash IS NOT NULL THEN false ELSE c.must_change_password END,
+    pin_hash             = COALESCE(p_pin_hash, c.pin_hash),
+    pin_updated_at       = CASE WHEN p_pin_hash IS NOT NULL THEN now() ELSE c.pin_updated_at END,
+    must_change_pin      = CASE WHEN p_pin_hash IS NOT NULL THEN false ELSE c.must_change_pin END,
+    updated_at           = now();
+$$;
+
+-- Admin tomonidan tiklash: tanlangan hash NULL, must_change_* = true; parol tiklansa foydalanuvchining barcha
+-- sessiya/refresh tokenlari bekor qilinadi (revoked_reason='credential_reset').
+CREATE OR REPLACE FUNCTION app.auth_reset_credentials(p_user_id uuid, p_reset_password boolean, p_reset_pin boolean)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+BEGIN
+  UPDATE auth.user_credentials c
+     SET password_hash        = CASE WHEN p_reset_password THEN NULL ELSE c.password_hash END,
+         must_change_password = CASE WHEN p_reset_password THEN true ELSE c.must_change_password END,
+         pin_hash             = CASE WHEN p_reset_pin THEN NULL ELSE c.pin_hash END,
+         must_change_pin      = CASE WHEN p_reset_pin THEN true ELSE c.must_change_pin END,
+         updated_at           = now()
+   WHERE c.user_id = p_user_id;
+  IF p_reset_password THEN
+    UPDATE auth.refresh_tokens t SET revoked_at = now(), revoked_reason = 'credential_reset'
+     WHERE t.user_id = p_user_id AND t.revoked_at IS NULL;
+    UPDATE auth.sessions s SET revoked_at = now(), revoked_reason = 'credential_reset'
+     WHERE s.user_id = p_user_id AND s.revoked_at IS NULL;
+  END IF;
+END;
+$$;
+
+-- /auth/pin/verify uchun.
+CREATE OR REPLACE FUNCTION app.auth_get_pin_hash(p_user_id uuid)
+RETURNS TABLE (pin_hash text, must_change_pin boolean)
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+  SELECT c.pin_hash, c.must_change_pin FROM auth.user_credentials c WHERE c.user_id = p_user_id;
+$$;
+
+-- Bitta sessiyani va uning joriy refresh oilasini bekor qilish (logout, admin).
+CREATE OR REPLACE FUNCTION app.auth_revoke_session(p_session_id uuid, p_reason text)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+DECLARE
+  v_rt uuid;
+BEGIN
+  UPDATE auth.sessions s SET revoked_at = now(), revoked_reason = p_reason
+   WHERE s.id = p_session_id AND s.revoked_at IS NULL
+  RETURNING s.current_refresh_token_id INTO v_rt;
+  IF v_rt IS NOT NULL THEN
+    UPDATE auth.refresh_tokens t SET revoked_at = now(), revoked_reason = p_reason
+     WHERE t.family_id = (SELECT f.family_id FROM auth.refresh_tokens f WHERE f.id = v_rt)
+       AND t.revoked_at IS NULL;
+  END IF;
+END;
+$$;
+
+-- Foydalanuvchining (p_tenant_id berilsa — faqat shu tenantdagi) barcha sessiya/refresh tokenlarini bekor qilish;
+-- qaytaradi — bekor qilingan sessiyalar soni.
+CREATE OR REPLACE FUNCTION app.auth_revoke_user(p_user_id uuid, p_tenant_id uuid, p_reason text)
+RETURNS int
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+DECLARE
+  v_n int;
+BEGIN
+  UPDATE auth.refresh_tokens t SET revoked_at = now(), revoked_reason = p_reason
+   WHERE t.user_id = p_user_id AND (p_tenant_id IS NULL OR t.tenant_id = p_tenant_id) AND t.revoked_at IS NULL;
+  UPDATE auth.sessions s SET revoked_at = now(), revoked_reason = p_reason
+   WHERE s.user_id = p_user_id AND (p_tenant_id IS NULL OR s.tenant_id = p_tenant_id) AND s.revoked_at IS NULL;
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  RETURN v_n;
+END;
+$$;
+
+-- GET /admin/users/{id}/sessions — faol (bekor qilinmagan, muddati o'tmagan) sessiyalar.
+CREATE OR REPLACE FUNCTION app.auth_list_user_sessions(p_user_id uuid, p_tenant_id uuid)
+RETURNS TABLE (session_id uuid, client_id uuid, device_id uuid, created_at timestamptz, last_seen_at timestamptz,
+               ip inet, user_agent text)
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+  SELECT s.id, s.client_id, s.device_id, s.created_at, s.last_seen_at, s.ip, s.user_agent
+  FROM auth.sessions s
+  WHERE s.user_id = p_user_id AND (p_tenant_id IS NULL OR s.tenant_id = p_tenant_id)
+    AND s.revoked_at IS NULL AND s.idle_expires_at > now() AND s.absolute_expires_at > now()
+  ORDER BY s.last_seen_at DESC;
+$$;
+
+-- OTP Telegram kanali: telefon bo'yicha faol bog'langan chat (eng oxirgi linked_at); topilmasa NULL → SMS.
+CREATE OR REPLACE FUNCTION app.auth_telegram_chat_by_phone(p_phone text)
+RETURNS text
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+  SELECT tl.chat_id
+  FROM app.users u
+  JOIN app.telegram_links tl ON tl.user_id = u.id
+  WHERE u.phone = p_phone AND tl.revoked_at IS NULL
+  ORDER BY tl.linked_at DESC
+  LIMIT 1;
+$$;
+
+-- funksiyalar ichida o'qiladigan qo'shimcha app jadvali
+GRANT SELECT ON app.telegram_links TO erp_system;
+
+ALTER FUNCTION app.auth_issue_code(text, uuid, uuid, uuid, text, text, text, int) OWNER TO erp_system;
+ALTER FUNCTION app.auth_issue_tokens(uuid, uuid, uuid, uuid, text, timestamptz, text, boolean, timestamptz, timestamptz, inet, text) OWNER TO erp_system;
+ALTER FUNCTION app.auth_session_by_id(uuid) OWNER TO erp_system;
+ALTER FUNCTION app.auth_touch_session(uuid, timestamptz) OWNER TO erp_system;
+ALTER FUNCTION app.auth_otp_create(text, text, text, text, int) OWNER TO erp_system;
+ALTER FUNCTION app.auth_otp_verify(uuid, text) OWNER TO erp_system;
+ALTER FUNCTION app.auth_record_login(text, inet, boolean, text) OWNER TO erp_system;
+ALTER FUNCTION app.auth_set_credentials(uuid, text, text) OWNER TO erp_system;
+ALTER FUNCTION app.auth_reset_credentials(uuid, boolean, boolean) OWNER TO erp_system;
+ALTER FUNCTION app.auth_get_pin_hash(uuid) OWNER TO erp_system;
+ALTER FUNCTION app.auth_revoke_session(uuid, text) OWNER TO erp_system;
+ALTER FUNCTION app.auth_revoke_user(uuid, uuid, text) OWNER TO erp_system;
+ALTER FUNCTION app.auth_list_user_sessions(uuid, uuid) OWNER TO erp_system;
+ALTER FUNCTION app.auth_telegram_chat_by_phone(text) OWNER TO erp_system;
+
+REVOKE ALL ON FUNCTION app.auth_issue_code(text, uuid, uuid, uuid, text, text, text, int) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_issue_tokens(uuid, uuid, uuid, uuid, text, timestamptz, text, boolean, timestamptz, timestamptz, inet, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_session_by_id(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_touch_session(uuid, timestamptz) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_otp_create(text, text, text, text, int) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_otp_verify(uuid, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_record_login(text, inet, boolean, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_set_credentials(uuid, text, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_reset_credentials(uuid, boolean, boolean) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_get_pin_hash(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_revoke_session(uuid, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_revoke_user(uuid, uuid, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_list_user_sessions(uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_telegram_chat_by_phone(text) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION app.auth_issue_code(text, uuid, uuid, uuid, text, text, text, int) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_issue_tokens(uuid, uuid, uuid, uuid, text, timestamptz, text, boolean, timestamptz, timestamptz, inet, text) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_session_by_id(uuid) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_touch_session(uuid, timestamptz) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_otp_create(text, text, text, text, int) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_otp_verify(uuid, text) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_record_login(text, inet, boolean, text) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_set_credentials(uuid, text, text) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_reset_credentials(uuid, boolean, boolean) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_get_pin_hash(uuid) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_revoke_session(uuid, text) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_revoke_user(uuid, uuid, text) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_list_user_sessions(uuid, uuid) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_telegram_chat_by_phone(text) TO erp_app;
+```
+
+#### Do'kon agenti va 1C integratsiyasi funksiyalari (`0028 store_agent`, `0029 onec_integration`)
+
+7 ta funksiya — agentni ulash (RFC 8628 device grant, `auth.onec_device_authorizations`), agent tokeni (`private_key_jwt`) va SAQ cron fan-out uchun (`33-1c-integratsiya.md` §5.18, §4.4, §9.2). Naqsh yuqoridagi bilan bir xil: `erp_system` egaligida, `SET search_path = app, auth, pg_temp` (`auth`ga tegmaydiganlarida `app, pg_temp`), `erp_app`ga faqat `EXECUTE`. `0028 store_agent` — `onec_device_auth_start/lookup/approve/poll/deny`, `onec_agent_credentials` (6 ta); `0029 onec_integration` — `onec_tenants_due`.
 
 ```sql
 -- AS POST /oauth/device_authorization: yangi pending yozuv (10 daqiqa).
@@ -3677,13 +4196,16 @@ $$;
 
 -- W-04: onec_agents/devices shu tranzaksiyada RLS ostida yaratilgandan keyin chaqiriladi.
 -- pending → approved. Agent joriy tenant'da bo'lishi va kaliti so'rovdagi kalit bilan bir xil bo'lishi shart.
--- false = kod topilmadi / muddati o'tdi / allaqachon ishlatilgan.
+-- Natija: 'approved' | 'not_found' (kod yo'q yoki agent/kalit mos emas → 404 ONEC_PAIRING_CODE_INVALID) |
+-- 'expired' (→ 409 ONEC_PAIRING_CODE_EXPIRED) | 'used' (allaqachon tasdiqlangan/rad etilgan/iste'mol qilingan → 404 ONEC_PAIRING_CODE_INVALID).
 CREATE OR REPLACE FUNCTION app.onec_device_auth_approve(
   p_user_code text, p_tenant_id uuid, p_user_id uuid, p_agent_id uuid
-) RETURNS boolean
+) RETURNS text
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = app, auth, pg_temp
 AS $$
+DECLARE
+  r auth.onec_device_authorizations%ROWTYPE;
 BEGIN
   IF p_tenant_id IS DISTINCT FROM app.current_tenant_id()
      OR p_user_id IS DISTINCT FROM app.current_user_id() THEN
@@ -3691,16 +4213,71 @@ BEGIN
       USING ERRCODE = 'insufficient_privilege';
   END IF;
 
+  -- user_code faqat pending orasida noyob — pending birinchi, aks holda eng oxirgisi
+  SELECT * INTO r FROM auth.onec_device_authorizations d
+   WHERE d.user_code = p_user_code
+   ORDER BY (d.status = 'pending') DESC, d.created_at DESC
+   LIMIT 1
+   FOR UPDATE;
+  IF NOT FOUND THEN
+    RETURN 'not_found';
+  END IF;
+  IF r.status = 'expired' OR (r.status = 'pending' AND r.expires_at <= now()) THEN
+    UPDATE auth.onec_device_authorizations d SET status = 'expired' WHERE d.id = r.id AND d.status = 'pending';
+    RETURN 'expired';
+  END IF;
+  IF r.status <> 'pending' THEN
+    RETURN 'used';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM app.onec_agents a
+                 WHERE a.id = p_agent_id AND a.tenant_id = p_tenant_id
+                   AND a.public_key_thumbprint = r.public_key_thumbprint) THEN
+    RETURN 'not_found';
+  END IF;
+
   UPDATE auth.onec_device_authorizations d
      SET status = 'approved', tenant_id = p_tenant_id, approved_by = p_user_id,
          approved_at = now(), agent_id = p_agent_id
+   WHERE d.id = r.id;
+  RETURN 'approved';
+END;
+$$;
+
+-- W-04 "Rad etish": pending → denied; agent poll'i 'denied' oladi (AS: access_denied).
+-- Natija: 'denied' | 'not_found' | 'expired' | 'used' (approve bilan bir xil xaritalash).
+CREATE OR REPLACE FUNCTION app.onec_device_auth_deny(p_user_code text, p_user_id uuid)
+RETURNS text
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+DECLARE
+  r auth.onec_device_authorizations%ROWTYPE;
+BEGIN
+  IF app.current_tenant_id() IS NULL OR p_user_id IS DISTINCT FROM app.current_user_id() THEN
+    RAISE EXCEPTION 'onec_device_auth_deny: tenant/foydalanuvchi konteksti mos emas'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  SELECT * INTO r FROM auth.onec_device_authorizations d
    WHERE d.user_code = p_user_code
-     AND d.status = 'pending'
-     AND d.expires_at > now()
-     AND EXISTS (SELECT 1 FROM app.onec_agents a
-                 WHERE a.id = p_agent_id AND a.tenant_id = p_tenant_id
-                   AND a.public_key_thumbprint = d.public_key_thumbprint);
-  RETURN FOUND;
+   ORDER BY (d.status = 'pending') DESC, d.created_at DESC
+   LIMIT 1
+   FOR UPDATE;
+  IF NOT FOUND THEN
+    RETURN 'not_found';
+  END IF;
+  IF r.status = 'expired' OR (r.status = 'pending' AND r.expires_at <= now()) THEN
+    UPDATE auth.onec_device_authorizations d SET status = 'expired' WHERE d.id = r.id AND d.status = 'pending';
+    RETURN 'expired';
+  END IF;
+  IF r.status <> 'pending' THEN
+    RETURN 'used';
+  END IF;
+
+  UPDATE auth.onec_device_authorizations d
+     SET status = 'denied', tenant_id = app.current_tenant_id()
+   WHERE d.id = r.id;
+  RETURN 'denied';
 END;
 $$;
 
@@ -3754,6 +4331,34 @@ AS $$
   WHERE a.client_id = p_client_id;
 $$;
 
+-- 0028: funksiyalar ichida o'qiladigan app jadvali (erp_system — BYPASSRLS, lekin jadval grant'i baribir kerak)
+GRANT SELECT ON app.onec_agents TO erp_system;
+
+ALTER FUNCTION app.onec_device_auth_start(text, text, jsonb, text, text, text, text, text, inet) OWNER TO erp_system;
+ALTER FUNCTION app.onec_device_auth_lookup(text) OWNER TO erp_system;
+ALTER FUNCTION app.onec_device_auth_approve(text, uuid, uuid, uuid) OWNER TO erp_system;
+ALTER FUNCTION app.onec_device_auth_deny(text, uuid) OWNER TO erp_system;
+ALTER FUNCTION app.onec_device_auth_poll(text) OWNER TO erp_system;
+ALTER FUNCTION app.onec_agent_credentials(text) OWNER TO erp_system;
+
+REVOKE ALL ON FUNCTION app.onec_device_auth_start(text, text, jsonb, text, text, text, text, text, inet) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.onec_device_auth_lookup(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.onec_device_auth_approve(text, uuid, uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.onec_device_auth_deny(text, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.onec_device_auth_poll(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.onec_agent_credentials(text) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION app.onec_device_auth_start(text, text, jsonb, text, text, text, text, text, inet) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.onec_device_auth_lookup(text) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.onec_device_auth_approve(text, uuid, uuid, uuid) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.onec_device_auth_deny(text, uuid) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.onec_device_auth_poll(text) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.onec_agent_credentials(text) TO erp_app;
+```
+
+`0029 onec_integration`:
+
+```sql
 -- SAQ cron fan-out (33 §4.4): arxivlanmagan 1C bazasi bor tenantlar;
 -- 'sweep' — yana queued/leased vazifasi yoki retry_wait itemi borlar.
 CREATE OR REPLACE FUNCTION app.onec_tenants_due(p_kind text)
@@ -3777,28 +4382,9 @@ BEGIN
 END;
 $$;
 
--- funksiyalar ichida o'qiladigan app jadvallari (erp_system — BYPASSRLS, lekin jadval grant'i baribir kerak)
-GRANT SELECT ON app.onec_agents, app.onec_bases, app.onec_agent_tasks, app.onec_export_items TO erp_system;
-
-ALTER FUNCTION app.onec_device_auth_start(text, text, jsonb, text, text, text, text, text, inet) OWNER TO erp_system;
-ALTER FUNCTION app.onec_device_auth_lookup(text) OWNER TO erp_system;
-ALTER FUNCTION app.onec_device_auth_approve(text, uuid, uuid, uuid) OWNER TO erp_system;
-ALTER FUNCTION app.onec_device_auth_poll(text) OWNER TO erp_system;
-ALTER FUNCTION app.onec_agent_credentials(text) OWNER TO erp_system;
+GRANT SELECT ON app.onec_bases, app.onec_agent_tasks, app.onec_export_items TO erp_system;
 ALTER FUNCTION app.onec_tenants_due(text) OWNER TO erp_system;
-
-REVOKE ALL ON FUNCTION app.onec_device_auth_start(text, text, jsonb, text, text, text, text, text, inet) FROM PUBLIC;
-REVOKE ALL ON FUNCTION app.onec_device_auth_lookup(text) FROM PUBLIC;
-REVOKE ALL ON FUNCTION app.onec_device_auth_approve(text, uuid, uuid, uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION app.onec_device_auth_poll(text) FROM PUBLIC;
-REVOKE ALL ON FUNCTION app.onec_agent_credentials(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.onec_tenants_due(text) FROM PUBLIC;
-
-GRANT EXECUTE ON FUNCTION app.onec_device_auth_start(text, text, jsonb, text, text, text, text, text, inet) TO erp_app;
-GRANT EXECUTE ON FUNCTION app.onec_device_auth_lookup(text) TO erp_app;
-GRANT EXECUTE ON FUNCTION app.onec_device_auth_approve(text, uuid, uuid, uuid) TO erp_app;
-GRANT EXECUTE ON FUNCTION app.onec_device_auth_poll(text) TO erp_app;
-GRANT EXECUTE ON FUNCTION app.onec_agent_credentials(text) TO erp_app;
 GRANT EXECUTE ON FUNCTION app.onec_tenants_due(text) TO erp_app;
 ```
 
@@ -3826,6 +4412,15 @@ INSERT INTO platform.marking_product_groups (code, name, acceptance_deadline, le
   ('medicines',       'Dori vositalari',                           '72_hours',        'VM 149'),
   ('vegetable_oil',   'O''simlik yog''i (pilot)',                  '72_hours',        'VM 23');
 
+-- aylanma solig'i stavkalari (13 §4.3) — stavka o'zgarsa yangi valid_from qatori qo'shiladi
+INSERT INTO platform.turnover_tax_rates (code, rate_pct, valid_from) VALUES
+  ('retail_city_100k_plus',  4.00, '2026-01-01'),
+  ('retail_other',           2.00, '2026-01-01'),
+  ('retail_remote_mountain', 1.00, '2026-01-01'),
+  ('general',                4.00, '2026-01-01'),
+  ('tobacco',                4.00, '2026-01-01'),
+  ('sole_proprietor',        1.00, '2026-01-01');
+
 -- kamida bitta standart yorliq shabloni
 INSERT INTO platform.label_templates (code, name, width_mm, height_mm, fields) VALUES
   ('58x40_price', '58×40 narx yorlig''i', 58.00, 40.00,
@@ -3836,7 +4431,7 @@ INSERT INTO platform.oauth_clients (client_id, client_type, name, allowed_grant_
   ('admin-bff',    'confidential', 'Platforma admin BFF',               ARRAY['authorization_code','refresh_token'], ARRAY['platform.admin'], 'pending_secret'),
   ('android-pos',  'public',       'Android POS',                       ARRAY['authorization_code','refresh_token'], ARRAY['*','sync','pos'], 'active'),
   ('telegram-bot', 'confidential', 'Telegram bot',                      ARRAY['client_credentials'],                 ARRAY['bot.internal'],   'pending_secret'),
-  ('onec-agent',   'public',       '1C agenti (Windows)',               ARRAY['urn:ietf:params:oauth:grant-type:device_code','client_credentials'], ARRAY['onec.agent'], 'active');
+  ('onec-agent',   'public',       'Do''kon agenti (Windows)',               ARRAY['urn:ietf:params:oauth:grant-type:device_code','client_credentials'], ARRAY['onec.agent'], 'active');
 -- onec-agent: ulash — device code (RFC 8628), keyin client_credentials + private_key_jwt
 -- (agentning shaxsiy client_id'si 'onec-agent:{agent_id}', kaliti app.onec_agents.public_jwk; 33-1c-integratsiya.md §9.2).
 -- redirect_uris bo'sh, client_secret yo'q.
@@ -3864,7 +4459,7 @@ INSERT INTO app.roles (tenant_id, name, is_system, system_code) VALUES
   (:tenant_id, 'Omborchi',   true, 'storekeeper'),
   (:tenant_id, 'Buxgalter',  true, 'accountant');
 
--- standart limitlar (05-xavfsizlik §2.3) — faqat Kassir rolига namuna; to'liq matritsa §2.2'dan ilova kodida yuklanadi
+-- standart limitlar (`15` §2.3) — faqat Kassir roliga namuna; to'liq matritsa §2.2'dan ilova kodida yuklanadi
 INSERT INTO app.role_permissions (tenant_id, role_id, permission_code, limit_value) VALUES
   (:tenant_id, :cashier_role_id, 'discount.give',    5.00), -- foiz
   (:tenant_id, :cashier_role_id, 'returns.approve',  100000.00), -- so'm
@@ -3900,6 +4495,13 @@ INSERT INTO app.expense_categories (tenant_id, code, name, default_account, sour
   (:tenant_id, 'tax_payment',        'Soliq to''lovi (byudjetga)',      '6410', 'S1 §275',         true),
   (:tenant_id, 'other',              'Boshqa',                          '9430', 'S1 §410',         true);
 
+-- standart filial (code='01') va uning ombori — type='store', inventory_account='2920' (13 §1; keyingi
+-- omborlar POST /branches yoki PATCH /warehouses orqali, type → inventory_account: store → 2920, stock → 2910)
+INSERT INTO app.branches (id, tenant_id, code, name, is_default, settlement_category, activity_type) VALUES
+  (:branch_id, :tenant_id, '01', :branch_name, true, :settlement_category, 'retail');
+INSERT INTO app.warehouses (tenant_id, branch_id, name, type, inventory_account) VALUES
+  (:tenant_id, :branch_id, 'Asosiy ombor', 'store', '2920');
+
 -- doc_sequences — birinchi hujjat yaratilganda ON CONFLICT bilan o'zi paydo bo'ladi (next_doc_number, 2.9-bo'lim),
 -- oldindan INSERT shart emas (ixtiyoriy, hisobot uchun 0-qatorlar kerak bo'lsa):
 -- INSERT INTO app.doc_sequences (tenant_id, branch_id, doc_type, year, next_value) VALUES (:tenant_id, :branch_id, 'K', :year, 1)
@@ -3915,33 +4517,34 @@ INSERT INTO app.expense_categories (tenant_id, code, name, default_account, sour
 | № | Revizion | Mazmuni |
 |---|---|---|
 | 0001 | `extensions_roles_schemas` | Sxemalar, kengaytmalar, rollar, `app.uuidv7()`, `app.set_updated_at()`, `app.forbid_mutation()` |
-| 0002 | `core_tenant_user` | `tenants` (+`legal_form`, `go_live_date`, `accepted_terms_*`), `users`, `branches` (+`code`), `branch_tax_settings`, `warehouses` (+`inventory_account`), `cash_registers` (+`ofd_status`, `fm_state`, `last_unacked_receipt_at`, `fm_receipts_pending`, `tax_registered_at`, `outlet_address_snapshot`, `txkm_contract_ref`), `devices` (`kind` ichida `onec_agent`, qaror #58), `memberships`, `roles`, `role_permissions` |
-| 0003 | `auth_schema` | `auth.*` (6 jadval, `otp_challenges.channel` — qaror #34) + ularning `app.users`/`tenants`/`devices`ga FK'lari, `app.license_tokens`, **`app.user_identities`** (Google OIDC bog'lash, qaror #34) |
+| 0002 | `core_tenant_user` | `tenants` (+`legal_form`, `go_live_date`, `accepted_terms_*`), `users`, `branches` (+`code`), `branch_tax_settings`, `warehouses` (+`inventory_account`, standartsiz), `cash_registers` (+`ofd_status`, `fm_state`, `last_unacked_receipt_at`, `fm_receipts_pending`, `tax_registered_at`, `outlet_address_snapshot`, `txkm_contract_ref`, `fiscal_agent_id` — FK 0028 da, `fiscal_local_device_id`), `devices` (`kind` ichida `onec_agent`, qaror #58), `memberships`, `roles`, `role_permissions` |
+| 0003 | `auth_schema` | `platform.oauth_clients` (+`status`, `pending_secret` CHECK — auth FK'lari uchun oldin), `auth.*` (6 jadval, `otp_challenges.channel` — qaror #34) + ularning `app.users`/`tenants`/`devices`ga FK'lari, `app.license_tokens`, **`app.user_identities`** (Google OIDC bog'lash, qaror #34) |
 | 0004 | `label_templates` | `platform.label_templates`, `platform.marking_product_groups` (qaror #63) |
 | 0005 | `valuation_method_history` | `app.valuation_method_history` |
 | 0006 | `counterparties` | `counterparties` (+`debt_due_date`, `is_founder`), `debt_doubtful_flags` |
-| 0007 | `platform_global` | `platform.plans`, `addons`, `units`, `oauth_clients` (+`status`, `pending_secret` CHECK), `signing_keys` (`purpose` ichida `onec_task`/`agent_update`), `platform_admins`, `fx_rates` (qaror #55), `terms_versions` (qaror #61) + `app.subscriptions`, `tenant_addons`, `billing_payments` (davr/kvitansiya ustunlari, +`kind`/`reason`/`actor_user_id`, qaror #56), `tenant_tax_regimes`, `consents` (qaror #61) |
-| 0008 | `catalog_pricing` | `product_categories`, `products` (`mxik_code` NULL ruxsat; `name_ru` nullable — qaror #29; `marking_group_code` — qaror #63), `product_barcodes`, `product_prices`, `label_print_queue`, `internal_barcode_seq`, `discount_rules`; `products.package_code` uzunlik CHECK |
+| 0007 | `platform_global` | `platform.plans`, `addons`, `units`, `signing_keys` (`purpose` ichida `onec_task`/`agent_update`), `platform_admins`, `fx_rates` (qaror #55), `terms_versions` (qaror #61), `turnover_tax_rates` + `app.subscriptions`, `tenant_addons`, `billing_payments` (davr/kvitansiya ustunlari, +`kind`/`reason`/`actor_user_id`, qaror #56), `tenant_tax_regimes`, `consents` (qaror #61) |
+| 0008 | `catalog_pricing` | `product_categories`, `products` (`mxik_code` NULL ruxsat; `name_ru` nullable — qaror #29; `marking_group_code` — qaror #63; `turnover_tax_group`), `product_barcodes`, `product_prices`, `label_print_queue`, `internal_barcode_seq`, `discount_rules`; `products.package_code` uzunlik CHECK |
 | 0009 | `counterparty_statement_links` | `app.counterparty_statement_links` (`counterparties`dan keyin) |
 | 0010 | `approval_payment_infra` | `approval_requests`, `doc_approvals`, `payment_checkouts` — `docs_sales`dan **oldin**, `sale_payments.checkout_ref` FK uchun |
-| 0011 | `docs_sales` | `shifts` (`shift_no`/`variance`), `sales` (+`is_offline`/`debt_limit_exceeded`), `sale_lines` (chegirma/QQS ustunlari), `sale_payments` (+`due_date`/`checkout_ref`, `card_type`/`card_mask`/`rrn` va UzQR CHECK'lari — qaror #64) |
-| 0012 | `docs_returns` | `returns` (+smena/kassa/qaytarish usuli), `return_lines` (+QQS/marking, `restock` — qaror #48) |
-| 0013 | `docs_purchasing` | `purchase_orders` (+`warehouse_id`), `po_lines` (`price` ixtiyoriy), `goods_receipts` (+`source`/`einvoice_id`/`ai_ocr_job_id`/`ettn_ref`/`poa_number`/`kind`), `receipt_lines` (+`vat_exemption_code`) |
+| 0011 | `docs_sales` | `shifts` (`shift_no`/`variance`, `status` — `open`/`closed`), `sales` (+`is_offline`/`debt_limit_exceeded`), `sale_lines` (chegirma/QQS ustunlari, `settled_amount`), `sale_payments` (+`due_date`/`checkout_ref`, `card_type`/`card_mask`/`rrn` va UzQR CHECK'lari — qaror #64) |
+| 0012 | `docs_returns` | `returns` (+smena/kassa/qaytarish usuli — `uzqr`/`click`/`payme`/`uzum` bilan), `return_lines` (+QQS/marking, `restock` — qaror #48) |
+| 0013 | `docs_purchasing` | `purchase_orders` (+`warehouse_id`), `po_lines` (`price` ixtiyoriy), `goods_receipts` (+`source`/`einvoice_id`/`ai_ocr_job_id`/`ettn_ref`/`poa_id`/`poa_number`/`kind`), `receipt_lines` (+`vat_exemption_code`, `discrepancy_reason`) |
 | 0014 | `docs_inventory` | `transfers` (+`sent_at/by`, `received_at/by`), `transfer_lines` (`lot_id` yo'q, `lot_allocations` JSONB), `transfers` (+`transport_mode`/`ettn_ref`/`vehicle_plate`/`driver_name`), `stock_counts` (+`started_at`/`responsible_user_id`), `count_lines` (`counted` NULL, +`snapshot_qty`/`counted_at` — qaror #53), `write_offs` (+`responsible_user_id`/`promo_order_ref`/`source_return_id`), `write_off_lines` (+`expired_return`, `gift_kind`), `stock_openings`, `opening_lines` |
-| 0015 | `registers` | `stock_moves`, `stock_lots` (`source_doc_type` ko'plik, +`stock_counts`) (+ `supplier_returns` (+`reason`) / `supplier_return_lines`), `avg_costs`, `stock_balances`, `debt_moves` (+`limit_exceeded`), `debt_balances`, `cash_moves` (`method` CHECK + bank_account_id izohi), `ledger_entries` (+`branch_id`, hisob kodi formati CHECK), `vat_moves`; append-only `REVOKE`+trigger (3-bo'lim, **+`app.doc_approvals`) |
+| 0015 | `registers` | `stock_moves`, `stock_lots` (`source_doc_type` ko'plik, +`stock_counts`, `blocked_qty`) (+ `supplier_returns` (+`reason`) / `supplier_return_lines`), `avg_costs` (+`total_value`), `stock_balances`, `debt_moves` (+`limit_exceeded`), `debt_balances`, `cash_moves` (`method` CHECK + bank_account_id izohi), `ledger_entries` (+`branch_id`, hisob kodi formati CHECK), `vat_moves`; append-only `REVOKE`+trigger (3-bo'lim, **+`app.doc_approvals`) |
 | 0016 | `ledger_adjustments` | `app.ledger_adjustments` (doc_sequences kodi `BX`, +`analytics`) |
-| 0017 | `docs_pricing_debts` | `price_changes`, `price_change_lines` (+`valid_from`), `debt_openings` (+`due_date`), `debt_payments` (`method` to'liq ro'yxat + checkout/promise_date, +`card_type`/`card_mask`/`rrn`/`qr_type`), `debt_payment_allocations` (`target_doc_type` CHECK, +`debt_writeoffs`), `debt_writeoffs` (+`reason`, `account_choice` default, `tax_writeoff_basis`), `supplier_payments` (+`cash_register_id`/`shift_id`), `supplier_payment_allocations` (`target_doc_type` CHECK) |
-| 0018 | `docs_expenses_cash` | `expense_categories` (+`version`, `code`/`default_account`/`source_ref`), `recurring_expenses`, `attachments` (+`content_type`/`original_name`/`sha256`/`kind` CHECK), `expenses` (+`tax_type`), `cash_movements` (+`counterparty_id`), `bank_statement_imports`, `bank_settlements` (qaror #42, `attachments`dan keyin; +`variance_amount`, `statement_import_id`), `tax_settlements` (kod `ST`); shu revizionda `attachments` mavjud bo'lgach `ALTER TABLE billing_payments ADD CONSTRAINT fk_bp_invoice_attachment ...` |
+| 0017 | `docs_pricing_debts` | `price_changes`, `price_change_lines` (+`valid_from`), `debt_openings` (+`due_date`), `debt_payments` (`method` to'liq ro'yxat + checkout/promise_date, +`card_type`/`card_mask`/`rrn`/`qr_type`, `receipt_seq`, `unallocated_amount`, bank ↔ kassasiz CHECK), `debt_payment_allocations` (`target_doc_type` CHECK, +`debt_writeoffs`), `debt_writeoffs` (+`reason`, `account_choice` default, `tax_writeoff_basis`), `supplier_payments` (+`cash_register_id`/`shift_id`), `supplier_payment_allocations` (`target_doc_type` CHECK) |
+| 0018 | `docs_expenses_cash` | `expense_categories` (+`version`, `code`/`default_account`/`source_ref`), `recurring_expenses`, `attachments` (+`content_type`/`original_name`/`sha256`/`kind` CHECK), `expenses` (+`tax_type`), `cash_movements` (+`counterparty_id`, `account`, `employee_id`, `reason`↔`direction` CHECK), `bank_statement_imports`, `bank_settlements` (qaror #42, `attachments`dan keyin; +`variance_amount`, `statement_import_id`), `tax_settlements` (kod `ST`; `vat_offset` — (tenant, davr), `turnover_tax` — (filial, davr) bo'yicha yagona); shu revizionda `attachments` mavjud bo'lgach `ALTER TABLE billing_payments ADD CONSTRAINT fk_bp_invoice_attachment ...` |
 | 0019 | `doc_sequences` | `doc_sequences`, `app.next_doc_number()`; kod ro'yxatiga `BX`=ledger_adjustments, `BT`=bank_settlements, `ST`=tax_settlements |
-| 0020 | `fiscal_marking_edocs` | `fiscal_receipts` (`kind` + `debt_settlement`/`credit_sale`, `debt_payment_id`, `fm_terminal_id`/`fm_receipt_seq`/`fiscal_at`/`ofd_acked_at`, `payment_form`, `delivery`; qaror #30, #43, #45), `marking_codes`, `einvoices` (status CHECK + summalar + `uq_einvoice_out_per_doc`, `risk_flag` + `unknown`, `factura_type`/`related_einvoice_id`), `ettn_documents` (+`transfer_id`/`transport_type`/`direction`, `status` CHECK — qaror #63), `state_reports` (+solishtirish ustunlari), `state_report_diffs`; shu revizionda `einvoices`/`marking_codes` mavjud bo'lgach `fk_gr_einvoice`, `fk_vm_einvoice`, `fk_sl_marking` |
-| 0021 | `ai_ocr_jobs` | `app.ai_requests` (`ai_ocr_jobs.ai_request_id` FK uchun oldin), `app.ai_ocr_jobs` + `fk_gr_ocr_job` (`goods_receipts.ai_ocr_job_id` → `ai_ocr_jobs.id`) |
-| 0022 | `integration_sync` | `app.tenant_secrets` (integratsiya hisob ma'lumotlari, +`cash_register_id` — UzQR kaliti); `outbox_jobs` (kind ro'yxati + `ettn_accept`/`marking_accept`/`marking_return`/`report_export`/`label_pdf`, job-progress ustunlari), `sync_receipts`, `sync_exceptions` (qaror #56), `idempotency_keys`, `recost_jobs`, `import_jobs` (holatlar + `result`) |
+| 0020 | `fiscal_marking_edocs` | `fiscal_receipts` (`kind` + `debt_settlement`/`credit_sale`, `debt_payment_id`, `fm_terminal_id`/`fm_receipt_seq`/`fiscal_at`/`ofd_acked_at`, `payment_form`, `delivery`; qaror #30, #43, #45), `marking_codes`, `einvoices` (status CHECK + summalar + `uq_einvoice_out_per_doc`, `risk_flag` + `unknown`, `factura_type`/`related_einvoice_id`), `powers_of_attorney` (`einvoices` dan keyin), `ettn_documents` (+`transfer_id`/`transport_type`/`direction`/`counterparty_id`/`receipt_id`/`doc_date`/`payload`/`signed_at`/`last_error`, `status` CHECK `failed` bilan — qaror #63), `state_reports` (+solishtirish ustunlari, `confirmed`, `correction_comment`/`correction_portal_ref`/`confirmed_at`/`confirmed_by`), `state_report_diffs`; shu revizionda `einvoices`/`marking_codes`/`powers_of_attorney` mavjud bo'lgach `fk_gr_einvoice`, `fk_vm_einvoice`, `fk_sl_marking`, `fk_gr_poa` |
+| 0021 | `ai_ocr_jobs` | `app.ai_requests` (`ai_ocr_jobs.ai_request_id` FK uchun oldin), `app.ai_ocr_jobs` (`doc_type_hint` — `purchase`/`catalog`, `created_product_ids`) + `fk_gr_ocr_job` (`goods_receipts.ai_ocr_job_id` → `ai_ocr_jobs.id`) |
+| 0022 | `integration_sync` | `app.tenant_secrets` (integratsiya hisob ma'lumotlari, +`cash_register_id` — UzQR kaliti); `outbox_jobs` (17 qiymatli `kind` ro'yxati — `poa_send`, `marking_supplier_return`, `marking_writeoff`, `billing_webhook_reconcile` bilan; job-progress ustunlari), `sync_receipts`, `sync_exceptions` (qaror #56; `kind` CHECK — 16 §5 ro'yxati), `idempotency_keys`, `recost_jobs`, `import_jobs` (holatlar + `result`) |
 | 0023 | `notifications_ai` | `telegram_links`, `notification_settings`, `notifications_log`, `ai_training_samples`, `ai_feedback`, `tenant_glossary` |
 | 0024 | `audit_periods` | `audit_log`, `period_closings` |
 | 0025 | `updated_at_triggers` | 2.10-bo'limdagi `DO` bloki |
-| 0026 | `rls_policies` | 4.2–4.4-bo'limlardagi `DO` bloki + maxsus siyosatlar + GRANT/REVOKE (+`platform.label_templates`/`marking_product_groups`/`terms_versions` SELECT, `platform.fx_rates` SELECT/INSERT/UPDATE) |
-| 0027 | `security_definer_functions` | 4.5-bo'limdagi 4 funksiya + `auth_consume_code`/`auth_rotate_refresh`/`auth_revoke_tenant`/`auth_suspend_tenant` + (`payments_checkout_by_provider_tx`, `payments_checkout_by_ref`, `billing_payment_by_id`, `public_statement_by_token`) — jami 12; ular o'qiydigan `app` jadvallariga `erp_system` uchun nomma-nom `GRANT SELECT` |
-| 0028 | `onec_integration` | 1C integratsiyasi (2.11-bo'lim, `33-1c-integratsiya.md` §5): 18 ta `app.onec_*` jadval (FK tartibida: `onec_agents` → `onec_bases` → `onec_settings`, `onec_branch_bindings`, `onec_metadata_snapshots`, `onec_catalog_items`, `onec_mappings`, `onec_value_mappings`, `onec_ref_create_requests` → `onec_export_batches` → `onec_export_items` → `onec_export_item_sources`, `onec_object_refs` → `onec_agent_tasks` → `onec_task_results`, `onec_reconciliations`, `onec_events`, `onec_agent_logs`) + `auth.onec_device_authorizations`; `onec_forbid_namespace_change` trigger'i; kechiktirilgan FK'lar; `updated_at` trigger'lari (2.10, 13 jadval); RLS uchligi (4.2); grantlar (4.4); 6 ta `SECURITY DEFINER` funksiya (4.5). `onec_metadata_snapshots`/`onec_reconciliations`/`onec_events` `task_id` FK'lari `ON DELETE SET NULL` (o'qish vazifalari 30 kunda tozalanadi). `0002`/`0007`/`0018` dagi `devices`, `signing_keys`, `attachments`ga bog'liq. Bosqich 7 |
+| 0026 | `rls_policies` | 4.2–4.4-bo'limlardagi `DO` bloki + maxsus siyosatlar + GRANT/REVOKE (+`platform.label_templates`/`marking_product_groups`/`terms_versions`/`turnover_tax_rates` SELECT, `platform.fx_rates` SELECT/INSERT/UPDATE) |
+| 0027 | `security_definer_functions` | 4.5-bo'limdagi 4 funksiya + `auth_consume_code`/`auth_rotate_refresh`/`auth_revoke_tenant`/`auth_suspend_tenant` + (`payments_checkout_by_provider_tx`, `payments_checkout_by_ref`, `billing_payment_by_id`, `public_statement_by_token`) + 14 ta AS yozuvchi/sessiya funksiyasi (`auth_issue_code` … `auth_telegram_chat_by_phone`) — jami 26; ular o'qiydigan `app` jadvallariga `erp_system` uchun nomma-nom `GRANT SELECT` |
+| 0028 | `store_agent` | Do'kon agenti umumiy registri (2.11-bo'lim, qaror #66): `app.onec_agents` (+`capabilities`), `app.onec_agent_tasks` (1C ustunlari FK'siz; fiskal/printer/tarozi xizmat vazifalari, `purpose='device_service'`), `app.onec_task_results`, `auth.onec_device_authorizations`; `fk_cr_fiscal_agent` (`cash_registers.fiscal_agent_id` → `onec_agents`); `updated_at` trigger'lari (2.10, 2 jadval); RLS uchligi (4.2, 3 jadval); grantlar (4.4); 6 ta `SECURITY DEFINER` funksiya (`onec_device_auth_start/lookup/approve/poll/deny`, `onec_agent_credentials`; 4.5). `0002`/`0007` dagi `devices`, `signing_keys`, `cash_registers` ga bog'liq. Bosqich 5 |
+| 0029 | `onec_integration` | 1C integratsiyasi (2.11-bo'lim, `33-1c-integratsiya.md` §5): 15 ta `app.onec_*` jadval (FK tartibida: `onec_bases` → `onec_settings`, `onec_branch_bindings`, `onec_metadata_snapshots`, `onec_catalog_items`, `onec_mappings`, `onec_value_mappings`, `onec_ref_create_requests` → `onec_export_batches` → `onec_export_items` → `onec_export_item_sources`, `onec_object_refs` → `onec_reconciliations`, `onec_events`, `onec_agent_logs`); `onec_forbid_namespace_change` trigger'i; kechiktirilgan FK'lar, jumladan `onec_agent_tasks` ga `fk_oat_base`, `fk_oat_batch`, `fk_oat_item`, `fk_oat_ref_create`, `fk_oat_reconciliation`; `updated_at` trigger'lari (2.10, 11 jadval); RLS uchligi (4.2, 15 jadval); grantlar (4.4); `onec_tenants_due` (4.5). `onec_metadata_snapshots`/`onec_reconciliations`/`onec_events` `task_id` FK'lari `ON DELETE SET NULL` (o'qish vazifalari 30 kunda tozalanadi). `0018` dagi `attachments`ga bog'liq. Bosqich 7 |
 
 Seed (5-bo'lim) — **Alembic revizion emas** (`23-backend-arxitekturasi.md` §11: "bazani versiyalash bilan aralashtirmaslik uchun"), `migrate` konteyneridan keyin alohida `scripts/seed.py` bosqichi, faqat 5.1 (global) qismini bir marta ishga tushiradi; 5.2 (tenant-provisioning) — har signup'da ilova kodi tomonidan.
 
@@ -3955,7 +4558,7 @@ WITH exempt AS (
     'platform.plans', 'platform.addons', 'platform.units',
     'platform.oauth_clients', 'platform.signing_keys', 'platform.platform_admins',
     'platform.label_templates', 'platform.fx_rates', 'platform.terms_versions',
-    'platform.marking_product_groups',
+    'platform.marking_product_groups', 'platform.turnover_tax_rates',
     'auth.user_credentials', 'auth.otp_challenges', 'auth.login_attempts',
     'auth.authorization_codes', 'auth.refresh_tokens', 'auth.sessions',
     'auth.onec_device_authorizations', -- 1C agent device grant: tenant tasdiqqacha noma'lum, faqat SECURITY DEFINER orqali
@@ -3998,10 +4601,15 @@ WHERE n.nspname = 'app' AND p.prosecdef
                      'auth_revoke_tenant','auth_suspend_tenant',
                      'payments_checkout_by_provider_tx','payments_checkout_by_ref',
                      'billing_payment_by_id','public_statement_by_token',
+                     'auth_issue_code','auth_issue_tokens','auth_session_by_id','auth_touch_session',
+                     'auth_otp_create','auth_otp_verify','auth_record_login','auth_set_credentials',
+                     'auth_reset_credentials','auth_get_pin_hash','auth_revoke_session','auth_revoke_user',
+                     'auth_list_user_sessions','auth_telegram_chat_by_phone',
                      'onec_device_auth_start','onec_device_auth_lookup',
-                     'onec_device_auth_approve','onec_device_auth_poll',
+                     'onec_device_auth_approve','onec_device_auth_deny','onec_device_auth_poll',
                      'onec_agent_credentials','onec_tenants_due');
--- 18 qator qaytishi shart; kamroq bo'lsa CI qizil.
+-- 33 qator qaytishi shart (0027 — 26, 0028 — 6, 0029 — 1); kamroq bo'lsa CI qizil.
+-- 0028 qo'llanmagan muhitda — 26, 0029 qo'llanmagan muhitda — 32.
 ```
 
 ---
@@ -4013,7 +4621,7 @@ WHERE n.nspname = 'app' AND p.prosecdef
 1. **UUID generatsiyasi**: ilova tomonida (offline-first talabi, §1.2), DB `DEFAULT app.uuidv7()` — faqat zaxira.
 2. **`stock_lots`/`avg_costs`/`stock_balances`/`debt_balances`ning append-only emasligi**: 11 §7 ularni "Registrlar (append-only)" sarlavhasi ostida bersa ham, bular jismoniy mutatsiya qilinadigan balans-keshlari; haqiqiy append-only — `stock_moves`/`debt_moves`/`cash_moves`/`ledger_entries`/`vat_moves` (3-bo'lim).
 3. **`stock_lots.receipt_line_id`ning umumlashtirilishi**: 11 faqat `receipt_line_id`ni ko'rsatadi, lekin `stock_openings`/`transfers` ham yangi partiya yaratadi (goods_receipt'siz). Shuning uchun `receipt_line_id` (faqat kirim uchun, nullable) ustiga `source_doc_type`/`source_doc_id`/`source_line_id` polimorfik ustunlari qo'shildi.
-4. **Sxema taqsimoti** (`app`/`auth`/`platform`): 11'da umuman yo'q — bu hujjat tomonidan kiritildi, `15-xavfsizlik-va-audit.md` §3.3/§19'dagi RLS istisnolari mantiqiga mos ravishda.
+4. **Sxema taqsimoti** (`app`/`auth`/`platform`): 11'da umuman yo'q — bu hujjat tomonidan kiritildi, `15-xavfsizlik-va-audit.md` §3.3, `14-autentifikatsiya-oauth2.md` §19 dagi RLS istisnolari mantiqiga mos ravishda.
 5. **Hisob-kitob ustunlarining aniq `NUMERIC` kategoriyasi**: 11 faqat uchta umumiy kategoriya beradi (pul/miqdor/narx-tannarx); har bir aniq ustun (masalan `sale_lines.price` → narx 18,4; `sale_lines.line_total` → pul 18,2; `sale_lines.cost_amount` → pul 18,2, chunki bu qatorning **jami** tannarxi, birlik tannarxi emas) shu uchta toifaga ushbu hujjat tomonidan taqsimlangan.
 6. **`role_permissions.limit_value` birligi**: 11 aniqlashtirmaydi (foiz yoki summa) — bu hujjat yagona `NUMERIC(18,4)` ustunni tanladi, ma'no `permission_code` konvensiyasi orqali aniqlanadi (masalan `discount.give` = foiz, `cash.withdraw` = so'm); alohida `limit_unit` ustuni **qo'shilmadi** (ilova darajasida kod-konstanta sifatida saqlanadi).
 7. **`discount_rules.value`**: xuddi shunday, `kind='percent'` bo'lsa foiz, aks holda summa — bitta `NUMERIC(18,4)` ustun.

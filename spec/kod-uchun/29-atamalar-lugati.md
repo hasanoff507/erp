@@ -11,7 +11,7 @@
 2. **Bir atama — bitta qator.** Sinonimlar (masalan "nasiya" va "qarz") bitta qatorda eslatma sifatida ko'rsatiladi, ikkinchi qator ochilmaydi.
 3. **Ruscha/Inglizcha ustunlar — ishchi tarjima**, rasmiy atama lug'ati emas; UX-yozuvchi/tarjimon final matnni `08-dizayn-tizimi.md` va i18n fayllarida tasdiqlaydi (bu jadval — dasturchi uchun yo'naltiruvchi, UI matni manbai emas).
 4. Jadval **domenlar bo'yicha guruhlangan**: Savdo/kassa, Ombor, Qarz, Pul/kassa puli, Buxgalteriya/soliq, Fiskal/markirovka/e-hujjat, Auth/obuna, Sync/offline, AI, Texnik, 1C integratsiyasi.
-5. Yangi atama/jadval/ustun qo'shilganda — shu faylga ham qator qo'shiladi (`10-umumiy-arxitektura.md` §Qoidalar, 2-band mantiqiga mos).
+5. Yangi atama/jadval/ustun qo'shilganda — shu faylga ham qator qo'shiladi (`00-README.md` §Qoidalar, 2-band mantiqiga mos).
 6. Ba'zi texnik atamalar (masalan "posting service", "outbox") uchun o'zbekcha tarjima qasddan berilmagan — kod/spec'da ingliz nomi aynan ishlatiladi, jadvalda faqat tushuntirish uchun o'zbekcha izoh. `message_key` uz/ru yakuniy matni — `08` UX-yozuv qoidalari bo'yicha (qaror #58 a).
 
 ---
@@ -175,8 +175,8 @@
 | Do'kon ko'prigi (Local Bridge) | Локальный мост | Local fiscal bridge | `FISCAL_PROVIDER=multikassa_local`/`fiscaldrive_local` | POS → Do'kon agenti → FM/hamkor lokal xizmati → OFD yo'li (qaror #60) | 10, 21 |
 | Sotuvdan oldingi markirovka tekshiruvi | Предпроверка кода | Marking precheck | `MARKING_PRECHECK` (`off`/`warn`/`block`, standart `warn`) | `warn` — ogohlantirish + audit, sotuv to'xtamaydi; `block` — qat'iy rad (qaror #62) | 18, 21 |
 | Lokal takror-kod tekshiruvi | Локальная проверка дубля | Local duplicate check | `marking_codes` | Bir markirovka kodi ikki marta sotilmasligini qurilma/server tekshiradi — rejimdan qat'i nazar (qaror #62) | 16, 18 |
-| Ombordan omborga (E-TTN) | Склад-склад | Warehouse transfer waybill | `transfers.ettn_ref`, `transfers.transport_mode` | O'z omborlari/filiallari orasidagi ko'chirish uchun majburiy E-TTN rejimi (qaror #63) | 03, 21 |
-| E-ishonchnoma | Электронная доверенность | E-power of attorney | `goods_receipts.poa_number` | Do'kon xodimiga e-faktura operatori orqali beriladi; Vakolat.uz ishlatilmaydi (qaror #63) | 04, 21 |
+| Ombordan omborga (E-TTN) | Склад-склад | Warehouse transfer waybill | `transfers.ettn_ref`, `transfers.transport_mode` | O'z omborlari/filiallari orasidagi ko'chirish uchun E-TTN rejimi — avtotransportda (`transport_mode='vehicle'`) majburiy; piyoda/jamoat transportida — yo'q (VM 249 31-ilova 24-band; qaror #63) | 03, 21 |
+| E-ishonchnoma | Электронная доверенность | E-power of attorney | `powers_of_attorney`, `goods_receipts.poa_id`/`poa_number` | Do'kon xodimiga e-faktura operatori orqali beriladi; saqlanadi — `powers_of_attorney`; Vakolat.uz ishlatilmaydi (qaror #63) | 04, 12, 19, 21 |
 | Markirovka | Маркировка | Marking | `marking_codes` | Asl belgisi/CRPT tizimi talab qilgan tovar kodi | 12, 16 |
 | Asl belgisi | Asl belgisi (система маркировки) | National marking system | `marking_codes` | O'zbekistonning milliy tovar markirovkasi tizimi (CRPT Turon orqali) | 03, 21 |
 | DataMatrix kod | Код DataMatrix | DataMatrix code | `marking_codes.code` | Markirovka shtrix-kodining fizik formati | 03, 12 |
@@ -186,7 +186,7 @@
 | E-faktura | Электронный счёт-фактура | E-invoice | `einvoices` | Elektron soliq hisob-faktura hujjati | 12 |
 | E-faktura operatori | Оператор ЭСФ | E-invoice provider | `einvoices.operator` | `didox`/`faktura` (Faktura.uz — MVP'da yagona) | 12, 21 |
 | E-faktura xavf bayrogi | Флаг риска счёт-фактуры | E-invoice risk flag | `einvoices.risk_flag` | Davlat xavf-baholash (VM 830) natijasi: `unknown` (standart — QQS krediti to'lovgacha kechiktiriladi) / `green` / `red` (26 #47) | 12 |
-| E-TTN | Электронная товарно-транспортная накладная | E-waybill | `ettn_documents` (`transfer_id`, `transport_type`, `direction`) | Elektron yuk xati — EDO operatori orqali; sotuvda va o'z omborlari orasida ham majburiy (qaror #63) | 12, 21 |
+| E-TTN | Электронная товарно-транспортная накладная | E-waybill | `ettn_documents` (`transfer_id`, `transport_type`, `direction`) | Elektron yuk xati — EDO operatori orqali; avtotransportda (`transport_mode='vehicle'`) majburiy, o'z omborlari orasida ham; piyoda/jamoat transportida — yo'q (VM 249 31-ilova 24-band; qaror #63) | 12, 21 |
 | Ishonchnoma raqami | Номер доверенности | Power of attorney number | `goods_receipts.poa_number` | Do'kon o'z xodimiga e-faktura operatori orqali bergan e-ishonchnoma raqami (qaror #63) | 12 |
 | E-IMZO | Э-ИМЗО | E-IMZO (digital signature) | — | Brauzerda ishlaydigan elektron raqamli imzo tizimi | 10, 14, 23 |
 | UzQR | Единый QR | UzQR | `sale_payments.qr_type` | Bank yagona QR to'lov standarti (PF-246) | 01, 11 |

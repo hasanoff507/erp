@@ -14,7 +14,7 @@
 3. **Uskunalar**: fiskal modul — veb bilan bir xil **`FiscalPort`** kontrakti (Kotlin): `AndroidIntentFiscalAdapter` (vendor SDK/intent), `ApduFiscalAdapter` (SAM/NFC'dagi FM "0400" applet'iga APDU — keyin), `FakeFiscalAdapter`; FM javobi veb bilan bir xil (`fm_terminal_id`, `fm_receipt_seq`, `fiscal_sign`, `qr_url`). Ommaviy SDK yo'q — vendor/hamkor javobi kutiladi (26 #63 (OQ-063), Xat 9). Android'da Do'kon agenti (qaror #60) kerak emas — FM qurilmaning o'zida. FM javob bermasa POS chekni **yopmaydi** — veb-kassadagi «Fiskal modul ulanmagan» holati bilan bir xil (`21-integratsiyalar.md` §1, §16).
 4. **ESC/POS** — chek/yorliq chop etish uchun de-fakto standart (Epson, `06-fayl` §3); **shtrix-kod/markirovka skaneri** — ichki kamera (CameraX + ZXing/ML Kit, veb'dagi `@zxing/browser`ga mos) va tashqi USB/Bluetooth HID "keyboard wedge" (klaviatura emulyatsiyasi, qo'shimcha drayversiz) ikkisi ham qo'llab-quvvatlanadi.
 5. **Tarozi** — og'irlik shtrix-kodi EAN-13 `PP CCCCC VVVVV K`, prefiks do'kon sozlamasi (`settings.weight_barcode_templates`; 22 = gramm, 21 = summa — 26 #31); jonli og'irlik — serial/Bluetooth adapter (keyin); **qo'lda og'irlik kiritish doimiy zahira**.
-6. **Karta to'lovi** — MVP'da mustaqil terminal, kassir `card_type` (`personal/corporate/social/unknown`, `method='card'` da majburiy), ijtimoiy kartada `card_mask` + `rrn` kiritadi — veb bilan bir xil (qaror #64, 26 #65/#121); integratsiyalangan NFC terminal — keyin.
+6. **Karta to'lovi** — MVP'da mustaqil terminal, kassir `card_type` (`personal/corporate/social/unknown`, `method='card'` da majburiy; standart qiymat yo'q — kassir har to'lovda tanlaydi, qaror #64), ijtimoiy kartada `card_mask` + `rrn` kiritadi — veb bilan bir xil (qaror #64, 26 #65/#121); integratsiyalangan NFC terminal — keyin.
 7. **48 soatlik fiskal blok** (qaror #43) Android'da ham bir xil: 24 soat 🟡, 40 soat 🔴 + M18, 46 soat modal, 48 soat — `ofd_acked_at IS NULL` eng eski chekdan hisoblanib yangi fiskal chek bloklanadi (`FISCAL_OFFLINE_48H_BLOCKED`); taymer **qurilmada ham** hisoblanadi (offline'da server yo'q), server qayta tekshiradi. Markirovka kodi chek ichida (qaror #62, `MARKING_PRECHECK=warn`).
 8. **Auth**: qurilma tokeni veb bilan bir xil — access 15 daqiqa, refresh sliding 14 / mutlaq 180 kun (qaror #44).
 9. **Modul tuzilishi** — clean architecture: `data` (Room, Retrofit/sync), `domain` (use case'lar, entity'lar), `ui` (Compose, ViewModel) qatlamlari, veb'dagi FSD'ga mos ravishda modul (Gradle modullari) bo'yicha ajratilgan (2-bo'lim).
@@ -116,7 +116,7 @@ Farq faqat **klient tomonidagi saqlash mexanizmi** (Room o'rniga Dexie) va **UI 
 
 ### 4.5 NFC / karta terminali
 
-- MVP: mustaqil bank terminali bilan karta to'lovi kassada qo'lda belgilanadi (online va offline) — `card_type` majburiy, ijtimoiy kartada `card_mask` (`^[0-9]{4}\*+[0-9]{4}$`) va `rrn` (qaror #64, 26 #65/#121). Chekda to'lov shakli `payment_form` (`cash/card/qr/mixed`).
+- MVP: mustaqil bank terminali bilan karta to'lovi kassada qo'lda belgilanadi (online va offline) — `card_type` majburiy (standart qiymat yo'q — kassir har to'lovda tanlaydi, qaror #64), ijtimoiy kartada `card_mask` (`^[0-9]{4}\*+[0-9]{4}$`) va `rrn` (qaror #64, 26 #65/#121). Chekda to'lov shakli `payment_form` (`cash/card/qr/mixed`).
 - Integratsiyalangan terminal (bank SDK, `hardware/card-terminal`) — keyin. Virtual kassa reyestri talabi (karta/UzQR "shu qurilma orqali") — 26 #170.
 - UzQR: **faqat online** (statik ham, qaror #64); statik — kassir qo'lda tasdiqlaydi; dinamik — `UzqrPort` (26 #49), veb bilan bir xil.
 

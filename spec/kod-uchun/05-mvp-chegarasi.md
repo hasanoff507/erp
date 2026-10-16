@@ -27,7 +27,7 @@ Barcha 18 modul MVP ichida (Asosiy xulosalar, 1-band); har birida kamida bitta M
 
 | Modul | Must | Should | Could |
 |---|---|---|---|
-| M01 Kassa | US-M01-01 (sotuv/chek), US-M01-02 (offline+sync), US-M01-03 (markirovka tekshirish), US-M01-04 (smena/Z-hisobot), US-M01-05 (UzQR to'lov — yuridik shaxslar uchun 2026-07-01'dan majburiy), US-M01-06 (chekdan keyin e-faktura, qaror #18), US-M01-07 (chek printeri va tarozini sozlash, POS-16) | — | — |
+| M01 Kassa | US-M01-01 (sotuv/chek), US-M01-02 (offline+sync), US-M01-03 (markirovka tekshirish), US-M01-04 (smena/Z-hisobot), US-M01-05 (UzQR to'lov — yuridik shaxslar uchun 2026-07-01'dan majburiy), US-M01-06 (chekdan keyin e-faktura, qaror #18), US-M01-07 (chek printeri va tarozini sozlash, POS-16), US-M01-08 (integratsiyalangan karta terminali — summa terminalga avtomatik, qaror #71) | — | — |
 | M02 Qaytarish | US-M02-01 (asl chek bo'yicha), US-M02-03 (QQS tuzatish) | US-M02-02 (limit tasdiqlash) | — |
 | M03 Chegirma | US-M03-01 (limit ichida chegirma) | — | US-M03-03 (margin hisoboti) |
 | M04 Ombor qoldig'i | US-M04-01 (kirim balans), US-M04-04 (boshlang'ich katalog/qoldiq), US-M04-05 (tannarx usuli FIFO/AVECO) | US-M04-02 (past qoldiq ogohlantirish), US-M04-03 (ko'p filial konsolidatsiya), US-M04-06 (yaroqlilik muddati, hisobdan chiqarish) | — |

@@ -22,7 +22,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
       <div><div style="color: #FFFFFF; font-weight: 800; font-size: 15px;">ERP</div><div style="font-size: 12px; color: #8C99A8;">[Do'kon nomi]</div></div>
     </div>
     <sc-for list="{{menu}}" as="g" hint-placeholder-count="5">
-      <div style="padding: 14px 10px 6px; font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #6F7E90;">{{g.title}}</div>
+      <div style="padding: 14px 10px 6px; font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #8C99A8;">{{g.title}}</div>
       <sc-for list="{{g.items}}" as="m" hint-placeholder-count="3">
         <a href="{{m.href}}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 14px; font-weight: 600; text-decoration: none; color: {{m.fg}}; background: {{m.bg}};">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{m.icon}}"></path></svg>
@@ -38,17 +38,21 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
   </nav>
   <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column;">
     <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 28px; background: #FFFFFF; border-bottom: 1px solid #E7EAEE;">
-      <h1 style="margin: 0; font-size: 22px; font-weight: 800;">Ombor qoldig'i</h1>
+      <h1 style="margin: 0; font-size: 26px; line-height: 34px; font-weight: 800;">Ombor qoldig'i</h1>
       <div style="flex-grow: 1;"></div>
       <label style="display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px; min-width: 240px; border: 1px solid #DCE1E7; border-radius: 12px; background: #F8FAFB;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7686" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
         <span style="position: absolute; width: 1px; height: 1px; overflow: hidden;">Qidiruv</span>
-        <input type="search" placeholder="Tovar, mijoz, hujjat…" style="flex-grow: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 14px; color: #0F1B2D;">
+        <input type="search" placeholder="Tovar, mijoz, ekran…" style="flex-grow: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 14px; color: #0F1B2D;">
       </label>
       <select aria-label="Filial" style="height: 42px; padding: 0 12px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; color: #0F1B2D;"><option>Chilonzor-3</option><option>Yunusobod-1</option><option>Barcha filiallar</option></select>
       <button type="button" aria-label="Bildirishnomalar" style="width: 42px; height: 42px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; color: #3D4A5C; display: flex; align-items: center; justify-content: center;">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0112 0v5l1.5 2h-15z"></path><path d="M10 20a2 2 0 004 0"></path></svg>
       </button>
+      <div role="group" aria-label="Interfeys tili" style="display: flex; gap: 2px; padding: 2px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF;">
+        <button type="button" aria-pressed="true" style="min-width: 40px; height: 36px; padding: 0 8px; border: 0; border-radius: 10px; background: #0F1B2D; color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 700;">UZ</button>
+        <button type="button" aria-pressed="false" style="min-width: 40px; height: 36px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; color: #3D4A5C; font: inherit; font-size: 13px; font-weight: 700;">RU</button>
+      </div>
     </header>
     <main style="padding: 24px 28px; display: flex; flex-direction: column; gap: 18px;">
       <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px;">
@@ -105,23 +109,23 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
             <span style="font-size: 13px; font-weight: 600; color: #3D4A5C;">Ombor / filial</span>
             <select style="height: 44px; padding: 0 12px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; color: #0F1B2D;"><option>Chilonzor-3 — asosiy ombor</option><option>Yunusobod-1 — asosiy ombor</option><option>Barchasi (konsolidatsiya)</option></select>
           </label>
-          <div style="display: flex; align-items: center; gap: 10px; height: 44px;">
+          <label style="display: flex; align-items: center; gap: 10px; height: 44px; cursor: pointer;">
             <button type="button" role="switch" aria-checked="false" aria-label="Faqat kam qoldiq" style="width: 44px; height: 26px; padding: 3px; border: 0; border-radius: 999px; background: #DCE1E7; display: flex; align-items: center;"><span style="width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 1px 2px rgba(15,27,45,.2);"></span></button>
             <span style="font-size: 14px; font-weight: 600; color: #3D4A5C;">Faqat kam qoldiq</span>
-          </div>
+          </label>
           <button type="button" aria-pressed="false" style="height: 44px; padding: 0 14px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; color: #3D4A5C; font: inherit; font-size: 13px; font-weight: 700;">Muddati 7 kunda tugaydi</button>
         </div>
         <div style="overflow-x: auto;">
           <div role="table" aria-label="Ombor qoldig'i" style="min-width: 980px;">
-            <div role="row" style="display: grid; grid-template-columns: minmax(0,2.3fr) minmax(0,1.4fr) minmax(0,.9fr) minmax(0,.7fr) minmax(0,1fr) minmax(0,1.1fr) minmax(0,1.5fr); column-gap: 12px; align-items: center; padding: 12px 20px; background: #F8FAFB; border-top: 1px solid #E7EAEE; font-size: 12px; font-weight: 600; color: #6B7686;">
+            <div role="row" style="display: grid; grid-template-columns: minmax(0,2.3fr) minmax(0,1.4fr) minmax(0,.9fr) minmax(0,.7fr) minmax(0,1fr) minmax(0,1.1fr) minmax(0,1.5fr); column-gap: 12px; align-items: center; padding: 12px 20px; background: #F8FAFB; border-top: 1px solid #E7EAEE; font-size: 12px; font-weight: 600; color: #5B6675;">
               <span role="columnheader">Tovar</span><span role="columnheader">Shtrix-kod</span><span role="columnheader" style="text-align: right;">Qoldiq</span><span role="columnheader" style="text-align: right;">Min.</span><span role="columnheader" style="text-align: right;">Tannarx (o'rt.)</span><span role="columnheader" style="text-align: right;">Qiymat</span><span role="columnheader">Holat</span>
             </div>
             <sc-for list="{{rows}}" as="r" hint-placeholder-count="10">
               <div role="row" style="display: grid; grid-template-columns: minmax(0,2.3fr) minmax(0,1.4fr) minmax(0,.9fr) minmax(0,.7fr) minmax(0,1fr) minmax(0,1.1fr) minmax(0,1.5fr); column-gap: 12px; align-items: center; min-height: 54px; padding: 0 20px; border-top: 1px solid #F0F2F5; font-size: 14px; background: {{r.rowBg}};">
-                <span role="cell" style="display: flex; flex-direction: column;"><span style="font-weight: 700;">{{r.name}}</span><span style="font-size: 12px; color: #6B7686;">{{r.meta}}</span></span>
+                <span role="cell" style="display: flex; flex-direction: column;"><span style="font-weight: 700;">{{r.name}}</span><span style="font-size: 12px; color: #5B6675;">{{r.meta}}</span></span>
                 <span role="cell" style="font-size: 13px; color: #3D4A5C; font-variant-numeric: tabular-nums;">{{r.barcode}}</span>
                 <span role="cell" style="text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; color: {{r.qtyFg}};">{{r.qty}}</span>
-                <span role="cell" style="text-align: right; color: #6B7686; font-variant-numeric: tabular-nums;">{{r.min}}</span>
+                <span role="cell" style="text-align: right; color: #5B6675; font-variant-numeric: tabular-nums;">{{r.min}}</span>
                 <span role="cell" style="text-align: right; font-variant-numeric: tabular-nums;">{{r.cost}}</span>
                 <span role="cell" style="text-align: right; font-weight: 700; font-variant-numeric: tabular-nums;">{{r.value}}</span>
                 <span role="cell" style="display: flex; flex-wrap: wrap; gap: 6px;">
@@ -131,9 +135,9 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
               </div>
             </sc-for>
             <div role="row" style="display: grid; grid-template-columns: minmax(0,2.3fr) minmax(0,1.4fr) minmax(0,.9fr) minmax(0,.7fr) minmax(0,1fr) minmax(0,1.1fr) minmax(0,1.5fr); column-gap: 12px; align-items: center; min-height: 52px; padding: 0 20px; border-top: 1px solid #E7EAEE; background: #F8FAFB; font-size: 13px;">
-              <span role="cell" style="font-weight: 700;">Sahifadagi jami</span><span role="cell" style="color: #6B7686;">1–10 / 248 pozitsiya</span><span role="cell"></span><span role="cell"></span><span role="cell"></span>
+              <span role="cell" style="font-weight: 700;">Sahifadagi jami</span><span role="cell" style="color: #5B6675;">1–10 / 248 pozitsiya</span><span role="cell"></span><span role="cell"></span><span role="cell"></span>
               <span role="cell" style="text-align: right; font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums;">{{pageTotal}}</span>
-              <span role="cell" style="color: #6B7686;">so'm</span>
+              <span role="cell" style="color: #5B6675;">so'm</span>
             </div>
           </div>
         </div>
@@ -141,8 +145,8 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 00-14.5-4.5L4 8"></path><path d="M4 4v4h4M4 13a8 8 0 0014.5 4.5L20 16"></path><path d="M20 20v-4h-4"></path></svg>
           <span>Oxirgi yangilanish: 16.10.2026 14:32 · Tannarx — FIFO bo'yicha o'rtacha</span>
           <div style="flex-grow: 1;"></div>
-          <button type="button" aria-label="Oldingi sahifa" style="height: 32px; padding: 0 12px; border: 1px solid #E7EAEE; border-radius: 9px; background: #FFFFFF; color: #6B7686; font: inherit; font-size: 12px; font-weight: 700;">Oldingi</button>
-          <button type="button" aria-label="Keyingi sahifa" style="height: 32px; padding: 0 12px; border: 1px solid #E7EAEE; border-radius: 9px; background: #FFFFFF; color: #0F1B2D; font: inherit; font-size: 12px; font-weight: 700;">Keyingi</button>
+          <button type="button" aria-label="Oldingi sahifa" style="height: 36px; padding: 0 12px; border: 1px solid #E7EAEE; border-radius: 9px; background: #FFFFFF; color: #6B7686; font: inherit; font-size: 12px; font-weight: 700;">Oldingi</button>
+          <button type="button" aria-label="Keyingi sahifa" style="height: 36px; padding: 0 12px; border: 1px solid #E7EAEE; border-radius: 9px; background: #FFFFFF; color: #0F1B2D; font: inherit; font-size: 12px; font-weight: 700;">Keyingi</button>
         </div>
       </section>
 
@@ -155,7 +159,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
         </div>
         <div style="overflow-x: auto;">
           <div role="table" aria-label="Ko'chirishlar" style="min-width: 980px;">
-            <div role="row" style="display: grid; grid-template-columns: minmax(0,1fr) minmax(0,2fr) minmax(0,1.2fr) minmax(0,.6fr) minmax(0,1.1fr) minmax(0,1.4fr) minmax(0,1.6fr) minmax(0,1.3fr); column-gap: 12px; align-items: center; padding: 12px 20px; background: #F8FAFB; border-top: 1px solid #E7EAEE; font-size: 12px; font-weight: 600; color: #6B7686;">
+            <div role="row" style="display: grid; grid-template-columns: minmax(0,1fr) minmax(0,2fr) minmax(0,1.2fr) minmax(0,.6fr) minmax(0,1.1fr) minmax(0,1.4fr) minmax(0,1.6fr) minmax(0,1.3fr); column-gap: 12px; align-items: center; padding: 12px 20px; background: #F8FAFB; border-top: 1px solid #E7EAEE; font-size: 12px; font-weight: 600; color: #5B6675;">
               <span role="columnheader">Hujjat</span><span role="columnheader">Yo'nalish</span><span role="columnheader">Yuborilgan</span><span role="columnheader" style="text-align: right;">Poz.</span><span role="columnheader" style="text-align: right;">Summa</span><span role="columnheader">Holat</span><span role="columnheader">e-TTN</span><span role="columnheader">Amal</span>
             </div>
             <sc-for list="{{transfers}}" as="t" hint-placeholder-count="6">
@@ -168,7 +172,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
                 <span role="cell"><span style="padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; background: {{t.st.bg}}; color: {{t.st.fg}};">{{t.st.text}}</span></span>
                 <span role="cell"><span style="padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; background: {{t.et.bg}}; color: {{t.et.fg}};">{{t.et.text}}</span></span>
                 <span role="cell">
-                  <sc-if value="{{t.hasAction}}" hint-placeholder-val="{{false}}"><button type="button" style="height: 34px; padding: 0 12px; border: 1px solid {{t.actBorder}}; border-radius: 10px; background: {{t.actBg}}; color: {{t.actFg}}; font: inherit; font-size: 12px; font-weight: 700;">{{t.action}}</button></sc-if>
+                  <sc-if value="{{t.hasAction}}" hint-placeholder-val="{{false}}"><button type="button" style="height: 36px; padding: 0 12px; border: 1px solid {{t.actBorder}}; border-radius: 10px; background: {{t.actBg}}; color: {{t.actFg}}; font: inherit; font-size: 12px; font-weight: 700;">{{t.action}}</button></sc-if>
                 </span>
               </div>
             </sc-for>
@@ -198,16 +202,16 @@ class Component extends DCLogic {
     const F = { "Dashboard": "Bo02Dashboard", "AI yordamchi": "Bo13Ai", "Tasdiqlash navbati": "Bo16Tasdiqlash", "Kassa (POS)": "Main", "Qarzdorlar": "Bo06Qarzdorlar", "Tovarlar va narxlar": "Bo05Narxlar", "Qoldiq va ko'chirish": "Bo03Ombor", "Xaridlar": "Bo04Xarid", "Yorliqlar": "Bo18Yorliq", "Xarajatlar": "Bo17Xarajatlar", "Bank tushumi": "Bo24Bank", "E-faktura": "Bo15Efaktura", "QQS va davlat hisoboti": "Bo10DavlatHisobot", "Buxgalteriya": "Bo08Jurnal", "Hisobotlar": "Bo09Hisobotlar", "1C integratsiyasi": "Bo23OneC", "Sozlamalar": "Bo14Sozlamalar" };
     const ACTIVE = "Qoldiq va ko'chirish";
     const it = (label, icon, _a, badge) => { const active = label === ACTIVE; return { label, icon: I[icon], href: F[label] + ".dc.html", fg: active ? "#FFFFFF" : "#C9D2DC", bg: active ? "#1C2A3F" : "transparent", hasBadge: !!badge, badge: badge || "" }; };
-    const T = { success: ["#E5F5EC", "#1F8A4C"], info: ["#E8F0FC", "#2F6FDB"], amber: ["#FDF3E1", "#8A5A12"], danger: ["#FBEAE8", "#C8372D"], violet: ["#EFEAFC", "#6D4AD8"], gray: ["#EEF1F4", "#3D4A5C"], brand: ["#E3F2EE", "#0A5E4D"] };
+    const T = { success: ["#E5F5EC", "#1F6B3E"], info: ["#E8F0FC", "#1F4FA8"], amber: ["#FDF3E1", "#8A5A12"], danger: ["#FBEAE8", "#A82B22"], violet: ["#EFEAFC", "#6D4AD8"], gray: ["#EEF1F4", "#3D4A5C"], brand: ["#E3F2EE", "#0A5E4D"] };
     const chip = (text, t) => ({ text, bg: T[t][0], fg: T[t][1] });
-    const fmt = (n, d = 2) => { const s = Math.abs(n).toFixed(d).split("."); const i = s[0].replace(/\B(?=(\d{3})+(?!\d))/g, " "); return (n < 0 ? "−" : "") + i + (d ? "," + s[1] : ""); };
+    const fmt = (n, d = 0) => { const s = Math.abs(n).toFixed(d).split("."); const i = s[0].replace(/\B(?=(\d{3})+(?!\d))/g, " "); return (n < 0 ? "−" : "") + i + (d ? "," + s[1] : ""); };
     const prod = [
       ["Non «Patir»", "dona · Non mahsulotlari", "4780012340017", 40, 0, 20, 3200, "ok"],
       ["Sut 2,5% 1 l", "dona · Sut mahsulotlari", "4780012340024", 85, 0, 30, 11200, "ok"],
-      ["Guruch «Lazer»", "kg · Bakaleya", "4780012340031", 126.5, 1, 50, 15000, "ok"],
+      ["Guruch «Lazer»", "kg · Bakaleya", "4780012340031", 126.5, 3, 50, 15000, "ok"],
       ["Choy ko'k 100 g", "dona · Choy va qahva", "4780012340048", 8, 0, 12, 17500, "low"],
       ["Gazli ichimlik 1,5 l", "dona · Ichimliklar · markirovka", "4780012340055", 12, 0, 24, 7200, "low"],
-      ["Shakar", "kg · Bakaleya", "4780012340062", 18, 1, 40, 10400, "low"],
+      ["Shakar", "kg · Bakaleya", "4780012340062", 18, 3, 40, 10400, "low"],
       ["Tuxum 10 dona", "dona · Tuxum", "4780012340079", 34, 0, 20, 13500, "exp5"],
       ["Kungaboqar yog'i 1 l", "dona · Yog'lar", "4780012340086", 46, 0, 20, 20000, "ok"],
       ["Makaron 500 g", "dona · Bakaleya", "4780012340093", 120, 0, 40, 6800, "ok"],
@@ -218,7 +222,7 @@ class Component extends DCLogic {
       const v = q * cost; pageSum += v;
       const low = s === "low";
       return {
-        name, meta, barcode, qty: fmt(q, dec), min: fmt(min, 0), cost: fmt(cost), value: fmt(v),
+        name, meta, barcode, qty: fmt(q, dec), min: fmt(min, dec), cost: fmt(cost, 0), value: fmt(v, 0),
         qtyFg: low ? "#C8372D" : "#0F1B2D", rowBg: low ? "#FFFBFA" : "#FFFFFF",
         st: low ? chip("Kam qoldi", "danger") : chip("Yetarli", "success"),
         hasExtra: s === "exp5" || s === "exp3",
@@ -247,12 +251,12 @@ class Component extends DCLogic {
       ],
       kpis: [
         { label: "Ombor qiymati (Chilonzor-3)", value: "48 120 000", note: "248 pozitsiya · tannarxda", noteFg: "#6B7686", icon: I.box, tile: "#E3F2EE", tileFg: "#0A5E4D" },
-        { label: "Kam qoldiq", value: "11", note: "Minimal darajadan past", noteFg: "#C8372D", icon: I.alert, tile: "#FBEAE8", tileFg: "#C8372D" },
+        { label: "Kam qoldiq", value: "11", note: "Minimal darajadan past", noteFg: "#C8372D", icon: I.alert, tile: "#FBEAE8", tileFg: "#A82B22" },
         { label: "Muddati yaqin partiyalar", value: "2", note: "7 kun ichida: tuxum, pishloq", noteFg: "#8A5A12", icon: I.doc, tile: "#FDF3E1", tileFg: "#8A5A12" },
-        { label: "Yo'ldagi ko'chirishlar", value: "2", note: "1 tasi kechikmoqda · 1 e-TTN imzo kutmoqda", noteFg: "#2F6FDB", icon: I.truck, tile: "#E8F0FC", tileFg: "#2F6FDB" }
+        { label: "Yo'ldagi ko'chirishlar", value: "2", note: "1 tasi kechikmoqda · 1 e-TTN imzo kutmoqda", noteFg: "#1F4FA8", icon: I.truck, tile: "#E8F0FC", tileFg: "#1F4FA8" }
       ],
       rows,
-      pageTotal: fmt(pageSum),
+      pageTotal: fmt(pageSum, 0),
       transfers
     };
   }

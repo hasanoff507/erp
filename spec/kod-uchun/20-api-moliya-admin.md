@@ -165,7 +165,7 @@
 |---|---|
 | Maqsad | my.soliq.uz'dan qo'lda yuklab olingan davlat hisoboti faylini tizimga kiritish (`11-malumotlar-modeli.md` §9) |
 | Ruxsat | `tax.compare.review` |
-| So'rov | `multipart/form-data`: `file` (PDF/Excel, ≤5 MB), `tax_type` (`vat`\|`turnover`\|`property`\|`land`\|`pit`\|`social`, majburiy), `period` (`YYYY-MM`, majburiy), `published_at` (ISO 8601 vaqt (`timestamptz`), davlat hisoboti e'lon qilingan vaqt, majburiy — 5 ish kunlik hisoblagich shundan boshlanadi) |
+| So'rov | `multipart/form-data`: `file` (PDF/Excel, ≤5 MB), `tax_type` (`vat`\|`turnover`, majburiy; mol-mulk/yer/JShDS/ijtimoiy soliq hisobotlari MVP'dan tashqari — `05-mvp-chegarasi.md`), `period` (`YYYY-MM`, majburiy), `published_at` (ISO 8601 vaqt (`timestamptz`), davlat hisoboti e'lon qilingan vaqt, majburiy — 5 ish kunlik hisoblagich shundan boshlanadi) |
 | Javob | `201 {id, tax_type, period, status: "uploaded", deadline_at}` — `deadline_at = min(published_at + 5 ish kuni, hisobot topshirish muddati)` (US-M10-02). Eslatmalar (M18 `state_report_diff`) — `published_at`dan **1-, 3-, 4-ish kuni**, `deadline_at`dan keyingi eslatma yuborilmaydi (qaror #50) |
 | Xatolar | `VALIDATION_ERROR`, `FILE_TOO_LARGE`, `UNSUPPORTED_FILE_TYPE` |
 | Idempotency-Key | Majburiy |

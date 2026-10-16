@@ -2,7 +2,7 @@
 
 **Maqsad:** Tezlik (SLO), mavjudlik, sig'im/narx, masshtablash, lokalizatsiya, saqlash muddati, unit-iqtisod va qo'llab-quvvatlash modelini belgilash.
 **Kim uchun:** Arxitektor, asoschi (biznes/narx qarorlari uchun).
-**Bog'liq fayllar:** `10-umumiy-arxitektura.md`, `11-malumotlar-modeli.md`, `15-xavfsizlik-va-audit.md` (§7 backup), `21-integratsiyalar.md` (§1 fiskal, §16 Do'kon agenti), `22-ai-qatlami.md` (§13), `23-backend-arxitekturasi.md` (§7.3, §9), `24-frontend-arxitekturasi.md` (§6), `03-modullar-talablari.md`, `06-ekranlar-umumiy.md`, `33-1c-integratsiya.md` (§15), `34-1c-agent.md`, `01-qarorlar.md` #22, #43, #51, #58, #60, #65.
+**Bog'liq fayllar:** `10-umumiy-arxitektura.md`, `11-malumotlar-modeli.md`, `15-xavfsizlik-va-audit.md` (§7 backup), `21-integratsiyalar.md` (§1 fiskal, §9.4 karta terminali, §16 Do'kon agenti), `22-ai-qatlami.md` (§13), `23-backend-arxitekturasi.md` (§7.3, §9), `24-frontend-arxitekturasi.md` (§6), `03-modullar-talablari.md`, `06-ekranlar-umumiy.md`, `33-1c-integratsiya.md` (§15), `34-1c-agent.md`, `01-qarorlar.md` #22, #43, #51, #57, #58, #60, #65, #71; `design/USLUB.md` (vizual uslub, shrift).
 **Holat:** joriy, 2026-10-16.
 
 ## Asosiy xulosalar
@@ -11,7 +11,7 @@
 2. **Qonuniy muddatlar**: offline chekning OFD'ga yetishi — **48 soat**, keyin kassa **avtomatik bloklanadi** (VMQ-943 1-ilova 31-band, 2-ilova 6-band; ogohlantirish shkalasi 24/40/46/48 soat — qaror #43); markirovkalangan tovar egalik o'tishi xabarnomasi (kirim) — **3 ish kuni**, ayrim tovar guruhlarida **72 soat** (VM 833 66–67-band; VM 631, VM 149, VM 23); davlat hisobotini tuzatish — **5 ish kuni** (SK 5-modda 7-qism, 81-modda).
 3. **Sig'im rejasi** (100 → 1000 tenant) — UzCloud'ning manbali birlik narxlari (2026-10-16) ustida hisoblangan; 1000 tenant uchun boshlang'ich konfiguratsiya — qaror #58 (3-bo'lim). Tenant soni va yuklama — taxmin.
 4. **Mavjudlik**: UzCloud — marketing da'vosi **99,982%**, K8s Control Plane — **99,9%**, ommaviy ofertada foizli SLA ham, kompensatsiya ham yo'q (shartnoma muzokarasi). MVP maqsadi — oylik **99,5%**. Backup — RPO ≤ 5 daqiqa (o'z WAL PITR), RTO ≤ 4 soat (qaror #51), nusxa boshqa provayderda ham (qaror #65).
-5. **Uskunalar narxi va protokollari manbali** (2026-10-16): skaner, chek printeri (shu jumladan bulut printerlar — Toshkentda 4,7–7,1 mln so'm), yorliq printeri (bozor standarti Xprinter XP-365B, TSPL+ESC/POS), tarozi (EAN-13 og'irlik kodi, prefiks — tenant sozlamasi), Android terminal (7-bo'lim). Xom TCP 9100 LAN printerlar va lokal fiskal ko'prik uchun do'konda **Windows PK + Do'kon agenti** kerak (qaror #60).
+5. **Uskunalar narxi va protokollari manbali** (2026-10-16): skaner, chek printeri (shu jumladan bulut printerlar — Toshkentda 4,7–7,1 mln so'm), yorliq printeri (bozor standarti Xprinter XP-365B, TSPL+ESC/POS), tarozi (EAN-13 og'irlik kodi, prefiks — tenant sozlamasi), Android terminal (7-bo'lim). Xom TCP 9100 LAN printerlar, lokal fiskal ko'prik va integratsiyalangan karta terminali uchun do'konda **Windows PK + Do'kon agenti** kerak (qaror #60, #71). Bank karta terminali — bank/vendor beradi (ijara yoki xarid), integratsiya vendor hamkor shartnomasiga bog'liq; terminalsiz kassada karta qo'lda belgilanadi (7.7-bo'lim).
 6. **Lokalizatsiya**: o'zbek (lotin) — asosiy, rus — ikkinchi til; kirill qidiruv `pg_trgm` orqali; chek ikki tilda (qaror #29).
 7. **Ma'lumot saqlash muddati**: buxgalteriya hujjatlari kamida **5 yil** (O'RQ-404, 29-modda), soliq hujjatlari **3 yil** (SK 84-modda); audit log va arxiv backup — 5 yil (10-bo'lim).
 8. **Narx modeli — yagona tarif, 99 000 so'm/oy** (qaror #22): barcha modul, AI, Telegram + 1 virtual kassa; yillik −20%, 30 kunlik sinov. Bizning tenant-boshiga xarajatimiz (100 tenantda) ≈ 29 000–35 000 so'm, marja ≈ 64 000–70 000 so'm (support xodimisiz). **Fiskal modul haqi** — 1 BHM/yil (440 000 so'm ≈ 36 700 so'm/oy/kassa) — do'kon fiskal operatorga o'zi to'laydi (VMQ-943 1-ilova 55-band), tarifimizga kirmaydi. Qo'shimcha kassa narxi (+39 000 so'm/oy) va pilotdagi hamkor kassa haqi (chakana ~123 600 so'm/oy) qayta ko'riladi (11-bo'lim).
@@ -31,6 +31,7 @@ Qonuniy qatorlardan tashqari barcha raqamlar — standart maqsad (manbada son ko
 | Chekni yakunlash (to'lov tasdig'idan chek chiqishigacha, lokal) | **< 1 s** (lokal ko'prikda FM imzosi bilan **< 2 s**) | Offline rejimda ham; hamkor bulut rejimida OFD yuborish asinxron navbatda |
 | API javob vaqti, p95 (o'qish so'rovlari) | **< 300 ms** | Backend ichida, tashqi tizim kutilmaydi |
 | API javob vaqti, p95 (yozuvchi so'rovlar, masalan sotuv posting) | **< 800 ms** | Bitta DB tranzaksiyada hujjat+registr+provodka; tashqi yuborish navbatga tushadi |
+| Karta terminali: `purchase` umumiy kutish | **≤ 120 s** (ulanish 5 s; `refund`/`void` 60 s; `health` 3 s; agent lokal API ≤ 125 s) | Mijoz PIN kiritishi kiradi; vendor maksimumiga moslashtiriladi; taymaut → `unknown`, avtomatik takrorlanmaydi (qaror #71, `21` §9.4) |
 | AI chat javobi (AI-01) | **< 3 s** (birinchi token) | LLM API tashqi tarmoqqa bog'liq |
 | Offline chekning OFD'ga yetishi | **≤ 48 soat** (100% talab); 48 soatda kassa bloklanadi (`FISCAL_OFFLINE_48H_BLOCKED`) | **Qonuniy majburiy** (VMQ-943 1-ilova 31-band, 2-ilova 6-band; qaror #43) |
 | Markirovkalangan tovar kirimida egalik o'tishi xabarnomasi | **≤ 3 ish kuni** (suv/ichimlik, dori, o'simlik yog'i pilot — **≤ 72 soat**) | **Qonuniy majburiy** (VM 833 66–67-band; VM 631, VM 149, VM 23) — `marking_product_groups.acceptance_deadline` |
@@ -123,7 +124,7 @@ Stack — **Prometheus + Grafana + Loki + Tempo**, o'z-hosted (Ops VM; 26 #53). 
 | Strukturaviy loglar | structlog (JSON) → Loki; `tenant_id`/`request_id` har satrda, PII redaction | Tenant bo'yicha filtrlash, xato tezkor topish |
 | Metrikalar | prometheus-client → Prometheus → Grafana | So'rov soni/kechikish/xato, DB pool, `outbox_jobs` navbat chuqurligi, AI xarajati |
 | Tracing | OpenTelemetry → Tempo | So'rov → tranzaksiya → navbat ishi; OFD/EDO/AI tashqi chaqiruv kechikishi |
-| Alerting | Grafana alerting → Telegram (platforma admin) | **Fiskal**: `ofd_acked_at` bo'lmagan eng eski chek 24/40/46/48 soat bosqichlari (qaror #43), `fm_state != ok`; **agent**: Do'kon agenti oflayn (lokal ko'prik rejimida > 15 daqiqa); navbat ishi muvaffaqiyatsizligi; DB/Redis mavjudligi; WAL arxivi kechikishi (> 5 daqiqa — RPO buzilishi); **UzCloud billing** (hisob-faktura muddati) |
+| Alerting | Grafana alerting → Telegram (platforma admin) | **Fiskal**: `ofd_acked_at` bo'lmagan eng eski chek 24/40/46/48 soat bosqichlari (qaror #43), `fm_state != ok`; **agent**: Do'kon agenti oflayn (lokal ko'prik rejimida > 15 daqiqa); **karta terminali**: `CARD_VOID_FAILED`, settlement ↔ Z-hisobot farqi (`card.settlement.mismatch`), hal qilinmagan `unknown` urinish > 1 soat; navbat ishi muvaffaqiyatsizligi; DB/Redis mavjudligi; WAL arxivi kechikishi (> 5 daqiqa — RPO buzilishi); **UzCloud billing** (hisob-faktura muddati) |
 | Tenant-boshiga sarf | `ai_requests`, `notifications_log` | Tarif limitlari (M17), unit-iqtisod |
 
 ---
@@ -132,10 +133,10 @@ Stack — **Prometheus + Grafana + Loki + Tempo**, o'z-hosted (Ops VM; 26 #53). 
 
 - **Back-office PWA**: barcha zamonaviy brauzerlar (Chrome, Edge, Safari, Firefox) — uskunaga bog'liq emas.
 - **Veb-kassa (PWA, offline)** — to'liq matritsa `24-frontend-arxitekturasi.md` §6.2:
-  - **Windows PK, Chrome/Edge** — asosiy kassa platformasi: barcha printer transportlari (Web Serial, WebUSB, HTTP ePOS/WebPRNT, Do'kon agenti orqali xom TCP 9100, bulut, tizim printeri); lokal fiskal ko'prik — Do'kon agenti (.NET Framework 4.8, Windows 10/11).
-  - **Android Chrome** — WebUSB, BLE, HTTP va bulut printerlar; fiskal kassa faqat fiskal hamkorning bulut rejimida.
+  - **Windows PK, Chrome/Edge** — asosiy kassa platformasi: barcha printer transportlari (Web Serial, WebUSB, HTTP ePOS/WebPRNT, Do'kon agenti orqali xom TCP 9100, bulut, tizim printeri); lokal fiskal ko'prik va integratsiyalangan karta terminali (LAN/Wi-Fi) — Do'kon agenti (.NET Framework 4.8, Windows 10/11).
+  - **Android Chrome** — WebUSB, BLE, HTTP va bulut printerlar; fiskal kassa faqat fiskal hamkorning bulut rejimida; integratsiyalangan karta — faqat vendor bulut API'si bo'lsa, aks holda qo'lda kiritish.
   - **iPhone/iPad (Safari)** — **shartli**: kassa faqat fiskal hamkorning bulut rejimida va faqat o'rnatilgan PWA (Home Screen) sifatida; chop etish — faqat bulut printer yoki elektron chek zaxirasi. Aks holda iOS — faqat back-office.
-- **Android POS (keyingi bosqich, native Kotlin)** — bozordagi terminallar (UZKASSA N5 — Android 7.1, PAX A930, Sunmi P3) asosida; minimal versiya `28-android-pos.md` da (minSdk 24); fiskal modul — SAM/NFC orqali (`21` §1).
+- **Android POS (keyingi bosqich, native Kotlin)** — bozordagi terminallar (UZKASSA N5 — Android 7.1, PAX A930, Sunmi P3) asosida; minimal versiya `28-android-pos.md` da (minSdk 24); fiskal modul — SAM/NFC orqali (`21` §1); karta — shu smart-terminaldagi bank to'lov ilovasi (`AndroidIntentCardAdapter`) yoki SoftPOS (`SoftPosAdapter`), qaror #71.
 
 ---
 
@@ -208,7 +209,24 @@ Barcha modellarda Windows drayveri bor — yorliq brauzer + drayver/PDF orqali c
 ### 7.6 Fiskal modul va Do'kon agenti
 
 - **Fiskal modul (FM)** — fiskal operator/hamkor beradi (USB-ridyer + JavaCard yoki SAM); narxi va yetkazish tartibi — hamkordan. Xizmat haqi 1 BHM/yil (440 000 so'm) — do'kon operatorga to'laydi (VMQ-943 1-ilova 55-band).
-- **Do'kon agenti** — do'konning mavjud Windows 10/11 kompyuterida (.NET Framework 4.8), qo'shimcha uskuna emas; lokal fiskal ko'prik va xom TCP 9100 printerlar uchun shart (qaror #60).
+- **Do'kon agenti** — do'konning mavjud Windows 10/11 kompyuterida (.NET Framework 4.8), qo'shimcha uskuna emas; lokal fiskal ko'prik, xom TCP 9100 printerlar va integratsiyalangan karta terminali uchun shart (qaror #60, #71).
+
+### 7.7 Bank karta terminallari (qaror #71)
+
+Integratsiya uchun terminal do'kon LAN/Wi-Fi tarmog'ida bo'lishi kerak (agent bilan bitta tarmoq, statik IP yoki DHCP rezervatsiyasi). Wi-Fi amalda faqat Android smart-terminallarda. Real integratsiya vendor hamkor shartnomasidan keyin (26 #172–#175); qo'llab-quvvatlanadigan modellar ro'yxati — birinchi hamkor pilotidan keyin qotiriladi. Komissiya — do'kon va ekvayer bank shartnomasi (9430, qaror #42), tarifimizga kirmaydi.
+
+| Variant | Qurilma | Tarmoq | Narx / komissiya (2026-10-16) | Integratsiya holati |
+|---|---|---|---|---|
+| Rahmat POS | Sunmi P3 (Android) | Wi-Fi/4G/LAN | Qurilma 990 000 so'm; faqat to'lov terminali 0 so'm/oy (Rahmat onlayn kassasi 100 000 so'm/oy — bizda ishlatilmaydi, fiskal chekni bizning kassa chiqaradi) | "Ochiq API" (yopiq hujjat) — 26 #172 |
+| Humo (НМПЦ) | Sunmi P2/P3, NEXGO N82 | Wi-Fi/BT/LAN | Sotuv/ijara, narx e'lon qilinmagan | "Open API" (yopiq) — 26 #172 |
+| Humo (НМПЦ) Smart PIN Pad | Ingenico Lane/3600 | **faqat** Ethernet/USB/RS232 (Wi-Fi yo'q) | Narx e'lon qilinmagan | LAN ECR (Arcus2 ehtimoli) — 26 #174 |
+| Arca Group / ERA (Uzcard, Kapitalbank, Ipoteka) | PAX A930 / A930 RTX / A910S | Wi-Fi/4G | Bank ijarasi, narx topilmadi | ERA "ERP moduli" API (karta-push tasdiqlanmagan) — 26 #173 |
+| Smart Business (CDTI) | A-PAY P10, UZKASSA N5 | Wi-Fi/4G | Qurilma 1,95–3,3 mln so'm | API (yopiq) |
+| Hamkorbank | Ijara terminal | — | Komissiya "0,2% dan" | ECR topilmadi |
+| SoftPOS (MayaSoft MARTA) | NFC'li Android telefon/planshet (qo'shimcha uskuna yo'q) | Mobil internet | Ipoteka: Uzcard/Humo 0,3%, Visa/MC 1%, ulanish bepul; Asaka: 0,3% / 1,5% | SDK hamkor bank/PSP orqali, Kotlin POS — 26 #175 |
+| Mustaqil (integratsiyasiz) terminal | Har qanday bank terminali | — | Bank tarifi | Integratsiya yo'q — karta qo'lda belgilanadi (`21` §9.2) |
+
+Pilot sinovi birinchi navbatda **Sunmi P3 (Rahmat/Humo)** va **PAX A930 (ERA/Uzcard)** bilan. Taqqoslash uchun: TBC SoftPOS (Humo/Uzcard 0,4%, Visa/MC 1,4%) faqat BILLZ POS ichida — raqobatchi, bizga ochiq emas.
 
 ---
 
@@ -217,7 +235,7 @@ Barcha modellarda Windows drayveri bor — yorliq brauzer + drayver/PDF orqali c
 - **Asosiy til — o'zbek (lotin), ikkinchi til — rus** (i18next/react-i18next). Til almashtirish tugmasi barcha ekranlarda bir xil joyda (`06-ekranlar-umumiy.md`, 1.4-bo'lim).
 - **Kirill qidiruv**: `pg_trgm` indeks (`11-malumotlar-modeli.md`, 1-bo'lim).
 - Chek ikki tilda — o'zbek (birinchi, majburiy) + ixtiyoriy rus (`products.name_ru`), fiskal rekvizitlar operator formatida (qaror #29). Chek printerida o'zbek kirill harflari (Қ/Ғ/Ҳ) — raster rejimi (`24` §6.1).
-- Shrift — tizim shrifti; U+02BB va kirill gliflari Bosqich 0 skrinshot-testida tekshiriladi, yetishmasa self-hosted Noto Sans (qaror #57).
+- Shrift — **Manrope**, ilova bilan birga bundle qilingan (CDN yo'q, offline PWA keshida), zaxira `system-ui`; uslub — `design/USLUB.md`. U+02BB va o'zbek kirill gliflari Bosqich 0 skrinshot-testida tekshiriladi; Manrope'da yo'q glif `system-ui` zaxirasidan chiqadi, natija yomon bo'lsa self-hosted Noto Sans subset'i qo'shiladi (qaror #57).
 
 ---
 
@@ -339,12 +357,13 @@ Faqat tashqi javob kerak bo'lgan bandlar:
 7. **Faqat elektron chek** ruxsati (iOS kassa yo'li) — 26 #112 (OQ-018).
 8. **Eskiz.uz SMS** shartnomasi va yetkazish tezligi — 26 #45 (OQ-102).
 9. **1C yozish tezligi** (13.1 maqsadlari) — 26 #135 (OQ-054).
+10. **Karta terminali vendorlari** — integratsiya protokoli, test qurilma, narx/shartnoma (7.7-bo'lim): Rahmat/Humo — 26 #172, Arca/ERA — 26 #173, Humo Ingenico Lane/3600 — 26 #174, MayaSoft SoftPOS — 26 #175. Interim: `FakeCardTerminalAdapter`, karta qo'lda belgilanadi.
 
 ## Manbalar
 
 - `spec/kod-uchun/10-umumiy-arxitektura.md`, `11-malumotlar-modeli.md`, `15-xavfsizlik-va-audit.md`, `21-integratsiyalar.md`, `22-ai-qatlami.md`, `23-backend-arxitekturasi.md`, `24-frontend-arxitekturasi.md`
 - `spec/kod-uchun/03-modullar-talablari.md`, `06-ekranlar-umumiy.md`, `09-ai-funksiyalar.md`, `05-mvp-chegarasi.md` (3.3-bo'lim — tariflar va unit-iqtisod talabi)
-- `research_notes/ochiq-savollar/P1-soliq-fiskal.md` (48 soat bloki, reyestr muddatlari, 1 BHM, hamkor narxi), `P2-efaktura-markirovka.md` (markirovka muddatlari, E-IMZO-SERVER), `P4-huquq-hosting.md` §4 (UzCloud: SLA, S3, KMS, DBaaS, oferta 4.4, narxlar), `P6-uskuna-ai-narx.md` (bulut printerlar, tarozi, yorliq printerlari, AI narxi), `D-qarorlar-va-E-standartlar.md` (qaror #51, #58; OQ-046 OV sertifikat, OQ-098 support)
+- `research_notes/ochiq-savollar/P1-soliq-fiskal.md` (48 soat bloki, reyestr muddatlari, 1 BHM, hamkor narxi), `P2-efaktura-markirovka.md` (markirovka muddatlari, E-IMZO-SERVER), `P4-huquq-hosting.md` §4 (UzCloud: SLA, S3, KMS, DBaaS, oferta 4.4, narxlar), `P6-uskuna-ai-narx.md` (bulut printerlar, tarozi, yorliq printerlari, AI narxi), `P8-karta-terminal-integratsiya.md` (karta terminallari, SoftPOS komissiyalari), `D-qarorlar-va-E-standartlar.md` (qaror #51, #58; OQ-046 OV sertifikat, OQ-098 support)
 - `research_notes/texnik/04-arxitektura-va-stack.md`, `06-raqobatchilar-texnik-va-uskunalar.md`, `07-hosting-lokalizatsiya-xavfsizlik.md`
 - `spec/kod-uchun/33-1c-integratsiya.md` §15; `research_notes/1c-integratsiya/04-integratsiya-arxitekturasi.md` §2.9
-- uzcloud.uz/en/prices, /en/oferta, /en/status; officemax.uz, scalesstore.gl.uz, a-one.uz, mertech.uz, uzum.uz, asaxiy.uz (2026-10-16); ssl.com, cabforum.org (kod-imzolash); rhmt.uz/pos (hamkor kassa narxi)
+- uzcloud.uz/en/prices, /en/oferta, /en/status; officemax.uz, scalesstore.gl.uz, a-one.uz, mertech.uz, uzum.uz, asaxiy.uz (2026-10-16); ssl.com, cabforum.org (kod-imzolash); rhmt.uz/pos (hamkor kassa va Sunmi P3 narxi); humocard.uz/ru/business/terminals, ipotekabank.uz (SoftPOS), asakabank.uz (MARTA), hamkorbank.uz/rental-trading-terminals (karta terminallari)

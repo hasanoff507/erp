@@ -22,7 +22,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
       <div><div style="color: #FFFFFF; font-weight: 800; font-size: 15px;">ERP</div><div style="font-size: 12px; color: #8C99A8;">[Do'kon nomi]</div></div>
     </div>
     <sc-for list="{{menu}}" as="g" hint-placeholder-count="5">
-      <div style="padding: 14px 10px 6px; font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #6F7E90;">{{g.title}}</div>
+      <div style="padding: 14px 10px 6px; font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #8C99A8;">{{g.title}}</div>
       <sc-for list="{{g.items}}" as="m" hint-placeholder-count="3">
         <a href="{{m.href}}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 14px; font-weight: 600; text-decoration: none; color: {{m.fg}}; background: {{m.bg}};">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{m.icon}}"></path></svg>
@@ -38,27 +38,31 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
   </nav>
   <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column;">
     <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 28px; background: #FFFFFF; border-bottom: 1px solid #E7EAEE;">
-      <h1 style="margin: 0; font-size: 22px; font-weight: 800;">Hisobotlar markazi</h1>
+      <h1 style="margin: 0; font-size: 26px; line-height: 34px; font-weight: 800;">Hisobotlar markazi</h1>
       <div style="flex-grow: 1;"></div>
       <label style="display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px; min-width: 240px; border: 1px solid #DCE1E7; border-radius: 12px; background: #F8FAFB;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7686" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
         <span style="position: absolute; width: 1px; height: 1px; overflow: hidden;">Qidiruv</span>
-        <input type="search" placeholder="Tovar, mijoz, hujjat…" style="flex-grow: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 14px; color: #0F1B2D;">
+        <input type="search" placeholder="Tovar, mijoz, ekran…" style="flex-grow: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 14px; color: #0F1B2D;">
       </label>
       <select aria-label="Filial" style="height: 42px; padding: 0 12px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; color: #0F1B2D;"><option>Barcha filiallar</option><option>Chilonzor-3</option><option>Yunusobod-1</option></select>
       <button type="button" aria-label="Bildirishnomalar" style="width: 42px; height: 42px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; color: #3D4A5C; display: flex; align-items: center; justify-content: center;">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0112 0v5l1.5 2h-15z"></path><path d="M10 20a2 2 0 004 0"></path></svg>
       </button>
+      <div role="group" aria-label="Interfeys tili" style="display: flex; gap: 2px; padding: 2px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF;">
+        <button type="button" aria-pressed="true" style="min-width: 40px; height: 36px; padding: 0 8px; border: 0; border-radius: 10px; background: #0F1B2D; color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 700;">UZ</button>
+        <button type="button" aria-pressed="false" style="min-width: 40px; height: 36px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; color: #3D4A5C; font: inherit; font-size: 13px; font-weight: 700;">RU</button>
+      </div>
     </header>
     <main style="padding: 24px 28px; display: flex; flex-direction: column; gap: 18px;">
       <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px;">
         <div style="flex: 1 1 320px;">
           <div style="font-size: 26px; font-weight: 800;">Hisobotlar markazi</div>
-          <div style="font-size: 13px; color: #6B7686; margin-top: 4px;">Hisobotni tanlang, davrni belgilang va Excel yoki PDF ga eksport qiling. Rasmiy shakllar — tayyorlov eksporti, topshirish my.soliq.uz kabinetida.</div>
+          <div style="font-size: 13px; color: #5B6675; margin-top: 4px;">Hisobotni tanlang, davrni belgilang va Excel yoki PDF ga eksport qiling. Rasmiy shakllar — tayyorlov eksporti, topshirish my.soliq.uz kabinetida.</div>
         </div>
         <div role="tablist" aria-label="Tez davr" style="display: flex; padding: 4px; background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 12px;">
           <sc-for list="{{presets}}" as="p" hint-placeholder-count="5">
-            <button type="button" role="tab" aria-selected="{{p.sel}}" style="height: 34px; padding: 0 14px; border: 0; border-radius: 9px; background: {{p.bg}}; color: {{p.fg}}; font: inherit; font-size: 13px; font-weight: 700;">{{p.label}}</button>
+            <button type="button" role="tab" aria-selected="{{p.sel}}" style="height: 36px; padding: 0 14px; border: 0; border-radius: 9px; background: {{p.bg}}; color: {{p.fg}}; font: inherit; font-size: 13px; font-weight: 700;">{{p.label}}</button>
           </sc-for>
         </div>
         <div style="display: flex; align-items: flex-end; gap: 8px;">
@@ -84,7 +88,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
             <sc-for list="{{gr.items}}" as="r" hint-placeholder-count="4">
               <button type="button" aria-pressed="{{r.sel}}" style="text-align: left; display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: 12px; border: 1px solid {{r.border}}; background: {{r.bg}}; font: inherit; color: #0F1B2D; cursor: pointer;">
                 <span style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 14px; font-weight: 700; flex-grow: 1;">{{r.name}}</span><span style="padding: 2px 8px; border-radius: 999px; background: {{r.chipBg}}; color: {{r.chipFg}}; font-size: 11px; font-weight: 700; white-space: nowrap;">{{r.chip}}</span></span>
-                <span style="font-size: 12px; color: #6B7686;">{{r.desc}}</span>
+                <span style="font-size: 12px; color: #5B6675;">{{r.desc}}</span>
               </button>
             </sc-for>
           </section>
@@ -113,28 +117,28 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
           <sc-for list="{{sum}}" as="s" hint-placeholder-count="4">
             <div style="padding: 14px 16px; border-radius: 12px; background: #F8FAFB; border: 1px solid #E7EAEE;">
-              <div style="font-size: 12px; font-weight: 600; color: #6B7686;">{{s.label}}</div>
+              <div style="font-size: 12px; font-weight: 600; color: #5B6675;">{{s.label}}</div>
               <div style="font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 4px;">{{s.value}}</div>
-              <div style="font-size: 12px; color: #6B7686; margin-top: 2px;">{{s.note}}</div>
+              <div style="font-size: 12px; color: #5B6675; margin-top: 2px;">{{s.note}}</div>
             </div>
           </sc-for>
         </div>
         <div style="overflow-x: auto; border: 1px solid #E7EAEE; border-radius: 12px;">
-          <div role="table" aria-label="Kunlik savdo jadvali" style="min-width: 980px;">
-            <div role="row" style="display: grid; grid-template-columns: 110px 80px repeat(7, 1fr); gap: 12px; padding: 12px 16px; background: #F8FAFB; font-size: 12px; font-weight: 600; color: #6B7686; border-bottom: 1px solid #E7EAEE;">
-              <span role="columnheader">Sana</span><span role="columnheader" style="text-align: right;">Cheklar</span><span role="columnheader" style="text-align: right;">Yalpi savdo</span><span role="columnheader" style="text-align: right;">Qaytarish</span><span role="columnheader" style="text-align: right;">Chegirma</span><span role="columnheader" style="text-align: right;">Sof savdo</span><span role="columnheader" style="text-align: right;">Naqd</span><span role="columnheader" style="text-align: right;">Karta / QR</span><span role="columnheader" style="text-align: right;">Nasiya</span>
+          <div role="table" aria-label="Kunlik savdo jadvali" style="min-width: 640px;">
+            <div role="row" style="display: grid; grid-template-columns: 140px repeat(3, 1fr); gap: 12px; padding: 12px 16px; background: #F8FAFB; font-size: 12px; font-weight: 600; color: #5B6675; border-bottom: 1px solid #E7EAEE;">
+              <span role="columnheader">Sana</span><span role="columnheader" style="text-align: right;">Jami savdo, so'm</span><span role="columnheader" style="text-align: right;">Cheklar</span><span role="columnheader" style="text-align: right;">O'rtacha chek, so'm</span>
             </div>
             <sc-for list="{{rows}}" as="w" hint-placeholder-count="7">
-              <div role="row" style="display: grid; grid-template-columns: 110px 80px repeat(7, 1fr); gap: 12px; align-items: center; min-height: 52px; padding: 0 16px; border-bottom: 1px solid #F0F2F5; font-size: 14px; font-variant-numeric: tabular-nums;">
-                <span role="cell" style="font-weight: 600;">{{w.d}}</span><span role="cell" style="text-align: right;">{{w.n}}</span><span role="cell" style="text-align: right;">{{w.gross}}</span><span role="cell" style="text-align: right; color: #C8372D;">{{w.ret}}</span><span role="cell" style="text-align: right; color: #8A5A12;">{{w.disc}}</span><span role="cell" style="text-align: right; font-weight: 700;">{{w.net}}</span><span role="cell" style="text-align: right;">{{w.cash}}</span><span role="cell" style="text-align: right;">{{w.card}}</span><span role="cell" style="text-align: right;">{{w.debt}}</span>
+              <div role="row" style="display: grid; grid-template-columns: 140px repeat(3, 1fr); gap: 12px; align-items: center; min-height: 52px; padding: 0 16px; border-bottom: 1px solid #F0F2F5; font-size: 14px; font-variant-numeric: tabular-nums;">
+                <span role="cell" style="font-weight: 600;">{{w.d}}</span><span role="cell" style="text-align: right; font-weight: 800;">{{w.total}}</span><span role="cell" style="text-align: right;">{{w.n}}</span><span role="cell" style="text-align: right;">{{w.avg}}</span>
               </div>
             </sc-for>
-            <div role="row" style="display: grid; grid-template-columns: 110px 80px repeat(7, 1fr); gap: 12px; align-items: center; min-height: 54px; padding: 0 16px; background: #F8FAFB; font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums;">
-              <span role="cell">Jami</span><span role="cell" style="text-align: right;">{{tot.n}}</span><span role="cell" style="text-align: right;">{{tot.gross}}</span><span role="cell" style="text-align: right; color: #C8372D;">{{tot.ret}}</span><span role="cell" style="text-align: right; color: #8A5A12;">{{tot.disc}}</span><span role="cell" style="text-align: right;">{{tot.net}}</span><span role="cell" style="text-align: right;">{{tot.cash}}</span><span role="cell" style="text-align: right;">{{tot.card}}</span><span role="cell" style="text-align: right;">{{tot.debt}}</span>
+            <div role="row" style="display: grid; grid-template-columns: 140px repeat(3, 1fr); gap: 12px; align-items: center; min-height: 54px; padding: 0 16px; background: #F8FAFB; font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums;">
+              <span role="cell">Jami</span><span role="cell" style="text-align: right;">{{tot.total}}</span><span role="cell" style="text-align: right;">{{tot.n}}</span><span role="cell" style="text-align: right;">{{tot.avg}}</span>
             </div>
           </div>
         </div>
-        <div style="font-size: 12px; color: #6B7686;">Sof savdo = yalpi savdo − qaytarish − chegirma. Nasiya ustuni — shu kun qarzga berilgan summa (to'lov emas). Offline holatda faqat oxirgi keshlangan hisobot ko'rinadi.</div>
+        <div style="font-size: 12px; color: #6B7686;">Jami savdo = o'tkazilgan cheklar summasi − qaytarishlar; o'rtacha chek = jami savdo ÷ cheklar. Offline holatda faqat oxirgi keshlangan hisobot ko'rinadi.</div>
       </section>
     </main>
   </div>
@@ -156,19 +160,18 @@ class Component extends DCLogic {
     const ACTIVE = "Bo09Hisobotlar";
     const it = (label, icon, file, badge) => ({ label, icon: I[icon], href: file + ".dc.html", fg: file === ACTIVE ? "#FFFFFF" : "#C9D2DC", bg: file === ACTIVE ? "#1C2A3F" : "transparent", hasBadge: !!badge, badge: badge || "" });
     const g = n => (n < 0 ? "−" : "") + Math.abs(Math.round(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-    const g2 = n => g(n) + ",00";
 
     const chip = {
-      both: ["Excel · PDF", "#F4F6F8", "#3D4A5C"], fin: ["Buxgalter", "#EFEAFC", "#6D4AD8"], form: ["Shakl", "#E8F0FC", "#2F6FDB"]
+      both: ["Excel · PDF", "#F4F6F8", "#3D4A5C"], fin: ["Buxgalter", "#EFEAFC", "#6D4AD8"], form: ["Shakl", "#E8F0FC", "#1F4FA8"]
     };
     const item = (name, desc, c, sel) => ({ name, desc, sel: sel ? "true" : "false", chip: chip[c][0], chipBg: chip[c][1], chipFg: chip[c][2], bg: sel ? "#E3F2EE" : "#F8FAFB", border: sel ? "#0E7C66" : "#E7EAEE" });
     const groups = [
       { title: "Savdo", icon: I.cart, tile: "#E3F2EE", tileFg: "#0A5E4D", items: [
-        item("Kunlik savdo", "Cheklar, qaytarish, chegirma, to'lov turlari", "both", true),
+        item("Kunlik savdo", "Jami savdo, cheklar soni, o'rtacha chek", "both", true),
         item("Top tovarlar", "Miqdor va summa bo'yicha reyting", "both"),
         item("Kassa / smena tarixi", "Smena ochish-yopish, Z-hisobot, naqd farqi", "both"),
-        item("Kassirlar bo'yicha savdo", "Chek soni, o'rtacha chek, qaytarishlar", "both")] },
-      { title: "Ombor", icon: I.box, tile: "#E8F0FC", tileFg: "#2F6FDB", items: [
+        item("Kassirlar bo'yicha savdo", "Jami savdo, chek soni, o'rtacha chek", "both")] },
+      { title: "Ombor", icon: I.box, tile: "#E8F0FC", tileFg: "#1F4FA8", items: [
         item("Ombor qoldig'i", "Sana holatiga miqdor va tannarx", "both"),
         item("Tovar harakati", "Kirim, chiqim, ko'chirish, hisobdan chiqarish", "both"),
         item("Kam qolgan tovarlar", "Minimal darajadan past qoldiqlar", "both"),
@@ -187,28 +190,26 @@ class Component extends DCLogic {
 
     const presets = ["Bugun", "Hafta", "Oy", "Chorak", "Boshqa"].map((label, i) => ({ label, sel: i === 1 ? "true" : "false", bg: i === 1 ? "#0F1B2D" : "transparent", fg: i === 1 ? "#FFFFFF" : "#3D4A5C" }));
 
-    // [sana, cheklar, sof savdo, qaytarish, chegirma, naqd, karta/QR] — nasiya = sof − naqd − karta
+    // GET /reports/sales?group_by=day → rows[{group_key, total_sales, receipt_count, avg_receipt}]
     const raw = [
-      ["09.10.2026", 296, 12180000, 84000, 126000, 6940000, 4380000],
-      ["10.10.2026", 271, 11200000, 52000, 98000, 6310000, 4120000],
-      ["11.10.2026", 334, 13800000, 140000, 160000, 7650000, 5210000],
-      ["12.10.2026", 238, 9600000, 0, 74000, 5480000, 3520000],
-      ["13.10.2026", 352, 14900000, 96000, 182000, 8140000, 5690000],
-      ["14.10.2026", 301, 12400000, 61500, 118500, 6870000, 4660000],
-      ["15.10.2026", 377, 15700000, 120000, 204000, 8520000, 6050000]
+      ["09.10.2026", 12180000, 296],
+      ["10.10.2026", 11200000, 271],
+      ["11.10.2026", 13800000, 334],
+      ["12.10.2026", 9600000, 238],
+      ["13.10.2026", 14900000, 352],
+      ["14.10.2026", 12400000, 301],
+      ["15.10.2026", 15700000, 377]
     ];
-    const T = { n: 0, gross: 0, ret: 0, disc: 0, net: 0, cash: 0, card: 0, debt: 0 };
-    const rows = raw.map(([d, n, net, ret, disc, cash, card]) => {
-      const gross = net + ret + disc, debt = net - cash - card;
-      T.n += n; T.gross += gross; T.ret += ret; T.disc += disc; T.net += net; T.cash += cash; T.card += card; T.debt += debt;
-      return { d, n: g(n), gross: g2(gross), ret: ret ? g2(-ret) : "0,00", disc: g2(-disc), net: g2(net), cash: g2(cash), card: g2(card), debt: g2(debt) };
+    const T = { total: 0, n: 0 };
+    const rows = raw.map(([d, total, n]) => {
+      T.total += total; T.n += n;
+      return { d, total: g(total), n: g(n), avg: g(total / n) };
     });
-    const tot = { n: g(T.n), gross: g2(T.gross), ret: g2(-T.ret), disc: g2(-T.disc), net: g2(T.net), cash: g2(T.cash), card: g2(T.card), debt: g2(T.debt) };
+    const tot = { total: g(T.total), n: g(T.n), avg: g(T.total / T.n) };
     const sum = [
-      { label: "Sof savdo", value: g(T.net) + " so'm", note: "7 kun · 2 filial" },
-      { label: "Cheklar", value: g(T.n), note: "O'rtacha chek " + g(T.net / T.n) + " so'm" },
-      { label: "Qaytarish va chegirma", value: g(T.ret + T.disc) + " so'm", note: "Qaytarish " + g(T.ret) + " · chegirma " + g(T.disc) },
-      { label: "Nasiyaga berilgan", value: g(T.debt) + " so'm", note: "Sof savdoning " + (Math.round(T.debt / T.net * 1000) / 10).toString().replace(".", ",") + "%" }
+      { label: "Jami savdo", value: g(T.total) + " so'm", note: "7 kun · barcha filiallar" },
+      { label: "Cheklar", value: g(T.n), note: "7 kun bo'yicha jami" },
+      { label: "O'rtacha chek", value: g(T.total / T.n) + " so'm", note: "Jami savdo ÷ cheklar" }
     ];
 
     return {

@@ -2,7 +2,7 @@
 
 **Maqsad:** har bir foydalanuvchi hikoyasi (US-Mxx-nn)dan implementatsiya uchun kerakli hamma narsaga (biznes jarayon, ekran, API/voqea, DB jadval, provodka qoidasi, ruxsat kodi, backlog bosqichi) bitta qatordan borish va bo'shliqlarni aniqlash.
 **Kim uchun:** hammasi.
-**Bog'liq fayllar:** `03-modullar-talablari.md`, `04-biznes-jarayonlar.md`, `05-mvp-chegarasi.md`, `07-ekran-tafsilotlari.md`, `12-db-sxema.md`, `13-provodka-qoidalari.md`, `15-xavfsizlik-va-audit.md`, `16-offline-sync.md`, `17-api-umumiy.md`–`20-api-moliya-admin.md`, `27-backlog.md`, `33-1c-integratsiya.md` (M19), `01-qarorlar.md` (#43–#65), `26-ochiq-savollar-reestri.md`, `research_notes/ochiq-savollar/02-db-nomlar.md` (ustun/enum nomlari).
+**Bog'liq fayllar:** `03-modullar-talablari.md`, `04-biznes-jarayonlar.md`, `05-mvp-chegarasi.md`, `07-ekran-tafsilotlari.md`, `12-db-sxema.md`, `13-provodka-qoidalari.md`, `15-xavfsizlik-va-audit.md`, `16-offline-sync.md`, `17-api-umumiy.md`–`20-api-moliya-admin.md`, `27-backlog.md`, `33-1c-integratsiya.md` (M19), `01-qarorlar.md` (#43–#71), `26-ochiq-savollar-reestri.md`, `research_notes/ochiq-savollar/02-db-nomlar.md` (ustun/enum nomlari).
 **Holat:** joriy, 2026-10-16.
 
 ## Belgilar
@@ -22,13 +22,14 @@
 
 | US-id | Qisqa nomi | MVP | BP | Ekran(lar) | API | Jadvallar | Provodka | Ruxsat | Bosqich |
 |---|---|---|---|---|---|---|---|---|---|
-| US-M01-01 | Chek yaratish va to'lov qabul qilish | Must | BP-02, BP-05 | POS-02, POS-03, POS-04 | voqea `sale.created` (`18-api-kassa.md` §4); `GET /api/v1/sales` (chek qidiruv, §4.8); fiskal chek — `FiscalPort` (hamkor bulut API yoki Do'kon agenti → FM → OFD, qaror #60; MVP'da `FISCAL_PROVIDER=fake`); bloklar `409 FISCAL_OFFLINE_48H_BLOCKED` (qaror #43), `409 FISCAL_DEVICE_LOCKED` | `app.sales`, `app.sale_lines`, `app.sale_payments` (`card_type`, `card_mask`, `rrn`, `qr_type`, `provider_tx_id` — qaror #64), `app.stock_moves`, `app.stock_lots`, `app.vat_moves`, `app.ledger_entries`, `app.fiscal_receipts` (`fm_terminal_id`, `fm_receipt_seq`, `fiscal_at`, `ofd_acked_at`, `payment_form`, `delivery` — qaror #12, #43), `app.cash_registers` (`fm_state`, `last_unacked_receipt_at`, `fm_receipts_pending`) | §2.1–2.4 (naqdsiz → 5710, qaror #42) | `sales.create` | 3 (fiskal real adapter — 5, 26 #109 (OQ-012)) |
+| US-M01-01 | Chek yaratish va to'lov qabul qilish | Must | BP-02, BP-05 | POS-02, POS-03, POS-04 | voqea `sale.created` (`18-api-kassa.md` §4); `GET /api/v1/sales` (chek qidiruv, §4.8); fiskal chek — `FiscalPort` (hamkor bulut API yoki Do'kon agenti → FM → OFD, qaror #60; MVP'da `FISCAL_PROVIDER=fake`); bloklar `409 FISCAL_OFFLINE_48H_BLOCKED` (qaror #43), `409 FISCAL_DEVICE_LOCKED` | `app.sales`, `app.sale_lines`, `app.sale_payments` (`card_type`, `card_mask`, `rrn`, `card_entry_mode`, `qr_type`, `provider_tx_id` — qaror #64, #71), `app.stock_moves`, `app.stock_lots`, `app.vat_moves`, `app.ledger_entries`, `app.fiscal_receipts` (`fm_terminal_id`, `fm_receipt_seq`, `fiscal_at`, `ofd_acked_at`, `payment_form`, `delivery` — qaror #12, #43), `app.cash_registers` (`fm_state`, `last_unacked_receipt_at`, `fm_receipts_pending`) | §2.1–2.4 (naqdsiz → 5710, qaror #42) | `sales.create` | 3 (fiskal real adapter — 5, 26 #109 (OQ-012)) |
 | US-M01-02 | Offline savdo + avtomatik sinxronlanish | Must | BP-02 (offline variant) | POS-02, POS-12 | `POST /api/v1/sync/push`, `GET /api/v1/sync/pull` (§17, `16-offline-sync.md`) | `app.sync_receipts`, `app.idempotency_keys` | §2.1–2.4 | `sales.create` | 3 |
 | US-M01-03 | Markirovkalangan tovar kodini tekshirish | Must | BP-02 (qadam 5) | POS-02 | kod chek ichida OFD'ga (`FiscalPort` `items[].marking_codes`, qaror #17, #62); sotuvdan oldin `POST /api/v1/marking-codes/verify` (§15) — `MARKING_PRECHECK=warn` + lokal takror-kod tekshiruvi | `app.marking_codes`, `app.fiscal_receipts` | §2.1–2.4 (sale_lines ichida) | — (CRPT integratsiyasiga `integrations.retry` tegishli, sotuvda alohida kod yo'q) | 5 (sotuv UI va `MARKING_PRECHECK` — Bosqich 3 vazifasi; CRPT `verify`/`writeoff` real adapteri — 26 #40 (OQ-025)) |
 | US-M01-04 | Smena ochish va yopish (Z-hisobot) | Must | **— (gap, BP yo'q)** | POS-01, POS-07 | voqea `shift.opened`/`shift.closed`; `GET /api/v1/shifts/{id}/z-report` (§3) | `app.shifts`, `app.cash_moves` | §2.19 (X-01) | `shift.open` / `shift.close` | 3 |
 | US-M01-05 | UzQR to'lov (yuridik shaxs, 2026-07-01'dan majburiy) | Must | BP-05 | POS-03 | statik UzQR — kassir qo'lda tasdiqlaydi (`qr_type='static'`, faqat online); dinamik — `POST /api/v1/payments/checkouts`, `GET /{checkout_ref}`, `POST /payments/webhooks/{provider}` (§16), `UzqrPort` stub (qaror #64) | `app.payment_checkouts`, `app.sale_payments` (`qr_type`, `provider_tx_id` faqat `dynamic`da), `app.tenant_secrets` (`cash_register_id` — kassa UzQR kaliti) | §2.2 | `sales.create` | 3 (statik) / 5 (dinamik — 26 #49 (OQ-032)) |
 | US-M01-06 | Chekdan keyin chiquvchi e-faktura (B2B) | Must | BP-13 | POS-06, BO-15 | `POST /api/v1/einvoices` (`direction=out`), `POST /einvoices/from-receipt` (§14a) | `app.einvoices` | §2.22 (provodkasiz) | `einvoice.create` | 5 |
 | US-M01-07 | Kassada chek printeri va tarozini bir marta sozlash, sinov chek (qaror #60) | Must | **— (setup, BP yo'q)** | POS-16, POS-01, POS-04, BO-14 | qurilma-lokal (WebUSB/Web Serial/Web Bluetooth, tizim printeri); LAN 9100 printer va tarozi — Do'kon agenti lokal API (`127.0.0.1`); tarozi shablonlari — `PATCH /tenant/settings` (20 #40b) | `app.tenants` (`settings.weight_barcode_templates`); printer sozlamasi — qurilmada (Dexie) | — | — (sozlash; shablon — `settings.tenant`) | 3 (agent orqali LAN/tarozi — 5); transport sinovi — 26 #139 (OQ-060) |
+| US-M01-08 | Integratsiyalangan karta terminali: summa terminalga, natija avtomatik; qo'lda zaxira tasdiq bilan (qaror #71) | Must | BP-05 (karta oqimi), BP-04, BP-11, BP-15 | POS-03, POS-16, BO-12 | Do'kon agenti lokal API `127.0.0.1:47110/v1/card/*` (`purchase`, `tx/{attempt_id}`, `cancel-pending`, `refund`, `void`, `settlement`, `terminals`, `health`; imkoniyat `card_terminal`); `POST /api/v1/card-terminal-transactions` (upsert, `id = attempt_id`), `GET /api/v1/card-terminal-transactions/{id}`; `GET/POST /api/v1/card-terminals`, `PATCH /api/v1/card-terminals/{id}`; `POST /api/v1/card-terminal-settlements` (`18-api-kassa.md` §16a, #42–#46); voqealar `sale.created` (`payments[].card_result`), `return.created` (`refund_card`), `debt_payment.created` (`card_result`), `shift.closed` (`card_settlements[]`, `z_report.card_split`); `PATCH /tenant/settings` (`card_manual_fallback`); xatolar `CARD_TERMINAL_UNREACHABLE`, `CARD_TERMINAL_BUSY`, `CARD_TERMINAL_TIMEOUT`, `CARD_DECLINED`, `CARD_OUTCOME_UNKNOWN`, `CARD_AMOUNT_MISMATCH`, `CARD_MANUAL_NOT_ALLOWED`, `CARD_MANUAL_APPROVAL_REQUIRED`, `CARD_VOID_FAILED`, `CARD_TRANSACTION_MISMATCH` | `app.card_terminals`, `app.card_terminal_transactions`, `app.card_terminal_settlements`, `platform.card_bin_rules`, `app.sale_payments`/`app.debt_payments`/qaytarish to'lovlari (`card_entry_mode`, `card_terminal_transaction_id`, `approval_code`, `card_scheme`, `card_type_source`, `manual_reason`), `app.tenants` (`settings.card_manual_fallback`), tasdiqlar (`kind='card_manual_entry'`) | §2.1–2.4 (5710), §2.18a (`rrn` bo'yicha moslashtirish) | `sales.create`; `card.manual_entry.approve`; `cash_register.manage` (terminal reyestri); `settings.tenant` (siyosat) | 3 (port, `FakeCardTerminalAdapter`, POS UI, zaxira siyosati) / 5 (agent `card_terminal`, BO-12, BO-24 `rrn`); real vendor drayveri — 26 #172–#174 |
 
 ### M02 — Qaytarish
 
@@ -219,7 +220,7 @@ Barcha qatorlar: MVP — `Keyin` (Bosqich 7, qaror #37); BP — BP-14; provodka 
 | US-M19-17 | Kompyuter almashtirilganda tarix saqlanadi | Keyin | BP-14 (sozlash) | BO-22 | W-05, W-14, W-15; A-02 | `app.onec_bases`, `app.onec_agents`, `app.onec_object_refs` | — | `onec.settings.manage` | 7 |
 | US-M19-18 | 1C'da qo'lda o'zgartirilgan/o'chirilgan hujjatni bilish (drift) | Keyin | BP-14 | BO-22 (Jurnal), BO-23 | W-08, W-51, W-52, W-54 | `app.onec_reconciliations`, `app.onec_events`, `app.onec_object_refs` | — | `onec.view` | 7 |
 
-**Jami: 104 ta US** (M01=7, M02=3, M03=3, M04=6, M05=3, M06=3, M07=5, M08=11, M09=7, M10=4, M11=4, M12=3, M13=8, M14=4, M15=3, M16=3, M17=5, M18=4, M19=18).
+**Jami: 105 ta US** (M01=8, M02=3, M03=3, M04=6, M05=3, M06=3, M07=5, M08=11, M09=7, M10=4, M11=4, M12=3, M13=8, M14=4, M15=3, M16=3, M17=5, M18=4, M19=18).
 
 ---
 
@@ -233,7 +234,7 @@ Manba: `07-ekran-tafsilotlari.md` har bir ekrandagi **"Bog'liq US"** qatori (so'
 |---|---|
 | POS-01 | US-M01-04, US-M01-07, US-M17-03, US-M13-06 |
 | POS-02 | US-M01-01, US-M01-02, US-M01-03, US-M03-01, US-M09-03, US-M09-07 |
-| POS-03 | US-M01-01, US-M01-05, US-M08-01 |
+| POS-03 | US-M01-01, US-M01-05, US-M01-08, US-M08-01 |
 | POS-04 | US-M01-01, US-M01-07 |
 | POS-05 | US-M02-01, US-M02-02 |
 | POS-06 | US-M08-01, US-M08-02, US-M01-06 |
@@ -246,7 +247,7 @@ Manba: `07-ekran-tafsilotlari.md` har bir ekrandagi **"Bog'liq US"** qatori (so'
 | POS-13 | US-M08-05, US-M08-06, US-M08-09, US-M08-11 |
 | POS-14 | US-M16-01 |
 | POS-15 | US-M16-02 |
-| POS-16 | US-M01-07, US-M09-06 |
+| POS-16 | US-M01-07, US-M09-06, US-M01-08 |
 | BO-01 | US-M13-06, US-M17-03 |
 | BO-02 | US-M12-01, US-M11-03 |
 | BO-03 | US-M04-01, US-M04-02, US-M04-03, US-M06-03, US-M04-06, US-M05-02, US-M05-03 |
@@ -258,7 +259,7 @@ Manba: `07-ekran-tafsilotlari.md` har bir ekrandagi **"Bog'liq US"** qatori (so'
 | BO-09 | US-M12-01, US-M12-02, US-M12-03, US-M16-03, US-M02-03 |
 | BO-10 | US-M10-02, US-M10-04, AI-05 |
 | BO-11 | US-M13-01…08 (barcha 8 tasi) |
-| BO-12 | US-M14-01, US-M14-03, US-M14-04 |
+| BO-12 | US-M14-01, US-M14-03, US-M14-04, US-M01-08 |
 | BO-13 | AI-01, US-M18-04 |
 | BO-14 | US-M04-05, US-M09-06, US-M01-03, US-M01-07, US-M17-01, US-M19-15 («1C» qatori, W-55); "Sinxron istisnolari" bloki — infratuzilma/admin (qaror #56 b) |
 | BO-15 | US-M07-03, US-M07-05, US-M01-06, US-M10-03 |
@@ -296,7 +297,7 @@ Har bir fayl o'zining endpoint indeksidagi tartib raqami bilan berilgan (`18-api
 | `/admin/users...` | US-M13-01, US-M13-02, US-M13-04, US-M13-05 |
 | `/admin/users/{id}/reset-password` | US-M13-06 |
 
-#### 18-api-kassa.md (§1, 41 qator)
+#### 18-api-kassa.md (§1, 46 qator)
 
 | Endpoint/voqea | US |
 |---|---|
@@ -331,6 +332,9 @@ Har bir fayl o'zining endpoint indeksidagi tartib raqami bilan berilgan (`18-api
 | `payments/checkouts`, `/{ref}`, `/webhooks/{provider}` | US-M01-05 |
 | `sync/push`, `sync/pull` | US-M01-02 |
 | `GET /sales`, `/{id}` | US-M01-01, US-M02-01 |
+| `POST /card-terminal-transactions`, `GET /card-terminal-transactions/{id}` (#42–#43) | US-M01-08, US-M02-01, US-M08-04 (qaror #71) |
+| `GET/POST /card-terminals`, `PATCH /card-terminals/{id}` (#44–#45) | US-M01-08 (BO-12, POS-16; `cash_register.manage`) |
+| `POST /card-terminal-settlements` (#46) | US-M01-08, US-M16-02 |
 
 #### 19-api-ombor.md (bo'lim raqami bilan, 102 endpoint)
 
@@ -443,6 +447,7 @@ Har bir fayl o'zining endpoint indeksidagi tartib raqami bilan berilgan (`18-api
 
 | Endpoint | US |
 |---|---|
+| Agent lokal API karta terminali (`127.0.0.1:47110/v1/card/*`, imkoniyat `card_terminal`, qaror #71) | US-M01-08; Bosqich 5 (MVP'da `FakeCardTerminalAdapter`, Bosqich 3) |
 | Agent lokal API (`127.0.0.1`): fiskal ko'prik (POS → agent → FM → OFD), LAN 9100 printer, tarozi | US-M01-01 (fiskal chek), US-M01-07 (printer/tarozi); Bosqich 5 |
 | Agent bulut API (`/onec-agent/*`, A-01, A-03…A-10; ulash W-01…W-05, W-07, W-08) | US-M01-01, US-M01-07 — agent infratuzilmasi Bosqich 5 (qaror #66); A-02 va 1C vazifalari — M19 (Bosqich 7) |
 
@@ -452,7 +457,11 @@ Asos — `13-provodka-qoidalari.md` §2.25 "Posting qamrovi" jadvali (hujjat↔A
 
 | Jadval guruhi | Yozuvchi endpoint | US |
 |---|---|---|
-| `app.sales`, `app.sale_lines`, `app.sale_payments` (`card_type`, `card_mask`, `rrn`, `qr_type`) | voqea `sale.created` | US-M01-01, US-M01-02, US-M01-03, US-M01-05, US-M03-01, US-M08-01, US-M08-05, US-M10-01 |
+| `app.card_terminals` | `GET/POST /card-terminals`, `PATCH /card-terminals/{id}` (`cash_register.manage`, BO-12, POS-16); `health_status` — agent `card.status` vazifasi | US-M01-08 |
+| `app.card_terminal_transactions` | `POST /card-terminal-transactions` (upsert), voqealar `sale.created` (`payments[].card_result`) / `return.created` (`refund_card.card_result`) / `debt_payment.created` (`card_result`) | US-M01-08, US-M02-01, US-M08-04 |
+| `app.card_terminal_settlements` | `POST /card-terminal-settlements` (smena yopilishi; agent vazifasi `card.settlement`) | US-M01-08, US-M16-02 |
+| `platform.card_bin_rules` | seed/ops (platforma ma'lumotnomasi; erp_app — faqat SELECT) | US-M01-08 |
+| `app.sales`, `app.sale_lines`, `app.sale_payments` (`card_type`, `card_mask`, `rrn`, `card_entry_mode`, `card_terminal_transaction_id`, `qr_type`) | voqea `sale.created` | US-M01-01, US-M01-02, US-M01-03, US-M01-05, US-M01-08, US-M03-01, US-M08-01, US-M08-05, US-M10-01 |
 | `app.returns`, `app.return_lines` | voqea `return.created` | US-M02-01, US-M02-03 |
 | `app.goods_receipts`, `app.receipt_lines` | `POST /goods-receipts/{id}/post` | US-M04-01, US-M07-02, US-M07-03 |
 | `app.transfers`, `app.transfer_lines` | `/send`, `/receive` | US-M06-01, US-M06-02, US-M06-03 |
@@ -526,7 +535,7 @@ Asos — `13-provodka-qoidalari.md` §2.25 "Posting qamrovi" jadvali (hujjat↔A
 
 ### A. US stories — MVP tier yo'q (05-mvp-chegarasi.md §1.1 jadvalida yo'q)
 
-Bo'shliq yo'q — MVP'dagi 86 ta US (M01–M18) `05-mvp-chegarasi.md` §1.1 jadvalida (61 tasi Must); M19 ning 18 tasi — `Keyin` (Bosqich 7).
+Bo'shliq yo'q — M01–M18 ning 87 ta US'i: 83 tasi `05-mvp-chegarasi.md` §1.1 jadvalida (62 Must, 19 Should, 2 Could), 4 tasi MVP'dan keyin (US-M03-02, US-M08-08, US-M14-02, US-M17-05 — §1.1 jadval ostidagi izoh, qaror #33); M19 ning 18 tasi — `Keyin` (Bosqich 7).
 
 ### B. US stories — Bosqich (27-backlog.md) hech qaerda yo'q
 
@@ -558,25 +567,25 @@ Bo'shliq yo'q: `app.ettn_documents` — yozuvchi `POST /transfers/{id}/post` va 
 
 ### H. Ruxsat kodlari — endpoint tomonidan ishlatiladi, lekin 15-katalogda yo'q / aksincha
 
-Tekshiruv (`15-xavfsizlik-va-audit.md` §2.1, 65 ta kod) va 18/19/20'dagi barcha `Ruxsat`/backtick-kod mentionlari solishtirildi — **nomuvofiqlik topilmadi**: 18 va 19'da ishlatilgan barcha ruxsat kodlari (`sales.*`, `returns.*`, `discount.*`, `stock.*`, `transfer.*`, `purchases.*`, `debts.*`, `prices.*`, `tax.*`, `catalog.manage`, `stock.opening.manage`, `valuation.settings.manage`, `labels.print`) 15-katalogda bor; 20'dagi barcha `Ruxsat` ustuni qiymatlari (`accounting.*`, `reports.*`, `settings.*`, `expenses.*`, `cash.*`, `billing.manage`, `notifications.manage`, `telegram.link`, `ai.*`, `platform.admin`) ham bor. **Hech qanday gap yo'q bu bo'limda** — ijobiy natija, alohida ta'kidlanadi.
+Tekshiruv (`15-xavfsizlik-va-audit.md` §2.1, 66 qator — 68 ta kod: `shift.open`/`shift.close` va `cash.deposit`/`cash.withdraw` bittadan qatorda) va 18/19/20'dagi barcha `Ruxsat`/backtick-kod mentionlari solishtirildi — **nomuvofiqlik topilmadi**: 18 va 19'da ishlatilgan barcha ruxsat kodlari (`sales.*`, `returns.*`, `discount.*`, `stock.*`, `transfer.*`, `purchases.*`, `debts.*`, `prices.*`, `tax.*`, `catalog.manage`, `stock.opening.manage`, `valuation.settings.manage`, `labels.print`, `card.manual_entry.approve`, `cash_register.manage`) 15-katalogda bor; 20'dagi barcha `Ruxsat` ustuni qiymatlari (`accounting.*`, `reports.*`, `settings.*`, `expenses.*`, `cash.*`, `billing.manage`, `notifications.manage`, `telegram.link`, `ai.*`, `platform.admin`) ham bor. **Hech qanday gap yo'q bu bo'limda** — ijobiy natija, alohida ta'kidlanadi.
 
 ### H2. 1C integratsiyasi, bank tushumi va yangi qarorlar — izchillik tekshiruvi
 
-M19 ning 18 ta US'i BO-22/BO-23 ning «Bog'liq US» qatorlari (`33` §13), W-xx endpointlari (`33` §10), `onec_*` jadvallari (`33` §5), `onec.*` ruxsatlari (`15` §2.1 = `33` §11.1) va Bosqich 7 (`27`) bilan to'liq bog'langan. US-M11-04 → BP-15 → BO-24 → `/bank-settlements` (+ `/transit-balances`, `/imports`) → `app.bank_settlements` → `bank_settlements.manage` → Bosqich 4 zanjiri to'liq. Qarorlar #43–#70 zanjirlari: 48 soat blok (#43) — US-M01-01 → `18` §4.6 → `fiscal_receipts.ofd_acked_at` → `FISCAL_OFFLINE_48H_BLOCKED`; karta rekvizitlari (#64) — US-M01-01/M08-04 → `sale_payments`/`debt_payments`; markirovka (#62) — US-M01-03 → `FiscalPort`; E-TTN (#63) — US-M06-01/02 → `ettn_documents`; QQS/aylanma hisob-kitobi — US-M10-01/04 → `tax_settlements` → `13` §2.26/§4.3; rozilik (#61) — US-M17-01 → `tenants.accepted_terms_*`, `/tenant/consents`; Do'kon agenti (#60, #66) — US-M01-01/07 → agent lokal API va A-API, `onec_agents`/`onec_agent_tasks`, `cash_registers.fiscal_agent_id` (Bosqich 5); qarz to'lovi cheki (#67) — US-M08-04 → `debt_payment.created` (POS-13) / `POST /debt-payments` `method='bank'` (BO-06) → `debt_payments.receipt_seq`/`unallocated_amount`, `sale_lines.settled_amount`; POS fiskal natija (#68) — US-M01-01 → `sale.created.fiscal_result` → `fiscal_receipts.ofd_acked_at`; kech POS voqealari (#69) — US-M11-02 → `GET /period-closings/{period}/readiness` (`devices_unsynced`) → `analytics.correction_of_period`; obuna to'lovi (#70) — US-M17-02/03 → `POST /billing/checkout` → `billing_payments.amount_breakdown`. Bo'shliq yo'q.
+M19 ning 18 ta US'i BO-22/BO-23 ning «Bog'liq US» qatorlari (`33` §13), W-xx endpointlari (`33` §10), `onec_*` jadvallari (`33` §5), `onec.*` ruxsatlari (`15` §2.1 = `33` §11.1) va Bosqich 7 (`27`) bilan to'liq bog'langan. US-M11-04 → BP-15 → BO-24 → `/bank-settlements` (+ `/transit-balances`, `/imports`) → `app.bank_settlements` → `bank_settlements.manage` → Bosqich 4 zanjiri to'liq. Qarorlar #43–#71 zanjirlari: 48 soat blok (#43) — US-M01-01 → `18` §4.6 → `fiscal_receipts.ofd_acked_at` → `FISCAL_OFFLINE_48H_BLOCKED`; karta rekvizitlari (#64) — US-M01-01/M08-04 → `sale_payments`/`debt_payments`; markirovka (#62) — US-M01-03 → `FiscalPort`; E-TTN (#63) — US-M06-01/02 → `ettn_documents`; QQS/aylanma hisob-kitobi — US-M10-01/04 → `tax_settlements` → `13` §2.26/§4.3; rozilik (#61) — US-M17-01 → `tenants.accepted_terms_*`, `/tenant/consents`; Do'kon agenti (#60, #66) — US-M01-01/07 → agent lokal API va A-API, `onec_agents`/`onec_agent_tasks`, `cash_registers.fiscal_agent_id` (Bosqich 5); qarz to'lovi cheki (#67) — US-M08-04 → `debt_payment.created` (POS-13) / `POST /debt-payments` `method='bank'` (BO-06) → `debt_payments.receipt_seq`/`unallocated_amount`, `sale_lines.settled_amount`; POS fiskal natija (#68) — US-M01-01 → `sale.created.fiscal_result` → `fiscal_receipts.ofd_acked_at`; kech POS voqealari (#69) — US-M11-02 → `GET /period-closings/{period}/readiness` (`devices_unsynced`) → `analytics.correction_of_period`; obuna to'lovi (#70) — US-M17-02/03 → `POST /billing/checkout` → `billing_payments.amount_breakdown`; integratsiyalangan karta terminali (#71) — US-M01-08 → BP-05 karta oqimi → POS-03/POS-16/BO-12 → agent `/v1/card/*` va `POST /card-terminal-transactions` → `card_terminals`/`card_terminal_transactions`/`card_terminal_settlements`, `sale_payments.card_entry_mode` → `card.manual_entry.approve`, `cash_register.manage` → Bosqich 3/5. Bo'shliq yo'q.
 
 ### I. MVP Must stories — hech qaysi backlog bosqichida yo'q
 
-Tekshirildi: barcha "Must" tegidagi US (05'da ro'yxatlangan 61 ta) `27-backlog.md` 1–6 bosqichlarining US-ID ro'yxatlarida aniq ID bilan bor. Bo'shliq yo'q.
+Tekshirildi: barcha "Must" tegidagi US (05'da ro'yxatlangan 62 ta) `27-backlog.md` 1–6 bosqichlarining US-ID ro'yxatlarida aniq ID bilan bor. Bo'shliq yo'q.
 
 ---
 
 ## Yakuniy hisob
 
-- **US stories:** 104/104 jadvalga kiritilgan (M01 — 7, US-M01-07 printer/tarozi sozlamasi; M19 — 18 ta, Bosqich 7; US-M11-04 — bank tushumi tasdig'i).
+- **US stories:** 105/105 jadvalga kiritilgan (M01 — 8, US-M01-07 printer/tarozi sozlamasi, US-M01-08 integratsiyalangan karta terminali; M19 — 18 ta, Bosqich 7; US-M11-04 — bank tushumi tasdig'i).
 - **Ekranlar:** 41 (POS-01…16, BO-01…24, ADM-01; 39 tasi MVP, BO-22/BO-23 — Bosqich 7) + yordamchi route `/install` — 41 ekranning barchasi kamida bitta US'ga bog'langan.
-- **Endpointlar:** `14` (29), `18` (41, index qatorlari), `19` (102, bo'lim bo'yicha, `ettn-documents` va `powers-of-attorney` bilan), `20` (107 raqamli index qatori: `state-reports/{id}/confirm` 7a, `tax-settlements` 8a–8d, `devices` 29a–29b, `warehouses/{id}` 37a, `sync-exceptions` 40f–40g, `tenant/consents` 40h, `cash-registers/{id}/archive` 40i, `bank-settlements` 55a–55h; + `/platform/*` 10) — hammasi §2b'da US yoki "infratuzilma/admin" belgisi bilan; qo'shimcha `33` (W-01…W-55, A-01…A-10) va Do'kon agenti lokal API.
+- **Endpointlar:** `14` (29), `18` (46, index qatorlari), `19` (102, bo'lim bo'yicha, `ettn-documents` va `powers-of-attorney` bilan), `20` (107 raqamli index qatori: `state-reports/{id}/confirm` 7a, `tax-settlements` 8a–8d, `devices` 29a–29b, `warehouses/{id}` 37a, `sync-exceptions` 40f–40g, `tenant/consents` 40h, `cash-registers/{id}/archive` 40i, `bank-settlements` 55a–55h; + `/platform/*` 10) — hammasi §2b'da US yoki "infratuzilma/admin" belgisi bilan; qo'shimcha `33` (W-01…W-55, A-01…A-10) va Do'kon agenti lokal API.
 - **Jadvallar:** barchasi yozuvchiga ega (endpoint/voqea, ichki quvur yoki seed/ops — §2c).
-- **Ruxsat kodlari:** 15 §2.1 katalogi (65 ta, `onec.*` 7 ta, `bank_settlements.manage`, `cash_register.manage`, `devices.revoke` bilan) — nomuvofiqlik topilmadi.
+- **Ruxsat kodlari:** 15 §2.1 katalogi (66 qator, 68 ta kod; `onec.*` 7 ta, `bank_settlements.manage`, `cash_register.manage`, `card.manual_entry.approve`, `devices.revoke` bilan) — nomuvofiqlik topilmadi.
 - **1C jadvallari:** 18 ta `app.onec_*` + `auth.onec_device_authorizations` — barchasi W/A endpointlari yoki `onec_*` job'lari orqali yoziladi (§2c).
 - **Sinxron voqea turlari:** `16-offline-sync.md` §2 ro'yxati — barchasi §1 va §2b'da US/endpoint bilan bog'langan.
 

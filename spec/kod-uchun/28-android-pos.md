@@ -14,7 +14,7 @@
 3. **Uskunalar**: fiskal modul — veb bilan bir xil **`FiscalPort`** kontrakti (Kotlin): `AndroidIntentFiscalAdapter` (vendor SDK/intent), `ApduFiscalAdapter` (SAM/NFC'dagi FM "0400" applet'iga APDU — keyin), `FakeFiscalAdapter`; FM javobi veb bilan bir xil (`fm_terminal_id`, `fm_receipt_seq`, `fiscal_sign`, `qr_url`). Ommaviy SDK yo'q — vendor/hamkor javobi kutiladi (26 #63 (OQ-063), Xat 9). Android'da Do'kon agenti (qaror #60) kerak emas — FM qurilmaning o'zida. FM javob bermasa POS chekni **yopmaydi** — veb-kassadagi «Fiskal modul ulanmagan» holati bilan bir xil (`21-integratsiyalar.md` §1, §16).
 4. **ESC/POS** — chek/yorliq chop etish uchun de-fakto standart (Epson, `06-fayl` §3); **shtrix-kod/markirovka skaneri** — ichki kamera (CameraX + ZXing/ML Kit, veb'dagi `@zxing/browser`ga mos) va tashqi USB/Bluetooth HID "keyboard wedge" (klaviatura emulyatsiyasi, qo'shimcha drayversiz) ikkisi ham qo'llab-quvvatlanadi.
 5. **Tarozi** — og'irlik shtrix-kodi EAN-13 `PP CCCCC VVVVV K`, prefiks do'kon sozlamasi (`settings.weight_barcode_templates`; 22 = gramm, 21 = summa — 26 #31); jonli og'irlik — serial/Bluetooth adapter (keyin); **qo'lda og'irlik kiritish doimiy zahira**.
-6. **Karta to'lovi** — MVP'da mustaqil terminal, kassir `card_type` (`personal/corporate/social/unknown`, `method='card'` da majburiy; standart qiymat yo'q — kassir har to'lovda tanlaydi, qaror #64), ijtimoiy kartada `card_mask` + `rrn` kiritadi — veb bilan bir xil (qaror #64, 26 #65/#121); integratsiyalangan NFC terminal — keyin.
+6. **Karta to'lovi** — integratsiyalangan terminal (qaror #71): Android'da `AndroidIntentCardAdapter` (bank to'lov ilovasi — Sunmi/PAX smart-terminal) yoki `SoftPosAdapter` (MayaSoft SDK) — MVP'dan keyin, `CardTerminalPort` veb bilan bir xil (`21` §9.4). Ungacha mustaqil terminal + qo'lda kiritish (`card_entry_mode='manual'`, `manual_reason='standalone_terminal'`, `card_type_source='cashier'`): kassir `card_type` (`personal/corporate/social/unknown`, `method='card'` da majburiy; standart qiymat yo'q — kassir har to'lovda tanlaydi, qaror #64), ijtimoiy kartada `card_mask` + `rrn` kiritadi — veb bilan bir xil (qaror #64, 26 #65/#121); integratsiyalangan NFC terminal — keyin.
 7. **48 soatlik fiskal blok** (qaror #43) Android'da ham bir xil: 24 soat 🟡, 40 soat 🔴 + M18, 46 soat modal, 48 soat — `ofd_acked_at IS NULL` eng eski chekdan hisoblanib yangi fiskal chek bloklanadi (`FISCAL_OFFLINE_48H_BLOCKED`); taymer **qurilmada ham** hisoblanadi (offline'da server yo'q), server qayta tekshiradi. Markirovka kodi chek ichida (qaror #62, `MARKING_PRECHECK=warn`).
 8. **Auth**: qurilma tokeni veb bilan bir xil — access 15 daqiqa, refresh sliding 14 / mutlaq 180 kun (qaror #44).
 9. **Modul tuzilishi** — clean architecture: `data` (Room, Retrofit/sync), `domain` (use case'lar, entity'lar), `ui` (Compose, ViewModel) qatlamlari, veb'dagi FSD'ga mos ravishda modul (Gradle modullari) bo'yicha ajratilgan (2-bo'lim).
@@ -60,7 +60,7 @@ android/
     ├── fiscal/                 # FiscalPort (veb bilan bir xil kontrakt) + AndroidIntent/Apdu/Fake adapterlari
     ├── scanner/                 # Kamera (CameraX+ZXing) va HID skaner abstraksiyasi
     ├── scale/                   # Tarozi: EAN-13 og'irlik kodi parseri + jonli og'irlik adapteri (keyin) + qo'lda kiritish
-    └── card-terminal/            # Integratsiyalangan terminal (keyin); MVP — card_type/card_mask/rrn qo'lda
+    └── card-terminal/            # CardTerminalPort: AndroidIntentCardAdapter / SoftPosAdapter (qaror #71, keyin); ungacha qo'lda
 ```
 
 Har bir `feature/*` modul o'z ichida `data/domain/ui` uch qatlamiga bo'linadi (veb'dagi `model/ui` naqshiga mos, lekin Android idiomalariga moslashtirilgan): `ui/` — Compose ekran + ViewModel, `domain/` — use case (masalan `CreateSaleUseCase`, veb'dagi Effector `effect`siga mos), `data/` — Room DAO + repository implementatsiyasi.
@@ -83,7 +83,7 @@ Android POS **xuddi veb-kassa bilan bir xil** backend kontraktidan foydalanadi �
 | Lokal keshlanadigan ma'lumot toifalari | Katalog, narx, shtrix-kod, mijoz+qarz, limit, huquq, smena — `16-offline-sync.md` §1 bilan bir xil ro'yxat, Room jadvallarida saqlanadi (Dexie jadvallariga mos) |
 | Konflikt qoidalari | Ombor overselling, qarz limiti, narx muzlatish, LWW+version — `16-offline-sync.md` §5 bilan bir xil, chunki qoidalar serverda amalga oshiriladi, klient faqat ko'rsatadi |
 | 48 soatlik fiskal shkala va blok | Qoida bir xil (qaror #43): qurilma `ofd_acked_at IS NULL` eng eski chekdan hisoblaydi va 48 soatda yangi fiskal chekni bloklaydi (`FISCAL_OFFLINE_48H_BLOCKED`), server qayta tekshiradi; UI — POS-12 |
-| To'lov rekvizitlari | `sale_payments`/`debt_payments`: `card_type`, `card_mask`, `rrn`, `qr_type`, `provider_tx_id` — veb bilan bir xil CHECK'lar (qaror #64) |
+| To'lov rekvizitlari | `sale_payments`/`debt_payments`: `card_type`, `card_mask`, `rrn`, `qr_type`, `provider_tx_id`, `card_entry_mode`, `manual_reason`, `card_type_source` — veb bilan bir xil CHECK'lar (qaror #64, #71) |
 | Fiskal natija | `fiscal_receipts`: `receipt_seq` (qurilma) + `fm_terminal_id`, `fm_receipt_seq`, `fiscal_sign`, `fiscal_at`, `ofd_acked_at`, `payment_form` (qaror #12) |
 
 Farq faqat **klient tomonidagi saqlash mexanizmi** (Room o'rniga Dexie) va **UI freymvorki** (Compose o'rniga React) — protokol darajasida farq yo'q. Bu bitta backend sync-engine kodini ikki marta yozmaslik imkonini beradi.
@@ -117,7 +117,7 @@ Farq faqat **klient tomonidagi saqlash mexanizmi** (Room o'rniga Dexie) va **UI 
 ### 4.5 NFC / karta terminali
 
 - MVP: mustaqil bank terminali bilan karta to'lovi kassada qo'lda belgilanadi (online va offline) — `card_type` majburiy (standart qiymat yo'q — kassir har to'lovda tanlaydi, qaror #64), ijtimoiy kartada `card_mask` (`^[0-9]{4}\*+[0-9]{4}$`) va `rrn` (qaror #64, 26 #65/#121). Chekda to'lov shakli `payment_form` (`cash/card/qr/mixed`).
-- Integratsiyalangan terminal (bank SDK, `hardware/card-terminal`) — keyin. Virtual kassa reyestri talabi (karta/UzQR "shu qurilma orqali") — 26 #170.
+- Integratsiyalangan terminal (qaror #71): `hardware/card-terminal` — `AndroidIntentCardAdapter` (bank to'lov ilovasi intent'i, smart-terminal) va `SoftPosAdapter` (SDK, 26 #175); natija `card_terminal_transactions` ga, `card_entry_mode='integrated'`; `purchase` avtomatik takrorlanmaydi, `unknown` → holat so'rovi (`21` §9.4). Vendor javobi — 26 #172–#175. Virtual kassa reyestri talabi (karta/UzQR "shu qurilma orqali") — 26 #170.
 - UzQR: **faqat online** (statik ham, qaror #64); statik — kassir qo'lda tasdiqlaydi; dinamik — `UzqrPort` (26 #49), veb bilan bir xil.
 
 ---

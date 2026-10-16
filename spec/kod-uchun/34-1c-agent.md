@@ -1,6 +1,6 @@
 # 34. «ERP 1C Agent» — Windows agentining ichki tuzilishi (COM, pull)
 
-**Maqsad:** do'kon kompyuterida ishlaydigan «ERP 1C Agent» (supervisor tray-ilova + 32/64-bit COM worker'lar) ni kodga tayyor darajada belgilash: solution tuzilishi, jarayonlar va oqimlar, worker protokoli, o'rnatish va imzoli avto-yangilanish, ulash va token, bazalarni topish va onboarding, pull sikli, har vazifa turining COM ketma-ketligi, xato tasnifi, mahalliy jurnal, loglar, UI, xavfsizlik va testlar — `33-1c-integratsiya.md` §9 protokoliga to'liq bo'ysungan holda. · **Kim uchun:** agent dasturchisi · **Bog'liq fayllar:** `33-1c-integratsiya.md` (ustun: §2.3, §8, §9, §12, §15, §16.1), `14-autentifikatsiya-oauth2.md` (§5, §6), `15-xavfsizlik-va-audit.md`, `01-qarorlar.md` (#36–#41, #60), `26-ochiq-savollar-reestri.md` (#100, #102, #105, #109); tadqiqot — `research_notes/1c-integratsiya/01`, `04`, `06`; `research_notes/sonar-1c-integratsiya/01`, `02`, `04` (faqat g'oyalar, kod ko'chirilmaydi) · **Holat:** joriy, 2026-10-16.
+**Maqsad:** do'kon kompyuterida ishlaydigan «ERP 1C Agent» (supervisor tray-ilova + 32/64-bit COM worker'lar) ni kodga tayyor darajada belgilash: solution tuzilishi, jarayonlar va oqimlar, worker protokoli, o'rnatish va imzoli avto-yangilanish, ulash va token, bazalarni topish va onboarding, pull sikli, har vazifa turining COM ketma-ketligi, xato tasnifi, mahalliy jurnal, loglar, UI, xavfsizlik va testlar — `33-1c-integratsiya.md` §9 protokoliga to'liq bo'ysungan holda. · **Kim uchun:** agent dasturchisi · **Bog'liq fayllar:** `33-1c-integratsiya.md` (ustun: §2.3, §8, §9, §12, §15, §16.1), `14-autentifikatsiya-oauth2.md` (§5, §6), `15-xavfsizlik-va-audit.md`, `01-qarorlar.md` (#36–#41, #60, #71), `26-ochiq-savollar-reestri.md` (#100, #102, #105, #109); tadqiqot — `research_notes/1c-integratsiya/01`, `04`, `06`; `research_notes/sonar-1c-integratsiya/01`, `02`, `04` (faqat g'oyalar, kod ko'chirilmaydi) · **Holat:** joriy, 2026-10-16.
 
 Bu fayl agent **ichini** yozadi; tashqi shartnoma (endpointlar A-01…A-10, vazifa turlari, `ObjectSpec`/`QuerySpec`, imzo, muddatlar, xato kodlari) — `33` da va shu yerda o'zgartirilmaydi. Ziddiyatda tartib: `01-qarorlar.md` → `33-1c-integratsiya.md` → shu fayl. `33` bilan moslik jadvali — §13.1. Agent — Do'kon agentining (qaror #60) 1C moduli; Do'kon agentining boshqa modullari — §14. Sonar AI dekompilyatsiya kodi **ko'chirilmaydi** (qaror #36: noldan yoziladi) — faqat naqshlar olinadi.
 
@@ -73,7 +73,7 @@ Bu fayl agent **ichini** yozadi; tashqi shartnoma (endpointlar A-01…A-10, vazi
 
 ### 2.1 Repo papkasi
 
-Agent kodi repo ildizida `agent-1c/` papkasida (`backend/`, `web/` yonida; `32-kod-qoidalari.md` §1.3 bilan bir xil). Bosqich 5 modullari — `src/Erp1C.Fiscal/` va `src/Erp1C.Devices/` (§14.1 «Kod tuzilishi»). Umumiy test vektorlari — `shared/` (backend bilan birga).
+Agent kodi repo ildizida `agent-1c/` papkasida (`backend/`, `web/` yonida; `32-kod-qoidalari.md` §1.3 bilan bir xil). Bosqich 5 modullari — `src/Erp1C.Fiscal/`, `src/Erp1C.Devices/` va `src/Erp1C.CardTerminal/` (+ vendor drayverlari `src/Erp1C.CardTerminal.Drivers.<Vendor>/`) (§14.1 «Kod tuzilishi», §14.4). Umumiy test vektorlari — `shared/` (backend bilan birga).
 
 ```
 agent-1c/
@@ -132,6 +132,8 @@ agent-1c/
 | `Erp1C.Worker` | `Erp1C.Worker.dll` | AnyCPU, `net48` | `Erp1C.Core` (+ `Microsoft.CSharp` — `dynamic` uchun) |
 | `Erp1C.Worker32` / `Erp1C.Worker64` | `OneCWorker.x86.exe` / `OneCWorker.x64.exe` | x86 / x64 | `Erp1C.Worker` |
 | `Erp1C.Agent` | `ErpOneCAgent.exe` | AnyCPU, `Prefer32Bit=false` | `Erp1C.Core`, Serilog, QRCoder |
+| `Erp1C.CardTerminal` | `Erp1C.CardTerminal.dll` (Bosqich 5) | AnyCPU, `net48` | `Erp1C.Core` |
+| `Erp1C.CardTerminal.Drivers.<Vendor>` | `Erp1C.CardTerminal.Drivers.<Vendor>.dll` (Fake — Bosqich 5; real — hamkordan keyin) | AnyCPU, `net48` | faqat `Erp1C.CardTerminal` |
 | `Erp1C.ReleaseTool` | `erp1c-release.exe` (yetkazilmaydi) | x64 | `Erp1C.Core` |
 
 Barcha exe'lar bitta papkada (umumiy managed DLL'lar bir marta yotadi); har exe'ning `.config` faylida `<supportedRuntime version="v4.0" sku=".NETFramework,Version=v4.8"/>`.
@@ -1583,7 +1585,7 @@ Faqat tashqi javob talab qiladigan bandlar, `26-ochiq-savollar-reestri.md` raqam
 
 ## 14. Do'kon agenti kengaytmasi (qaror #60, Bosqich 5)
 
-Qaror #60: do'kon Windows kompyuteridagi **bitta** lokal dastur — «Do'kon agenti»; shu faylning §1–§13 dagi 1C moduli uning imkoniyatlaridan biri (Bosqich 7). Agent infratuzilmasi (ulash, token, A-API, imzoli vazifa navbati, avto-yangilanish — qaror #66) va fiskal ko'prik — **Bosqich 5**; MVP kodi `FISCAL_PROVIDER=fake` (`FakeFiscalAdapter` + FM emulyatori) bilan yoziladi, real adapter fiskal hamkor tanlangach (26 #109). Quyida — o'zgarmas asos.
+Qaror #60: do'kon Windows kompyuteridagi **bitta** lokal dastur — «Do'kon agenti»; shu faylning §1–§13 dagi 1C moduli uning imkoniyatlaridan biri (Bosqich 7). Agent infratuzilmasi (ulash, token, A-API, imzoli vazifa navbati, avto-yangilanish — qaror #66), fiskal ko'prik va karta terminali imkoniyati (qaror #71) — **Bosqich 5**; MVP kodi `FISCAL_PROVIDER=fake` (`FakeFiscalAdapter` + FM emulyatori) bilan yoziladi, real adapter fiskal hamkor tanlangach (26 #109). Quyida — o'zgarmas asos.
 
 ### 14.1 Umumiy asos
 
@@ -1595,8 +1597,8 @@ Qaror #60: do'kon Windows kompyuteridagi **bitta** lokal dastur — «Do'kon age
 | Vazifa xavfsizligi | Har vazifa — §7.5 dagi kabi Ed25519 JWS (`knd` claim), `payload_sha256`, muddat, mahalliy jurnal (§8.14); har modulning o'z `kind` oq ro'yxati; noma'lum `kind` → rad |
 | Jarayon | Supervisor — tarmoq, sirlar, UI, rejalashtirish; har qurilma o'z yo'lagida (`DeviceLane` — qurilma bo'yicha FIFO), 1C `BaseLane` lari bilan bloklashmaydi: 1C'ga uzun yozish chek chiqarishni kechiktirmaydi |
 | 1C moduli chegaralari | O'zgarmaydi: 13 turli oq ro'yxat, COM metodlari oq ro'yxati, uch qulf (`33` §3.1); yangi modullar 1C COM'ga tegmaydi |
-| Lokal kanal | Qaror #60: agent `127.0.0.1:<port>` da lokal API beradi — POS (PWA) shu PK'dan internet uzilganda ham chek chiqarishi va xom printerga chop etishi uchun. Yo'llar (`/v1/status`, `/v1/pair`, `/v1/fiscal/*`, `/v1/print/raw`), so'rov/javob sxemalari, standart port `47110` va xato shakli — yagona ta'rif `21-integratsiyalar.md` §16.1; himoya — `21` §16: faqat loopback, `Origin` oq ro'yxati (`https://app.<domen>`), CORS/Private Network Access javobi faqat shu `Origin` uchun, qurilmaga bog'langan lokal token (tray'dagi 6 raqamli bir martalik kod → `POST /v1/pair {code, device_id}` → 256-bit token, `device_id` bilan juft holda DPAPI ostida; tray «Ulangan kassalar»dan o'chiriladi). Agent javob bermasa POS «Fiskal modul ulanmagan» holatida chekni yopmaydi (`24-frontend-arxitekturasi.md` §6.4). 1C moduli lokal API'dan foydalanmaydi |
-| Kod tuzilishi | Har modul alohida loyiha (`Erp1C.*` yonida); fiskal modul kodi — alohida, kam o'zgaradigan paket (VMQ-943 2-ilova 6-band: fiskal qism o'zgarsa qayta xulosa) |
+| Lokal kanal | Qaror #60: agent `127.0.0.1:<port>` da lokal API beradi — POS (PWA) shu PK'dan internet uzilganda ham chek chiqarishi, bank karta terminalidan to'lov olishi (qaror #71) va xom printerga chop etishi uchun. Yo'llar (`/v1/status`, `/v1/pair`, `/v1/fiscal/*`, `/v1/card/*`, `/v1/print/raw`), so'rov/javob sxemalari, standart port `47110` va xato shakli — yagona ta'rif `21-integratsiyalar.md` §16.1; himoya — `21` §16: faqat loopback, `Origin` oq ro'yxati (`https://app.<domen>`), CORS/Private Network Access javobi faqat shu `Origin` uchun, qurilmaga bog'langan lokal token (tray'dagi 6 raqamli bir martalik kod → `POST /v1/pair {code, device_id}` → 256-bit token, `device_id` bilan juft holda DPAPI ostida; tray «Ulangan kassalar»dan o'chiriladi). Agent javob bermasa POS «Fiskal modul ulanmagan» holatida chekni yopmaydi (`24-frontend-arxitekturasi.md` §6.4). 1C moduli lokal API'dan foydalanmaydi |
+| Kod tuzilishi | Har modul alohida loyiha (`Erp1C.*` yonida); fiskal modul kodi — alohida, kam o'zgaradigan paket (VMQ-943 2-ilova 6-band: fiskal qism o'zgarsa qayta xulosa); karta terminali — `Erp1C.CardTerminal` (kontrakt, holat mashinasi, jurnal) + har vendor uchun alohida drayver loyihasi (§14.4) |
 | Kod-imzolash | O'sha OV Authenticode va imzoli manifest (§2.5, §4.4); pilot tarqatish sharti — 26 #105 |
 
 ### 14.2 `hello` imkoniyat bayroqlari
@@ -1607,7 +1609,9 @@ Qaror #60: do'kon Windows kompyuteridagi **bitta** lokal dastur — «Do'kon age
   "fiscal": {"enabled": false, "version": 0, "provider": null, "devices": []},
   "print":  {"enabled": true,  "version": 1,
              "devices": [{"local_id": "…", "transport": "tcp9100", "host": "192.168.1.50", "port": 9100, "status": "ok"}]},
-  "scale":  {"enabled": false, "version": 0, "devices": []}
+  "scale":  {"enabled": false, "version": 0, "devices": []},
+  "card_terminal": {"enabled": true, "version": 1,
+             "devices": [{"local_id": "…", "driver": "rahmat_lan", "host": "192.168.1.60", "tid": "…", "status": "online"}]}
 }
 ```
 
@@ -1615,6 +1619,7 @@ Qaror #60: do'kon Windows kompyuteridagi **bitta** lokal dastur — «Do'kon age
 - Agent faqat o'zi qo'llaydigan va shu do'konda sozlangan modullarni `enabled=true` deb e'lon qiladi; server vazifani faqat `capabilities.<oila>.enabled = true` bo'lsa navbatga qo'yadi (aks holda `AgentTaskPort.enqueue` → `409 AGENT_CAPABILITY_DISABLED`). Maydonsiz `hello` — faqat `onec`.
 - `fiscal.devices[].local_id` — lokal ko'prik kassasi bog'lanishining kaliti: kassa tomonida `cash_registers.fiscal_agent_id` (shu agent) + `cash_registers.fiscal_local_device_id` (shu `local_id`), BO-12 da sozlanadi.
 - `provider` — fiskal ko'prik turi (`multikassa_local` / `fiscaldrive_local`, qaror #60); `devices[].status` ∈ `ok`, `error`, `offline`.
+- `card_terminal.devices[].local_id` — karta terminali bog'lanishining kaliti: `card_terminals.agent_id` (shu agent) + `card_terminals.local_id` (shu `local_id`), BO-12 da sozlanadi; `driver` — o'rnatilgan vendor drayveri nomi (`rahmat_lan`, `humo_lan`, `era_lan`, `arcus2_tcp`, `fake`); `status` ∈ `online`, `busy`, `offline`, `error`. `card_terminal.enabled=true` faqat kamida bitta drayver o'rnatilgan va terminal sozlangan bo'lsa.
 
 ### 14.3 Lokal API amallari va server vazifa turlari
 
@@ -1625,6 +1630,7 @@ Ikki xil kanal — aralashtirilmaydi:
 | Oila | Amallar | Bajaruvchi | Qoidalar |
 |---|---|---|---|
 | fiskal | `open-shift`, `close-shift`, `sale`, `refund`, `device-status`, `unsent`, `resend` (`/v1/fiscal/*`) | Fiskal ko'prik: hamkorning lokal xizmati yoki SDK'si orqali fiskal modul (FM) → OFD | `FiscalPort` chegarasida summalar butun son tiyinda (26 #84); FM bergan raqam — alohida `fm_receipt_seq`; 48 soatlik offline blok (qaror #43) eng eski yuborilmagan chek vaqtidan; fiskal amal hech qachon avtomatik takrorlanmaydi — `device-status`/`unsent` bilan tekshiriladi, keyin `resend` |
+| karta terminali | `terminals`, `health`, `purchase`, `refund`, `void`, `tx/{attempt_id}`, `cancel-pending`, `settlement` (`/v1/card/*`) | `Erp1C.CardTerminal` → vendor drayveri → LAN/Wi-Fi'dagi bank terminali (TCP yoki terminalning lokal HTTP API'si) | Summalar butun son tiyinda; `attempt_id` idempotent (jurnalda saqlangan natija qaytadi, terminalga qayta bormaydi); **`purchase` hech qachon avtomatik takrorlanmaydi** — taymaut → `unknown` → `tx/{attempt_id}` holat so'rovi; bir terminalga bitta tranzaksiya (`DeviceLane` FIFO, band → `CARD_TERMINAL_BUSY`); ulanish faqat sozlangan terminalga (xususiy LAN manzili) — ixtiyoriy host yo'q; jurnal va logda faqat niqob (PAN/track/CVV hech qachon) — §14.4 |
 | chop etish | `print/raw` (`/v1/print/raw`) | Raw TCP 9100 (ESC/POS) LAN printer | Matn — `cp866` kod sahifasi (`ESC t`); cp866 da yo'q belgilar (o'zbek kirill `ў қ ғ ҳ`, `ʻ`) bo'lsa — raster (`GS v 0`); ulanish faqat ro'yxatdagi printerga (xususiy LAN manzili, port 9100) — ixtiyoriy host yo'q |
 
 **(b) Server vazifa turlari** (server → agent, `33` §9 dagi o'sha imzoli vazifa konverti va pull sikli; `purpose='device_service'`, `base_id = null`; vazifa faqat `capabilities.<oila>.enabled = true` bo'lsa qo'yiladi; ro'yxat `21-integratsiyalar.md` §16, `23-backend-arxitekturasi.md` §4.2 va `33-1c-integratsiya.md` §9.5 bilan aynan bir xil):
@@ -1636,9 +1642,63 @@ Ikki xil kanal — aralashtirilmaydi:
 | `fiscal.zreport` | Smena POS'siz yopilganda Z-hisobotni FM'dan olish | `{cash_register_id, shift_id}` | `ZReport` → `fiscal_receipts(kind='z_report')` |
 | `print.raw` | Back-office'dan LAN printerga chop etish | `{printer_local_id, data_base64, encoding: "cp866"\|"raster"}` | yuborildi / printer xatosi |
 | `scale.plu_upload` | PLU ro'yxatini yorliqli taroziga yuklash (CAS TCP 20304, Shtrih-Print UDP 1111) — **MVP'dan keyin** (MVP'da PLU CSV eksport) | `{scale_local_id, items:[{plu, name, price, barcode_prefix}]}` | yuklangan qatorlar soni / xato |
+| `card.status` | Karta terminallari holati (`health`) va jurnalda hal qilinmagan `unknown` urinishlarni terminaldan aniqlash (har 5 daqiqa) | `{card_terminal_ids?:[]}` | `{terminals:[{card_terminal_id, local_id, status, tid, last_tx_at}], unresolved:[CardTxResult]}` → `card_terminals.health_status`; `unresolved[]` → `card_terminal_transactions` (`resolved_by='status_query'`) |
+| `card.settlement` | Smena POS'siz yopilganda yoki kun oxirida terminal settlement'i | `{card_terminal_id, shift_id?}` | `SettlementResult` → `card_terminal_settlements` (server `expected_*`/`variance`/`status` ni hisoblaydi) |
+
+**Karta terminali bog'lanishi:** `card.*` vazifasi payload'idagi `card_terminal_id` — `card_terminals.agent_id` shu agent bo'lgan terminal; agent vazifani `card_terminals.local_id` qurilmasida bajaradi. `card.*` vazifasi to'lov (`purchase`/`refund`/`void`) bajarmaydi — ular faqat lokal API orqali.
 
 **Kassa bog'lanishi:** `fiscal.*` vazifasi payload'idagi `cash_register_id` kassasi agentga `cash_registers.fiscal_agent_id` (shu agent) va `cash_registers.fiscal_local_device_id` (`capabilities.fiscal.devices[].local_id`) orqali bog'langan; agent vazifani shu `local_id` qurilmasida bajaradi.
 
 Kassadagi jonli og'irlik agent vazifasi emas — desktop Chrome'da Web Serial (MVP'dan keyin, `24-frontend-arxitekturasi.md` §6.3); vaznli shtrix kod prefiksi (EAN-13) — do'kon sozlamasi, POS tomonda.
 
 Fiskal hamkor tanlangach (26 #109) aniqlanadi: hamkor xato kodlarining `fm_state`/`FISCAL_*` ga xaritasi (hamkorga xos maydonlar adapter ichida qoladi — lokal API va vazifa sxemalari o'zgarmaydi), hamkor lokal xizmati bilan aloqa (localhost API yoki SDK), dasturni sertifikatlash talabi. Qo'llab-quvvatlanadigan printer va tarozi modellari ro'yxati — pilot uskunasi bilan birga.
+
+### 14.4 Karta terminali moduli (`Erp1C.CardTerminal`, qaror #71)
+
+Vazifa: POS'ning `CardTerminalPort` chaqiruvlarini (`21-integratsiyalar.md` §9.4) do'kon LAN/Wi-Fi tarmog'idagi bank terminaliga uzatish. Brauzer terminalga to'g'ridan-to'g'ri ulana olmaydi (xom TCP yo'q, `http://` LAN manziliga mixed content va Local Network Access bloki), agent esa internetsiz ham ishlaydi — terminal bankka o'z kanali bilan chiqadi.
+
+**Lokal API** — `127.0.0.1:47110/v1/card/*`; so'rov/javob sxemalari, HTTP kodlari va xato shakli — yagona ta'rif `21-integratsiyalar.md` §16.1 (C# DTO'lari backend eksport qilgan JSON Schema'dan generatsiya qilinadi — `tools/gen-contracts.ps1`, qo'lda ikkinchi sxema yo'q):
+
+| Yo'l | Agentdagi bajarilish |
+|---|---|
+| `GET /v1/card/terminals` | Sozlangan terminallar va oxirgi `health` holati (keshdan, ≤ 30 s eski) |
+| `GET /v1/card/health?local_id=` | Drayver `HealthAsync` (≤ 3 s) |
+| `POST /v1/card/purchase` | Jurnalda `attempt_id` bo'lsa — saqlangan natija; aks holda jurnalga `created` → `DeviceLane` navbati → drayver `PurchaseAsync` (≤ 120 s) → jurnalga natija; HTTP uzun so'rov ≤ 125 s, mijoz uzilsa natija jurnalda qoladi va `tx/{attempt_id}` bilan olinadi |
+| `POST /v1/card/refund`, `/void` | `original_rrn` yoki `original_attempt_id` (jurnaldan RRN olinadi); ≤ 60 s |
+| `GET /v1/card/tx/{attempt_id}` | Jurnaldan; holat `unknown` bo'lsa — drayver `GetStatusAsync`, qo'llamasa `GetLastTransactionAsync` (ERN/summa/vaqt bo'yicha moslash), natija jurnalga (`resolved_by='status_query'`) |
+| `POST /v1/card/cancel-pending` | Drayver `CancelPendingAsync` (qo'llamasa `not_cancellable`) |
+| `POST /v1/card/settlement` | Drayver `SettlementAsync`; natija jurnalga va keyingi `results` outbox orqali serverga |
+
+**Drayver plug-in modeli**:
+```csharp
+public interface ICardTerminalDriver
+{
+    string Name { get; }                                   // "rahmat_lan", "humo_lan", "era_lan", "arcus2_tcp", "fake"
+    DriverCapabilities Capabilities { get; }               // Void, CancelPending, StatusByErn, LastTransaction, Settlement, CardType
+    Task<TerminalHealth> HealthAsync(TerminalConfig t, CancellationToken ct);
+    Task<CardTxResult> PurchaseAsync(TerminalConfig t, CardPurchase req, CancellationToken ct);
+    Task<CardTxResult> RefundAsync(TerminalConfig t, CardRefund req, CancellationToken ct);
+    Task<CardTxResult> VoidAsync(TerminalConfig t, CardVoid req, CancellationToken ct);
+    Task<CardTxResult?> GetStatusAsync(TerminalConfig t, Guid attemptId, CancellationToken ct);
+    Task<CardTxResult?> GetLastTransactionAsync(TerminalConfig t, CancellationToken ct);
+    Task<SettlementResult> SettlementAsync(TerminalConfig t, CancellationToken ct);
+    Task CancelPendingAsync(TerminalConfig t, Guid attemptId, CancellationToken ct);
+}
+```
+- Har vendor drayveri — alohida loyiha `Erp1C.CardTerminal.Drivers.<Vendor>` (classlib, `net48`, AnyCPU), faqat `Erp1C.CardTerminal` kontraktiga bog'liq; `Erp1C.Agent` drayverlarni `DriverRegistry` orqali nom bo'yicha topadi (refleksiya bilan ixtiyoriy DLL yuklanmaydi — ro'yxat kompilyatsiya vaqtida, imzolangan reliz ichida). Yangi drayver — yangi agent relizi (imzoli avto-yangilanish, §4.4).
+- `FakeCardTerminalDriver` (`fake`) — CI va demo uchun, `21` §9.4 dagi deterministik ssenariylar (summa oxiri bo'yicha: tasdiq, rad, taymaut → `unknown`, busy); prod tenant terminaliga `fake` tayinlanmaydi.
+- Drayver vendor protokolini (TCP/TLV, lokal HTTP va h.k.) **ichida** saqlaydi; tashqariga faqat `CardTxResult` chiqadi — vendor kodlari `status`/`decline_code` ga drayverda xaritalanadi. NDA ostidagi vendor hujjatlari repo'ga qo'yilmaydi (faqat drayver kodi va anonim test-fiksturalar).
+- `card_mask` normallashtirish (`^[0-9]{4}\*+[0-9]{4}$`), `amount_tiyin` tekshiruvi (farq → avtomatik `void` + `CARD_AMOUNT_MISMATCH`) va `card_scheme` aniqlash (AID yoki BIN) — `Erp1C.CardTerminal` umumiy qatlamida, drayverda emas.
+
+**Qoidalar**:
+- **Avtomatik takrorlash yo'q**: `PurchaseAsync` bir `attempt_id` uchun bir martadan ortiq chaqirilmaydi (jurnal yozuvi `sent` bo'lgach — hech qachon); taymaut/uzilish → `unknown`. `HealthAsync`, `GetStatusAsync`, `SettlementAsync` — 3 martagacha, 2 s oraliq.
+- **Taymautlar**: ulanish 5 s; `purchase` 120 s; `refund`/`void` 60 s; `health` 3 s.
+- **`DeviceLane`**: har terminal — o'z FIFO yo'lagi; bir vaqtda bitta tranzaksiya, kutayotgan so'rov bo'lsa yangi `purchase` → `409 CARD_TERMINAL_BUSY` (navbatga qo'yilmaydi — kassir bir vaqtda ikki to'lov boshlamasligi kerak). Fiskal va printer yo'laklari bilan bloklashmaydi.
+- **Tarmoq**: terminal manzili faqat sozlamadagi xususiy LAN IP (RFC 1918) va port; ixtiyoriy host yo'q; terminal topish (POS-16 «Uskunalar sozlamasi») — foydalanuvchi IP kiritadi yoki drayver qo'llasa lokal subnetda tor skan (faqat drayver portlari).
+- **Jurnal** `card_journal.jsonl` (DPAPI'siz, lekin sirsiz): `attempt_id`, `kind`, `local_id`, `amount_tiyin`, `status`, `rrn`, `approval_code`, `card_mask`, `card_scheme`, `tid`, `tx_at`, `resolved_by`; **to'liq PAN, track, CVV, PIN-blok hech qachon** — drayver bunday maydon qaytarsa umumiy qatlam uni tashlaydi va `card_mask` ga normallashtiradi; Serilog'da ham shu `SecretMasker` (§9.2) qoidasi. Saqlash — 90 kun.
+- **Sirlar**: vendor kredensiali (bo'lsa) — DPAPI `CurrentUser` (§5.1); serverga chiqmaydi.
+- **Settlement**: POS smena yopilishida `/v1/card/settlement` chaqiradi; POS yopiq bo'lsa server `card.settlement` vazifasini qo'yadi (§14.3 (b)).
+
+**Testlar**: `Erp1C.CardTerminal.Tests` — holat mashinasi, idempotentlik (bir `attempt_id` → bitta drayver chaqiruvi), taymaut → `unknown` → status so'rovi, `DeviceLane` busy, niqob normallashtirish va PAN tashlash, summa farqida avtomatik `void`; har real drayver — vendor test qurilmasida qabul testi (`[Trait("Category","CardTerminal")]`, CI'da emas).
+
+Birinchi real drayver — birinchi imzolangan hamkor bilan (26 #172–#174: Rahmat/Humo Sunmi P3 yoki ERA PAX A930); unga qadar agent faqat `fake` drayver bilan yetkaziladi va `card_terminal.enabled=false` (demo-tenantdan tashqari).

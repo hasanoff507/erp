@@ -2,7 +2,7 @@
 
 **Maqsad:** POS kassa (smena, chek, qaytarish, chegirma), tasdiqlash navbati va qarz daftari uchun to'liq API kontrakti — voqea (event) payload'lari va REST resurslari.
 **Kim uchun:** Backend/frontend/Android ishlab chiquvchilar, QA.
-**Bog'liq fayllar:** `17-api-umumiy.md` (konventsiyalar), `11-malumotlar-modeli.md`, `13-provodka-qoidalari.md`, `21-integratsiyalar.md` (§1 OFD, §4 Asl belgisi, §9 Click/Payme/Uzum/UzQR), `16-offline-sync.md` (§3.1 `/sync/push`, §9), `15-xavfsizlik-va-audit.md`, `23-backend-arxitekturasi.md`, `33-1c-integratsiya.md` §7.3 (`outbox_state` — 1C eksporti tayyorligi), `34-1c-agent.md` (Do'kon agenti — fiskal modul ko'prigi, qaror #60), `03-modullar-talablari.md` (M01, M02, M03, M08, M16), `04-biznes-jarayonlar.md` (BP-03, BP-11, BP-12), `06-ekranlar-umumiy.md` (POS-01…16, BO-06, BO-16).
+**Bog'liq fayllar:** `17-api-umumiy.md` (konventsiyalar), `11-malumotlar-modeli.md`, `13-provodka-qoidalari.md`, `21-integratsiyalar.md` (§1 OFD, §4 Asl belgisi, §9 Click/Payme/Uzum/UzQR, §9.4 karta terminali va §16.1 agent `/v1/card/*`), `16-offline-sync.md` (§3.1 `/sync/push`, §9), `15-xavfsizlik-va-audit.md`, `23-backend-arxitekturasi.md`, `33-1c-integratsiya.md` §7.3 (`outbox_state` — 1C eksporti tayyorligi), `34-1c-agent.md` (Do'kon agenti — fiskal modul ko'prigi, qaror #60), `03-modullar-talablari.md` (M01, M02, M03, M08, M16), `04-biznes-jarayonlar.md` (BP-03, BP-11, BP-12), `06-ekranlar-umumiy.md` (POS-01…16, BO-06, BO-16).
 **Holat:** joriy, 2026-10-16.
 
 ## Asosiy xulosalar
@@ -10,7 +10,7 @@
 1. **Kassada yaratiladigan hujjatlar REST orqali emas** — smena, chek, qaytarish, qarz to'lovi (POS'da), kassa pul harakati, mijozni tezkor yaratish — barchasi `POST /api/v1/sync/push` orqali **voqea (event)** sifatida yuboriladi; `16-offline-sync.md` umumiy konvertni (`client_event_id`, `seq`, `type`) beradi, bu fayl shu voqealarning **to'liq payload sxemasini** belgilaydi.
 2. **Voqea turlari**: `shift.opened`, `shift.closed`, `sale.created`, `sale.draft_voided`, `receipt.reprinted`, `return.created`, `debt_payment.created`, `cash_movement.created`, `counterparty.created` (tezkor mijoz yaratish offline uchun, US-M08-05, §11.1), `expense.created` (POS-14 «Xarajat», `source=cash` — §13.2), `transfer.sent`, `transfer.received`, `stock_count.line_recorded` (M04/M05 ombor voqealari — to'liq payload sxemasi `19-api-ombor.md`da, bu fayl faqat ro'yxatda tutadi).
 3. **Tasdiqlash ikki yo'l bilan ishlaydi**: (a) Menejer/Egasi kassada **jismonan** bo'lsa — PIN mahalliy (offline ham) tekshiriladi, voqea ichida `approval` obyekti bilan yuboriladi, server postingda qayta tekshiradi; (b) Menejer yo'q bo'lsa — **faqat online**, `POST /api/v1/approval-requests` orqali BO-16 navbatiga tushadi, Menejer PWA'dan tasdiqlaydi/rad etadi, POS natijani so'rab oladi (`approval_request_id`). Ikkisi ham bir xil `ApprovalRef` sxemasiga tushadi (§2.4).
-4. **To'lovlar (dinamik UzQR/Click/Payme/Uzum) ikki bosqichli**: avval `POST /api/v1/payments/checkouts` bilan to'lov boshlanadi (hali chek yo'q — `checkout_ref` qurilma beradi), tasdiq kelgandan keyin (poll yoki webhook) `sale.created` voqeasi shu `checkout_ref`/`provider_tx_id` bilan yuboriladi. Bu to'lovlar **faqat online**. **Statik UzQR** — checkout'siz, kassir qo'lda tasdiqlaydi (mustaqil terminaldagi `card` kabi), faqat online. Karta to'lovida `card_type` majburiy, ijtimoiy kartada `card_mask` va `rrn` ham (qaror #64). Fiskal chekni har doim bizning kassamiz chiqaradi — provayder tomonidagi avto-fiskalizatsiya o'chiq bo'lishi shart (§16).
+4. **To'lovlar (dinamik UzQR/Click/Payme/Uzum) ikki bosqichli**: avval `POST /api/v1/payments/checkouts` bilan to'lov boshlanadi (hali chek yo'q — `checkout_ref` qurilma beradi), tasdiq kelgandan keyin (poll yoki webhook) `sale.created` voqeasi shu `checkout_ref`/`provider_tx_id` bilan yuboriladi. Bu to'lovlar **faqat online**. **Statik UzQR** — checkout'siz, kassir qo'lda tasdiqlaydi (mustaqil terminaldagi `card` kabi), faqat online. Karta to'lovida `card_type` majburiy, ijtimoiy kartada `card_mask` va `rrn` ham (qaror #64). **Karta — integratsiyalangan terminal** (qaror #71, §16a): kassaga faol `card_terminals` bog'langan bo'lsa POS summani terminalga yuboradi (agent `127.0.0.1:47110/v1/card/*`, Android adapter yoki bulut adapteri orqali), kassir karta raqami/RRN'ni yozmaydi; natija (`card_result`) to'lov qatoriga avtomatik tushadi (`card_entry_mode='integrated'`). Tartib: karta tasdig'i → fiskal chek → `sale.created`; chek chiqmasa sotuv "to'lov qabul qilingan, chek kutilmoqda" holatida qoladi, kassir uni bekor qilsa — avtomatik `void` (boshqa avtomatik `void` faqat `CARD_AMOUNT_MISMATCH`da). Terminal ishlamasa — qo'lda kiritish (`card_entry_mode='manual'`) `tenants.settings.card_manual_fallback` siyosati bo'yicha (`allow`/`manager_approval`/`forbid`). Fiskal chekni har doim bizning kassamiz chiqaradi — provayder tomonidagi avto-fiskalizatsiya o'chiq bo'lishi shart (§16).
 5. **Markirovka**: kod Asl belgisi'ga **fiskal chek ichida** OFD orqali boradi (`items[].marking_codes`), sotuv uchun CRPT API chaqirilmaydi (qaror #62). Sotuvdan oldingi tekshiruv (`POST /api/v1/marking-codes/verify`) — `MARKING_PRECHECK=off|warn|block`, standart `warn`: tekshiruv o'tmasa yoki CRPT javob bermasa sotuv davom etadi, `warnings[]`da `MARKING_PRECHECK_WARNING` (§4.2, §15). Lokal takror-kod tekshiruvi har doim ishlaydi.
 6. **Fiskal bloklar**: shu kassada OFD tasdig'ini olmagan eng eski chek ≥ 48 soat bo'lsa yangi fiskal chek (sotuv, qaytarish, qarz to'lovi) rad etiladi — `FISCAL_OFFLINE_48H_BLOCKED` (qaror #43); fiskal modul holati `fm_state ≠ ok` bo'lsa — `FISCAL_DEVICE_LOCKED` (§4.10).
 7. **Qarz daftari** — ikki kiritish yo'li: POS'dan (`debt_payment.created` voqeasi, offline ham; `cash`/`card`/`uzqr`/`click`/`payme`/`uzum` — har doim kassa, smena va fiskal chek bilan) va back-office'dan (`POST /api/v1/debt-payments`, online, faqat `method='bank'` — kassasiz, chek yo'q; qaror #67). Ikkisi ham bitta `DebtPaymentPostingService`ga tushadi. Qarzni kechish/shubhali belgisi — faqat Egasi, faqat back-office REST (offline'da yo'q).
@@ -83,6 +83,12 @@
 | 39 | `POST /api/v1/payments/webhooks/{provider}` | Bank/to'lov tizimi tasdig'i (kiruvchi) | 16.4 |
 | 40 | `POST /api/v1/sync/push` / `GET /api/v1/sync/pull` | POS bootstrap/sinxron (to'liq — `16-offline-sync.md`; push so'rovi — §2.6) | 17, 2.6 |
 | 41 | `GET /api/v1/sales` / `GET /api/v1/sales/{id}` | Chek qidiruvi (back-office/POS-05) | 4.8 |
+| 42 | `POST /api/v1/card-terminal-transactions` | Karta terminali urinishini yozish (natija bilan — lokal adapterlar) yoki boshlash (natijasiz — bulut adapteri); `id = attempt_id` bo'yicha upsert | 16a.3 |
+| 43 | `GET /api/v1/card-terminal-transactions/{id}` | Urinish holati (bulut adapteri poll, `unknown`ni tiklash) | 16a.4 |
+| 44 | `GET /api/v1/card-terminals` / `POST /api/v1/card-terminals` | Karta terminallari ro'yxati / ro'yxatga olish (BO-12, POS-16) | 16a.5 |
+| 45 | `PATCH /api/v1/card-terminals/{id}` | Terminalni tahrirlash, o'chirish/arxivlash, standart qilish | 16a.5 |
+| 46 | `POST /api/v1/card-terminal-settlements` | Terminal settlement natijasi (smena yopilishi) | 16a.6 |
+| — | Agent lokal API `GET/POST http://127.0.0.1:47110/v1/card/*` | POS ↔ Do'kon agenti (server endpoint emas; sxemalar — `21-integratsiyalar.md` §16.1) | 16a.2 |
 
 ---
 
@@ -145,6 +151,34 @@ Server validatsiyasi (ikkala holatda ham): `approved_by` (yoki `approval_request
 
 Javob — `{results: PushResultEntry[]}` (§2.2). `outbox_state` asosida server `devices.outbox_pending_count`/`outbox_oldest_pending_at`/`outbox_reported_at` va `last_sync_at` ni bitta tranzaksiyada yangilaydi (rad etilgan voqealar ham hisobga qo'shiladi) — to'liq qoida va 1C eksporti tayyorligidagi o'rni `16-offline-sync.md` §3.1, §9; `33-1c-integratsiya.md` §7.3.
 
+### 2.7 `CardResult` (karta terminali natijasi, qaror #71)
+
+Integratsiyalangan karta to'lovi/qaytarishida terminal natijasi — `sale.created.payments[].card_result`, `debt_payment.created.card_result`, `return.created.refund_card.card_result` va `POST /card-terminal-transactions` tanasidagi `result`. Adapter `CardTxResult`idan (`21-integratsiyalar.md` §9.4; summalar tiyinda) quriladi — bu yerda pul `Money` satri.
+
+| Maydon | Tur | Majburiy | Izoh |
+|---|---|---|---|
+| `attempt_id` | UUIDv7 | ha | Qurilma terminalga yuborishdan **oldin** beradi — idempotentlik kaliti, `card_terminal_transactions.id` |
+| `card_terminal_id` | UUID | ha | `card_terminals.id` (faol, shu filial) |
+| `kind` | enum | ha | `purchase` / `refund` / `void` |
+| `original_attempt_id` | UUID\|null | shartli | `void`da majburiy; `refund`da asl xarid ma'lum bo'lsa |
+| `status` | enum | ha | `approved` / `declined` / `unknown` / `voided` (`CardTxResult` xaritasi: `cancelled`/`error` → `declined`, `timeout` → `unknown`); to'lov qatoriga faqat `approved` bog'lanadi |
+| `amount` | Money | ha | Terminal tasdiqlagan summa; to'lov qatoridagi `amount` bilan **aynan** teng bo'lishi shart (aks holda POS avtomatik `void` qilgan bo'ladi — `CARD_AMOUNT_MISMATCH`) |
+| `approval_code` | string\|null | yo'q | Avtorizatsiya kodi (`^[0-9A-Za-z]{1,12}$`) |
+| `rrn` | string | `approved`da ha | Tranzaksiya unikal raqami (`^[0-9A-Za-z]{6,32}$`) |
+| `stan` | string\|null | yo'q | — |
+| `card_mask` | string | `approved`da ha | `^[0-9]{4}\*+[0-9]{4}$` — adapter normallashtiradi (BIN saqlanmaydi) |
+| `card_scheme` | enum\|null | yo'q | `uzcard`/`humo`/`visa`/`mastercard`/`unionpay`/`mir`/`other` |
+| `card_type` | enum\|null | yo'q | `personal`/`corporate`/`social`/`unknown` — terminal bergan yoki `card_bin_rules`dan; to'lov qatoridagi `card_type` yakuniy (kassir bitta bosishda tanlagan bo'lishi mumkin) |
+| `card_type_source` | enum\|null | shartli | `card_type` bo'lsa: `terminal` / `bin_table` / `cashier` |
+| `entry_mode` | enum\|null | yo'q | `chip`/`contactless`/`magstripe`/`fallback` |
+| `tid`, `mid`, `acquirer` | string\|null | yo'q | Terminal/merchant ID, ekvayer kodi |
+| `tx_at` | ISO vaqt\|null | yo'q | Terminal vaqti |
+| `resolved_by` | enum | ha | `auto` (terminal javobi) / `status_query` (`get_status`/`get_last_transaction`) / `manager` (`unknown` terminal chekiga qarab yopildi — to'lov qatorida / `POST /card-terminal-transactions` tanasida `card_manual_approval: ApprovalRef` majburiy: tasdiq turi `card_manual_entry`, tasdiqlovchida `card.manual_entry.approve`) |
+| `decline_code`, `decline_message` | string\|null | yo'q | `declined`da |
+| `slip_text` | string\|null | yo'q | Terminal cheki matni (ixtiyoriy) |
+
+`PAN`, track, CVV, PIN-blok, EMV kriptogramma — hech qachon (`15-xavfsizlik-va-audit.md` §9.3).
+
 ---
 
 ## 3. Smena (shift)
@@ -181,13 +215,14 @@ Javob — `{results: PushResultEntry[]}` (§2.2). `outbox_state` asosida server 
 |---|---|---|---|
 | `shift_id` | UUID | ha | `shifts.id`, `status=open`, shu `device_id`ga tegishli |
 | `counted_cash` | Money | ha | Kassir sanagan naqd |
-| `counted_card_total` | Money | yo'q | Qo'lda belgilangan "Karta" (`terminal_ref`) jami — qurilma hisoblab yuboradi, server qayta tekshiradi |
+| `counted_card_total` | Money | yo'q | Qo'lda kiritilgan karta to'lovlari (`card_entry_mode='manual'`) jami — mustaqil terminal cheklari bo'yicha; qurilma hisoblab yuboradi, server qayta tekshiradi |
+| `card_settlements[]` | array | yo'q | Smena yopilishida bajarilgan terminal settlement'lari (qaror #71) — har biri §16a.6 tanasi (`id`, `card_terminal_id`, `batch_no`, `settled_at`, `purchase_count`, `purchase_total`, `refund_count`, `refund_total`, `status`); offline'da shu voqea bilan, online'da §16a.6 bilan ham yuborilishi mumkin (`id` bo'yicha idempotent). Hal qilinmagan (`pending`/`unknown`) karta urinishi bo'lsa smena yopilmaydi — `CARD_OUTCOME_UNKNOWN` |
 | `variance_note` | string | shartli | `expected_cash ≠ counted_cash` bo'lsa majburiy |
 
 Server hisoblaydi: `expected_cash = opening_cash + Σcash_moves(shift_id)` (`cash_moves` (`shift_id`, `method='cash'`), US-M16-02 formulasi). `variance = counted_cash − expected_cash`.
 
-**Javob** (`server`): `{id, shift_no, z_report: {expected_cash, counted_cash, variance, totals_by_method: {cash, card, uzqr, click, payme, uzum, debt}, vat_total, discount_total, returns_total, sales_count, returns_count}, fiscal: {status: "pending"}}`.
-**Xatolar**: `SHIFT_NOT_OPEN`, `SHIFT_DEVICE_MISMATCH`, `VALIDATION_ERROR` (`variance_note` yo'q — `details[].message_key="validation.variance_note_required"`).
+**Javob** (`server`): `{id, shift_no, z_report: {expected_cash, counted_cash, variance, totals_by_method: {cash, card, uzqr, click, payme, uzum, debt}, card_split: {integrated, manual}, card_settlements: [{card_terminal_id, net_total, expected_total, variance, status}], vat_total, discount_total, returns_total, sales_count, returns_count}, fiscal: {status: "pending"}}` — `card_split` — karta tushumi kiritish usuli bo'yicha (Z-hisobot, BO-24; qaror #71), `card_settlements[].status='mismatch'` — ogohlantirish (`card.settlement.mismatch`), smena yopilishini bloklamaydi.
+**Xatolar**: `SHIFT_NOT_OPEN`, `SHIFT_DEVICE_MISMATCH`, `CARD_OUTCOME_UNKNOWN` (shu smenada hal qilinmagan karta urinishi — qurilma avval holat so'rovi yoki menejer yopishini bajaradi), `VALIDATION_ERROR` (`variance_note` yo'q — `details[].message_key="validation.variance_note_required"`).
 **Idempotentlik**: `client_event_id`.
 **Offline**: to'liq ishlaydi; Z-hisobot `fiscal_receipts.status=pending` bilan OFD'ga navbatga qo'yiladi (internet qaytganda, `21-integratsiyalar.md` §1).
 **Bog'liq**: US-M01-04, US-M16-02, POS-07, POS-15.
@@ -273,17 +308,23 @@ Server hisoblaydi: `expected_cash = opening_cash + Σcash_moves(shift_id)` (`cas
 |---|---|---|---|
 | `method` | enum | ha | `cash` / `card` / `uzqr` / `click` / `payme` / `uzum` / `debt` |
 | `amount` | Money | ha | > `"0.00"` |
-| `terminal_ref` | string\|null | yo'q | `method=card` — mustaqil terminal operatsiya raqami (online/offline ikkisida ham); `method=uzqr` + `qr_type=static` — ixtiyoriy to'lov raqami (kassir mijoz telefonidan kiritadi) |
-| `card_type` | enum\|null | shartli | `personal` / `corporate` / `social` / `unknown`; `method=card` bo'lsa majburiy (standart qiymat yo'q — kassir har karta to'lovida terminal chekiga qarab tanlaydi; `unknown` chekda "Noma'lum / Не определён"), boshqa usullarda `null` — chekdagi majburiy "karta turi" rekviziti (qaror #64) |
-| `card_mask` | string\|null | shartli | Karta niqobi — birinchi va oxirgi 4 raqam, terminal chekidan; format `^[0-9]{4}\*+[0-9]{4}$` (masalan `8600****1234`); `card_type=social` bo'lsa majburiy, boshqa holatda ixtiyoriy |
-| `rrn` | string\|null | shartli | Tranzaksiyaning unikal raqami (RRN, terminal chekidan); `card_type=social` bo'lsa majburiy, boshqa holatda ixtiyoriy |
+| `card_entry_mode` | enum\|null | shartli | `method=card` bo'lsa majburiy: `integrated` — terminal natijasi avtomatik (`card_result` majburiy); `manual` — kassir terminal chekidan kiritadi (qaror #64 zaxirasi); boshqa usullarda `null` (qaror #71) |
+| `card_result` | `CardResult`\|null | shartli | `card_entry_mode=integrated` bo'lsa majburiy (§2.7), `status=approved`, `kind=purchase`, `amount` = shu qator `amount`; server `card_terminal_transactions`ni `attempt_id` bo'yicha upsert qilib, `sale_payments.card_terminal_transaction_id`, `rrn`, `card_mask`, `approval_code`, `card_scheme`ni shundan oladi (qurilma ularni alohida yubormaydi). Boshqa holatda `null` |
+| `terminal_ref` | string\|null | yo'q | `method=card` + `manual` — mustaqil terminal operatsiya raqami (online/offline ikkisida ham); `integrated`da server `card_result.tid` bilan to'ldiradi; `method=uzqr` + `qr_type=static` — ixtiyoriy to'lov raqami (kassir mijoz telefonidan kiritadi) |
+| `card_type` | enum\|null | shartli | `personal` / `corporate` / `social` / `unknown`; `method=card` bo'lsa majburiy, boshqa usullarda `null` — chekdagi majburiy "karta turi" rekviziti (qaror #64). `integrated`: `card_result.card_type` (terminal yoki `card_bin_rules`) bo'lsa shu qiymat, bo'lmasa kassir bitta bosishda tanlaydi; `manual`: standart qiymat yo'q — kassir har karta to'lovida terminal chekiga qarab tanlaydi; `unknown` chekda "Noma'lum / Не определён" |
+| `card_type_source` | enum\|null | shartli | `method=card`da majburiy: `terminal` / `bin_table` / `cashier`; `manual`da doim `cashier` |
+| `card_mask` | string\|null | shartli | `manual`: karta niqobi — birinchi va oxirgi 4 raqam, terminal chekidan; format `^[0-9]{4}\*+[0-9]{4}$` (masalan `8600****1234`); `card_type=social` bo'lsa majburiy, boshqa holatda ixtiyoriy. `integrated`: yuborilmaydi (`card_result`dan) |
+| `rrn` | string\|null | shartli | `manual`: tranzaksiyaning unikal raqami (RRN, terminal chekidan); `card_type=social` bo'lsa majburiy, boshqa holatda ixtiyoriy. `integrated`: yuborilmaydi (`card_result`dan) |
+| `approval_code`, `card_scheme` | string\|null, enum\|null | yo'q | Faqat `manual`da ixtiyoriy (terminal chekidan); `integrated`da `card_result`dan |
+| `manual_reason` | enum\|null | shartli | `card_entry_mode=manual`da majburiy: `terminal_offline` / `terminal_error` / `unknown_result` / `standalone_terminal` (kassada faol terminal yo'q); `integrated`da `null` |
+| `card_manual_approval` | `ApprovalRef`\|null | shartli | `card_entry_mode=manual` va `card_manual_fallback=manager_approval` (sozlama yo'q bo'lsa — faol terminali bor kassada standart) bo'lsa majburiy — tasdiq turi `card_manual_entry`, tasdiqlovchida `card.manual_entry.approve`; `card_result.resolved_by=manager` (`unknown` qo'lda yopilgan) bo'lsa ham majburiy |
 | `qr_type` | enum\|null | shartli | `static`/`dynamic`; `method=uzqr` bo'lsa majburiy, boshqa usullarda `null` |
 | `checkout_ref` | UUID\|null | shartli | `click`/`payme`/`uzum` va `uzqr`+`qr_type=dynamic`da majburiy — §16dagi `payment_checkouts.checkout_ref`; `uzqr`+`qr_type=static`da `null` (checkout yaratilmaydi) |
 | `provider_tx_id` | string\|null | shartli | `click`/`payme`/`uzum` va `uzqr`+`qr_type=dynamic`da majburiy — §16dagi checkout natijasidan; **istisno**: `uzqr`+`qr_type=static` — ixtiyoriy (qo'lda tasdiq, ixtiyoriy to'lov raqami `terminal_ref`da) — `sale_payments` CHECK shu qoida bilan (`12-db-sxema.md`) |
 | `due_date` | ISO sana\|null | yo'q | Faqat `method=debt` — "va'da sanasi" (bitta, bo'lib to'lash grafigi yo'q); `debt_moves.due_date`/`counterparties.debt_due_date` manbasi |
 | `debt_approval` | `ApprovalRef`\|null | shartli | `method=debt` va joriy qarz+summa kredit limitidan oshsa (online rejimda majburiy; offline'da — §4.3) |
 
-Mos kelmagan shart (masalan `method=card` va `card_type` yo'q, `card_type=social` va `card_mask`/`rrn` yo'q, `uzqr` va `qr_type` yo'q) — `VALIDATION_ERROR` (ijtimoiy karta rekvizitlari yo'q bo'lsa `details[].message_key="validation.social_card_details_required"`). `is_offline=true` va `method='uzqr'` (statik ham) — `VALIDATION_ERROR` (`message_key=validation.uzqr_online_only`).
+Mos kelmagan shart (masalan `method=card` va `card_type`/`card_entry_mode` yo'q, `card_type=social` va `card_mask`/`rrn` yo'q, `uzqr` va `qr_type` yo'q) — `VALIDATION_ERROR` (ijtimoiy karta rekvizitlari yo'q bo'lsa `details[].message_key="validation.social_card_details_required"`; kiritish usuli yo'q — `validation.card_entry_mode_required`; `integrated`da `card_result` yo'q yoki `approved` emas — `validation.card_result_required`; `manual`da sabab yo'q — `validation.card_manual_reason_required`). Karta qoidalari (qaror #71): `manual` va `card_manual_fallback=forbid` (kassaga faol integratsiyalangan terminal bog'langan bo'lsa; terminalsiz kassada `standalone_terminal` har doim ruxsat) — `CARD_MANUAL_NOT_ALLOWED` (online `rejected`; offline voqea rad etilmaydi — POS bu yo'lni o'zi yopgan, kelib qolsa `sync_exceptions(kind='approval_limit_exceeded_offline')`); `manager_approval` va `card_manual_approval` yo'q — online `CARD_MANUAL_APPROVAL_REQUIRED`, offline xuddi shu `sync_exceptions` bilan qabul; `card_result` serverdagi qator bilan mos emas (summa, takroriy `tid`+`rrn`, `attempt_id` boshqa hujjatga bog'langan) — voqea qabul qilinadi, `warnings=["CARD_TRANSACTION_MISMATCH"]`, `sync_exceptions(kind='card_result_mismatch')`. Aralash to'lovda har karta urinishi — alohida `payments[]` qatori, alohida `attempt_id`. `is_offline=true` va `method='uzqr'` (statik ham) — `VALIDATION_ERROR` (`message_key=validation.uzqr_online_only`).
 
 ### 4.2 Markirovka qatori qoidalari (qaror #62)
 
@@ -318,13 +359,13 @@ Server chegirma summasini **qayta hisoblamaydi** (narx kabi "qotirilgan", manba 
 - **Aralash to'lov** (masalan qisman naqd + qisman qarz) — naqd/karta/UzQR/Click/Payme/Uzum qismiga **darhol** oddiy fiskal chek chiqariladi (`fiscal_receipts.kind='sale'`, `receipt_seq`), `fiscal.status="pending"` (yoki `fiscal_result` bilan — `fiscalized`); `credit_type` rejimida qarz qismiga ikkinchi chek (`kind='credit_sale'`) `credit_receipt_seq` bilan. Birinchi chek qatorlari proporsional: `ratio = non_debt_amount / total_amount`; `amt_i = ROUND_HALF_UP(line_total_i × ratio, 2)` (yaxlitlash qoldig'i eng katta `line_total` qatoriga, teng bo'lsa — eng katta `line_no`), `qty_i = ROUND_HALF_UP(qty_i × ratio, 3)` (kamida `0.001`), `vat_i = ROUND_HALF_UP(amt_i × r / (100 + r), 2)` (qaror #26); server `sale_lines.settled_amount` ga `amt_i` ni qo'shadi. Qarz qismiga chek **qarz to'langanda** chiqariladi (§12.2) — keyingi `debt_settlement` qatorlari `line_total_i − settled_amount_i` qoldiqdan.
 - Faqat naqd/karta/UzQR/Click/Payme/Uzum (qarz yo'q) — `fiscal.status="pending"`.
 
-**Chekdagi to'lov rekvizitlari** (2026-10-22 dan majburiy, qaror #64): `fiscal_receipts.payment_form` — `cash` (naqd), `card` (bank kartalari), `qr` (`uzqr`/`click`/`payme`/`uzum` — QR-kodli to'lov), `mixed` (bitta chekda bir nechta shakl); karta to'lovida chekka `card_type` (shaxsiy/korporativ/ijtimoiy), ijtimoiy kartada `card_mask` va `rrn` ham yoziladi. Bu maydonlar `payments[]`dan olinadi, `FiscalPort` chek payload'iga xaritalanadi (`21-integratsiyalar.md` §1).
+**Chekdagi to'lov rekvizitlari** (2026-10-22 dan majburiy, qaror #64): `fiscal_receipts.payment_form` — `cash` (naqd), `card` (bank kartalari), `qr` (`uzqr`/`click`/`payme`/`uzum` — QR-kodli to'lov), `mixed` (bitta chekda bir nechta shakl); karta to'lovida chekka `card_type` (shaxsiy/korporativ/ijtimoiy), ijtimoiy kartada `card_mask` va `rrn` ham yoziladi. Bu maydonlar `payments[]`dan olinadi (`integrated`da — `card_result`dan avtomatik, `card_mask` va `rrn` har doim chekka tushadi; qaror #71), `FiscalPort` chek payload'iga xaritalanadi (`21-integratsiyalar.md` §1). Terminal cheki (slip) terminalning o'zi chop etadi; `card_result.slip_text` bo'lsa ixtiyoriy ravishda bizning chek ostiga ham qo'shiladi (VMQ-943 1-ilova 6-band — ikkala chek beriladi).
 
 **Chek tili — ikki tilli chek**: chek matni/payload **ikki tilda** chiqadi — har bir tovar qatori `"{products.name} / {products.name_ru}"` (name_ru bo'lmasa faqat `name`); sarlavha/yakun matnlari ham ikki tilda ("Jami / Итого", "Qaytim / Сдача" va h.k., to'liq lug'at — chop etish shabloni, §4.9). Fiskal rekvizitlar (STIR, OFD QR, chek raqami) — OFD operatori talab qilgan formatda, tarjima qilinmaydi.
 
 ### 4.6 Xatolar (voqea darajasida)
 
-`SHIFT_NOT_OPEN`, `SHIFT_DEVICE_MISMATCH`, `RECEIPT_SEQ_CONFLICT` (`UNIQUE (tenant_id, cash_register_id, shift_id, receipt_seq)` buzilgan; voqeada `fiscal_result` bor bo'lsa (FM imzolagan) rad etilmaydi — server `receipt_seq` ni shu smenadagi `max(receipt_seq) + 1` ga qayta raqamlaydi, qurilma qiymati `fiscal_receipts.payload.device_receipt_seq` da, `sync_exceptions(kind='receipt_seq_conflict')`; `fiscal_result` yo'q — `rejected`, `retryable:false`, eskalatsiya), `PAYMENT_NOT_CONFIRMED` (`checkout_ref` `confirmed` emas yoki allaqachon `consumed` — §16.1), `DEPENDENCY_NOT_SYNCED` (bog'liq voqea — masalan `counterparty.created` — hali qabul qilinmagan, `retryable:true`), `STOCK_NEGATIVE` (faqat **ogohlantirish**, offline overselling ruxsat — §4.7), `DISCOUNT_LIMIT_EXCEEDED`, `DEBT_LIMIT_EXCEEDED`, `MARKING_CODE_INVALID`, `MARKING_CODE_ALREADY_SOLD`, `MARKING_PRICE_UNKNOWN_OFFLINE`, `FISCAL_OFFLINE_48H_BLOCKED`, `FISCAL_DEVICE_LOCKED` (§4.10), `APPROVAL_INVALID` (`ApprovalRef` kutilgan, kelmagan), `SUBSCRIPTION_RESTRICTED`, `VALIDATION_ERROR`.
+`SHIFT_NOT_OPEN`, `SHIFT_DEVICE_MISMATCH`, `RECEIPT_SEQ_CONFLICT` (`UNIQUE (tenant_id, cash_register_id, shift_id, receipt_seq)` buzilgan; voqeada `fiscal_result` bor bo'lsa (FM imzolagan) rad etilmaydi — server `receipt_seq` ni shu smenadagi `max(receipt_seq) + 1` ga qayta raqamlaydi, qurilma qiymati `fiscal_receipts.payload.device_receipt_seq` da, `sync_exceptions(kind='receipt_seq_conflict')`; `fiscal_result` yo'q — `rejected`, `retryable:false`, eskalatsiya), `PAYMENT_NOT_CONFIRMED` (`checkout_ref` `confirmed` emas yoki allaqachon `consumed` — §16.1), `DEPENDENCY_NOT_SYNCED` (bog'liq voqea — masalan `counterparty.created` — hali qabul qilinmagan, `retryable:true`), `STOCK_NEGATIVE` (faqat **ogohlantirish**, offline overselling ruxsat — §4.7), `DISCOUNT_LIMIT_EXCEEDED`, `DEBT_LIMIT_EXCEEDED`, `MARKING_CODE_INVALID`, `MARKING_CODE_ALREADY_SOLD`, `MARKING_PRICE_UNKNOWN_OFFLINE`, `FISCAL_OFFLINE_48H_BLOCKED`, `FISCAL_DEVICE_LOCKED` (§4.10), `APPROVAL_INVALID` (`ApprovalRef` kutilgan, kelmagan), `CARD_MANUAL_NOT_ALLOWED`, `CARD_MANUAL_APPROVAL_REQUIRED` (online; §4.1), `CARD_TRANSACTION_MISMATCH` (faqat `warnings[]`, rad etmaydi), `SUBSCRIPTION_RESTRICTED`, `VALIDATION_ERROR`. Terminal darajasidagi kodlar (`CARD_TERMINAL_UNREACHABLE`, `CARD_TERMINAL_BUSY`, `CARD_TERMINAL_TIMEOUT`, `CARD_DECLINED`, `CARD_OUTCOME_UNKNOWN`, `CARD_AMOUNT_MISMATCH`, `CARD_VOID_FAILED`) `sale.created`dan **oldin**, POS ↔ terminal bosqichida paydo bo'ladi (§16a) — bunday holatda `sale.created` yuborilmaydi.
 
 ### 4.7 Manfiy qoldiq (overselling)
 
@@ -426,6 +467,7 @@ Asosiy himoya — POS'ning o'zida: qurilma 24 soatda 🟡, 40 soatda 🔴 + Egas
 | `lines[]` | array | ha, ≥1 | pastda |
 | `reason` | enum | ha | `defective`/`wrong_item`/`customer_changed_mind`/`other` |
 | `refund_method` | enum | ha | `cash`/`card`/`uzqr`/`click`/`payme`/`uzum`/`debt_adjustment`; standart — asl to'lov usuli. Click/Payme/Uzum (va UzQR) pulini qaytarish provayder kabinetida qo'lda, tizim qayd etadi |
+| `refund_card` | object\|null | shartli | `refund_method=card`da majburiy (qaror #71): `{card_entry_mode: "integrated"\|"manual", card_result: CardResult\|null, card_type, card_mask, rrn, approval_code, card_scheme, manual_reason, card_manual_approval: ApprovalRef\|null}` → `returns.card_*` ustunlari. **`integrated`** — asl to'lov `integrated` bo'lsa standart: shu terminalda `refund` (asl xarid settlement'dan oldin va shu kunniki bo'lsa — `void`) bajarilgan, `card_result` (`kind=refund`/`void`, `status=approved`, `amount` = pul bilan qaytariladigan qism `money_part`; `void` — faqat to'liq summa) majburiy; `card_type`/`card_mask`/`rrn` `card_result`dan (yoki asl to'lovdan). **`manual`** — terminal boshqa, ishlamaydi yoki asl to'lov `manual` bo'lgan: `manual_reason` majburiy, `card_type` majburiy (asl to'lovdan oldindan to'ldiriladi), `card_manual_fallback` qoidalari §4.1 bilan bir xil |
 | `approval` | `ApprovalRef`\|null | shartli | `sale_id=null` YOKI summa `returns.approve.limit_value` (standart 100 000 so'm)dan oshsa YOKI muddati o'tgan tovar qatori bo'lsa (pastda) va `actor_user_id`da `returns.approve` yo'q bo'lsa majburiy |
 
 **`lines[]`**:
@@ -455,7 +497,7 @@ Asosiy himoya — POS'ning o'zida: qurilma 24 soatda 🟡, 40 soatda 🔴 + Egas
 **Markirovka qoidasi**: `marking_code` bor qatorli `return.created` — **faqat `is_offline=false`** bilan qabul qilinadi; qurilma offline'da bu amal tugmasini bloklaydi (POS-05), lekin server ham qayta tekshiradi: offline voqea markirovka qatori bilan kelsa `MARKING_RETURN_REQUIRES_ONLINE`. Bu qonundan qat'iyroq ichki tanlov (kod holatini tekshirish, firibgarlikdan himoya). Kod Asl belgisi'ga qaytarish fiskal cheki ichida OFD orqali boradi (§4.2 bilan bir xil, `items[].marking_codes`).
 
 **Javob**: `{id, number, fiscal_receipt_seq, fiscal: {status: "pending"|"fiscalized"|"deferred"}, write_off_id|null, warnings: []}` (qaytarish cheki ham OFD'ga yuboriladi; `money_part = 0` da chek yo'q — `fiscal_receipt_seq = null`, `deferred`; `write_off_id` — muddati o'tgan qator bo'lsa yaratilgan qoralama).
-**Xatolar**: `SALE_NOT_FOUND` (`retryable:true` — asl chek hali sinxronlanmagan), `DEPENDENCY_NOT_SYNCED` (`retryable:true`), `RECEIPT_SEQ_CONFLICT` (§4.6 qoidasi), `RETURN_QTY_EXCEEDED`, `RETURN_LIMIT_EXCEEDED`, `APPROVAL_REQUIRED` (muddati o'tgan tovar, `returns.approve` yo'q), `APPROVAL_INVALID`, `MARKING_CODE_INVALID`, `MARKING_RETURN_REQUIRES_ONLINE`, `FISCAL_OFFLINE_48H_BLOCKED`, `FISCAL_DEVICE_LOCKED` (§4.10).
+**Xatolar**: `SALE_NOT_FOUND` (`retryable:true` — asl chek hali sinxronlanmagan), `DEPENDENCY_NOT_SYNCED` (`retryable:true`), `RECEIPT_SEQ_CONFLICT` (§4.6 qoidasi), `RETURN_QTY_EXCEEDED`, `RETURN_LIMIT_EXCEEDED`, `APPROVAL_REQUIRED` (muddati o'tgan tovar, `returns.approve` yo'q), `APPROVAL_INVALID`, `CARD_MANUAL_NOT_ALLOWED`, `CARD_MANUAL_APPROVAL_REQUIRED`, `CARD_TRANSACTION_MISMATCH` (`warnings[]`), `MARKING_CODE_INVALID`, `MARKING_RETURN_REQUIRES_ONLINE`, `FISCAL_OFFLINE_48H_BLOCKED`, `FISCAL_DEVICE_LOCKED` (§4.10).
 **Idempotentlik**: `client_event_id`.
 **Offline**: oddiy tovar — to'liq ishlaydi (append-only); markirovkalangan — bloklanadi (yuqorida).
 **Bog'liq**: US-M02-01…03, POS-05.
@@ -516,7 +558,7 @@ Umumiy mexanizm — chegirma (limitdan yuqori), qaytarish (limitdan yuqori/chek 
 | Maydon | Tur | Izoh |
 |---|---|---|
 | `id` | UUID | — |
-| `kind` | enum | `discount_over_limit` / `return_over_limit` / `return_no_receipt` / `debt_over_limit` / `cash_withdrawal_over_limit` / `price_change` / `expense_over_limit` / `write_off_over_limit` |
+| `kind` | enum | `discount_over_limit` / `return_over_limit` / `return_no_receipt` / `debt_over_limit` / `cash_withdrawal_over_limit` / `price_change` / `expense_over_limit` / `write_off_over_limit` / `card_manual_entry` (karta rekvizitini qo'lda kiritish yoki `unknown` urinishni yopish — `card.manual_entry.approve`, qaror #71; `linked_doc_type` — `sales`/`returns`/`debt_payments`, `context`: `{card_terminal_id, attempt_id?, amount, manual_reason}`) |
 | `permission_code` | string | Tasdiqlovchida bo'lishi shart kod (server to'ldiradi — `15-xavfsizlik-va-audit.md` §2.3 xaritasi) |
 | `requested_value` | decimal\|null | Summa yoki foiz (`role_permissions.limit_value` bilan bir xil birlik, 4 xonali satr) |
 | `context` | object | Kind'ga mos snapshot — masalan `{"amount": "569000.00", "requested_pct": "25.00"}` |
@@ -671,6 +713,7 @@ Zaxira sozlama `FiscalPolicy.debt_receipt_split` = `single` (standart) / `per_sa
 | `method` | enum | ha | `cash`/`card`/`uzqr`/`click`/`payme`/`uzum` (`bank` — faqat §12.3) |
 | `terminal_ref` | string\|null | yo'q | `method=card`; `uzqr`+`qr_type=static`da ixtiyoriy to'lov raqami |
 | `card_type`, `card_mask`, `rrn` | — | shartli | §4.1 `payments[]` bilan bir xil qoidalar (`method=card`da `card_type` majburiy; `social`da `card_mask`+`rrn`) |
+| `card_entry_mode`, `card_result`, `card_type_source`, `approval_code`, `card_scheme`, `manual_reason`, `card_manual_approval` | — | shartli | `method=card`da §4.1 `payments[]` bilan aynan bir xil qoidalar (qaror #71); `card_result.amount` = `amount`; server `debt_payments.card_*` ustunlarini to'ldiradi |
 | `qr_type` | enum\|null | shartli | `method=uzqr`da majburiy: `static`/`dynamic` |
 | `checkout_ref` | UUID\|null | shartli | `click`/`payme`/`uzum` va dinamik `uzqr`da — §16dagi `payment_checkouts.checkout_ref`; statik `uzqr`da `null` |
 | `provider_tx_id` | string\|null | shartli | `click`/`payme`/`uzum` va dinamik `uzqr`da majburiy; statik `uzqr`da ixtiyoriy |
@@ -683,7 +726,7 @@ Zaxira sozlama `FiscalPolicy.debt_receipt_split` = `single` (standart) / `per_sa
 **Allokatsiya** — yagona funksiya (`shared/lib/debt-allocation` (TS) va `app/shared/debt_allocation.py`, umumiy test-vektorlar `shared/debt-allocation-vectors.json`) tartibi bilan: avval `sales` + `debt_openings` ochiq qoldiqlari `ORDER BY COALESCE(due_date, doc_date), doc_date, doc_id`; keyin `debt_writeoffs` (hisobdan chiqarilgan, eng eskisi birinchi — bu qism `Kt 9390`, `13-provodka-qoidalari.md` §2.14). Qurilma hisoblaydi, server postingda DB holatidan qayta hisoblaydi: registrlar (`debt_payment_allocations`, `debt_moves`, `settled_amount`) **server** allokatsiyasi bo'yicha yoziladi; fiskal chek payload'i qurilma yuborgan ko'rinishda saqlanadi (FM imzolagan — o'zgarmaydi). Farq bo'lsa voqea rad etilmaydi — `sync_exceptions(kind='debt_allocation_mismatch', details:{device, server})`.
 **Offline ortiqcha summa** (qaror #67): provodka `Dt 5010/5710 / Kt 6310` (analitika `counterparty_id`); hal qilish BO-06 da (Buxgalter/Egasi): (a) qaytarish — `cash_movements` `reason='other'`, `direction='out'`, `account='6310'`, `counterparty_id` (§13.1); (b) keyingi qarzga hisoblash — `ledger_adjustments` `Dt 6310 / Kt 4010` (`analytics.counterparty_id`).
 **Javob**: `{id, allocations: [{target_doc_type, target_doc_id, amount}], unallocated_amount, remaining_balance, fiscal: {status: "pending"|"fiscalized"}}` (`allocations` — server natijasi, `debt_payment_allocations` ustunlari bilan bir xil).
-**Xatolar**: `VALIDATION_ERROR` (`debt_payment_exceeds_balance` — faqat online, va boshqa shartlar), `SHIFT_NOT_OPEN`, `RECEIPT_SEQ_CONFLICT` (§4.6 qoidasi), `PAYMENT_NOT_CONFIRMED` (§16.1), `DEPENDENCY_NOT_SYNCED` (`retryable:true`), `FISCAL_OFFLINE_48H_BLOCKED`, `FISCAL_DEVICE_LOCKED` (§4.10), `NOT_FOUND`.
+**Xatolar**: `VALIDATION_ERROR` (`debt_payment_exceeds_balance` — faqat online, va boshqa shartlar), `CARD_MANUAL_NOT_ALLOWED`, `CARD_MANUAL_APPROVAL_REQUIRED`, `CARD_TRANSACTION_MISMATCH` (`warnings[]`), `SHIFT_NOT_OPEN`, `RECEIPT_SEQ_CONFLICT` (§4.6 qoidasi), `PAYMENT_NOT_CONFIRMED` (§16.1), `DEPENDENCY_NOT_SYNCED` (`retryable:true`), `FISCAL_OFFLINE_48H_BLOCKED`, `FISCAL_DEVICE_LOCKED` (§4.10), `NOT_FOUND`.
 **Idempotentlik**: `client_event_id`.
 **Offline**: to'liq ishlaydi; lokal ko'prik rejimida chek FM'da darhol imzolanadi (`fiscal_result`); hamkor bulut va `fake` rejimida chekni server chiqaradi, `outbox_jobs(kind='ofd_send')` faqat `partner_cloud` rejimida (`16-offline-sync.md` §6).
 **Bog'liq**: US-M08-04/09, POS-13, BO-06 "To'lov qabul qilish".
@@ -943,7 +986,97 @@ Bu endpoint faqat do'kon sotuvi uchun — bizning obuna to'lovi (`"billing"` kon
 ### 16.5 Xatolar
 
 `PAYMENT_PROVIDER_ERROR` (umumiy — tashqi tizim xatosi), `PAYMENT_NOT_CONFIRMED` (tasdiq kelmadi; muddat o'tishi checkout `status=expired` bilan ifodalanadi, chek "kutilmoqda" holatida qoladi, kassir boshqa usulga o'tishi mumkin).
-**Offline**: checkout oqimi (dinamik UzQR/Click/Payme/Uzum) butunlay ishlamaydi — statik UzQR ham offline'da ruxsat etilmaydi; offline paytda faqat `cash`/`debt`/`card` (qo'lda `card_type`, `terminal_ref`) ishlaydi.
+**Offline**: checkout oqimi (dinamik UzQR/Click/Payme/Uzum) butunlay ishlamaydi — statik UzQR ham offline'da ruxsat etilmaydi; offline paytda faqat `cash`/`debt`/`card` ishlaydi — karta integratsiyalangan terminal orqali (agent/Android lokal zanjiri — §16a.7) yoki qo'lda (`card_type`, `terminal_ref`).
+
+---
+
+## 16a. Karta — integratsiyalangan terminal (qaror #71)
+
+Kassir karta raqami/RRN'ni yozmaydi: POS summani do'kondagi bank terminaliga tarmoq (LAN/Wi-Fi) orqali yuboradi va natijani avtomatik oladi. Port, adapterlar, holat mashinasi, taymautlar — `21-integratsiyalar.md` §9.4; agent lokal API sxemalari — §16.1; xavfsizlik — `14-autentifikatsiya-oauth2.md` §2.4, `15-xavfsizlik-va-audit.md` §9.3; offline — `16-offline-sync.md` §2.1; DDL — `12-db-sxema.md` (`card_terminals`, `card_terminal_transactions`, `card_terminal_settlements`).
+
+### 16a.1 Terminal tanlash va zaxira siyosati
+
+- POS kassaning faol terminallarini sinxrondan (`sync/pull` `scope=settings` — `card_terminals` qatorlari, PAN/kalitlarsiz) va agentdan (`GET /v1/card/terminals`) oladi; standart — `is_default=true`, aks holda yagona faol terminal; bir nechta bo'lsa kassir tanlaydi.
+- "Karta" bosilganda — `health` (agent `GET /v1/card/health`, ≤ 3 s): `online` → integratsiyalangan oqim (16a.2); `busy` → `CARD_TERMINAL_BUSY`, kutish; `offline`/`error`/agent javob bermaydi → `CARD_TERMINAL_UNREACHABLE`, integratsiyalangan yo'l yopiladi va zaxira taklif qilinadi.
+- **Zaxira** — `card_entry_mode=manual` (§4.1), siyosat `tenants.settings.card_manual_fallback`: `allow` — kassir terminal chekidan kiritadi; `manager_approval` — POS-06 PIN oynasi (`ApprovalRef`, `kind=card_manual_entry`, `card.manual_entry.approve`) yoki BO-16 so'rovi (online); `forbid` — `CARD_MANUAL_NOT_ALLOWED`, boshqa to'lov usuli. Sozlama yo'q: faol terminal bog'langan kassada `manager_approval`, terminalsiz kassada `allow` (`manual_reason=standalone_terminal`).
+
+### 16a.2 Sotuv ketma-ketligi (agent orqali, Windows veb-kassa)
+
+1. POS `attempt_id` (UUIDv7) yaratadi va lokal `card_attempts`ga `pending` yozadi (`16-offline-sync.md` §2.1); online bo'lsa — ixtiyoriy ravishda `POST /card-terminal-transactions` (`result`siz, `status=pending` bilan — server BO-14'da "jarayonda" ko'radi).
+2. `POST http://127.0.0.1:47110/v1/card/purchase {attempt_id, local_id, amount_tiyin, currency:"UZS", cash_register_id, client_event_id, receipt_seq?}` — uzun so'rov ≤ 125 s (yoki `202` → `GET /v1/card/tx/{attempt_id}` poll). POS "Kartani terminalga qo'ying" ekranini summa, hisoblagich (120 s) va "Bekor qilish" (`POST /v1/card/cancel-pending`, drayver qo'llasa) bilan ko'rsatadi.
+3. Natija (`CardTxResult` → `CardResult`, §2.7):
+   - `approved` va `amount_tiyin` = so'ralgan → `card.purchase.approved`; `card_type` yo'q bo'lsa `card_bin_rules` (BIN — faqat xotirada), topilmasa bitta bosishli tanlov (`card_type_source=cashier`);
+   - `approved`, lekin summa farq qiladi → POS darhol `POST /v1/card/void` (`original_attempt_id`), `CARD_AMOUNT_MISMATCH`, to'lov qabul qilinmaydi (`card.void.auto`);
+   - `declined` → `CARD_DECLINED` (`decline_message`), boshqa usul yoki **yangi** `attempt_id` bilan qayta urinish;
+   - `504`/aloqa uzildi → `unknown` (`CARD_TERMINAL_TIMEOUT`) → 16a.4.
+4. Fiskal chek (`POST /v1/fiscal/sale` yoki hamkor bulut) — `payment_form='card'` (aralashda `mixed`), `card_type`, `card_mask`, `rrn` avtomatik.
+5. `sale.created` — `payments[i] = {method:"card", amount, card_entry_mode:"integrated", card_result, card_type, card_type_source}` (§4.1); online bo'lsa lokal yozuv `POST /card-terminal-transactions` bilan ham yuboriladi (idempotent).
+
+**Karta tasdiqlangan, fiskal chek chiqmadi**: sotuv "to'lov qabul qilingan, chek kutilmoqda" holatida qoladi (savat saqlanadi), fiskal qayta urinish §4.10 qoidalari bo'yicha. Kassir sotuvni bekor qilsa — **avtomatik `void`** (`POST /v1/card/void {attempt_id: <yangi>, local_id, amount_tiyin, original_attempt_id}`; settlement o'tgan bo'lsa — `refund`), `card.void.auto`; muvaffaqiyatsiz bo'lsa — `CARD_VOID_FAILED` (`card.void.failed`), sotuv bekor qilinmaydi, BO-14 va Egasiga M18; urinishlar `POST /card-terminal-transactions` (yoki keyingi sinxron) bilan serverga yetadi — bog'lanmagan `approved` urinish 24 soatdan keyin `sync_exceptions(kind='card_orphan_transaction')` — qo'lda ko'rib chiqiladi, avtomatik `void` qilinmaydi. Avtomatik `void` faqat ikki holatda: kassir shu sotuvni bekor qilganda va `CARD_AMOUNT_MISMATCH`da.
+
+**Android (`android_intent`/`softpos`)** — xuddi shu ketma-ketlik, 2-qadam vendor ilova/SDK chaqiruvi (`28-android-pos.md`). **Bulut adapteri (`cloud`)** — 2-qadam o'rniga §16a.3 (natijasiz) + §16a.4 poll.
+
+**Qarz to'lovi** (`debt_payment.created`) — aynan shu ketma-ketlik (`client_event_id` = qarz to'lovi voqeasi). **Qaytarish** (`return.created`, `refund_card`) — `POST /v1/card/refund {attempt_id, local_id, amount_tiyin, original_attempt_id | original_rrn}` (asl xarid shu kunniki va settlement'gacha — `void`), keyin qaytarish cheki, keyin voqea (§7.1); `card.refund`.
+
+### 16a.3 `POST /api/v1/card-terminal-transactions`
+
+**Maqsad**: (a) lokal adapter (agent/Android) natijasini serverga yozish — tanada `result`; (b) **bulut adapteri**da xaridni boshlash — `result`siz, server `CloudTerminalAdapter.purchase()` chaqiradi.
+**Ruxsat**: `kind=purchase` — `sales.create` yoki `debts.payment.accept`; `refund` — `returns.create`; `void` — `sales.void` yoki `returns.create`; `result.resolved_by=manager` — qo'shimcha `card_manual_approval` (tasdiq turi `card_manual_entry`, tasdiqlovchida `card.manual_entry.approve`).
+**Idempotentlik**: `id` (= `attempt_id`) bo'yicha upsert — `Idempotency-Key` talab qilinmaydi. Holat faqat oldinga o'tadi (`pending` → `approved`/`declined`/`unknown`; `unknown` → `approved`/`declined`; `approved` → `voided` — mos `void` urinishi `approved` bo'lganda server o'zi qo'yadi); yakuniy holat boshqa yakuniy holatga almashtirilmaydi — farq bo'lsa `409 CARD_TRANSACTION_MISMATCH` + `sync_exceptions(kind='card_result_mismatch')`.
+
+**So'rov**:
+
+| Maydon | Tur | Majburiy | Validatsiya |
+|---|---|---|---|
+| `id` | UUIDv7 | ha | `attempt_id` |
+| `card_terminal_id` | UUID | ha | Faol terminal, foydalanuvchi filiali |
+| `cash_register_id`, `shift_id` | UUID\|null | yo'q | POS'da — majburiy (`shift_id` ochiq) |
+| `kind` | enum | ha | `purchase`/`refund`/`void` |
+| `original_transaction_id` | UUID\|null | shartli | `void`da majburiy; `refund`da asl xarid ma'lum bo'lsa |
+| `amount` | Money | ha | > 0; `void` = asl summa |
+| `client_event_id` | UUID\|null | yo'q | Bog'lanadigan `sale.created`/`return.created`/`debt_payment.created` voqeasi |
+| `requested_at` | ISO vaqt | ha | Qurilma soati |
+| `status` | enum\|null | shartli | `result` yo'q va adapter lokal bo'lsa — `pending` |
+| `result` | `CardResult`\|null | shartli | Lokal adapter yakuniy/`unknown` natijasi (§2.7); bulut adapteri boshlashda — `null` |
+| `card_manual_approval` | `ApprovalRef`\|null | shartli | `result.resolved_by=manager` bo'lsa majburiy |
+
+**Javob**: `201`/`200` — `{id, status, kind, amount, approval_code, rrn, card_mask, card_scheme, card_type, card_type_source, tid, doc_type, doc_id, resolved_by, updated_at}`; bulut adapteri boshlashda `202 {id, status:"pending"}`.
+**Xatolar**: `CARD_TERMINAL_UNREACHABLE` (503, bulut — vendor API ishlamaydi), `CARD_TERMINAL_BUSY` (409, shu terminalda boshqa `pending` — `uq_ctt_one_pending`), `CARD_OUTCOME_UNKNOWN` (409, shu terminalda hal qilinmagan `unknown` bor, yangi `purchase` bloklanadi), `CARD_TRANSACTION_MISMATCH` (409), `NOT_FOUND`, `VALIDATION_ERROR`, `PERMISSION_DENIED`.
+**Offline**: chaqirilmaydi — natija voqea ichida (`16-offline-sync.md` §2.1).
+
+### 16a.4 `GET /api/v1/card-terminal-transactions/{id}` va `unknown`ni hal qilish
+
+**Ruxsat**: `sales.create` / `returns.create` / `debts.payment.accept` (biri).
+**Javob**: §16a.3 javobi bilan bir xil. Bulut adapterida POS har 2 s (standart, sozlanadi) poll qiladi; server `pending`da vendor holatini o'zi so'raydi.
+
+**`unknown` tartibi** (`purchase` **hech qachon avtomatik takrorlanmaydi**):
+1. POS darhol `GET /v1/card/tx/{attempt_id}` (agent: jurnal → terminal `get_status` → `get_last_transaction`), bulutda — shu endpoint; `get_status`/`health` xavfsiz, 3 marta, 2 s oraliq.
+2. Natija `approved`/`declined` → `resolved_by=status_query`, oqim davom etadi (16a.2, 3-qadam).
+3. Hal bo'lmasa — shu terminalda va shu chekda yangi `purchase` bloklanadi (`CARD_OUTCOME_UNKNOWN`), POS: "Terminal chekini tekshiring". Terminal chekida tasdiq bor bo'lsa — Menejer/Egasi PIN (`card_manual_entry`, `card.manual_entry.approve`) bilan `resolved_by=manager`, `status=approved`, rekvizitlar terminal chekidan (`card.outcome.resolved_manual`); tasdiq yo'q bo'lsa — `declined` (`decline_code='not_found'`), keyin yangi urinish yoki boshqa usul. Hal qilinmagan urinish bilan smena yopilmaydi (§3.2).
+
+### 16a.5 `GET /api/v1/card-terminals` · `POST /api/v1/card-terminals` · `PATCH /api/v1/card-terminals/{id}`
+
+**Maqsad**: karta terminallari reyestri (BO-12 «Kassalar» — terminal bog'lash; POS-16 — agent topgan terminallarni ko'rish/sinash).
+**Ruxsat**: `GET` — `cash_register.manage` yoki `sales.create` (o'z kassasi); `POST`/`PATCH` — `cash_register.manage`.
+**`GET`** `?branch_id=&cash_register_id=&status=&page=&size=` → `{items: [CardTerminal], total, page, size}` (page pagination — ma'lumotnoma).
+**`CardTerminal`**: `{id, branch_id, cash_register_id, name, vendor, model, adapter, driver, agent_id, local_id, host, port, vendor_terminal_ref, tid, mid, acquirer_counterparty_id, status, is_default, capabilities, health_status, health_checked_at, version}` — `card_terminals` ustunlari (`12-db-sxema.md`).
+**`POST`** tanasi — `CardTerminal` (`id`, `health_*`, `capabilities`, `version`siz); qoidalar: `adapter=agent_ecr` — `agent_id`, `local_id`, `host` majburiy (`local_id` agent `capabilities.card_terminal.devices[]`da bo'lishi, `host` — RFC 1918 xususiy IPv4); `adapter=cloud` — `vendor_terminal_ref` majburiy, vendor kredensiali `tenant_secrets(kind='card_terminal_vendor')`da; `adapter=fake` — faqat dev/test/staging va demo-tenant (prod'da `VALIDATION_ERROR`); faol real terminalda `tid` majburiy va tenantda yagona; `is_default=true` — `cash_register_id` majburiy, shu kassadagi oldingi standart avtomatik `false`.
+**`PATCH`** — `version` majburiy (`409 VERSION_CONFLICT`); `status` `active`/`disabled`/`archived` (arxivlangan terminal tahrirlanmaydi); hal qilinmagan (`pending`/`unknown`) urinishi bor terminal `disabled`/`archived` qilinmaydi — `CARD_OUTCOME_UNKNOWN`.
+**Idempotentlik**: `POST` — `Idempotency-Key` majburiy. **Audit**: `card_terminal.created` / `card_terminal.updated` / `card_terminal.archived`.
+**Xatolar**: `VALIDATION_ERROR`, `VERSION_CONFLICT`, `CARD_OUTCOME_UNKNOWN`, `NOT_FOUND`, `PERMISSION_DENIED`.
+
+### 16a.6 `POST /api/v1/card-terminal-settlements`
+
+**Maqsad**: smena yopilishida terminal settlement'i («сверка итогов») natijasini yozish — POS agent orqali (`POST /v1/card/settlement {local_id}`) bajaradi; POS yopiq bo'lsa server agent vazifasini (`card.settlement`) navbatga qo'yadi va natijani agent API orqali o'zi yozadi.
+**Ruxsat**: `shift.close`.
+**So'rov**: `{id (UUIDv7, qurilma beradi), card_terminal_id, shift_id, batch_no, business_date, settled_at, purchase_count, purchase_total, refund_count, refund_total, terminal_response}` (pul — Money; `SettlementResult.total_tiyin` va `by_scheme[]` adapterda xaritalanadi).
+**Server**: `expected_count`/`expected_total`ni shu terminalning `approved` `purchase`/`refund` urinishlaridan hisoblaydi (partiyaga — `settlement_id` yozadi), `status` — `matched` / `mismatch` (farq → `card.settlement.mismatch`, BO-14, Egasiga M18) / `failed` (terminal settlement'ni bajarmadi); bank ko'chirmasi bilan moslashtirish — `13-provodka-qoidalari.md` §2.18a, `20-api-moliya-admin.md` (BO-24).
+**Javob**: `201 {id, status, net_total, expected_total, variance}`. **Idempotentlik**: `id` (takror — saqlangan natija). Offline — `shift.closed.card_settlements[]` (§3.2).
+**Xatolar**: `VALIDATION_ERROR`, `SHIFT_NOT_OPEN` (smena allaqachon boshqa qurilmada yopilgan bo'lsa ham qabul qilinadi — faqat `shift_id` mavjudligi tekshiriladi), `NOT_FOUND`.
+
+### 16a.7 Offline
+
+Agent/Android zanjiri do'kon internetisiz ishlaydi (terminal bankka o'z kanali bilan chiqadi) — integratsiyalangan karta offline'da **ruxsat**; natija voqea ichida (`card_result`), server sinxronda `card_terminal_transactions`ni upsert qiladi. Bulut adapteri — faqat online. `unknown` offline'da ham bloklaydi. To'liq qoidalar — `16-offline-sync.md` §2.1.
 
 ---
 
@@ -997,6 +1130,16 @@ To'liq protokol — `16-offline-sync.md` §1–3 (bu fayl **qaytarib yozmaydi**,
 | `IDEMPOTENCY_IN_PROGRESS` / `IDEMPOTENCY_KEY_REUSED` | Barcha back-office REST yozuvchi so'rovlar | `23-backend-arxitekturasi.md` §3 |
 | `PERIOD_CLOSED` | Faqat back-office REST (§12.3–§12.5 yaratish/`post`, `doc_date` yopilgan davrda); POS sync voqealari rad etilmaydi (`16-offline-sync.md` §3.4, qaror #69); `cancel` da ishlatilmaydi (§12.5a) | `13-provodka-qoidalari.md` §5.1 |
 | `PAYMENT_PROVIDER_ERROR` | §16.2–16.4 | 502 — tashqi to'lov tizimi xatosi |
+| `CARD_TERMINAL_UNREACHABLE` | §16a.1, §16a.3 | 503 — terminal/agent ulanmagan yoki bulut vendor API ishlamaydi; zaxira siyosati (qaror #71) |
+| `CARD_TERMINAL_BUSY` | §16a.1, §16a.3 | 409 — shu terminalda boshqa `pending` urinish |
+| `CARD_TERMINAL_TIMEOUT` | §16a.2 | 504 (agent) — urinish `unknown`, holat so'rovi |
+| `CARD_DECLINED` | §16a.2 | 200 `status:"declined"` — rad etildi, boshqa usul yoki yangi `attempt_id` |
+| `CARD_OUTCOME_UNKNOWN` | §3.2, §16a.3, §16a.4, §16a.5 | 409 — hal qilinmagan `unknown` urinish: yangi `purchase`, smena yopish va terminalni o'chirish bloklanadi |
+| `CARD_AMOUNT_MISMATCH` | §16a.2 | 422 — terminal summasi ≠ chek summasi, avtomatik `void` |
+| `CARD_MANUAL_NOT_ALLOWED` | §4.1, §4.6, §7.1, §12.2, §16a.1 | 403 — `card_manual_fallback=forbid` |
+| `CARD_MANUAL_APPROVAL_REQUIRED` | §4.1, §4.6, §7.1, §12.2, §16a.1 | 403 — `manager_approval` siyosatida `card_manual_approval` yo'q (online) |
+| `CARD_VOID_FAILED` | §16a.2 | 502 — avtomatik `void`/`refund` bajarilmadi, BO-14 + M18 |
+| `CARD_TRANSACTION_MISMATCH` | §4.1, §4.6, §7.1, §12.2, §16a.3 | Voqeada — `warnings[]` + `sync_exceptions(kind='card_result_mismatch')`; §16a.3 da — 409 |
 | `PAYMENT_NOT_CONFIRMED` | §4.6, §12.2 | Checkout `confirmed` emas yoki allaqachon `consumed` (§16.1) |
 | `DEPENDENCY_NOT_SYNCED` | §4.6, §7.1, §12.2 | `retryable:true` — bog'liq voqea hali qabul qilinmagan |
 | `DEBT_ALREADY_PAID` | §12.5 | 409 — mijozning ochiq qarzi 0 |

@@ -2,7 +2,7 @@
 
 **Maqsad:** Frontend (back-office + veb-kassa) papka strukturasi, holat boshqaruvi (Effector), API qatlami, kutubxona tanlovlari va platforma/chop etish strategiyasini belgilash.
 **Kim uchun:** Frontend ishlab chiquvchi.
-**Bog'liq fayllar:** `14-autentifikatsiya-oauth2.md`, `16-offline-sync.md`, `06-ekranlar-umumiy.md`, `07-ekran-tafsilotlari.md`, `08-dizayn-tizimi.md` (§13 chek shabloni), `21-integratsiyalar.md` (§1 fiskal, §16 Do'kon agenti), `25-nofunksional-talablar.md`, `33-1c-integratsiya.md` (§13 BO-22/BO-23), `01-qarorlar.md` #21, #57, #60.
+**Bog'liq fayllar:** `14-autentifikatsiya-oauth2.md`, `16-offline-sync.md`, `06-ekranlar-umumiy.md`, `07-ekran-tafsilotlari.md`, `08-dizayn-tizimi.md` (tokenlar, komponentlar, §13 chek shabloni), `design/USLUB.md`, `21-integratsiyalar.md` (§1 fiskal, §9.2/§9.4 karta terminali, §16 Do'kon agenti), `12-db-sxema.md` (`app.card_terminals`, `app.card_terminal_transactions`), `18-api-kassa.md` (§4.1 `card_result`), `25-nofunksional-talablar.md`, `33-1c-integratsiya.md` (§13 BO-22/BO-23), `01-qarorlar.md` #21, #57, #60, #71.
 **Holat:** joriy, 2026-10-16.
 
 *Stack: React + Vite + TypeScript, FSD strukturasi, Effector, shadcn/ui, iloji boricha tayyor kutubxonalar. Namuna loyiha: `E:/Project/monorepo/projects/metadata management/src/client` (bundan keyin — "namuna").*
@@ -12,11 +12,11 @@
 1. **Struktura namunadagidek**: Turborepo monorepo — `apps/shell` (yagona kirish nuqtasi, router, layout, auth) + `packages/pages/*` (har bir sahifa guruhi alohida paket) + `packages/shared/*` (api, models, state, ui, i18n, lib). Har sahifa ichida FSD: `model/` va `ui/`.
 2. **Effector modeli namunadagi tartibda**: har bir `model/` papkasi `events/`, `stores/`, `effects/`, `connections/` (faqat `sample` bilan bog'lash), `types/`, `lib/` dan iborat. UI faqat `useUnit` orqali store o'qiydi va event chaqiradi; API'ni hech qachon to'g'ridan-to'g'ri chaqirmaydi.
 3. **API qatlami namunadagidek**: `packages/shared/api` — bitta axios instance, interceptorlar (auth, CSRF, xato), har domen uchun funksiyalar fayli. Farqi: **tiplar va API funksiyalari FastAPI'ning OpenAPI sxemasidan avtomatik generatsiya qilinadi** (qo'lda yozilmaydi).
-4. **UI — shadcn/ui** (Radix + Tailwind CSS). Namunadagi Mantine o'rniga. Jadval — TanStack Table (shadcn data-table), forma — react-hook-form + zod.
+4. **UI — shadcn/ui** (Radix + Tailwind CSS). Namunadagi Mantine o'rniga. Jadval — TanStack Table (shadcn data-table), forma — react-hook-form + zod. Vizual uslub — `design/USLUB.md` tokenlari (`08-dizayn-tizimi.md`) Tailwind presetiga xaritalangan (§4.3); shrift Manrope ilova bilan bundle qilinadi (§4.1), ikonlar — lucide-react (§4.2).
 5. **Qo'lda yozish o'rniga kutubxona** — har bir vazifa uchun tanlangan kutubxona quyidagi jadvalda; yangi narsa qo'shishdan oldin avval shu ro'yxat va keyin tayyor kutubxona qidiriladi.
 6. **Veb-kassa offline ishlaydi**: PWA (vite-plugin-pwa) + IndexedDB (Dexie) + append-only outbox; tafsiloti `16-offline-sync.md` da.
 7. Namunadagi kamchiliklar takrorlanmaydi: `console.log` qoldirilmaydi, sana formatlash qo'lda yozilmaydi (dayjs), xato xabari `JSON.stringify` bilan foydalanuvchiga ko'rsatilmaydi (tarjima qilingan matn).
-8. **Chop etish va uskunalar (§6)**: printer transporti qurilmaga qarab tanlanadi — USB (Web Serial/WebUSB), HTTP LAN printer (Epson ePOS/Star WebPRNT), xom TCP 9100 LAN printer — faqat **Do'kon agenti** orqali (qaror #60), bulut printer (Star CloudPRNT/Epson SDP), tizim printeri; standart — bosma chek, elektron chek — zaxira. Lokal fiskal ko'prik rejimida kassa platformasi — Windows PK + Do'kon agenti; iOS kassa — faqat fiskal hamkorning bulut rejimida.
+8. **Chop etish va uskunalar (§6)**: printer transporti qurilmaga qarab tanlanadi — USB (Web Serial/WebUSB), HTTP LAN printer (Epson ePOS/Star WebPRNT), xom TCP 9100 LAN printer — faqat **Do'kon agenti** orqali (qaror #60), bulut printer (Star CloudPRNT/Epson SDP), tizim printeri; standart — bosma chek, elektron chek — zaxira. Lokal fiskal ko'prik rejimida kassa platformasi — Windows PK + Do'kon agenti; iOS kassa — faqat fiskal hamkorning bulut rejimida. Karta to'lovi — `CardTerminalPort` (§6.5, qaror #71): Windows veb-kassada Do'kon agenti orqali bank terminaliga, MVP'da `FakeCardTerminalAdapter`; `purchase` hech qachon avtomatik takrorlanmaydi.
 9. **Autentifikatsiya — BFF (Backend-for-Frontend) naqshi, OAuth 2.0 token hech qachon brauzer JS'iga chiqmaydi**: login `features/auth-provider` orqali backend'ning `/auth/login`iga POST qiladi, backend ichida OAuth Authorization Code+PKCE almashinuvini bajaradi va faqat `HttpOnly` sessiya cookie qaytaradi; access/refresh token faqat serverda. To'liq protokol — `14-autentifikatsiya-oauth2.md`. Login sahifasi obuna muddati tugagan holatni alohida ko'rsatadi (to'lov havolasi bilan).
 
 ---
@@ -52,7 +52,7 @@ web/                                  # Turborepo (npm workspaces)
 │       ├── ui/                       # shadcn/ui komponentlari (components/ui) + umumiy kompozitlar
 │       ├── i18n/                     # i18next: uz (lotin, asosiy), ru
 │       ├── offline/                  # Dexie baza, outbox, sync (faqat pos va kerakli sahifalar ishlatadi)
-│       ├── lib/                      # formatlash, pul, shtrix-kod/og'irlik kodi parser (scanner), printer adapterlari (printer), fiskal port klienti (fiscal), Do'kon agenti lokal klienti (agent)
+│       ├── lib/                      # formatlash, pul, shtrix-kod/og'irlik kodi parser (scanner), printer adapterlari (printer), fiskal port klienti (fiscal), karta terminali porti va adapterlari (cardTerminal, §6.5), Do'kon agenti lokal klienti (agent)
 │       └── config/                   # eslint-config, typescript-config, tailwind preset
 └── turbo.json
 ```
@@ -140,7 +140,8 @@ Qoidalar:
 | HTTP | axios | namunadagidek |
 | API tip/klient generatsiyasi | orval (axios mutator bilan) | qo'lda DTO yozilmaydi (26 #58) |
 | UI komponentlar | shadcn/ui (Radix UI) + Tailwind CSS | Mantine o'rniga |
-| Ikonkalar | lucide-react | shadcn standarti |
+| Ikonkalar | lucide-react (nomli import, tree-shaking; `strokeWidth` 1.8 — §4.2) | shadcn standarti; maketlardagi chiziqli ikon uslubiga mos |
+| Shrift | @fontsource-variable/manrope (self-hosted woff2 — §4.1) | CDN/Google Fonts yo'q, offline PWA keshida (qaror #57) |
 | Jadvallar | @tanstack/react-table + @tanstack/react-virtual | katta ro'yxatlar (tovarlar, cheklar) virtualizatsiya bilan |
 | Formalar va validatsiya | react-hook-form + zod + @hookform/resolvers | backend Pydantic xatolari bilan bir xil shakl |
 | Routing | react-router-dom | namunadagidek |
@@ -162,6 +163,84 @@ Qoidalar:
 | Testlar | vitest, @testing-library/react, msw, playwright | |
 | Kod sifati | eslint + @feature-sliced/eslint-config, prettier, typescript strict | ESLint `no-restricted-syntax` + custom qoida: `Number(`, `parseFloat(`, `parseInt(` va `Money` tipidagi `+ - * /` taqiqlanadi; CI'da `npm audit --audit-level=high`; qat'iy CSP (`default-src 'self'`, `frame-ancestors 'none'`; `connect-src` ga `http://127.0.0.1:<agent port>` qo'shiladi) — qaror #57 |
 
+### 4.1 Shrift — Manrope (ilova bilan bundle)
+
+- Paket: `@fontsource-variable/manrope` (bitta variable woff2, og'irlik o'qi 200–800; ishlatiladigani 400–800 — `08-dizayn-tizimi.md` §2). Ulash `apps/shell/src/main.tsx` da: `import "@fontsource-variable/manrope/wght.css";` — fayllar Vite build'iga (`dist/assets`, hashlangan nom) tushadi; runtime'da CDN/Google Fonts so'rovi yo'q (CSP `default-src 'self'`, qaror #57).
+- Subsetlar: **latin, latin-ext, cyrillic, cyrillic-ext** (o'zbek lotin, U+02BB, rus va o'zbek kirill `Ққ Ғғ Ҳҳ Ўў`); `@font-face` `unicode-range` bilan bo'lingan — brauzer faqat kerakli subsetni yuklaydi. Greek/vietnamese fayllari build'dan chiqariladi (Vite `build.rollupOptions` / PWA `globIgnores`).
+- `font-display: swap` (Fontsource standarti); `index.html` da latin subset fayli `<link rel="preload" as="font" type="font/woff2" crossorigin>` bilan oldindan yuklanadi (hashlangan nom Vite `transformIndexHtml` plagini orqali qo'yiladi).
+- **Offline (POS/PWA)**: vite-plugin-pwa `workbox.globPatterns` ga `**/*.woff2` qo'shiladi — to'rt subset fayli precache'da, internet yo'q holatda va birinchi offline ishga tushishda ham shrift bor.
+- Stek (Tailwind `fontFamily.sans`, §4.3): `'Manrope Variable', 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`. Bosqich 0 glif skrinshot-testi (qaror #57) yomon natija bersa — self-hosted Noto Sans subset'i (`@fontsource/noto-sans`, latin-ext + cyrillic-ext) stekka Manrope'dan keyin qo'shiladi.
+- Chek/yorliq rastr rejimi (`@shared/lib/printer`, §6.1) canvas'da shu shriftni ishlatadi — chizishdan oldin `document.fonts.load("700 24px 'Manrope Variable'")` kutiladi.
+
+### 4.2 Ikonkalar — lucide-react
+
+- `lucide-react` — faqat **nomli import** (`import { ScanLine, Wifi } from "lucide-react"`), ESM tree-shaking bilan build'ga faqat ishlatilgan ikonlar tushadi. Taqiqlanadi (ESLint `no-restricted-imports`): `import * as Icons from "lucide-react"`, `lucide-react/dynamic` (`DynamicIcon`) va nom bo'yicha runtime qidiruv — ular butun to'plamni bundle'ga qo'shadi.
+- Umumiy o'ram `@shared/ui/icon`: `<Icon as={ScanLine} size="md" />` — `strokeWidth={1.8}`, `aria-hidden="true"` standart; o'lchamlar `sm` 16 / `md` 18 / `lg` 20 / `xl` 24 px (`08-dizayn-tizimi.md` §4). Komponentlar lucide ikonini to'g'ridan-to'g'ri emas, shu o'ram orqali chizadi; menyu/to'lov usuli kabi ro'yxatlarda ikonka maydoni komponent havolasi (`LucideIcon` tipi), satr nomi emas.
+- Versiya `package.json` da aniq qulflanadi (lucide ikon nomlarini qayta nomlaydi — `08` §4 jadvalidagi nomlar joriy versiyaga mos; yangilashda tekshiriladi).
+
+### 4.3 Tailwind preset — tokenlarga xaritalash
+
+`packages/shared/config/tailwind/preset.ts` — barcha ilova va paketlar shu presetni ishlatadi; qiymatlar faqat `theme.css` CSS o'zgaruvchilaridan (`08` §1), Tailwind konfigida hex yozilmaydi:
+
+```ts
+const c = (v: string) => `hsl(var(--${v}) / <alpha-value>)`;
+export default {
+  darkMode: ["selector", '[data-theme="dark"]'],
+  theme: {
+    extend: {
+      fontFamily: { sans: ["'Manrope Variable'", "Manrope", "system-ui", "-apple-system", "'Segoe UI'", "Roboto", "sans-serif"] },
+      colors: {
+        background: c("background"), foreground: c("foreground"), "foreground-secondary": c("foreground-secondary"),
+        card: { DEFAULT: c("card"), foreground: c("card-foreground") },
+        popover: { DEFAULT: c("popover"), foreground: c("popover-foreground") },
+        primary: { DEFAULT: c("primary"), foreground: c("primary-foreground"), strong: c("primary-strong"), soft: c("primary-soft"), "soft-border": c("primary-soft-border") },
+        secondary: { DEFAULT: c("secondary"), foreground: c("secondary-foreground") },
+        muted: { DEFAULT: c("muted"), foreground: c("muted-foreground") },
+        accent: { DEFAULT: c("accent"), foreground: c("accent-foreground") },
+        destructive: { DEFAULT: c("destructive"), foreground: c("destructive-foreground"), strong: c("destructive-strong"), soft: c("destructive-soft"), border: c("destructive-border") },
+        success: { DEFAULT: c("success"), foreground: c("success-foreground"), strong: c("success-strong"), soft: c("success-soft") },
+        warning: { DEFAULT: c("warning"), foreground: c("warning-foreground"), strong: c("warning-strong"), soft: c("warning-soft"), border: c("warning-border") },
+        info: { DEFAULT: c("info"), foreground: c("info-foreground"), strong: c("info-strong"), soft: c("info-soft") },
+        "awaiting-approval": { DEFAULT: c("awaiting-approval"), foreground: c("awaiting-approval-foreground"), strong: c("awaiting-approval-strong"), soft: c("awaiting-approval-soft") },
+        offline: { DEFAULT: c("offline"), strong: c("offline-strong"), soft: c("offline-soft"), foreground: c("offline-foreground") },
+        "offline-critical": { DEFAULT: c("offline-critical"), strong: c("offline-critical-strong"), soft: c("offline-critical-soft") },
+        "fiscal-pending": { DEFAULT: c("fiscal-pending"), strong: c("fiscal-pending-strong"), soft: c("fiscal-pending-soft"), foreground: c("fiscal-pending-foreground") },
+        border: c("border"), input: c("input"), ring: c("ring"), divider: c("divider"), track: c("track"),
+        "disabled-foreground": c("disabled-foreground"), overlay: c("overlay"),
+        sidebar: { DEFAULT: c("sidebar-background"), foreground: c("sidebar-foreground"), "muted-foreground": c("sidebar-muted-foreground"),
+                   primary: c("sidebar-primary"), "primary-foreground": c("sidebar-primary-foreground"), accent: c("sidebar-accent"),
+                   "accent-foreground": c("sidebar-accent-foreground"), border: c("sidebar-border"), ring: c("sidebar-ring") },
+      },
+      borderRadius: { sm: "6px", md: "10px", lg: "var(--radius)", xl: "14px", "2xl": "16px", "3xl": "20px" },
+      boxShadow: {
+        card: "0 1px 2px rgb(15 27 45 / .04), 0 6px 20px rgb(15 27 45 / .05)",
+        raised: "0 1px 2px rgb(15 27 45 / .04), 0 10px 28px rgb(15 27 45 / .06)",
+        popover: "0 1px 2px rgb(15 27 45 / .04), 0 12px 32px rgb(15 27 45 / .10)",
+        dialog: "0 24px 60px rgb(15 27 45 / .30)",
+        cta: "0 8px 20px rgb(14 124 102 / .28)",
+        "pos-sheet": "0 -8px 24px -4px rgb(15 27 45 / .12)",
+        "focus-soft": "0 0 0 4px hsl(var(--primary-soft))",
+      },
+      fontSize: {
+        display: ["46px", { lineHeight: "52px", fontWeight: "800", letterSpacing: "-0.5px" }],
+        h1: ["26px", { lineHeight: "34px", fontWeight: "800" }],
+        h2: ["17px", { lineHeight: "24px", fontWeight: "700" }],
+        kpi: ["28px", { lineHeight: "34px", fontWeight: "800" }],
+        money: ["24px", { lineHeight: "32px", fontWeight: "800" }],
+        body: ["14px", "20px"], "body-pos": ["16px", "24px"],
+        label: ["13px", { lineHeight: "18px", fontWeight: "600" }], small: ["13px", "18px"],
+        caption: ["12px", { lineHeight: "16px", fontWeight: "700" }],
+        overline: ["11px", { lineHeight: "16px", fontWeight: "700", letterSpacing: "0.6px" }],
+        kbd: ["11px", { lineHeight: "14px", fontWeight: "600" }],
+      },
+    },
+  },
+  plugins: [require("tailwindcss-animate")],
+};
+```
+
+`text-display`, `text-kpi`, `text-money` klasslari bilan birga doim `tabular-nums` qo'yiladi (komponent ichida; ESLint/Stylelint emas — `MoneyDisplay`/`KpiCard` kabi komponentlar orqali). `DataTable` raqamli ustun meta'si (`meta.numeric: true`) `text-right tabular-nums` ni avtomatik qo'shadi.
+
 ## 5. Veb-kassa (POS) maxsus talablari
 
 - Kassa sahifasi (`@pages/pos`) — to'liq ekran, klaviatura/skaner bilan ishlaydi (F-tugmalar, Enter, Esc), sichqonchasiz ham.
@@ -172,11 +251,26 @@ Qoidalar:
 - Markirovka: chekka qo'shishdan oldin lokal takror-kod nazorati (bitta chekda va avval sotilgan kod — rad); online'da `MARKING_PRECHECK=warn` tekshiruvi (`21` §4).
 - Android POS (Kotlin) keyingi bosqichda xuddi shu backend API va sync protokolidan foydalanadi (`28-android-pos.md`).
 
+### 5.1 POS-02 katalog: ko'rinish almashtirgichi va kategoriya tablari
+
+Maket — `design/canvas/project/Main.dc.html`; komponentlar — `08-dizayn-tizimi.md` §7.2 (`SegmentedControl`, `CategoryTabs`, `ProductTile`, `ProductRow`). Model — `@pages/pos` → `pages/sale/model` (§2 naqshi):
+
+| Holat | Store | Qiymat | Saqlanishi |
+|---|---|---|---|
+| Ko'rinish (Kartochka / Ro'yxat) | `$catalogView` | `"grid" \| "list"`, standart `"grid"` | **Qurilma darajasida** — `device_settings` (kalit `pos.catalog_view`), `printer.transport` bilan bir joyda (§6.1, `07-ekran-tafsilotlari.md` POS-16); `erp-pos` dan alohida Dexie bazasi `erp-device` da, logout'da o'chirilmaydi (`16-offline-sync.md` §12); serverga yuborilmaydi va sinxronlanmaydi |
+| Faol kategoriya | `$activeCategoryId` | `string \| null` (`null` — «Hammasi») | Faqat xotirada (Effector store); `pageMounted` da `null` |
+| Qidiruv matni | `$catalogQuery` | `string` | Faqat xotirada |
+
+- Oqim: `pageMounted` → `loadDeviceSettingFx("pos.catalog_view")` → `$catalogView` (o'qib bo'lmasa yoki qiymat noto'g'ri — `"grid"`); `catalogViewChanged` → `$catalogView` → `saveDeviceSettingFx` (`patronum/debounce` 300 ms). `device_settings` o'qish/yozish — `@shared/offline` dagi umumiy `deviceSettings` moduli (`get(key)`, `set(key, value)`); komponent Dexie'ga to'g'ridan-to'g'ri murojaat qilmaydi.
+- Kategoriya tablari Dexie `catalog` dagi `product_categories` dan quriladi (shu filialda tovari bor kategoriyalar), birinchisi «Hammasi»; `categorySelected(id)` → `$activeCategoryId`. Qidiruv matni bo'sh bo'lmasa filtr barcha kategoriyalar bo'yicha ishlaydi (tanlangan tab ko'rinishda qoladi, lekin ro'yxatni cheklamaydi); qidiruv tozalanganda tab filtri qaytadi. Shtrix-kod skanerlash (`useBarcodeWedge`) katalog holatiga bog'liq emas — tovar to'g'ridan-to'g'ri chekka qo'shiladi.
+- `$visibleProducts = combine($catalogQuery, $activeCategoryId, …)` — Dexie so'rovi `lib/` dagi toza funksiya orqali; ikkala ko'rinish ham bir xil ma'lumotni `@tanstack/react-virtual` bilan chizadi (`grid` — 4 ustunli qatorlar, `list` — bir qatorli elementlar).
+- Klaviatura: `CategoryTabs` — Radix Tabs (`←`/`→` bilan tab almashadi); ko'rinish almashtirgichi `aria-pressed` tugmalari; `F1` har doim skaner/qidiruv maydoniga fokus qaytaradi (`08` §9).
+
 ## 6. Qo'llab-quvvatlanadigan platformalar, chop etish va uskunalar
 
 ### 6.1 Chop etish transportlari
 
-`@shared/lib/printer` — bitta `PrinterPort` (`printReceipt(doc)`, `printLabel(doc)`, `status()`), sozlama `printer.transport` (qurilma darajasida, Dexie'da) va transport adapterlari:
+`@shared/lib/printer` — bitta `PrinterPort` (`printReceipt(doc)`, `printLabel(doc)`, `status()`), sozlama `printer.transport` (qurilma darajasida — alohida Dexie bazasi `erp-device`, `device_settings`; logout'da saqlanadi, `16-offline-sync.md` §12; kalitlar — `printer.transport`, `printer.paper_width`, `printer.codepage`, `printer.render_mode`, `printer.lan_address` (`agent_raw`/`http_*` uchun IPv4:port), `printer.cloud_id`; `07-ekran-tafsilotlari.md` POS-16) va transport adapterlari:
 
 | `printer.transport` | Adapter | Qaysi printer | Brauzer/platforma | Cheklov |
 |---|---|---|---|---|
@@ -214,8 +308,122 @@ Qoidalar:
 
 - Agent lokal API'si: `http://127.0.0.1:<port>/v1/*` — `GET /v1/status`, `POST /v1/pair`, `POST /v1/fiscal/open-shift|close-shift|sale|refund`, `GET /v1/fiscal/device-status`, `GET /v1/fiscal/unsent`, `POST /v1/fiscal/resend`, `POST /v1/print/raw` (yagona ta'rif — `21` §16). Brauzer `http://127.0.0.1` ni xavfsiz kontekst deb hisoblaydi (mixed content emas); Chrome 142+ birinchi murojaatda Local Network Access ruxsatini so'raydi — onboarding'da ko'rsatiladi.
 - Himoya: agent faqat `127.0.0.1` da tinglaydi va `Origin` oq ro'yxatini (`https://app.<domen>`) tekshiradi; har so'rovda **qurilmaga bog'langan lokal token** (`Authorization: Bearer`) — POS-16 «Uskunalar sozlamasi»da agent tray'idagi 6 raqamli kod bilan bir marta bog'lanadi (`POST /v1/pair {code, device_id}`), token Dexie'da saqlanadi, serverga yuborilmaydi (`21` §16).
-- `$agentStatus` (`@shared/state`): `online | offline | not_installed | unpaired`, agent versiyasi, yoqilgan imkoniyatlar (`fiscal`, `print` — `34-1c-agent.md` §14.2 dagi nomlar), `fm_state`; `patronum/interval` bilan 10 s da `GET /v1/status`. Lokal ko'prik rejimida `$agentStatus != online` bo'lsa POS chekni **yopmaydi** — «Fiskal modul ulanmagan» holati (savat saqlanadi, agentni qayta ishga tushirish yo'riqnomasi); bu lokal holat, server xato kodi emas. `fm_state='locked'` → `FISCAL_DEVICE_LOCKED`; 48 soat → `FISCAL_OFFLINE_48H_BLOCKED` (`21` §1, `16-offline-sync.md`).
+- `$agentStatus` (`@shared/state`): `online | offline | not_installed | unpaired`, agent versiyasi, yoqilgan imkoniyatlar (`fiscal`, `print`, `card_terminal` — `34-1c-agent.md` §14.2 dagi nomlar), `fm_state`, `card_terminals[]` (`local_id`, `driver`, `tid`, `status` — `GET /v1/status`, `21` §16.1; karta oqimi — §6.5); `patronum/interval` bilan 10 s da `GET /v1/status`. Lokal ko'prik rejimida `$agentStatus != online` bo'lsa POS chekni **yopmaydi** — «Fiskal modul ulanmagan» holati (savat saqlanadi, agentni qayta ishga tushirish yo'riqnomasi); bu lokal holat, server xato kodi emas. `fm_state='locked'` → `FISCAL_DEVICE_LOCKED`; 48 soat → `FISCAL_OFFLINE_48H_BLOCKED` (`21` §1, `16-offline-sync.md`).
 - Sotuv paytidagi fiskal chek va chop etish faqat lokal API orqali; server navbatidagi agent vazifalari (`fiscal.status`, `fiscal.resend_unsent`, `fiscal.zreport`, `print.raw`, `scale.plu_upload`) frontend'ga tegishli emas (`21` §16).
+
+### 6.5 Bank karta terminali klienti (`@shared/lib/cardTerminal`, qaror #71)
+
+Kassir karta raqami/RRN'ni yozmaydi — POS summani bank terminaliga yuboradi va natijani avtomatik oladi. Kontrakt, holatlar, taymautlar va xato kodlari — `21-integratsiyalar.md` §9.4 (yagona manba), agent lokal API'si — `21` §16.1, jadval — `12-db-sxema.md` `app.card_terminal_transactions`, ekran — `07-ekran-tafsilotlari.md` POS-03 (`CardTerminalPanel`, `TerminalStatusChip`, `StepIndicator` — `08-dizayn-tizimi.md`).
+
+**`CardTerminalPort` (TypeScript)** — `21` §9.4 Python kontraktining aynan tarjimasi; DTO tiplari backend Pydantic sxemasidan generatsiya qilinadi (`@shared/models/generated`), qo'lda yozilmaydi:
+
+```ts
+// packages/shared/lib/cardTerminal/port.ts
+export interface CardTerminalPort {
+  purchase(req: CardPurchaseRequest): Promise<CardTxResult>;          // hech qachon avtomatik takrorlanmaydi
+  refund(req: CardRefundRequest): Promise<CardTxResult>;              // original_rrn | original_attempt_id, amount_tiyin
+  void(req: CardVoidRequest): Promise<CardTxResult>;                  // shu kunniki, settlementgacha
+  get_status(attempt_id: string): Promise<CardTxResult>;              // "unknown" ni hal qilish
+  get_last_transaction(terminal: TerminalRef): Promise<CardTxResult | null>;
+  settlement(terminal: TerminalRef): Promise<SettlementResult>;       // smena yopilishida
+  health(terminal: TerminalRef): Promise<TerminalHealth>;             // online | busy | offline | error
+}
+
+type TerminalRef = { card_terminal_id: string; local_id: string };
+type CardPurchaseRequest = {
+  attempt_id: string;            // UUIDv7 (uuid v7()), = card_terminal_transactions.id
+  terminal: TerminalRef;
+  amount_tiyin: number;          // butun son, faqat adapter chegarasida (quyida)
+  currency: "UZS";
+  cash_register_id: string;
+  client_event_id: string;       // kelgusi sale.created / return.created / debt_payment.created
+  receipt_seq?: number;
+};
+type CardTxResult = {
+  attempt_id: string; kind: "purchase" | "refund" | "void";
+  status: "approved" | "declined" | "cancelled" | "timeout" | "unknown" | "error";
+  amount_tiyin: number; approval_code: string | null; rrn: string | null; stan: string | null;
+  card_mask: string | null;      // ^[0-9]{4}\*+[0-9]{4}$ ga normallashtirilgan
+  card_scheme: "uzcard" | "humo" | "visa" | "mastercard" | "unionpay" | "mir" | "other" | null;
+  card_type: "personal" | "corporate" | "social" | "unknown" | null;
+  entry_mode: "chip" | "contactless" | "magstripe" | "fallback" | null;
+  tid: string | null; mid: string | null; acquirer: string | null; tx_at: string | null;
+  decline_code: string | null; decline_message: string | null; slip_text?: string | null;
+};
+// CardRefundRequest, CardVoidRequest, SettlementResult, TerminalHealth — 21 §9.4 / §16.1 dagi maydonlar bilan
+```
+
+- **Pul chegarasi**: `amount_tiyin` faqat adapter chaqiruvida hosil qilinadi — `shared/lib/money.toTiyin(value: string)` (`decimal.js`, butun son, `Number.isSafeInteger` tekshiruvi); ilova ichida summa doim kasr-satr (`"12000.00"`, `08` §0 band 1). Qaytgan `amount_tiyin` `fromTiyin()` bilan satrga aylantiriladi va so'ralgan summa bilan satr darajasida solishtiriladi.
+- **PCI**: port faqat niqob qaytaradi; to'liq PAN/track/CVV hech qachon store'ga, Dexie'ga, logga yoki Sentry'ga tushmaydi (`21` §9.4). POS-03 DOM'ida karta raqami kiritiladigan input yo'q (qo'lda zaxira rejimidan tashqari, u ham faqat niqob va RRN).
+
+**Adapter tanlovi** — `createCardTerminalPort(terminal)` kassaning standart terminali (`card_terminals.is_default`, aks holda yagona `status='active'` terminal) `adapter` qiymatiga qarab:
+
+| `card_terminals.adapter` | Veb-kassa adapteri | Transport |
+|---|---|---|
+| `agent_ecr` | `AgentEcrAdapter` | `http://127.0.0.1:47110/v1/card/*` — Do'kon agenti (`@shared/lib/agent` klienti: lokal `Authorization: Bearer` token, §6.4) |
+| `fake` | `FakeCardTerminalAdapter` | Brauzer ichida (tarmoqsiz) |
+| `cloud` | — | Faqat vendor bulut API'si bo'lsa (server adapteri, `21` §9.4); veb-kassa natijani server orqali oladi |
+| `android_intent`, `softpos` | — | Veb-kassada yo'q (Kotlin POS, `28`) |
+
+POS faqat `card_terminals.capabilities` da `true` bo'lgan amallarni taklif qiladi (`refund`, `void`, `status_query`, `last_transaction`, `settlement`).
+
+**`AgentEcrAdapter`** (Windows PK veb-kassa) — har metod bitta agent yo'liga mos (`21` §16.1):
+
+| Port metodi | Agent so'rovi | Klient taymauti |
+|---|---|---|
+| `health` | `GET /v1/card/health?local_id=` | 3 s |
+| `purchase` | `POST /v1/card/purchase` `{attempt_id, local_id, amount_tiyin, currency:"UZS", cash_register_id, client_event_id, receipt_seq?}` — uzun so'rov; `202 {attempt_id}` kelsa `GET /v1/card/tx/{attempt_id}` 2 s oraliqda poll | 125 s (`AbortController`) |
+| `get_status` | `GET /v1/card/tx/{attempt_id}` (agent jurnali; jurnalda `unknown` bo'lsa agent terminaldan holat/oxirgi tranzaksiyani so'raydi) | 10 s |
+| `get_last_transaction` | Alohida agent yo'li yo'q — xuddi shu `GET /v1/card/tx/{attempt_id}` (agent ichida bajaradi); natija faqat `attempt_id` mos kelsa qabul qilinadi | 10 s |
+| `refund` / `void` | `POST /v1/card/refund` / `POST /v1/card/void` `{attempt_id, local_id, amount_tiyin, original_rrn \| original_attempt_id}` | 60 s |
+| `settlement` | `POST /v1/card/settlement` `{local_id}` | 60 s |
+| (bekor qilish) | `POST /v1/card/cancel-pending` `{attempt_id}` — "Terminalda bekor qilish" tugmasi | 5 s |
+
+HTTP → holat xaritasi: `200` → `CardTxResult` (rad etilgan karta ham `200`, `status:"declined"` → `CARD_DECLINED`); `409 CARD_TERMINAL_BUSY` / `CARD_OUTCOME_UNKNOWN`; `422 CARD_AMOUNT_MISMATCH`; `502 CARD_VOID_FAILED`; `503 CARD_TERMINAL_UNREACHABLE`; `504 CARD_TERMINAL_TIMEOUT`, klient `AbortController` taymauti yoki aloqa uzilishi (`purchase` yuborilgandan keyin) → `unknown`; `401`/`403` → `$agentStatus='unpaired'` (POS-16 qayta bog'lash). Xato shakli `{code, message_key, params?}` — matn i18n kalitidan (`08` §11).
+
+**`FakeCardTerminalAdapter`** — dev, test (vitest, Playwright), staging va demo-tenant uchun; `21` §16.1 sxemalariga aynan tayanadi. Prod guard (`12-db-sxema.md` `card_terminals`: `fake` — dev/test/staging va demo-tenant, real pul yo'q): production muhitida (`window.__ERP_CONFIG__`) demo bo'lmagan tenantda `createCardTerminalPort` `fake` adapterni yaratmaydi — "Karta" tugmasi `CARD_TERMINAL_UNREACHABLE` sababi bilan o'chiq. Natija deterministik — summaning (so'm) oxirgi uch raqami bo'yicha:
+
+| Summa oxiri | Natija |
+|---|---|
+| boshqa | 3 s dan keyin `approved` (`rrn`, `approval_code`, `card_mask="8600****1234"`, `card_scheme="uzcard"`, `card_type=null`) |
+| `…001` | `declined` (`decline_code="51"`, `decline_message="Mablag' yetarli emas"`) |
+| `…002` | `purchase` javobsiz → `unknown`; `get_status` → `approved` |
+| `…003` | `purchase` javobsiz → `unknown`; `get_status` va `get_last_transaction` ham natijasiz (menejer yopishi) |
+| `…004` | `CARD_TERMINAL_BUSY` |
+| `…005` | `approved`, lekin `amount_tiyin` 100 000 kam (`CARD_AMOUNT_MISMATCH`) |
+| `…006` | `approved`; keyingi `void` → `CARD_VOID_FAILED` |
+
+Testlarda deterministik qoida `fakeCardScenario(...)` bilan ustidan yoziladi (31 qabul testlari "Fake sozlamasi"). Bir xil `attempt_id` bilan qayta `purchase` saqlangan natijani qaytaradi (`purchase` chaqiruvlari hisoblagichi testlarda tekshiriladi).
+
+**Holat mashinasi (Effector)** — `@pages/pos` → `features/card-payment/model` (§2 naqshi: `events/`, `stores/`, `effects/`, `connections/`). Bitta `$cardAttempt` store'i, holat `$cardAttempt.phase`:
+
+```
+idle ──purchase()──▶ pending (120 s teskari hisoblagich)
+pending ──approved, amount = so'ralgan──▶ approved ──▶ fiskal chek ──▶ sale.created
+pending ──approved, summa farqi──▶ void (avtomatik) ──▶ declined (CARD_AMOUNT_MISMATCH)
+pending ──declined / cancelled / error / cancel-pending──▶ declined
+pending ──timeout / 504 / aloqa uzildi──▶ unknown
+unknown ──get_status()──▶ approved | declined | unknown
+unknown ──get_last_transaction() (capabilities.last_transaction)──▶ approved | declined | unknown
+unknown ──"Menejer tasdig'i bilan yopish" (card_manual_entry)──▶ approved (resolved_by='manager') | declined
+declined ──"Qayta yuborish" (yangi attempt_id)──▶ pending
+```
+
+- Effektlar: `healthFx`, `purchaseFx`, `getStatusFx`, `getLastTransactionFx`, `cancelPendingFx`, `voidFx`, `recordTxFx` (`POST /api/v1/card-terminal-transactions`, online bo'lsa). Hisoblagich — `patronum/interval` (1 s), chegara `purchase` taymauti (120 s, `21` §9.4); UI "Kutish: mm:ss / 02:00".
+- **`purchase` hech qachon avtomatik takrorlanmaydi**: `purchaseFx` faqat `idle` va `declined` (foydalanuvchi "Qayta yuborish"ni bosganda, har safar yangi `attempt_id`) holatidan chaqiriladi; `sample` `filter` bilan majburlanadi. `unknown` va `pending` holatida yangi `purchase` bloklanadi (`CARD_OUTCOME_UNKNOWN`), "Qayta yuborish" o'chiq, `Esc` dialogni yopmaydi.
+- `unknown` ga o'tilganda darhol `get_status(attempt_id)` (xavfsiz so'rov — 3 marta, 2 s oraliq), natija hali `unknown` bo'lsa `get_last_transaction` (faqat `attempt_id` mos kelsa qabul); `resolved_by='status_query'`. Ikkalasi ham natija bermasa — "Terminal javobini tekshiring" va "Menejer tasdig'i bilan yopish" (`ApprovalDialog`, tasdiq turi `card_manual_entry`, ruxsat `card.manual_entry.approve`; "tasdiqlangan" — `card_mask` va `rrn` terminal chekidan, `resolved_by='manager'`, audit `card.outcome.resolved_manual`).
+- `unknown` holati Dexie'da (`card_attempts`: `attempt_id`, `card_terminal_id`, `local_id`, `kind`, `amount` (Money), `client_event_id`, `status`, `started_at`, oxirgi natija (`CardResult`, PAN'siz) — `16-offline-sync.md` §2.1) saqlanadi — sahifa yangilansa yoki PWA qayta ochilsa ham bloklash davom etadi va holat so'rovi qayta boshlanadi; offline'da ham bloklaydi.
+- Aralash to'lovda har karta qismi — alohida `sale_payments` qatori va alohida `attempt_id`; bir vaqtda bitta urinish.
+
+**Sotuv ketma-ketligi (qat'iy)**: karta `approved` → fiskal chek (`@shared/lib/fiscal`, `payment_form='card'`, aralashda `mixed`; `card_tiyin`, `card_type`, `card_mask`, `rrn` natijadan) → `sale.created` outbox voqeasi `payments[].card_result` bilan (`CardResult`, `18-api-kassa.md` §2.7: `{attempt_id, card_terminal_id, kind, original_attempt_id?, status, amount (Money), approval_code, rrn, stan, card_mask, card_scheme, card_type, card_type_source, entry_mode, tid, mid, acquirer, tx_at, resolved_by, decline_code?, decline_message?, slip_text?}` — adapterning `amount_tiyin` (int) qiymati `Money` satriga o'giriladi; `16-offline-sync.md` §2.1, `18-api-kassa.md` §4.1); `sale_payments`: `card_entry_mode='integrated'`, `card_terminal_transaction_id = attempt_id`. Qaytarishda — `return.created` → `refund_card.card_result`, qarz to'lovida — `debt_payment.created` ildizida `card_result`.
+- `card_type` tartibi (`21` §9.4): natijada bo'lsa — `card_type_source='terminal'`; aks holda `platform.card_bin_rules` (`bin_table`); topilmasa POS bitta bosishli tanlov (`card_type_source='cashier'`).
+- Karta tasdiqlangan, fiskal chek chiqmagan bo'lsa: sotuv "To'lov qabul qilingan, chek kutilmoqda" holatida qoladi, savat saqlanadi, `sale.created` yuborilmaydi, fiskal qayta urinish (POS-04/POS-12); kassir sotuvni bekor qilsa — **avtomatik `void`** (`voidFx`, `kind='void'`, `original_transaction_id` = xarid, audit `card.void.auto`); `void` ham bajarilmasa — `CARD_VOID_FAILED`, sotuv bekor qilinmaydi. `CARD_AMOUNT_MISMATCH` da ham avtomatik `void`, fiskal chek chiqmaydi.
+
+**Qo'lda zaxira** (`21` §9.2): terminal `offline`/`error`/`busy`, agent ulanmagan yoki `unknown` hal bo'lmagan holatda "Karta (qo'lda)" (`CardDetailsFields`, `card_entry_mode='manual'`, `manual_reason`) faqat `tenants.settings.card_manual_fallback` (Dexie `settings`) bo'yicha: `allow` — tasdiqsiz; `manager_approval` (kalit yo'q bo'lsa faol terminal bog'langan kassada standart) — avval `ApprovalDialog` (tasdiq turi `card_manual_entry`, `card.manual_entry.approve`; lokal PIN yoki BO-16 masofaviy tasdiq), tasdiqsiz — `CARD_MANUAL_APPROVAL_REQUIRED`; `forbid` — qo'lda kiritish yopiq (`CARD_MANUAL_NOT_ALLOWED`). Terminal bog'lanmagan kassada siyosat qo'llanmaydi (`allow`, `manual_reason='standalone_terminal'`).
+
+**`$agentStatus` bog'liqligi**: `adapter='agent_ecr'` terminalda integratsiyalangan "Karta" faqat `$agentStatus.status === 'online'`, `capabilities.card_terminal.enabled === true` va `card_terminals[]` da shu `local_id` `status='online'` bo'lsa faol; `busy` — "Terminal band", qolgan holatlar — "Terminal ulanmagan" (`CARD_TERMINAL_UNREACHABLE`, lokal holat) va qo'lda zaxira siyosati. `TerminalStatusChip` shu store'dan hosil qilinadi (`online` — "Wi-Fi · ulangan", `busy` — "Band", `offline`/`error` — "Ulanmagan", `unknown` urinish — "Tekshirilmoqda"). "Karta" bosilganda `health` (≤ 3 s) qayta tekshiriladi. Do'kon interneti yo'qligi (`$isOnline=false`) integratsiyalangan kartani o'chirmaydi — agent va terminal ishlasa to'lov o'tadi, natija `sale.created` bilan keyin yuboriladi.
+
+**Smena yopilishi**: har bog'langan terminal uchun `settlement()` → `POST /api/v1/card-terminal-settlements`; POS yopiq bo'lsa — server vazifasi `card.settlement` (`21` §9.4); Z-hisobotda "Karta (integratsiyalangan)" va "Karta (qo'lda)" alohida.
 
 ## Ochiq savollar
 
@@ -235,3 +443,4 @@ Faqat tashqi javob kerak bo'lgan bandlar:
 - https://caniuse.com/webusb, https://developer.chrome.com/docs/capabilities/serial, https://developer.chrome.com/docs/iwa/direct-sockets, https://developer.chrome.com/blog/local-network-access, https://webkit.org/tracking-prevention/
 - `research_notes/texnik/04-arxitektura-va-stack.md` — offline-first, PWA + IndexedDB.
 - Feature-Sliced Design: https://feature-sliced.design
+- `design/USLUB.md`, `design/canvas/project/Main.dc.html` (POS-02 katalog, ko'rinish almashtirgichi), `Pos03Tolov.dc.html` (karta terminali paneli); Fontsource Manrope (https://fontsource.org/fonts/manrope), lucide-react (https://lucide.dev/guide/packages/lucide-react)

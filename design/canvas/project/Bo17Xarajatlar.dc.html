@@ -22,7 +22,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
       <div><div style="color: #FFFFFF; font-weight: 800; font-size: 15px;">ERP</div><div style="font-size: 12px; color: #8C99A8;">[Do'kon nomi]</div></div>
     </div>
     <sc-for list="{{menu}}" as="g" hint-placeholder-count="5">
-      <div style="padding: 14px 10px 6px; font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #6F7E90;">{{g.title}}</div>
+      <div style="padding: 14px 10px 6px; font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #8C99A8;">{{g.title}}</div>
       <sc-for list="{{g.items}}" as="m" hint-placeholder-count="3">
         <a href="{{m.href}}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 14px; font-weight: 600; text-decoration: none; color: {{m.fg}}; background: {{m.bg}};">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{m.icon}}"></path></svg>
@@ -38,17 +38,21 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
   </nav>
   <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column;">
     <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 28px; background: #FFFFFF; border-bottom: 1px solid #E7EAEE;">
-      <h1 style="margin: 0; font-size: 22px; font-weight: 800;">Xarajatlar</h1>
+      <h1 style="margin: 0; font-size: 26px; line-height: 34px; font-weight: 800;">Xarajatlar</h1>
       <div style="flex-grow: 1;"></div>
       <label style="display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px; min-width: 240px; border: 1px solid #DCE1E7; border-radius: 12px; background: #F8FAFB;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7686" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
         <span style="position: absolute; width: 1px; height: 1px; overflow: hidden;">Qidiruv</span>
-        <input type="search" placeholder="Tovar, mijoz, hujjat…" style="flex-grow: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 14px; color: #0F1B2D;">
+        <input type="search" placeholder="Tovar, mijoz, ekran…" style="flex-grow: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 14px; color: #0F1B2D;">
       </label>
       <select aria-label="Filial" style="height: 42px; padding: 0 12px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; color: #0F1B2D;"><option>Barcha filiallar</option></select>
       <button type="button" aria-label="Bildirishnomalar" style="width: 42px; height: 42px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; color: #3D4A5C; display: flex; align-items: center; justify-content: center;">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0112 0v5l1.5 2h-15z"></path><path d="M10 20a2 2 0 004 0"></path></svg>
       </button>
+      <div role="group" aria-label="Interfeys tili" style="display: flex; gap: 2px; padding: 2px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF;">
+        <button type="button" aria-pressed="true" style="min-width: 40px; height: 36px; padding: 0 8px; border: 0; border-radius: 10px; background: #0F1B2D; color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 700;">UZ</button>
+        <button type="button" aria-pressed="false" style="min-width: 40px; height: 36px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; color: #3D4A5C; font: inherit; font-size: 13px; font-weight: 700;">RU</button>
+      </div>
     </header>
     <main style="padding: 24px 28px; display: flex; flex-wrap: wrap; align-items: flex-start; gap: 18px;">
       <div style="flex: 999 1 640px; min-width: 0; display: flex; flex-direction: column; gap: 18px;">
@@ -56,9 +60,9 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
           <div><div style="font-size: 13px; color: #6B7686;">01.10.2026 – 16.10.2026 · Barcha filiallar</div><div style="font-size: 26px; font-weight: 800;">Oktabr xarajatlari</div></div>
           <div style="flex-grow: 1;"></div>
           <div role="tablist" aria-label="Bo'lim" style="display: flex; padding: 4px; background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 12px;">
-            <button type="button" role="tab" aria-selected="true" style="height: 34px; padding: 0 14px; border: 0; border-radius: 9px; background: #0F1B2D; color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 700;">Xarajatlar</button>
-            <button type="button" role="tab" aria-selected="false" style="height: 34px; padding: 0 14px; border: 0; border-radius: 9px; background: transparent; color: #3D4A5C; font: inherit; font-size: 13px; font-weight: 700;">Takrorlanuvchi (3)</button>
-            <button type="button" role="tab" aria-selected="false" style="height: 34px; padding: 0 14px; border: 0; border-radius: 9px; background: transparent; color: #3D4A5C; font: inherit; font-size: 13px; font-weight: 700;">Toifalar</button>
+            <button type="button" role="tab" aria-selected="true" style="height: 36px; padding: 0 14px; border: 0; border-radius: 9px; background: #0F1B2D; color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 700;">Xarajatlar</button>
+            <button type="button" role="tab" aria-selected="false" style="height: 36px; padding: 0 14px; border: 0; border-radius: 9px; background: transparent; color: #3D4A5C; font: inherit; font-size: 13px; font-weight: 700;">Takrorlanuvchi (3)</button>
+            <button type="button" role="tab" aria-selected="false" style="height: 36px; padding: 0 14px; border: 0; border-radius: 9px; background: transparent; color: #3D4A5C; font: inherit; font-size: 13px; font-weight: 700;">Toifalar</button>
           </div>
           <button type="button" style="height: 44px; padding: 0 18px; border: 0; border-radius: 12px; background: #0E7C66; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Xarajat qo'shish
@@ -144,7 +148,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
           <div style="overflow-x: auto;">
             <table style="width: 100%; min-width: 860px; border-collapse: collapse; font-size: 14px;">
               <thead>
-                <tr style="background: #F8FAFB; color: #6B7686; font-size: 12px; font-weight: 600; text-align: left;">
+                <tr style="background: #F8FAFB; color: #5B6675; font-size: 12px; font-weight: 600; text-align: left;">
                   <th scope="col" style="padding: 10px 20px; font-weight: 600;">Sana</th>
                   <th scope="col" style="padding: 10px 12px; font-weight: 600;">Toifa</th>
                   <th scope="col" style="padding: 10px 12px; font-weight: 600;">Hisob</th>
@@ -166,7 +170,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
                     <td style="padding: 0 12px; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; text-decoration: {{r.strike}};">{{r.amount}}</td>
                     <td style="padding: 0 12px;"><span style="padding: 4px 10px; border-radius: 999px; background: {{r.chipBg}}; color: {{r.chipFg}}; font-size: 12px; font-weight: 700; white-space: nowrap;">{{r.status}}</span></td>
                     <td style="padding: 0 20px 0 12px; text-align: right;">
-                      <button type="button" aria-label="{{r.menuLabel}}" style="width: 34px; height: 34px; border: 1px solid #E7EAEE; border-radius: 10px; background: #FFFFFF; color: #3D4A5C; font: inherit; font-weight: 800;">…</button>
+                      <button type="button" aria-label="{{r.menuLabel}}" style="width: 36px; height: 36px; border: 1px solid #E7EAEE; border-radius: 10px; background: #FFFFFF; color: #3D4A5C; font: inherit; font-weight: 800;">…</button>
                     </td>
                   </tr>
                 </sc-for>
@@ -174,7 +178,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
             </table>
           </div>
           <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 14px 20px; background: #F8FAFB; font-size: 13px;">
-            <span style="color: #6B7686;">Bekor qilinganlar jamiga kirmaydi.</span>
+            <span style="color: #5B6675;">Bekor qilinganlar jamiga kirmaydi.</span>
             <div style="flex-grow: 1;"></div>
             <span style="color: #3D4A5C;">O'tkazilgan: <b style="font-variant-numeric: tabular-nums; color: #0F1B2D;">{{postedTotal2}}</b></span>
             <span style="color: #3D4A5C;">Kutilmoqda: <b style="font-variant-numeric: tabular-nums; color: #0F1B2D;">{{pendingTotal2}}</b></span>
@@ -185,7 +189,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
       <aside role="dialog" aria-labelledby="drawer-title" style="flex: 1 1 360px; max-width: 420px; min-width: 0; background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 16px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 12px 32px rgba(15,27,45,.10); display: flex; flex-direction: column;">
         <div style="display: flex; align-items: center; gap: 10px; padding: 18px 20px; border-bottom: 1px solid #E7EAEE;">
           <h2 id="drawer-title" style="margin: 0; font-size: 17px; font-weight: 800; flex-grow: 1;">Yangi xarajat</h2>
-          <button type="button" aria-label="Yopish" style="width: 36px; height: 36px; border: 1px solid #E7EAEE; border-radius: 10px; background: #FFFFFF; color: #3D4A5C; display: flex; align-items: center; justify-content: center;">
+          <button type="button" aria-label="Yopish" style="width: 40px; height: 40px; border: 1px solid #E7EAEE; border-radius: 10px; background: #FFFFFF; color: #3D4A5C; display: flex; align-items: center; justify-content: center;">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
           </button>
         </div>
@@ -228,7 +232,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
             <span style="width: 36px; height: 36px; border-radius: 10px; background: #FFFFFF; border: 1px solid #E7EAEE; color: #3D4A5C; display: flex; align-items: center; justify-content: center;">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"></path><path d="M14 3v4h4M9 13h6M9 17h6"></path></svg>
             </span>
-            <span style="display: flex; flex-direction: column;"><span style="font-size: 14px; font-weight: 700;">Hujjat fotosi</span><span style="font-size: 12px; color: #6B7686;">JPEG yoki PNG, 10 MB gacha</span></span>
+            <span style="display: flex; flex-direction: column;"><span style="font-size: 14px; font-weight: 700;">Hujjat fotosi</span><span style="font-size: 12px; color: #5B6675;">JPEG yoki PNG, 10 MB gacha</span></span>
             <input type="file" accept="image/jpeg,image/png" style="position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0;">
           </label>
           <div style="padding: 14px; border-radius: 12px; background: #F8FAFB; border: 1px solid #E7EAEE; display: flex; flex-direction: column; gap: 12px;">
@@ -242,7 +246,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
                 <input type="number" value="5" min="1" max="28" style="height: 44px; box-sizing: border-box; padding: 0 14px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 14px; color: #0F1B2D;">
               </label>
             </div>
-            <span style="font-size: 12px; color: #6B7686;">Har oyning 5-kuni «Kommunal to'lash vaqti» eslatmasi chiqadi — bir bosishda yoziladi.</span>
+            <span style="font-size: 12px; color: #5B6675;">Har oyning 5-kuni «Kommunal to'lash vaqti» eslatmasi chiqadi — bir bosishda yoziladi.</span>
           </div>
           <div style="display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: 12px; background: #EFEAFC; font-size: 12px; color: #3D4A5C;">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6D4AD8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"></path></svg>
@@ -275,12 +279,12 @@ class Component extends DCLogic {
     const H = {"Dashboard":"Bo02Dashboard.dc.html","AI yordamchi":"Bo13Ai.dc.html","Tasdiqlash navbati":"Bo16Tasdiqlash.dc.html","Kassa (POS)":"Main.dc.html","Qarzdorlar":"Bo06Qarzdorlar.dc.html","Tovarlar va narxlar":"Bo05Narxlar.dc.html","Qoldiq va ko'chirish":"Bo03Ombor.dc.html","Xaridlar":"Bo04Xarid.dc.html","Yorliqlar":"Bo18Yorliq.dc.html","Xarajatlar":"Bo17Xarajatlar.dc.html","Bank tushumi":"Bo24Bank.dc.html","E-faktura":"Bo15Efaktura.dc.html","QQS va davlat hisoboti":"Bo10DavlatHisobot.dc.html","Buxgalteriya":"Bo08Jurnal.dc.html","Hisobotlar":"Bo09Hisobotlar.dc.html","1C integratsiyasi":"Bo23OneC.dc.html","Sozlamalar":"Bo14Sozlamalar.dc.html"};
     const it = (label, icon, active, badge) => ({ label, icon: I[icon], href: H[label], fg: active ? "#FFFFFF" : "#C9D2DC", bg: active ? "#1C2A3F" : "transparent", hasBadge: !!badge, badge: badge || "" });
     const sp = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-    const m2 = (n) => sp(n) + ",00";
+    const m2 = (n) => sp(n);
 
     const SRC = { bank: ["Bank", I.bank], card: ["Karta", I.card], pos: ["Kassa (POS)", I.cash] };
     const ST = {
-      posted: ["O'tkazilgan", "#E5F5EC", "#1F8A4C"], draft: ["Qoralama", "#F4F6F8", "#3D4A5C"],
-      approval: ["Egasi tasdig'ida", "#EFEAFC", "#6D4AD8"], cancelled: ["Bekor qilingan", "#FBEAE8", "#C8372D"]
+      posted: ["O'tkazilgan", "#E5F5EC", "#1F6B3E"], draft: ["Qoralama", "#F4F6F8", "#3D4A5C"],
+      approval: ["Tasdiq kutmoqda", "#EFEAFC", "#6D4AD8"], cancelled: ["Bekor qilingan", "#FBEAE8", "#A82B22"]
     };
     const raw = [
       ["16.10.2026", "Transport", "Yetkazib berish, taksi", "9410", "Yunusobod-1", "pos", 95000, "posted"],
@@ -288,11 +292,11 @@ class Component extends DCLogic {
       ["14.10.2026", "Ta'mirlash", "Muzlatkich kompressori", "9430", "Chilonzor-3", "bank", 1850000, "approval"],
       ["12.10.2026", "Kommunal", "Gaz va suv", "9410", "Yunusobod-1", "bank", 310000, "posted"],
       ["11.10.2026", "Reklama", "Banner — xato summa", "9410", "Chilonzor-3", "card", 200000, "cancelled"],
-      ["10.10.2026", "Soliqlar", "Mol-mulk solig'i · 6410", "6410", "—", "bank", 420000, "posted"],
-      ["09.10.2026", "Reklama", "Ijtimoiy tarmoq reklamasi", "9410", "—", "card", 600000, "posted"],
+      ["10.10.2026", "Soliqlar", "Mol-mulk solig'i · 6410", "6410", "Chilonzor-3", "bank", 420000, "posted"],
+      ["09.10.2026", "Reklama", "Ijtimoiy tarmoq reklamasi", "9410", "Chilonzor-3", "card", 600000, "posted"],
       ["07.10.2026", "Transport", "Ombordan yuk tashish", "9410", "Chilonzor-3", "pos", 180000, "posted"],
       ["05.10.2026", "Kommunal", "Elektr energiyasi", "9410", "Chilonzor-3", "bank", 1240000, "posted"],
-      ["03.10.2026", "Internet va aloqa", "Oylik tarif, 2 filial", "9420", "—", "card", 350000, "posted"],
+      ["03.10.2026", "Internet va aloqa", "Oylik tarif", "9420", "Yunusobod-1", "card", 350000, "posted"],
       ["01.10.2026", "Ijara", "Do'kon binosi, oktabr", "9410", "Yunusobod-1", "bank", 2500000, "posted"],
       ["01.10.2026", "Ijara", "Do'kon binosi, oktabr", "9410", "Chilonzor-3", "bank", 3000000, "posted"]
     ];
@@ -332,7 +336,7 @@ class Component extends DCLogic {
       ],
       kpis: [
         { label: "O'tkazilgan (oktabr)", value: sp(total), note: posted.length + " ta xarajat", noteFg: "#6B7686", icon: I.wallet, tile: "#E3F2EE", tileFg: "#0A5E4D" },
-        { label: "Bank orqali", value: sp(bySrc("bank")), note: "Ijara, kommunal, soliq", noteFg: "#6B7686", icon: I.bank, tile: "#E8F0FC", tileFg: "#2F6FDB" },
+        { label: "Bank orqali", value: sp(bySrc("bank")), note: "Ijara, kommunal, soliq", noteFg: "#6B7686", icon: I.bank, tile: "#E8F0FC", tileFg: "#1F4FA8" },
         { label: "Karta va kassa", value: sp(bySrc("card") + bySrc("pos")), note: "Karta " + sp(bySrc("card")) + " · Kassa " + sp(bySrc("pos")), noteFg: "#6B7686", icon: I.card, tile: "#F4F6F8", tileFg: "#3D4A5C" },
         { label: "Kutilmoqda", value: sp(sum(pending)), note: "1 tasi Egasi tasdig'ida · 1 qoralama", noteFg: "#6D4AD8", icon: I.check, tile: "#EFEAFC", tileFg: "#6D4AD8" }
       ],

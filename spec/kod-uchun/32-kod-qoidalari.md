@@ -2,7 +2,7 @@
 
 **Maqsad:** Kod yozishda rioya qilinadigan aniq, tekshiriladigan qoidalar — repo tuzilmasi, nomlash, pul/sana, tranzaksiya/tenant, xato/log, test, Git ish oqimi, "tayyor" ta'rifi, spec↔kod bog'lanishi, xavfsizlik. Boshqa fayllarni (`11`–`24`) qaytarib yozmaydi — faqat ulardagi qarorlarni **bitta joyga jamlab**, PR tekshiruvida foydalanish uchun qisqartiradi.
 **Kim uchun:** hammasi (backend/frontend dasturchi — asoschi + Claude, qabul agenti, kod review).
-**Bog'liq fayllar:** `11-malumotlar-modeli.md`, `12-db-sxema.md`, `13-provodka-qoidalari.md`, `15-xavfsizlik-va-audit.md`, `17-api-umumiy.md`, `23-backend-arxitekturasi.md`, `24-frontend-arxitekturasi.md`, `27-backlog.md`, `29-atamalar-lugati.md`, `33-1c-integratsiya.md`, `34-1c-agent.md`, `01-qarorlar.md`.
+**Bog'liq fayllar:** `11-malumotlar-modeli.md`, `12-db-sxema.md`, `13-provodka-qoidalari.md`, `15-xavfsizlik-va-audit.md`, `17-api-umumiy.md`, `23-backend-arxitekturasi.md`, `24-frontend-arxitekturasi.md`, `27-backlog.md`, `29-atamalar-lugati.md`, `33-1c-integratsiya.md`, `34-1c-agent.md`, `21-integratsiyalar.md` (§9.4 karta terminali), `01-qarorlar.md`, `design/USLUB.md` (vizual uslub, shrift).
 **Holat:** joriy, 2026-10-16.
 
 ## Qoidalar ierarxiyasi
@@ -13,7 +13,7 @@ Bu fayl **ikkinchi darajali manba**: ziddiyat bo'lsa `01-qarorlar.md` → mavzu 
 
 ## 1. Repo tuzilmasi
 
-Uchta kod papkasi: `backend/` (`23-backend-arxitekturasi.md` §1), `web/` (`24-frontend-arxitekturasi.md` §1) va Bosqich 5 dan — `agent-1c/` (Do'kon agenti — fiskal ko'prik, printer, tarozi, 1C (1C qismi Bosqich 7 da); .NET Framework 4.8; 1.3-band, `34-1c-agent.md`). Hujjatlar — `spec/kod-uchun/` (bu repo ichida, kod bilan bir joyda). Umumiy test-vektorlar — repo ildizidagi `shared/` (6.3-band).
+Uchta kod papkasi: `backend/` (`23-backend-arxitekturasi.md` §1), `web/` (`24-frontend-arxitekturasi.md` §1) va Bosqich 5 dan — `agent-1c/` (Do'kon agenti — fiskal ko'prik, printer, tarozi, bank karta terminali, 1C (1C qismi Bosqich 7 da); .NET Framework 4.8; 1.3-band, `34-1c-agent.md`). Hujjatlar — `spec/kod-uchun/` (bu repo ichida, kod bilan bir joyda). Umumiy test-vektorlar — repo ildizidagi `shared/` (6.3-band).
 
 ### 1.1 Backend (`backend/`)
 
@@ -69,6 +69,8 @@ Modul papkalari (`23-backend-arxitekturasi.md` §1 — 18 mahsulot moduli + kesi
 
 **Fiskal kod — alohida, kam o'zgaradigan paket** (qaror #60): `FiscalPort` va uning adapterlari (`FakeFiscalAdapter`, hamkor bulut adapteri, lokal ko'prik adapterlari `multikassa_local`/`fiscaldrive_local`) `integrations/fiscal/` ichida, boshqa modullar faqat `FiscalPort` orqali murojaat qiladi; port chegarasida pul — butun son tiyinda (`int`), konvertatsiya bitta funksiyada (`01-qarorlar.md` #26). Sabab: virtual kassaning fiskal qismi o'zgarsa qayta xulosa talab qilinadi (VMQ-943 2-ilova 6-band) — fiskal paketga tegadigan PR alohida, kichik va CHANGELOG bilan. Tanlov — `FISCAL_PROVIDER` = `fake` / `partner_cloud` / `multikassa_local` / `fiscaldrive_local` (`21-integratsiyalar.md` §1) (MVP'da `fake`, real adapter Bosqich 5 da — `26-ochiq-savollar-reestri.md` #109).
 
+**Karta terminali — alohida paket** (qaror #71): `CardTerminalPort` kontrakti va DTO'lari (`CardPurchaseRequest`, `CardTxResult`, `SettlementResult`, `TerminalHealth`), adapterlar (`FakeCardTerminalAdapter`, vendor bulut API bo'lsa `CloudTerminalAdapter`), `card_terminal_transactions`/`card_terminal_settlements` yozuvchisi va `card.*` agent vazifalari — `integrations/card_terminal/` ichida; `sales`/`returns`/`debts`/`cash` unga faqat port orqali murojaat qiladi. Kontrakt — bitta manba: Pydantic modellaridan JSON Schema eksport qilinadi → veb-kassa TS tiplari (orval qoidasi bilan bir xil) va agent C# DTO'lari (`tools/gen-contracts.ps1`); qo'lda ikkinchi sxema yozilmaydi. Port chegarasida pul — butun son tiyinda. Vendorga xos kod faqat adapter/drayver ichida; `adapter='fake'` prod tenant terminaliga tayinlanmaydi (`app/core/config.py` prod guard'i bilan birga tekshiriladi). Veb-kassa tomoni (POS → agent klienti, holat mashinasi) — `24-frontend-arxitekturasi.md` §6.
+
 **Eslatma**: bu daraxt `{api,service,repo,models,schemas,events}` kabi yassi papka to'plami emas — har modulda **to'rt qatlam** (`domain/application/infrastructure/api`) bor; `service`/`repo`/`models`/`schemas` nomlari mos ravishda `application/services.py`, `infrastructure/repositories.py`, `infrastructure/models.py`, `api/schemas.py` ichida yashaydi. Alohida `events/` papkasi yo'q: domen voqealari (`sale.created`, `shift.opened` — 2.3-bo'lim) `sync`/`outbox_jobs` orqali, fon ishlari esa har modulning `infrastructure/tasks.py`sida.
 
 ### 1.2 Frontend (`web/`)
@@ -88,7 +90,7 @@ Import qoidasi (FSD, `24-frontend-arxitekturasi.md` §1): `app → pages → fea
 
 ### 1.3 Do'kon agenti (`agent-1c/` — butun Do'kon agenti uchun repo papkasi nomi; asos — Bosqich 5, 1C — Bosqich 7)
 
-Alohida .NET Framework 4.8 solution (qarorlar #38, #60). Bu **bitta Do'kon agenti** asosi: fiskal ko'prik (POS → `127.0.0.1` lokal API → FM/hamkor lokal xizmati → OFD), xom TCP 9100 printer, tarozi va 1C moduli bir xil supervisor, ulash, avto-yangilanish, imzo va DPAPI qatlamidan foydalanadi. Ichki arxitektura, loyiha nomlari, protokol bajarilishi va yozish algoritmi — `34-1c-agent.md` §2.1 (ustun manba; quyidagi daraxt — o'sha daraxtning qisqa ko'rinishi):
+Alohida .NET Framework 4.8 solution (qarorlar #38, #60, #71). Bu **bitta Do'kon agenti** asosi: fiskal ko'prik (POS → `127.0.0.1` lokal API → FM/hamkor lokal xizmati → OFD), karta terminali (POS → `127.0.0.1/v1/card/*` → vendor drayveri → LAN/Wi-Fi'dagi bank terminali), xom TCP 9100 printer, tarozi va 1C moduli bir xil supervisor, ulash, avto-yangilanish, imzo va DPAPI qatlamidan foydalanadi. Ichki arxitektura, loyiha nomlari, protokol bajarilishi va yozish algoritmi — `34-1c-agent.md` §2.1 (ustun manba; quyidagi daraxt — o'sha daraxtning qisqa ko'rinishi):
 
 ```
 agent-1c/
@@ -103,7 +105,11 @@ agent-1c/
 │   ├── Erp1C.Agent/        # supervisor (ErpOneCAgent.exe): tray, ulash, long-poll, lease/heartbeat,
 │   │                       # DPAPI sirlar, results.jsonl outbox, imzoli avto-yangilanish, lokal API (127.0.0.1)
 │   ├── Erp1C.Fiscal/       # fiskal ko'prik: FM/hamkor lokal xizmati adapterlari — Bosqich 5 (34 §14)
-│   └── Erp1C.Devices/      # xom TCP 9100 printer, tarozi PLU yuklash — Bosqich 5 (34 §14)
+│   ├── Erp1C.Devices/      # xom TCP 9100 printer, tarozi PLU yuklash — Bosqich 5 (34 §14)
+│   ├── Erp1C.CardTerminal/ # karta terminali: ICardTerminalDriver kontrakti, DriverRegistry, DeviceLane, card_journal,
+│   │                       # niqob normallashtirish, /v1/card/* — Bosqich 5 (34 §14.4)
+│   └── Erp1C.CardTerminal.Drivers.<Vendor>/  # har vendor — alohida classlib (Fake, Rahmat, Era, Arcus2, …);
+│                           # faqat Erp1C.CardTerminal ga bog'liq; real drayver — hamkor shartnomasidan keyin
 ├── tests/                  # Erp1C.*.Tests (soxta server, FakeOneC), IntegrationTests
 ├── installer/              # Inno Setup 6, per-user (admin huquqisiz)
 └── tools/                  # gen-contracts, ReleaseTool (oflayn imzolash)
@@ -114,6 +120,7 @@ agent-1c/
 - **Nomlash (C#)**: .NET standarti — `PascalCase` tiplar/metodlar, `camelCase` lokal o'zgaruvchilar, `_camelCase` maydonlar; JSON maydonlari protokolda **snake_case** (serverdagi bilan aynan bir xil, `01-qarorlar.md` #24).
 - **Pul**: `decimal` (hech qachon `double`); qiymat kodlash — `33` §9.8.
 - **Sirlar**: agent maxfiy kaliti va 1C paroli faqat DPAPI `CurrentUser` bilan PK'da; serverga, logga, crash-dump'ga hech qachon chiqmaydi (10-band).
+- **Karta terminali drayverlari** (`34` §14.4): har vendor drayveri — `Erp1C.CardTerminal.Drivers.<Vendor>` loyihasi, `ICardTerminalDriver` ni amalga oshiradi, ro'yxati kompilyatsiya vaqtida (`DriverRegistry`; diskdan ixtiyoriy DLL yuklanmaydi), yangi drayver — yangi imzoli agent relizi. Vendor protokoli (TCP/TLV, lokal HTTP) drayver ichida qoladi, tashqariga faqat `CardTxResult`. NDA ostidagi vendor hujjatlari repo'ga qo'yilmaydi — faqat drayver kodi va anonimlashtirilgan test-fiksturalar. To'liq PAN, track, CVV, PIN-blok hech qachon jurnal, log, DTO yoki test-fiksturaga yozilmaydi — faqat `card_mask` (4+4). `purchase` avtomatik qayta chaqirilmaydi (kod-review tekshiruv bandi). Har drayverda `FakeCardTerminalDriver` ssenariylariga qarshi kontrakt testi (CI) va vendor test qurilmasida qabul testi (`[Trait("Category","CardTerminal")]`, CI'da emas).
 
 **CI va imzolash (`agent-1c/`):**
 
@@ -408,7 +415,7 @@ Kichik, bitta mantiqiy o'zgarish bir PR'da (bitta modul/bitta hujjat turi oqimi)
 
 CI platformasi — GitHub Actions (`26-ochiq-savollar-reestri.md` #60). `agent-1c/` uchun alohida Windows job — 1.3-band jadvali.
 
-**Bosqich 0 spike'lari** (qaror #57, `27-backlog.md` Bosqich 0): (a) `zxing-cpp` GS1 DataMatrix (FNC1) dekod/enkod — `tests/fixtures/datamatrix` test-vektorlari (AI 01/21/91/92, GS ajratgichi); mos kelmasa server zahirasi `bwip-js` (Node) (`26` #62); (b) shrift — tizim shrifti; U+02BB (`oʻ gʻ`) va kirill glif skrinshot-testi (Playwright, Windows/Android/iOS), yetishmasa self-hosted Noto Sans (offline kesh, `08` §2).
+**Bosqich 0 spike'lari** (qaror #57, `27-backlog.md` Bosqich 0): (a) `zxing-cpp` GS1 DataMatrix (FNC1) dekod/enkod — `tests/fixtures/datamatrix` test-vektorlari (AI 01/21/91/92, GS ajratgichi); mos kelmasa server zahirasi `bwip-js` (Node) (`26` #62); (b) shrift — **Manrope** (woff2, 400–800) ilova bilan bundle qilinadi (CDN/Google Fonts yo'q — CSP `default-src 'self'`, offline PWA keshi), `font-family: 'Manrope', system-ui, sans-serif`, raqam/pul — `font-variant-numeric: tabular-nums`; uslub tokenlari — `design/USLUB.md`; U+02BB (`oʻ gʻ`) va o'zbek kirill glif skrinshot-testi (Playwright, Windows/Android/iOS), Manrope'da yo'q glif `system-ui` dan, natija yomon bo'lsa self-hosted Noto Sans subset'i zaxiraga (`08` §2).
 
 ---
 
@@ -454,6 +461,7 @@ Manba — `15-xavfsizlik-va-audit.md` §4, `23-backend-arxitekturasi.md` §7.3.
 - **AI'ga shaxsiy ma'lumot** — Claude'ga yuboriladigan har so'rov maskalash quvuridan o'tadi (o'chirib bo'lmaydi), `ai_cross_border_enabled=false` bo'lsa rasm yuborilmaydi (qaror #61); maskalashni chetlab o'tadigan to'g'ridan-to'g'ri SDK chaqiruvi taqiqlangan.
 - PII logga tushmaydi (5.2-band); `audit_log` immutable, DB roli darajasida `UPDATE`/`DELETE` huquqisiz (5.3-band).
 - Platform admin bypass (`platform_admins`) — faqat ichki admin panel yo'li, oddiy API endpoint hech qachon `tenant_id`siz ishlamaydi (4.2-band); har platform admin amali audit'ga majburiy yoziladi.
+- **Karta ma'lumotlari (PCI, qaror #71)**: to'liq PAN, track, CVV, PIN-blok — kodda, DB'da, logda, agent jurnalida, Sentry'da, AI so'rovida hech qachon; faqat `card_mask` (birinchi 4 + oxirgi 4), `rrn`, `approval_code`. BIN (PAN'ning birinchi 6–8 raqami) faqat `card_bin_rules` qidiruvi paytida xotirada ishlatiladi, saqlanmaydi. Karta terminali manzili — faqat ro'yxatdagi xususiy LAN IP (ixtiyoriy host yo'q).
 - **1C integratsiyasi**: server 1C parolini, to'liq ulanish satrini va agent maxfiy kalitini **hech qachon** olmaydi/saqlamaydi/loglamaydi; agentga ish faqat Ed25519 imzoli vazifa (`signing_keys.purpose='onec_task'`), faqat oq ro'yxatdagi `kind`, ixtiyoriy 1C kodi va jismoniy o'chirish yo'q; `/onec-agent/*` — faqat agent tokeni (`aud=urn:erp:onec-agent`), so'rov tanasidagi tenant e'tiborga olinmaydi (`33-1c-integratsiya.md` §9, §15.2).
 - Fayl yuklash — ruxsat etilgan tur/hajm chegarasi (`17-api-umumiy.md` §12) serverda tekshiriladi, faqat frontend validatsiyasiga ishonilmaydi.
 

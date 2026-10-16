@@ -126,6 +126,21 @@ Kanonik protokol — `33-1c-integratsiya.md` §9.1–9.2 (parametrlar, javob sha
 | Login bloklash istisnosi | Agent parol/OTP bilan kirmaydi — §12 dagi telefon/IP bo'yicha progressiv **login bloklash** va `ACCOUNT_LOCKED` unga qo'llanmaydi; o'rniga: `/oauth/device_authorization` IP bo'yicha 10/soat, device grant polling `slow_down`, assertion `jti` qayta ishlatish taqiqi, `client_id` bo'yicha `/oauth/token` rate limit. |
 | Obuna lokauti istisnosi | §16.1 qoidasidan farqli: `restricted`/`closed` tenant agentiga **token beriladi** (lease'dagi 1C yozuvi yarim qolmasligi uchun); cheklovni RS qo'llaydi — lokautda A-01 `hello`, A-02, A-03 `poll` → `403 SUBSCRIPTION_RESTRICTED` (yangi vazifa berilmaydi); A-04…A-10 — ruxsat (`33-1c-integratsiya.md` §9.1). |
 
+### 2.4 Do'kon agenti lokal API (POS ↔ agent) — OAuth tashqarisida (qaror #60, #66, #71)
+
+POS (veb-kassa) shu PK'dagi Do'kon agentiga `http://127.0.0.1:47110/v1/*` orqali murojaat qiladi — fiskal ko'prik (`/v1/fiscal/*`), xom printer (`/v1/print/*`) va **bank karta terminali (`/v1/card/*`, qaror #71)**. Bu kanal OAuth emas: AS token bermaydi, RS tekshirmaydi, server lokal tokenni ko'rmaydi va saqlamaydi. Protokol va sxemalar — `21-integratsiyalar.md` §16/§16.1; bu bo'lim himoya qoidalarini belgilaydi. Barcha `/v1/*` yo'llari uchun **bir xil** — karta yo'llariga alohida token yoki istisno yo'q:
+
+| Qoida | Tafsilot |
+|---|---|
+| Faqat loopback | Agent faqat `127.0.0.1` da tinglaydi; tashqi interfeysda port ochilmaydi (LAN'dagi boshqa qurilma `/v1/card/purchase` ni chaqira olmaydi) |
+| `Origin` oq ro'yxati | Faqat `https://app.<domen>` (dev'da `http://localhost:<vite-port>`); boshqa `Origin` yoki `Origin`siz so'rov → `403`; CORS preflight va Private Network Access javobi (`Access-Control-Allow-Private-Network: true`) faqat ro'yxatdagi `Origin` uchun |
+| Qurilmaga bog'langan lokal token | `Authorization: Bearer <local_token>` har so'rovda; POS-16 da agent tray'idagi 6 raqamli bir martalik kod (5 daqiqa) bilan `POST /v1/pair {code, device_id}` → 256-bit token, agentda POS `devices.id` bilan juft holda DPAPI ostida, POS'da Dexie'da. Boshqa `device_id` bilan ishlamaydi; tray'dan bog'lanish o'chiriladi; POS qurilmasi serverda bekor qilinsa (`POST /devices/{id}/revoke`) POS o'zi qulflanadi. Token yo'q/noto'g'ri → `401` |
+| Foydalanuvchi huquqi | Lokal API foydalanuvchini bilmaydi — ruxsat **POS tomonida**, OAuth sessiyasi/PIN bilan kirgan kassirning keshdagi `permission_code` to'plami bo'yicha tekshiriladi: `/v1/card/purchase` — `sales.create` yoki `debts.payment.accept`; `/v1/card/refund`, `/v1/card/void` — `returns.create` (sotuvni bekor qilishda avtomatik `void` — `sales.void`); `/v1/card/settlement` — `shift.close`. Natija server tomonida qayta tekshiriladi: `card_terminal_transactions` yozuvi `POST /card-terminal-transactions` yoki `sale.created`/`return.created`/`debt_payment.created` bilan keladi va odatdagi RS ruxsati (`require_permission`) qo'llanadi (`18-api-kassa.md` §4.1, §18) |
+| Karta ma'lumoti | Lokal API karta rekvizitini **qabul qilmaydi** — so'rovda faqat `attempt_id`, `local_id`, summa (tiyin), `cash_register_id`, `client_event_id`; javobda faqat niqob/RRN/avtorizatsiya kodi/sxema (`15-xavfsizlik-va-audit.md` §9.3) |
+| Terminal manzili | Agent faqat `card_terminals` dagi ro'yxatdagi xususiy LAN manzilga (`host`/`port`, RFC 1918) ulanadi; POS so'rovida host berilmaydi — `local_id` bo'yicha agent konfiguratsiyasidan olinadi (ixtiyoriy host'ga ulanish/SSRF yo'q) |
+| Qo'lda kiritish tasdig'i | `card_manual_fallback='manager_approval'` da terminal natijasisiz karta rekvizitini kiritish yoki `unknown` tranzaksiyani yopish — Menejer/Egasi PIN (`card.manual_entry.approve`, tasdiq turi `card_manual_entry`); PIN OAuth grant emas (§4.3), offline'da lokal tekshiriladi, server `doc_approvals` bo'yicha qayta tekshiradi (`15-xavfsizlik-va-audit.md` §2.3) |
+| Obuna lokauti | Lokautda (`restricted`) POS sotuvni bloklaydi (§16) — demak yangi karta `purchase` ham yuborilmaydi; agent mustaqil ravishda karta amalini boshlamaydi |
+
 ---
 
 ## 3. Grant turlari — jadval
@@ -286,6 +301,7 @@ Alohida scope katalogi **yaratilmaydi** — token yaratilganda foydalanuvchining
 | `settings` | M13, M14 |
 | `expenses` | M15 |
 | `cash` | M16 |
+| `card` | M01, M02, M08 (`card.manual_entry.approve`, qaror #71) |
 | `billing` | M17 |
 | `notifications`, `telegram` | M18 |
 | `onec` | M19 (1C integratsiyasi, `onec.*` — `15-xavfsizlik-va-audit.md` §2.1) |
@@ -338,7 +354,7 @@ Barchasi `slowapi` (Redis backend) orqali, `23-backend-arxitekturasi.md` §5'dag
 
 ## 14. Audit voqealari (qo'shimcha ro'yxat)
 
-`15-xavfsizlik-va-audit.md` §6.1'dagi ro'yxatga quyidagilar qo'shiladi: `login_success`, `login_failed`, `account_locked`, `otp_requested`, `otp_verified`, `otp_failed`, `password_changed`, `password_reset`, `pin_changed`, `pin_reset_forced`, `refresh_token_reuse_detected`, `session_revoked`, `all_sessions_revoked`, `tenant_switched`, `device_registered`, `device_revoked` (mavjud), `subscription_lockout_triggered`, `subscription_restored`, `signing_key_rotated`. 1C agenti ulash/uzish voqealari (`onec.agent.paired`, `onec.agent.revoked`, `onec.agent.unpaired`, `onec.agent.machine_changed`) — `15-xavfsizlik-va-audit.md` §6.1.
+`15-xavfsizlik-va-audit.md` §6.1'dagi ro'yxatga quyidagilar qo'shiladi: `login_success`, `login_failed`, `account_locked`, `otp_requested`, `otp_verified`, `otp_failed`, `password_changed`, `password_reset`, `pin_changed`, `pin_reset_forced`, `refresh_token_reuse_detected`, `session_revoked`, `all_sessions_revoked`, `tenant_switched`, `device_registered`, `device_revoked` (mavjud), `subscription_lockout_triggered`, `subscription_restored`, `signing_key_rotated`. 1C agenti ulash/uzish voqealari (`onec.agent.paired`, `onec.agent.revoked`, `onec.agent.unpaired`, `onec.agent.machine_changed`) va karta terminali voqealari (`card.purchase.approved`/`declined`/`unknown`, `card.void.auto`, `card.void.failed`, `card.refund`, `card.manual_entry`, `card.outcome.resolved_manual`, `card.settlement.mismatch` — qaror #71) — `15-xavfsizlik-va-audit.md` §6.1.
 
 ---
 

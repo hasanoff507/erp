@@ -18,10 +18,10 @@ Bu papka — ilovani yozish uchun **yagona va to'liq** spetsifikatsiya. Kod faqa
 
 | # | Fayl | Nima uchun | Qachon o'qiladi |
 |---|---|---|---|
-| 01 | `01-qarorlar.md` | Barcha qabul qilingan qarorlar #1–#70 (tarif, auth, chek, fiskal — 48 soatlik blok #43, markirovka #62, e-TTN #63, karta/UzQR #64; Do'kon agenti #60 va uning infratuzilmasi #66, AI shaxsiy ma'lumot #61, hosting #65, qarz to'lovi cheki #67, POS fiskal natijasi #68, yopilgan davrga kech voqealar #69, obuna to'lovi #70…) | **Har doim birinchi** |
+| 01 | `01-qarorlar.md` | Barcha qabul qilingan qarorlar #1–#71 (tarif, auth, chek, fiskal — 48 soatlik blok #43, markirovka #62, e-TTN #63, karta/UzQR #64; Do'kon agenti #60 va uning infratuzilmasi #66, AI shaxsiy ma'lumot #61, hosting #65, qarz to'lovi cheki #67, POS fiskal natijasi #68, yopilgan davrga kech voqealar #69, obuna to'lovi #70, integratsiyalangan karta terminali #71…) | **Har doim birinchi** |
 | | **Mahsulot — nima quriladi** | | |
 | 02 | `02-rollar-va-ssenariylar.md` | 5 rol, kundalik ssenariylar, huquqlar matritsasi | Boshida |
-| 03 | `03-modullar-talablari.md` | 18 modul + M19 (1C integratsiyasi, MVP'dan keyin), 104 ta foydalanuvchi hikoyasi (US-Mxx-nn; 86 tasi M01–M18, 18 tasi M19), qabul mezonlari | Har modul oldidan |
+| 03 | `03-modullar-talablari.md` | 18 modul + M19 (1C integratsiyasi, MVP'dan keyin), 105 ta foydalanuvchi hikoyasi (US-Mxx-nn; 87 tasi M01–M18, 18 tasi M19), qabul mezonlari | Har modul oldidan |
 | 04 | `04-biznes-jarayonlar.md` | BP-01…15 — tranzaksion hujjat oqimlari (BP-14 — kunni 1C ga yuborish, BP-15 — bank tushumi tasdig'i) | Har modul oldidan |
 | 05 | `05-mvp-chegarasi.md` | Must/Should/Could, tarif (99 000), MVP'dan keyingilar | Boshida |
 | 06 | `06-ekranlar-umumiy.md` | Ekranlar ro'yxati va oqimlar (POS/BO/ADM) | Frontend oldidan |

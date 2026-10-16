@@ -138,7 +138,7 @@ flowchart TD
 | 1 | Kassir | M02 | Asl chek | — | — |
 | 2a | Kassir | M02, M04 | Qaytarish chekidagi markirovka kodi — OFD orqali Asl belgisiga (VM 833 90-band) | Asl belgisi (OFD orqali) | — |
 | 3 | Tizim | M01, M02 | Korrektsiya cheki | Virtual kassa/OFD, MXIK | Savdo daromadi kamayadi |
-| 4 | Kassir | M02 | To'lov qaytarish kvitansiyasi | To'lov tizimi (karta bo'lsa) | Pul mablag'i kamayadi |
+| 4 | Kassir | M02 | To'lov qaytarish kvitansiyasi | To'lov tizimi (karta bo'lsa: asl to'lov integratsiyalangan — shu terminalda `void`/`refund` avtomatik, aks holda qo'lda; qaror #71) | Pul mablag'i kamayadi |
 | 5 | Tizim | M04 | `returns` posting — `stock_moves +qty` asl partiyaga; `restock=false` (muddati o'tgan, qaror #48) bo'lsa shu miqdor `stock_lots.blocked_qty` ga va `write_offs` qoralamasi | — | Ombor qoldig'i ortadi |
 | 6 | Tizim | M10, M11 | Avtomatik provodka | — | QQS majburiyati mos ravishda qayta hisoblanadi |
 
@@ -152,22 +152,55 @@ Manba: `02-kassa-ofd-markirovka.md`, `research_notes/ochiq-savollar/P2-efaktura-
 flowchart TD
     A["To'lov usuli tanlanadi"] --> B{"Usul?"}
     B -- "Naqd" --> C["Kassaga naqd tushadi,\nfiskal chek kassa orqali chiqadi"]
-    B -- "Bank kartasi (POS terminal)" --> D["Terminal orqali (Humo/Uzcard/Visa);\nkarta turi kiritiladi, chek kassadan chiqadi"]
+    B -- "Bank kartasi" --> D{"Kassaga integratsiyalangan\nterminal bog'langanmi va online?"}
+    D -- "Ha (qaror #71)" --> D1["Summa terminalga avtomatik yuboriladi;\nkarta niqobi, RRN, tasdiq kodi terminaldan;\nfiskal chek avtomatik (pastdagi karta oqimi)"]
+    D -- "Yo'q / terminal ishlamayapti" --> D2["Qo'lda belgilash (qaror #64):\nkarta turi, niqob, RRN terminal chekidan;\ncard_manual_fallback siyosati bo'yicha"]
     B -- "QR / Click / Payme / Uzum / UzQR" --> E["To'lov ilovasi orqali;\nfiskal chek — merchant kassasidan\n(VMQ-943 1a-ilova 2-band)"]
     C --> F["Tranzaksiya yakunlanadi,\npul mablag'i hisobga olinadi"]
-    D --> F
+    D1 --> F
+    D2 --> F
     E --> F
 ```
 
 | Qadam | Rol | Modul | Hujjat | Davlat tizimi | Buxgalteriya effekti |
 |---|---|---|---|---|---|
 | Naqd | Kassir | M01 | Fiskal chek | Virtual kassa/OFD | Kassadagi naqd pul ortadi |
-| Karta | Kassir | M01 | Terminal cheki + fiskal chek | Virtual kassa/OFD (acquiring bank orqali) | **Yo'ldagi pul mablag'lari** ortadi; ekvayer bankka o'tkazgani bank ko'chirmasi bo'yicha **bank tushumi tasdig'i** (`bank_settlements`) bilan bank hisobiga o'tadi, komissiya 9430 xarajatiga yoziladi (qaror #42) |
-| Karta — mustaqil terminal (qo'lda belgilangan) | Kassir | M01, M16 | Fiskal chek (to'lov shakli "bank kartalari" + karta turi `card_type`: `personal`/`corporate`/`social`/`unknown`); ijtimoiy kartada `card_mask` va `rrn` majburiy (qaror #64) | Virtual kassa/OFD (kassa terminal bilan integratsiyalanmagan — VMQ-943 1-ilova 6-band bo'yicha qonuniy) | Online va offline'da ruxsat; Z-hisobotda "karta" jami alohida chiqadi; yo'ldagi pul mablag'lari → bank tushumi tasdig'i (BP-15) |
+| Karta — integratsiyalangan terminal (qaror #71) | Kassir | M01 | Terminal cheki + fiskal chek (to'lov shakli "bank kartalari", `card_type`, `card_mask`, `rrn` — terminal natijasidan avtomatik); `sale_payments.card_entry_mode='integrated'`, `card_terminal_transaction_id` | Virtual kassa/OFD; terminal o'z kanali bilan ekvayer bankka (Windows veb-kassada Do'kon agenti orqali LAN/Wi-Fi) | **Yo'ldagi pul mablag'lari** ortadi; ekvayer bankka o'tkazgani bank ko'chirmasi bo'yicha **bank tushumi tasdig'i** (`bank_settlements`) bilan bank hisobiga o'tadi, komissiya 9430 xarajatiga yoziladi (qaror #42) |
+| Karta — qo'lda belgilash (mustaqil terminal yoki zaxira) | Kassir (zaxirada — Menejer/Egasi tasdig'i) | M01, M16 | Fiskal chek (to'lov shakli "bank kartalari" + karta turi `card_type`: `personal`/`corporate`/`social`/`unknown`); ijtimoiy kartada `card_mask` va `rrn` majburiy (qaror #64); `card_entry_mode='manual'`, `manual_reason` | Virtual kassa/OFD (kassa terminal bilan integratsiyalanmagan — VMQ-943 1-ilova 6-band bo'yicha qonuniy) | Terminal bog'lanmagan kassada asosiy usul, bog'langan kassada zaxira — `tenants.settings.card_manual_fallback` (`allow`/`manager_approval`/`forbid`; qaror #71); online va offline'da ruxsat; Z-hisobotda "Karta (qo'lda)" alohida chiqadi; yo'ldagi pul mablag'lari → bank tushumi tasdig'i (BP-15) |
 | QR/Click/Payme/Uzum | Kassir/mijoz | M01 | To'lov tasdiqlash (`provider_tx_id`) + fiskal chek (to'lov shakli "QR-kodli to'lov"); chek havolasi provayderga yuboriladi (Click `submit_qrcode`) | Virtual kassa/OFD, Click/Payme/Uzum API | Mablag' vositachi orqali tushadi, komissiya ushlab qolinadi — avval yo'ldagi pul mablag'lari, bank tushumi tasdig'ida bank hisobi + komissiya (9430) xarajati (qaror #42) |
 | Yagona QR (UzQR, bank) | Kassir/mijoz | M01 | Statik QR (`qr_type='static'`) — faqat online, kassir qo'lda tasdiqlaydi, ixtiyoriy tranzaksiya raqami; dinamik QR (`qr_type='dynamic'`) — `UzqrPort`, `provider_tx_id` majburiy; fiskal chek (to'lov shakli "QR-kodli to'lov") | Virtual kassa/OFD, bank (yagona QR, operator — CBU MUNIS) | Mablag' bank orqali tushadi — avval yo'ldagi pul mablag'lari, bank tushumi tasdig'ida bank hisobi (qaror #42); yuridik shaxslar uchun bank UzQR majburiy (PF-246 3-band "b"; CBU 5/11-son qoidalari), YaTT (`legal_form='sole_proprietor'`) uchun to'lov tashkiloti platformasidagi maxsus QR (Click/Payme/Uzum) majburiy (PQ-247 7-band "a") (qaror #64) |
 
 Manba: `03-efaktura-va-tolov.md` (Payme/Click/Uzum protokollari), `research_notes/ochiq-savollar/P1-soliq-fiskal.md` (OQ-001), `P3-tolovlar-bank.md` (OQ-032, OQ-033, §7.2). Fiskalizatsiya qoidasi: do'kon sotuvida chekni har doim bizning kassa chiqaradi (VMQ-943 1-ilova 6-band; 1a-ilova 2-band — UzQR uchun ham); tenant provayder kabinetida provayder tomonidagi avto-fiskallashtirishni o'chiradi (BO-14 tekshiruv bandi). 2026-10-22 dan chekda to'lov shakli va karta turi majburiy (VMQ-943 1-ilova 7-band). Dinamik UzQR POS API spetsifikatsiyasi — Tashqi javob kerak: 26 #49 (OQ-032).
+
+### BP-05 karta oqimi — integratsiyalangan terminal (qaror #71)
+
+```mermaid
+flowchart TD
+    K1["1. Kassir POS-03 da «Karta»ni tanlaydi\n(terminal holati: online)"] --> K2["2. Summa yuborildi:\nCardTerminalPort.purchase(attempt_id, summa)\nWindows: POS → agent 127.0.0.1:47110/v1/card/purchase → terminal"]
+    K2 --> K3["3. Mijoz kartani tegizadi / kiritadi, PIN teradi"]
+    K3 --> K4{"4. Bank javobi"}
+    K4 -- "approved, summa teng" --> K5["5. Fiskal chek avtomatik\n(bank kartalari, card_type, card_mask, rrn)"]
+    K5 --> K6["6. sale.created\n(payments[].card_result)"]
+    K4 -- "approved, summa farqi" --> K11["CARD_AMOUNT_MISMATCH:\navtomatik void (card.void.auto),\nto'lov qabul qilinmaydi"]
+    K4 -- "declined (rad / terminalda bekor)" --> K7["Rad sababi; chek ochiq —\n«Qayta yuborish» (yangi attempt_id)\nyoki boshqa usul"]
+    K4 -- "taymaut / aloqa uzildi" --> K8["unknown: get_status / get_last_transaction;\nyangi purchase bloklanadi"]
+    K8 -- "approved" --> K5
+    K8 -- "declined" --> K7
+    K8 -- "aniqlanmadi" --> K9["Menejer/Egasi tasdig'i bilan qo'lda yopish\n(card_manual_entry, terminal chekidan)"]
+    K5 -- "fiskal chek chiqmadi" --> K12["«To'lov qabul qilingan, chek kutilmoqda»:\nsavat saqlanadi, sale.created yuborilmaydi,\nfiskal qayta urinish"]
+    K12 -- "kassir sotuvni bekor qildi" --> K10["Avtomatik void (settlementgacha)\nyoki refund; bajarilmasa CARD_VOID_FAILED,\nsotuv bekor qilinmaydi"]
+```
+
+| Qadam | Rol | Modul | Hujjat | Davlat tizimi | Buxgalteriya effekti |
+|---|---|---|---|---|---|
+| 1–2. Summa yuborildi | Kassir, Tizim | M01 | `app.card_terminal_transactions` (`id = attempt_id`, `kind='purchase'`, `status='pending'`) | — | — |
+| 3–4. Bank javobi | Mijoz, terminal | M01 | Natija: `approved`/`declined`/`unknown` (`pending` dan); `rrn`, `approval_code`, `card_mask`, `card_scheme`, TID; terminal cheki (slip) terminalning o'zida chiqadi | Ekvayer bank (terminal kanali) | — |
+| 5. Fiskal chek | Tizim | M01 | Fiskal chek — to'lov shakli "bank kartalari", `card_type` (natija → `platform.card_bin_rules` → kassir bitta bosishda; `card_type_source`), `card_mask`, `rrn`; ikkala chek beriladi (VMQ-943 1-ilova 6-band) | Virtual kassa/OFD | — |
+| 6. Sotuv yozildi | Tizim | M01, M04, M11 | `sale.created`, `sale_payments` (`card_entry_mode='integrated'`) | — | Yo'ldagi pul mablag'lari (5710) ortadi; sotuv provodkalari BP-06 bo'yicha |
+| Smena yopilishi | Kassir, Tizim | M01, M16 | Terminal `settlement` → `app.card_terminal_settlements`; Z-hisobotdagi "Karta (integratsiyalangan)" bilan solishtirish, farqda `card.settlement.mismatch` | — | — |
+| Bank tushumi | Buxgalter | M11 | `bank_settlements` (BO-24) — ko'chirma qatorlari `rrn` bo'yicha tranzaksiyalarga avtomatik moslashtiriladi | Bank | 5710 → 5110, komissiya 9430 (qaror #42) |
+
+Qoidalar: `purchase` hech qachon avtomatik takrorlanmaydi; bir terminalda bir vaqtda bitta tranzaksiya (`CARD_TERMINAL_BUSY`); `attempt_id` bo'yicha idempotent. Avtomatik `void` faqat ikki holatda: kassir "chek kutilmoqda" sotuvini bekor qilganda va `CARD_AMOUNT_MISMATCH` da; boshqa avtomatik `void` yo'q — hujjatga bog'lanmagan `approved` xarid 24 soatdan keyin `sync_exceptions(kind='card_orphan_transaction')` ga qo'lda ko'rib chiqish uchun chiqadi. Do'kon interneti uzilganda agent + terminal zanjiri ishlaydi, natija offline navbatdagi `sale.created` ichida yuboriladi. Aralash to'lovda har bir karta qismi — alohida `attempt_id`. Qaytarishda (BP-04) asl to'lov integratsiyalangan bo'lsa — shu terminalda `void` (settlementgacha) yoki `refund` (asl `rrn` bilan). Qarz to'lovida (BP-11) karta qismi xuddi shu oqim bilan. Real terminal adapteri vendor hamkor bilan shartnomadan keyin ulanadi; MVP'da `FakeCardTerminalAdapter` (`21-integratsiyalar.md`).
 
 ---
 
@@ -322,7 +355,7 @@ flowchart TD
 | 1 | Mijoz/Kassir | M08 | — | — | — |
 | 2 | Kassir | M01, M08 | To'lov kvitansiyasi | Virtual kassa/OFD (BP-05 bilan bir xil) | Pul mablag'i ortadi (naqd — kassa; karta/QR — yo'ldagi pul mablag'lari; bank o'tkazmasi — bank hisobi; qaror #42) |
 | 3 | Tizim | M08 | Avtomatik provodka | — | Debitorlik qarzi kamayadi |
-| 4 | Tizim | M01, M08 | **Fiskal chek** (`debt_settlement`, qaror #30) — bitta to'lov = bitta chek, qatorlar yopilgan sotuvlardan proporsional (qaror #45); karta to'lovida `card_type`/`card_mask`/`rrn` (qaror #64) | Virtual kassa/OFD (VMQ-943 1-ilova 30-band — majburiy) | Effekt yo'q — savdo daromadi va QQS sotuv kuni (BP-03, 6-qadam) tan olingan (`13-provodka-qoidalari.md` §2.14, qaror #30); chek faqat to'langan summani fiskal rasmiylashtiradi |
+| 4 | Tizim | M01, M08 | **Fiskal chek** (`debt_settlement`, qaror #30) — bitta to'lov = bitta chek, qatorlar yopilgan sotuvlardan proporsional (qaror #45); karta to'lovida `card_type`/`card_mask`/`rrn` — integratsiyalangan terminalda natijadan avtomatik (qaror #71), aks holda qo'lda (qaror #64) | Virtual kassa/OFD (VMQ-943 1-ilova 30-band — majburiy) | Effekt yo'q — savdo daromadi va QQS sotuv kuni (BP-03, 6-qadam) tan olingan (`13-provodka-qoidalari.md` §2.14, qaror #30); chek faqat to'langan summani fiskal rasmiylashtiradi |
 | 5 | Tizim (AI) / Menejer | M08 | — | — | Effekt yo'q |
 
 Manba: `research_notes/ochiq-savollar/P1-soliq-fiskal.md` (OQ-002); qaror #30, #42, #45: asl nasiya sotuvida fiskal chek to'lovgacha chiqarilmaydi (BP-03), **har bir qarz to'lovida fiskal chek chiqariladi**; daromad/QQS — sotuv kuni. Joriy qarzdan ortiq summa rad etiladi (`422 VALIDATION_ERROR`, `message_key=debt_payment_exceeds_balance`), mijoz avansi MVP'da yo'q (qaror #45). 48 soatlik offline blokda `debt_settlement` cheki ham chiqarilmaydi (qaror #43).
@@ -458,7 +491,7 @@ flowchart TD
 |---|---|---|---|---|---|
 | 1 | Kassir / tizim | M01, M08, M16 | Sotuv, qarz to'lovi, inkassa (`cash_movements`, `reason='collection'`) | Virtual kassa/OFD (sotuvda) | Yo'ldagi pul mablag'lari ortadi (to'lov usuli bo'yicha) |
 | 2 | Tashqi (bank, ekvayer) | — | Bank ko'chirmasi / hisob-kitob hisoboti | Bank-klient (tizimdan tashqari) | — |
-| 3a/3b | Buxgalter / Egasi (`bank_settlements.manage`) | M11 | Bank tushumi tasdig'i (`bank_settlements`, `source='manual'`/`statement_import`, `draft`); import — `POST /api/v1/bank-settlements/imports` (1CClientBankExchange .txt: faqat kirimlar o'qiladi, `method` to'lovchi STIR va to'lov maqsadi bo'yicha aniqlanadi, `gross_amount`ni Buxgalter 5710 qoldig'idan tanlaydi, `commission_amount = gross − kirim`) | — | Effekt yo'q (qoralama) |
+| 3a/3b | Buxgalter / Egasi (`bank_settlements.manage`) | M11 | Bank tushumi tasdig'i (`bank_settlements`, `source='manual'`/`statement_import`, `draft`); import — `POST /api/v1/bank-settlements/imports` (1CClientBankExchange .txt: faqat kirimlar o'qiladi, `method` to'lovchi STIR va to'lov maqsadi bo'yicha aniqlanadi, `gross_amount`ni Buxgalter 5710 qoldig'idan tanlaydi, `commission_amount = gross − kirim`); karta usulida integratsiyalangan tranzaksiyalar (`app.card_terminal_transactions`) ekvayer hisobotidagi `rrn` bo'yicha avtomatik moslashtiriladi, moslashmaganlari Buxgalterga ro'yxat sifatida ko'rsatiladi (qaror #71) | — | Effekt yo'q (qoralama) |
 | 4 | Tizim | M11 | Tranzit qoldig'i (`GET /api/v1/bank-settlements/transit-balances` — usul × filial) | — | — |
 | 5 | Buxgalter / Egasi | M11 | Bank tushumi tasdig'i (`posted`) | — | Bank hisobi `net_amount` ga ortadi, yo'ldagi pul `gross_amount` ga kamayadi, komissiya (`commission_amount`) 9430 xarajatiga (inkassa — 9410) yoziladi; `cash_moves` yozilmaydi |
 
@@ -526,7 +559,8 @@ Faqat tashqi javob kutayotgan bandlar (raqamlar barqaror):
 - [lex.uz/docs/-7944527](https://lex.uz/docs/-7944527) — Soliq kodeksi 81-moddasi, O'RQ-1108-son Qonun (2025-12-25) — davlat hisobot shakllantirish, 5 ish kunlik tuzatish qoidasi (SK 5-modda 7-qism)
 - [uz.kursiv.media, 2025-12-30](https://uz.kursiv.media/uz/2025-12-30/1-yanvardan-ayrim-soliq-hisobotlari-avtomatik-shakllantiriladi/) — 5 kunlik va avtomatik qabul qoidasi (ikkinchi darajali manba, endi birlamchi qonun bilan tasdiqlangan)
 - `research_notes/texnik/tekshiruv-2026-10-14/` — fakt-tekshiruv natijalari
-- `spec/kod-uchun/01-qarorlar.md` — qaror #18 (BP-13, chekdan keyingi e-faktura), #30 (BP-03/BP-11, qarzga sotuvda fiskal chek), #36–#41 (BP-14, 1C integratsiyasi), #42 (BP-15, yo'ldagi pul)
+- `spec/kod-uchun/01-qarorlar.md` — qaror #18 (BP-13, chekdan keyingi e-faktura), #30 (BP-03/BP-11, qarzga sotuvda fiskal chek), #36–#41 (BP-14, 1C integratsiyasi), #42 (BP-15, yo'ldagi pul), #71 (BP-05 karta oqimi, integratsiyalangan terminal)
 - `spec/kod-uchun/33-1c-integratsiya.md` — BP-14 yagona manbasi (§3.2, §6, §7, §8)
 - `spec/tarix/tekshiruv/savollar-yakuniy-tavsiyalar.md` — tavsiya #5 (offline qaytarish/ko'chirish) va #6 (mustaqil terminal bilan karta)
+- `research_notes/ochiq-savollar/P8-karta-terminal-integratsiya.md` — integratsiyalangan karta terminali (qaror #71)
 - `research_notes/ochiq-savollar/` — P1 (OQ-001, 002, 004, 013, 014, 018), P2 (OQ-019, 021, 022, 024, 026, 027), P3 (OQ-032, 033, 034, 038), D-qarorlar (#43–#59)

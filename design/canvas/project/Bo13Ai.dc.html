@@ -22,7 +22,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
       <div><div style="color: #FFFFFF; font-weight: 800; font-size: 15px;">ERP</div><div style="font-size: 12px; color: #8C99A8;">[Do'kon nomi]</div></div>
     </div>
     <sc-for list="{{menu}}" as="g" hint-placeholder-count="5">
-      <div style="padding: 14px 10px 6px; font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #6F7E90;">{{g.title}}</div>
+      <div style="padding: 14px 10px 6px; font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #8C99A8;">{{g.title}}</div>
       <sc-for list="{{g.items}}" as="m" hint-placeholder-count="3">
         <a href="{{m.href}}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 14px; font-weight: 600; text-decoration: none; color: {{m.fg}}; background: {{m.bg}};">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{m.icon}}"></path></svg>
@@ -38,27 +38,27 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
   </nav>
   <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column;">
     <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 28px; background: #FFFFFF; border-bottom: 1px solid #E7EAEE;">
-      <h1 style="margin: 0; font-size: 22px; font-weight: 800;">AI yordamchi</h1>
+      <h1 style="margin: 0; font-size: 26px; line-height: 34px; font-weight: 800;">AI yordamchi</h1>
       <div style="flex-grow: 1;"></div>
       <label style="display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px; min-width: 240px; border: 1px solid #DCE1E7; border-radius: 12px; background: #F8FAFB;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7686" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
         <span style="position: absolute; width: 1px; height: 1px; overflow: hidden;">Qidiruv</span>
-        <input type="search" placeholder="Tovar, mijoz, hujjat…" style="flex-grow: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 14px; color: #0F1B2D;">
+        <input type="search" placeholder="Tovar, mijoz, ekran…" style="flex-grow: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 14px; color: #0F1B2D;">
       </label>
       <select aria-label="Filial" style="height: 42px; padding: 0 12px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; color: #0F1B2D;"><option>Barcha filiallar</option><option>Chilonzor-3</option><option>Yunusobod-1</option></select>
       <button type="button" aria-label="Bildirishnomalar" style="width: 42px; height: 42px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; color: #3D4A5C; display: flex; align-items: center; justify-content: center;">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0112 0v5l1.5 2h-15z"></path><path d="M10 20a2 2 0 004 0"></path></svg>
       </button>
+      <div role="group" aria-label="Interfeys tili" style="display: flex; gap: 2px; padding: 2px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF;">
+        <button type="button" aria-pressed="true" style="min-width: 40px; height: 36px; padding: 0 8px; border: 0; border-radius: 10px; background: #0F1B2D; color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 700;">UZ</button>
+        <button type="button" aria-pressed="false" style="min-width: 40px; height: 36px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; color: #3D4A5C; font: inherit; font-size: 13px; font-weight: 700;">RU</button>
+      </div>
     </header>
     <main style="padding: 24px 28px; display: flex; flex-direction: column; gap: 18px;">
       <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px;">
         <div style="flex: 1 1 380px;">
           <div style="font-size: 26px; font-weight: 800;">AI yordamchi</div>
-          <div style="font-size: 13px; color: #6B7686; margin-top: 4px;">Raqamni tizim hisoblaydi, AI faqat o'zbek tilida tushuntiradi. Javobda hisoblash manbasi ko'rsatiladi.</div>
-        </div>
-        <div role="group" aria-label="Javob tili" style="display: flex; padding: 4px; background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 12px;">
-          <button type="button" aria-pressed="true" style="height: 34px; padding: 0 14px; border: 0; border-radius: 9px; background: #0F1B2D; color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 700;">UZ</button>
-          <button type="button" aria-pressed="false" style="height: 34px; padding: 0 14px; border: 0; border-radius: 9px; background: transparent; color: #3D4A5C; font: inherit; font-size: 13px; font-weight: 700;">RU</button>
+          <div style="font-size: 13px; color: #5B6675; margin-top: 4px;">Raqamni tizim hisoblaydi, AI faqat o'zbek tilida tushuntiradi. Javobda hisoblash manbasi ko'rsatiladi.</div>
         </div>
         <button type="button" style="display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border: 1px solid #E7EAEE; border-radius: 12px; background: #FFFFFF; color: #0F1B2D; font: inherit; font-size: 14px; font-weight: 700;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Yangi suhbat
@@ -109,7 +109,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
                   10.10–16.10 oralig'ida eng ko'p foyda — <b>{{topName}}</b>: <b style="font-variant-numeric: tabular-nums;">{{topProfit}} so'm</b>. Quyidagi 4 ta tovar jami <b style="font-variant-numeric: tabular-nums;">{{t.profit}} so'm</b> foyda berdi.
                   <div style="overflow-x: auto; margin-top: 10px; border: 1px solid #E7EAEE; border-radius: 10px; background: #FFFFFF;">
                     <div role="table" aria-label="Tovarlar bo'yicha foyda" style="min-width: 520px;">
-                      <div role="row" style="display: grid; grid-template-columns: 1.6fr 0.9fr 1fr 1fr; gap: 10px; padding: 9px 12px; background: #F8FAFB; font-size: 12px; font-weight: 600; color: #6B7686;">
+                      <div role="row" style="display: grid; grid-template-columns: 1.6fr 0.9fr 1fr 1fr; gap: 10px; padding: 9px 12px; background: #F8FAFB; font-size: 12px; font-weight: 600; color: #5B6675;">
                         <span role="columnheader">Tovar</span><span role="columnheader" style="text-align: right;">Sotildi</span><span role="columnheader" style="text-align: right;">Savdo</span><span role="columnheader" style="text-align: right;">Foyda</span>
                       </div>
                       <sc-for list="{{prods}}" as="r" hint-placeholder-count="4">
@@ -154,7 +154,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
           <div style="border-top: 1px solid #E7EAEE; padding: 16px 24px 20px; display: flex; flex-direction: column; gap: 12px;">
             <div style="display: flex; flex-wrap: wrap; gap: 8px;">
               <sc-for list="{{chips}}" as="c" hint-placeholder-count="5">
-                <button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #CFE7E0; border-radius: 999px; background: #F3FAF8; color: #0A5E4D; font: inherit; font-size: 13px; font-weight: 600;">{{c}}</button>
+                <button type="button" style="height: 36px; padding: 0 14px; border: 1px solid #CFE7E0; border-radius: 999px; background: #F3FAF8; color: #0A5E4D; font: inherit; font-size: 13px; font-weight: 600;">{{c}}</button>
               </sc-for>
             </div>
             <label style="display: flex; align-items: flex-end; gap: 10px; padding: 8px 8px 8px 14px; border: 1px solid #DCE1E7; border-radius: 14px; background: #FFFFFF;">
@@ -198,16 +198,6 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
             <a href="Bo14Sozlamalar.dc.html" style="font-size: 13px; font-weight: 700;">Rozilikni boshqarish — Sozlamalar</a>
           </section>
 
-          <section style="background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 16px; padding: 20px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 6px 20px rgba(15,27,45,.05); display: flex; flex-direction: column; gap: 2px;">
-            <h2 style="margin: 0 0 8px; font-size: 17px; font-weight: 700;">Oldingi suhbatlar</h2>
-            <sc-for list="{{past}}" as="h" hint-placeholder-count="4">
-              <a href="#" style="display: flex; flex-direction: column; gap: 2px; padding: 10px 0; border-bottom: 1px solid #F0F2F5; text-decoration: none; color: #0F1B2D;">
-                <span style="font-size: 14px; font-weight: 600;">{{h.q}}</span>
-                <span style="font-size: 12px; color: #6B7686;">{{h.when}}</span>
-              </a>
-            </sc-for>
-          </section>
-
           <div role="note" style="display: flex; gap: 10px; padding: 12px 14px; border-radius: 12px; background: #F4F6F8; border: 1px dashed #DCE1E7; font-size: 12px; color: #3D4A5C;">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7686" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="M3 3l18 18"></path><path d="M8.5 16.5a5 5 0 017 0M12 20h.01"></path></svg>
             <span>Internet bo'lmasa chat butunlay o'chadi: «AI uchun internet kerak». Juda ko'p so'rovda — «Juda ko'p so'rov — biroz kuting».</span>
@@ -245,7 +235,7 @@ class Component extends DCLogic {
       ["Gazli ichimlik 1,5 l", 430, "dona", 9000, 7200]
     ];
     let ts = 0, tp = 0;
-    const prods = pr.map(([name, q, u, price, cost]) => { const s = q * price, f = q * (price - cost); ts += s; tp += f; return { name, qty: g(q) + " " + u, sales: g(s), profit: g(f), f }; }).sort((a, b) => b.f - a.f);
+    const prods = pr.map(([name, q, u, price, cost]) => { const s = q * price, f = q * (price - cost); ts += s; tp += f; return { name, qty: (u === "kg" ? g(q) + ",000" : g(q)) + " " + u, sales: g(s), profit: g(f), f }; }).sort((a, b) => b.f - a.f);
     const t = { sales: g(ts), profit: g(tp) };
     const chips = ["Bugun qancha foyda?", "Qaysi tovar tugayapti?", "Bu oy QQS qancha?", "Muddati o'tgan qarzlar"];
     const used = 214, cap = 500, day = 37, dayCap = 300;
@@ -253,12 +243,7 @@ class Component extends DCLogic {
       { label: "Oylik AI so'rovlar", val: used + " / " + cap, now: String(used), max: String(cap), w: Math.round(used / cap * 100) + "%", c: "#0E7C66", note: "Oktabr · tarif limiti, 01.11.2026 da yangilanadi" },
       { label: "Bugun (do'kon bo'yicha)", val: day + " / " + dayCap, now: String(day), max: String(dayCap), w: Math.round(day / dayCap * 100) + "%", c: "#2F6FDB", note: "Kuniga 300 so'rov · foydalanuvchiga 10 ta/daqiqa" }
     ];
-    const past = [
-      { q: "Qaysi tovar tugayapti?", when: "15.10.2026 · 3 xabar" },
-      { q: "Sentyabr QQS qancha bo'ldi?", when: "12.10.2026 · 4 xabar" },
-      { q: "Qaysi kassir ko'p qaytarish qilgan?", when: "09.10.2026 · 2 xabar" }
-    ];
-    const EXTRA = { p, prods, t, topName: prods[0].name, topProfit: prods[0].profit, chips, meters, past };
+    const EXTRA = { p, prods, t, topName: prods[0].name, topProfit: prods[0].profit, chips, meters };
     return {
       menu: [
         { title: "ASOSIY", items: [it("Dashboard", "home", "Bo02Dashboard"), it("AI yordamchi", "spark", "Bo13Ai"), it("Tasdiqlash navbati", "check", "Bo16Tasdiqlash", "4")] },

@@ -22,7 +22,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
       <div><div style="color: #FFFFFF; font-weight: 800; font-size: 15px;">ERP</div><div style="font-size: 12px; color: #8C99A8;">[Do'kon nomi]</div></div>
     </div>
     <sc-for list="{{menu}}" as="g" hint-placeholder-count="5">
-      <div style="padding: 14px 10px 6px; font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #6F7E90;">{{g.title}}</div>
+      <div style="padding: 14px 10px 6px; font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #8C99A8;">{{g.title}}</div>
       <sc-for list="{{g.items}}" as="m" hint-placeholder-count="3">
         <a href="{{m.href}}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 14px; font-weight: 600; text-decoration: none; color: {{m.fg}}; background: {{m.bg}};">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{m.icon}}"></path></svg>
@@ -38,23 +38,27 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
   </nav>
   <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column;">
     <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 28px; background: #FFFFFF; border-bottom: 1px solid #E7EAEE;">
-      <h1 style="margin: 0; font-size: 22px; font-weight: 800;">Telegram va bildirishnomalar</h1>
+      <h1 style="margin: 0; font-size: 26px; line-height: 34px; font-weight: 800;">Telegram va bildirishnomalar</h1>
       <div style="flex-grow: 1;"></div>
       <label style="display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px; min-width: 240px; border: 1px solid #DCE1E7; border-radius: 12px; background: #F8FAFB;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7686" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
         <span style="position: absolute; width: 1px; height: 1px; overflow: hidden;">Qidiruv</span>
-        <input type="search" placeholder="Tovar, mijoz, hujjat…" style="flex-grow: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 14px; color: #0F1B2D;">
+        <input type="search" placeholder="Tovar, mijoz, ekran…" style="flex-grow: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 14px; color: #0F1B2D;">
       </label>
       <select aria-label="Filial" style="height: 42px; padding: 0 12px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; color: #0F1B2D;"><option>Barcha filiallar</option></select>
       <button type="button" aria-label="Bildirishnomalar" style="width: 42px; height: 42px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; color: #3D4A5C; display: flex; align-items: center; justify-content: center;">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0112 0v5l1.5 2h-15z"></path><path d="M10 20a2 2 0 004 0"></path></svg>
       </button>
+      <div role="group" aria-label="Interfeys tili" style="display: flex; gap: 2px; padding: 2px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF;">
+        <button type="button" aria-pressed="true" style="min-width: 40px; height: 36px; padding: 0 8px; border: 0; border-radius: 10px; background: #0F1B2D; color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 700;">UZ</button>
+        <button type="button" aria-pressed="false" style="min-width: 40px; height: 36px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; color: #3D4A5C; font: inherit; font-size: 13px; font-weight: 700;">RU</button>
+      </div>
     </header>
     <main style="padding: 24px 28px; display: flex; flex-direction: column; gap: 18px;">
       <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
         <nav aria-label="Sozlamalar bo'limlari" style="display: flex; flex-wrap: wrap; padding: 4px; background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 12px;">
           <sc-for list="{{tabs}}" as="t" hint-placeholder-count="6">
-            <a href="{{t.href}}" aria-current="{{t.current}}" style="height: 34px; display: flex; align-items: center; padding: 0 14px; border-radius: 9px; background: {{t.bg}}; color: {{t.fg}}; font-size: 13px; font-weight: 700; text-decoration: none;">{{t.label}}</a>
+            <a href="{{t.href}}" aria-current="{{t.current}}" style="height: 36px; display: flex; align-items: center; padding: 0 14px; border-radius: 9px; background: {{t.bg}}; color: {{t.fg}}; font-size: 13px; font-weight: 700; text-decoration: none;">{{t.label}}</a>
           </sc-for>
         </nav>
         <div style="flex-grow: 1;"></div>
@@ -70,9 +74,9 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
             </span>
             <div style="flex-grow: 1;">
               <h2 style="margin: 0; font-size: 17px; font-weight: 700;">Telegram akkaunt</h2>
-              <div style="font-size: 13px; color: #6B7686;">Ogohlantirishlar va kunlik hisobot shu akkauntga keladi</div>
+              <div style="font-size: 13px; color: #6B7686;">Ogohlantirishlar va kunlik hisobot shu akkauntga keladi. Har foydalanuvchi faqat o'z akkauntini ulaydi (Menejer — Egasi ruxsati bilan).</div>
             </div>
-            <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: #E5F5EC; color: #1F8A4C; font-size: 12px; font-weight: 700;">
+            <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: #E5F5EC; color: #1F6B3E; font-size: 12px; font-weight: 700;">
               <svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true"><circle cx="4" cy="4" r="4" fill="#1F8A4C"></circle></svg>Ulangan · @akmal_k
             </span>
           </div>
@@ -80,16 +84,15 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
             <div style="flex: 1 1 260px; display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 12px; background: #F8FAFB; border: 1px solid #E7EAEE;">
               <div style="display: flex; align-items: center; gap: 12px;">
                 <div style="width: 44px; height: 44px; border-radius: 50%; background: #E3F2EE; color: #0A5E4D; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px;">AK</div>
-                <div><div style="font-size: 14px; font-weight: 700;">Akmal K. · Egasi</div><div style="font-size: 13px; color: #6B7686;">@akmal_k · 02.10.2026 dan beri</div></div>
+                <div><div style="font-size: 14px; font-weight: 700;">Akmal K. · Egasi</div><div style="font-size: 13px; color: #5B6675;">@akmal_k · 02.10.2026 dan beri</div></div>
               </div>
               <div style="display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; font-size: 13px;">
-                <span style="color: #6B7686;">Oxirgi xabar</span><span style="font-weight: 600;">16.10.2026 09:05 · «Kam qolgan tovar»</span>
-                <span style="color: #6B7686;">Bu oy yuborildi</span><span style="font-weight: 600; font-variant-numeric: tabular-nums;">46 ta xabar</span>
-                <span style="color: #6B7686;">Til</span><span style="font-weight: 600;">O'zbekcha</span>
+                <span style="color: #5B6675;">Oxirgi xabar</span><span style="font-weight: 600;">16.10.2026 09:05 · «Kam qolgan tovar»</span>
+                <span style="color: #5B6675;">Bu oy yuborildi</span><span style="font-weight: 600; font-variant-numeric: tabular-nums;">46 ta xabar</span>
+                <span style="color: #5B6675;">Til</span><span style="font-weight: 600;">O'zbekcha</span>
               </div>
               <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto;">
-                <button type="button" style="height: 40px; padding: 0 14px; border: 1px solid #E7EAEE; border-radius: 12px; background: #FFFFFF; color: #0F1B2D; font: inherit; font-size: 13px; font-weight: 700;">Sinov xabari yuborish</button>
-                <button type="button" style="height: 40px; padding: 0 14px; border: 0; border-radius: 12px; background: #FBEAE8; color: #C8372D; font: inherit; font-size: 13px; font-weight: 700;">Uzish</button>
+                <button type="button" style="height: 40px; padding: 0 14px; border: 0; border-radius: 12px; background: #FBEAE8; color: #A82B22; font: inherit; font-size: 13px; font-weight: 700;">Uzish</button>
               </div>
             </div>
             <div style="flex: 1 1 300px; display: flex; gap: 16px; align-items: flex-start;">
@@ -112,29 +115,11 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
           </div>
           <div role="status" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #FBEAE8; color: #0F1B2D; font-size: 13px;">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C8372D" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3z"></path><path d="M12 10v4M12 17v.5"></path></svg>
-            <span style="flex-grow: 1;"><b style="color: #C8372D;">Xato holati namunasi:</b> bot ulanmadi — havola muddati o'tgan yoki botda «Start» bosilmagan.</span>
-            <a href="#" style="font-weight: 700;">Qayta urinish</a>
+            <span style="flex-grow: 1;"><b style="color: #A82B22;">Xato holati namunasi:</b> bot ulanmadi — havola muddati o'tgan yoki botda «Start» bosilmagan.</span>
+            <a href="#" style="font-weight: 700; color: #0A5E4D;">Qayta urinish</a>
           </div>
         </section>
 
-        <section style="flex: 2 1 380px; min-width: 0; background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 16px; padding: 24px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 6px 20px rgba(15,27,45,.05); display: flex; flex-direction: column; gap: 12px;">
-          <div style="display: flex; align-items: baseline; justify-content: space-between;">
-            <h2 style="margin: 0; font-size: 17px; font-weight: 700;">Qabul qiluvchilar</h2>
-            <span style="font-size: 13px; color: #6B7686;">2 / 3 ulangan</span>
-          </div>
-          <sc-for list="{{people}}" as="p" hint-placeholder-count="3">
-            <div style="display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #F0F2F5;">
-              <div style="width: 36px; height: 36px; flex-shrink: 0; border-radius: 50%; background: {{p.avBg}}; color: {{p.avFg}}; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px;">{{p.ini}}</div>
-              <div style="flex-grow: 1; min-width: 0;">
-                <div style="font-size: 14px; font-weight: 700;">{{p.name}}</div>
-                <div style="font-size: 12px; color: #6B7686;">{{p.role}}</div>
-              </div>
-              <span style="padding: 4px 10px; border-radius: 999px; background: {{p.chipBg}}; color: {{p.chipFg}}; font-size: 12px; font-weight: 700; white-space: nowrap;">{{p.chip}}</span>
-            </div>
-          </sc-for>
-          <div style="font-size: 12px; line-height: 1.5; color: #6B7686;">Menejer o'z akkauntini Egasi ruxsati bilan ulaydi. Menejer faqat o'z filiali ogohlantirishlarini oladi.</div>
-          <button type="button" style="align-self: flex-start; height: 40px; padding: 0 14px; border: 1px solid #E7EAEE; border-radius: 12px; background: #FFFFFF; color: #0F1B2D; font: inherit; font-size: 13px; font-weight: 700;">Bobur N. ga taklif havolasi</button>
-        </section>
       </div>
 
       <div style="display: flex; flex-wrap: wrap; gap: 14px;">
@@ -152,8 +137,8 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
                   <div style="font-size: 12px; color: #6B7686;">{{s.desc}}</div>
                 </div>
                 <span style="font-size: 12px; font-weight: 700; color: {{s.stateFg}};">{{s.state}}</span>
-                <button type="button" role="switch" aria-checked="{{s.on}}" aria-label="{{s.title}}" style="width: 46px; height: 26px; flex-shrink: 0; padding: 3px; border: 0; border-radius: 999px; background: {{s.track}}; display: flex; justify-content: {{s.justify}};">
-                  <span style="display: block; width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 1px 3px rgba(15,27,45,.25);"></span>
+                <button type="button" role="switch" aria-checked="{{s.on}}" aria-label="{{s.title}}" style="width: 50px; height: 36px; flex-shrink: 0; padding: 0; border: 0; background: transparent; display: flex; align-items: center; justify-content: center;">
+                  <span style="width: 46px; height: 26px; box-sizing: border-box; padding: 3px; border-radius: 999px; background: {{s.track}}; display: flex; justify-content: {{s.justify}};"><span style="display: block; width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 1px 3px rgba(15,27,45,.25);"></span></span>
                 </button>
               </div>
             </sc-for>
@@ -162,6 +147,16 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
 
         <section style="flex: 2 1 380px; min-width: 0; background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 16px; padding: 24px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 6px 20px rgba(15,27,45,.05); display: flex; flex-direction: column; gap: 14px;">
           <h2 style="margin: 0; font-size: 17px; font-weight: 700;">Kunlik hisobot</h2>
+          <div style="display: flex; align-items: center; gap: 14px; padding-bottom: 12px; border-bottom: 1px solid #F0F2F5;">
+            <div style="flex-grow: 1; min-width: 0;">
+              <div style="font-size: 14px; font-weight: 600;">Kunlik hisobotni Telegramga yuborish</div>
+              <div style="font-size: 12px; color: #6B7686;">Kun yakuni: savdo, cheklar, to'lov usullari, kecha bilan farq</div>
+            </div>
+            <span style="font-size: 12px; font-weight: 700; color: #0A5E4D;">Yoqilgan</span>
+            <button type="button" role="switch" aria-checked="true" aria-label="Kunlik hisobotni Telegramga yuborish" style="width: 50px; height: 36px; flex-shrink: 0; padding: 0; border: 0; background: transparent; display: flex; align-items: center; justify-content: center;">
+              <span style="width: 46px; height: 26px; box-sizing: border-box; padding: 3px; border-radius: 999px; background: #0E7C66; display: flex; justify-content: flex-end;"><span style="display: block; width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 1px 3px rgba(15,27,45,.25);"></span></span>
+            </button>
+          </div>
           <label style="display: flex; flex-direction: column; gap: 6px;">
             <span style="font-size: 13px; font-weight: 600; color: #3D4A5C;">Kunlik hisobot vaqti</span>
             <select style="height: 44px; padding: 0 14px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; color: #0F1B2D;">
@@ -186,7 +181,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
   </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1140}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1523}}'>
 class Component extends DCLogic {
   renderVals() {
     const I = {
@@ -212,19 +207,23 @@ class Component extends DCLogic {
     }
 
     const sw = (title, desc, on) => ({ title, desc, on: on ? "true" : "false", track: on ? "#0E7C66" : "#CBD3DC", justify: on ? "flex-end" : "flex-start", state: on ? "Yoqilgan" : "O'chiq", stateFg: on ? "#0A5E4D" : "#6B7686" });
+    // GET /notification-settings → kind: cash_variance, over_limit_action, offline_48h, low_stock, expiry_soon,
+    // debt_due_today, debt_aging_60, debt_limit_exceeded_offline, state_report_diff, subscription_due/subscription_grace (daily_report — «Kunlik hisobot» blokida)
     const groups = [
       { title: "Kassa va savdo", items: [
         sw("Kassa farqi", "Smena yopilganda naqd farqi 10 000 so'mdan oshsa", true),
-        sw("Limitdan oshgan so'rov", "Chegirma yoki qaytarish Egasi tasdig'ini kutmoqda", true),
+        sw("Limitdan oshgan amal", "Chegirma, qaytarish yoki pul olish rol limitidan oshdi", true),
         sw("Offline 40/48 soat", "OFD tasdig'isiz chek 40 soatdan eski — 48 soatda kassa bloklanadi", true) ] },
       { title: "Ombor", items: [
-        sw("Kam qolgan tovar", "Qoldiq minimal darajadan pastga tushganda, kuniga 1 marta", true) ] },
-      { title: "Moliya va soliq", items: [
-        sw("Davlat hisoboti", "QQS ichki hisob va davlat hisoboti o'rtasida farq", true),
-        sw("Kiruvchi e-faktura", "Yangi faktura imzo kutmoqda", false),
-        sw("1C ga yuborish natijasi", "Kun 1C ga yozilgani yoki xato bilan tugagani", true) ] },
-      { title: "Tizim", items: [
-        sw("Obuna eslatmasi", "Muddat tugashidan 3, 1 va 0 kun oldin", true) ] }
+        sw("Kam qolgan tovar", "Qoldiq minimal darajadan pastga tushganda, kuniga 1 marta", true),
+        sw("Yaroqlilik muddati yaqin", "Muddati tugashiga oz qolgan tovarlar", true) ] },
+      { title: "Qarzlar", items: [
+        sw("Qarz muddati bugun", "Bugun to'lanishi kerak bo'lgan mijoz qarzlari", true),
+        sw("60 kundan oshgan qarz", "Muddati 60 kundan o'tgan qarzdorlar", false),
+        sw("Offline qarz limiti oshdi", "Kassa offline paytida mijoz qarz limitidan oshib ketdi", true) ] },
+      { title: "Soliq va tizim", items: [
+        sw("Davlat hisoboti farqi", "QQS ichki hisob va davlat hisoboti o'rtasida farq", true),
+        sw("Obuna eslatmasi", "Muddat tugashidan 3, 1 va 0 kun oldin; imtiyozli davrda", true) ] }
     ];
     const all = groups.reduce((a, g) => a.concat(g.items), []);
     const onN = all.filter(s => s.on === "true").length;
@@ -235,7 +234,7 @@ class Component extends DCLogic {
     const checks = 412;
     const digest = [{ k: "Savdo", v: fmt(total) + " so'm", fg: "#0F1B2D", w: "800" }, { k: "Cheklar", v: String(checks), fg: "#0F1B2D", w: "600" }, { k: "O'rtacha chek", v: fmt(Math.round(total / checks)) + " so'm", fg: "#0F1B2D", w: "600" }]
       .concat(pay.map(([k, v]) => ({ k: "· " + k, v: fmt(v), fg: "#3D4A5C", w: "500" })))
-      .concat([{ k: "Kecha bilan farq", v: "+" + fmt(total - 15720000), fg: "#1F8A4C", w: "700" }]);
+      .concat([{ k: "Kecha bilan farq", v: "+" + fmt(total - 15720000), fg: "#1F6B3E", w: "700" }]);
 
     return {
       menu: [
@@ -247,11 +246,6 @@ class Component extends DCLogic {
       ],
       tabs: [tab("Do'kon", "Bo14Sozlamalar.dc.html"), tab("Xodimlar", "Bo11Xodimlar.dc.html"), tab("Filiallar", "Bo12Filiallar.dc.html"), tab("Telegram", "Bo20Telegram.dc.html", true), tab("Obuna", "Bo19Obuna.dc.html"), tab("1C", "Bo22OneCSozlama.dc.html")],
       qr,
-      people: [
-        { ini: "AK", name: "Akmal K.", role: "Egasi · barcha filiallar", chip: "@akmal_k", chipBg: "#E5F5EC", chipFg: "#1F8A4C", avBg: "#E3F2EE", avFg: "#0A5E4D" },
-        { ini: "SM", name: "Sardor M.", role: "Menejer · Chilonzor-3", chip: "@sardor_m", chipBg: "#E5F5EC", chipFg: "#1F8A4C", avBg: "#E8F0FC", avFg: "#2F6FDB" },
-        { ini: "BN", name: "Bobur N.", role: "Menejer · Yunusobod-1", chip: "Ulanmagan", chipBg: "#FDF3E1", chipFg: "#8A5A12", avBg: "#F4F6F8", avFg: "#3D4A5C" }
-      ],
       groups,
       onCount: onN + " / " + all.length + " yoqilgan",
       digest

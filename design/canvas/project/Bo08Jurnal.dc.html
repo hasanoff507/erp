@@ -22,7 +22,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
       <div><div style="color: #FFFFFF; font-weight: 800; font-size: 15px;">ERP</div><div style="font-size: 12px; color: #8C99A8;">[Do'kon nomi]</div></div>
     </div>
     <sc-for list="{{menu}}" as="g" hint-placeholder-count="5">
-      <div style="padding: 14px 10px 6px; font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #6F7E90;">{{g.title}}</div>
+      <div style="padding: 14px 10px 6px; font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #8C99A8;">{{g.title}}</div>
       <sc-for list="{{g.items}}" as="m" hint-placeholder-count="3">
         <a href="{{m.href}}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 14px; font-weight: 600; text-decoration: none; color: {{m.fg}}; background: {{m.bg}};">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{m.icon}}"></path></svg>
@@ -38,17 +38,21 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
   </nav>
   <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column;">
     <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 28px; background: #FFFFFF; border-bottom: 1px solid #E7EAEE;">
-      <h1 style="margin: 0; font-size: 22px; font-weight: 800;">Buxgalteriya jurnali</h1>
+      <h1 style="margin: 0; font-size: 26px; line-height: 34px; font-weight: 800;">Buxgalteriya jurnali</h1>
       <div style="flex-grow: 1;"></div>
       <label style="display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px; min-width: 240px; border: 1px solid #DCE1E7; border-radius: 12px; background: #F8FAFB;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7686" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
         <span style="position: absolute; width: 1px; height: 1px; overflow: hidden;">Qidiruv</span>
-        <input type="search" placeholder="Tovar, mijoz, hujjat…" style="flex-grow: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 14px; color: #0F1B2D;">
+        <input type="search" placeholder="Tovar, mijoz, ekran…" style="flex-grow: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 14px; color: #0F1B2D;">
       </label>
       <select aria-label="Filial" style="height: 42px; padding: 0 12px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; color: #0F1B2D;"><option>Barcha filiallar</option><option>Chilonzor-3</option><option>Yunusobod-1</option></select>
       <button type="button" aria-label="Bildirishnomalar" style="width: 42px; height: 42px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; color: #3D4A5C; display: flex; align-items: center; justify-content: center;">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0112 0v5l1.5 2h-15z"></path><path d="M10 20a2 2 0 004 0"></path></svg>
       </button>
+      <div role="group" aria-label="Interfeys tili" style="display: flex; gap: 2px; padding: 2px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF;">
+        <button type="button" aria-pressed="true" style="min-width: 40px; height: 36px; padding: 0 8px; border: 0; border-radius: 10px; background: #0F1B2D; color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 700;">UZ</button>
+        <button type="button" aria-pressed="false" style="min-width: 40px; height: 36px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; color: #3D4A5C; font: inherit; font-size: 13px; font-weight: 700;">RU</button>
+      </div>
     </header>
     <main style="padding: 24px 28px; display: flex; flex-direction: column; gap: 18px;">
       <section style="background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 16px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 6px 20px rgba(15,27,45,.05); padding: 18px 20px; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px;">
@@ -83,7 +87,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
           </div>
           <div style="overflow-x: auto;">
             <div role="table" aria-label="Provodkalar" style="min-width: 700px;">
-              <div role="row" style="display: grid; grid-template-columns: minmax(0,.85fr) minmax(0,1.25fr) minmax(0,2.3fr) minmax(0,.55fr) minmax(0,.55fr) minmax(0,1.25fr); column-gap: 12px; padding: 12px 20px; background: #F8FAFB; border-top: 1px solid #E7EAEE; font-size: 12px; font-weight: 600; color: #6B7686;">
+              <div role="row" style="display: grid; grid-template-columns: minmax(0,.85fr) minmax(0,1.25fr) minmax(0,2.3fr) minmax(0,.55fr) minmax(0,.55fr) minmax(0,1.25fr); column-gap: 12px; padding: 12px 20px; background: #F8FAFB; border-top: 1px solid #E7EAEE; font-size: 12px; font-weight: 600; color: #5B6675;">
                 <span role="columnheader">Sana</span><span role="columnheader">Hujjat</span><span role="columnheader">Mazmun</span><span role="columnheader">Dt</span><span role="columnheader">Kt</span><span role="columnheader" style="text-align: right;">Summa</span>
               </div>
               <sc-for list="{{entries}}" as="e" hint-placeholder-count="16">
@@ -91,13 +95,13 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
                   <span role="cell" style="color: #3D4A5C; font-variant-numeric: tabular-nums;">{{e.date}}</span>
                   <span role="cell" style="display: flex; flex-direction: column;"><a href="{{e.href}}" style="font-weight: 700; text-decoration: none;">{{e.doc}}</a><span style="font-size: 11px; color: #6B7686;">{{e.branch}}</span></span>
                   <span role="cell" style="color: #0F1B2D;">{{e.text}}</span>
-                  <span role="cell"><span style="padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: 800; background: #E8F0FC; color: #2F6FDB; font-variant-numeric: tabular-nums;">{{e.dt}}</span></span>
+                  <span role="cell"><span style="padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: 800; background: #E8F0FC; color: #1F4FA8; font-variant-numeric: tabular-nums;">{{e.dt}}</span></span>
                   <span role="cell"><span style="padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: 800; background: #E3F2EE; color: #0A5E4D; font-variant-numeric: tabular-nums;">{{e.kt}}</span></span>
                   <span role="cell" style="text-align: right; font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums;">{{e.amount}}</span>
                 </div>
               </sc-for>
               <div role="row" style="display: grid; grid-template-columns: minmax(0,.85fr) minmax(0,1.25fr) minmax(0,2.3fr) minmax(0,.55fr) minmax(0,.55fr) minmax(0,1.25fr); column-gap: 12px; align-items: center; min-height: 52px; padding: 0 20px; border-top: 1px solid #E7EAEE; background: #F8FAFB; font-size: 13px;">
-                <span role="cell" style="font-weight: 700;">Jami</span><span role="cell"></span><span role="cell" style="color: #6B7686;">Dt oboroti = Kt oboroti</span><span role="cell"></span><span role="cell"></span>
+                <span role="cell" style="font-weight: 700;">Jami</span><span role="cell"></span><span role="cell" style="color: #5B6675;">Dt oboroti = Kt oboroti</span><span role="cell"></span><span role="cell"></span>
                 <span role="cell" style="text-align: right; font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums;">{{sum}}</span>
               </div>
             </div>
@@ -126,7 +130,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
             </div>
             <div style="display: flex; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #FBEAE8;">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C8372D" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="M12 4l9 16H3z"></path><path d="M12 10v4M12 17v.5"></path></svg>
-              <span style="font-size: 12px; color: #3D4A5C;"><b style="color: #C8372D;">To'siq:</b> tannarx qayta hisoblash navbatida 1 ta ish (Shakar, 28.09.2026 dan).</span>
+              <span style="font-size: 12px; color: #3D4A5C;"><b style="color: #A82B22;">To'siq:</b> tannarx qayta hisoblash navbatida 1 ta ish (Shakar, 28.09.2026 dan).</span>
             </div>
             <div style="display: flex; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #FDF3E1;">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A5A12" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="M12 4l9 16H3z"></path><path d="M12 10v4M12 17v.5"></path></svg>
@@ -145,7 +149,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
         </div>
         <div style="overflow-x: auto;">
           <div role="table" aria-label="Qayta hisoblash navbati" style="min-width: 860px;">
-            <div role="row" style="display: grid; grid-template-columns: minmax(0,1.6fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,.6fr) minmax(0,1.3fr) minmax(0,2fr) minmax(0,1fr); column-gap: 12px; padding: 12px 20px; background: #F8FAFB; border-top: 1px solid #E7EAEE; font-size: 12px; font-weight: 600; color: #6B7686;">
+            <div role="row" style="display: grid; grid-template-columns: minmax(0,1.6fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,.6fr) minmax(0,1.3fr) minmax(0,2fr) minmax(0,1fr); column-gap: 12px; padding: 12px 20px; background: #F8FAFB; border-top: 1px solid #E7EAEE; font-size: 12px; font-weight: 600; color: #5B6675;">
               <span role="columnheader">Tovar</span><span role="columnheader">Ombor</span><span role="columnheader">Sanadan</span><span role="columnheader">Holat</span><span role="columnheader" style="text-align: right;">Urinish</span><span role="columnheader">Navbatga qo'yildi</span><span role="columnheader">Xato</span><span role="columnheader">Amal</span>
             </div>
             <sc-for list="{{recost}}" as="q" hint-placeholder-count="3">
@@ -157,7 +161,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
                 <span role="cell" style="text-align: right; font-variant-numeric: tabular-nums;">{{q.attempts}}</span>
                 <span role="cell" style="color: #3D4A5C; font-variant-numeric: tabular-nums;">{{q.created}}</span>
                 <span role="cell" style="font-size: 12px; color: #C8372D;">{{q.err}}</span>
-                <span role="cell"><sc-if value="{{q.canRetry}}" hint-placeholder-val="{{false}}"><button type="button" style="height: 32px; padding: 0 10px; border: 1px solid #E7EAEE; border-radius: 9px; background: #FFFFFF; color: #0F1B2D; font: inherit; font-size: 12px; font-weight: 700;">Qayta urinish</button></sc-if></span>
+                <span role="cell"><sc-if value="{{q.canRetry}}" hint-placeholder-val="{{false}}"><button type="button" style="height: 36px; padding: 0 10px; border: 1px solid #E7EAEE; border-radius: 9px; background: #FFFFFF; color: #0F1B2D; font: inherit; font-size: 12px; font-weight: 700;">Qayta urinish</button></sc-if></span>
               </div>
             </sc-for>
           </div>
@@ -186,7 +190,7 @@ class Component extends DCLogic {
     const F = { "Dashboard": "Bo02Dashboard", "AI yordamchi": "Bo13Ai", "Tasdiqlash navbati": "Bo16Tasdiqlash", "Kassa (POS)": "Main", "Qarzdorlar": "Bo06Qarzdorlar", "Tovarlar va narxlar": "Bo05Narxlar", "Qoldiq va ko'chirish": "Bo03Ombor", "Xaridlar": "Bo04Xarid", "Yorliqlar": "Bo18Yorliq", "Xarajatlar": "Bo17Xarajatlar", "Bank tushumi": "Bo24Bank", "E-faktura": "Bo15Efaktura", "QQS va davlat hisoboti": "Bo10DavlatHisobot", "Buxgalteriya": "Bo08Jurnal", "Hisobotlar": "Bo09Hisobotlar", "1C integratsiyasi": "Bo23OneC", "Sozlamalar": "Bo14Sozlamalar" };
     const ACTIVE = "Buxgalteriya";
     const it = (label, icon, _a, badge) => { const active = label === ACTIVE; return { label, icon: I[icon], href: F[label] + ".dc.html", fg: active ? "#FFFFFF" : "#C9D2DC", bg: active ? "#1C2A3F" : "transparent", hasBadge: !!badge, badge: badge || "" }; };
-    const T = { success: ["#E5F5EC", "#1F8A4C"], info: ["#E8F0FC", "#2F6FDB"], amber: ["#FDF3E1", "#8A5A12"], danger: ["#FBEAE8", "#C8372D"], violet: ["#EFEAFC", "#6D4AD8"], gray: ["#EEF1F4", "#3D4A5C"], brand: ["#E3F2EE", "#0A5E4D"] };
+    const T = { success: ["#E5F5EC", "#1F6B3E"], info: ["#E8F0FC", "#1F4FA8"], amber: ["#FDF3E1", "#8A5A12"], danger: ["#FBEAE8", "#A82B22"], violet: ["#EFEAFC", "#6D4AD8"], gray: ["#EEF1F4", "#3D4A5C"], brand: ["#E3F2EE", "#0A5E4D"] };
     const chip = (text, t) => ({ text, bg: T[t][0], fg: T[t][1] });
     const fmt = (n, d = 2) => { const s = Math.abs(n).toFixed(d).split("."); const i = s[0].replace(/\B(?=(\d{3})+(?!\d))/g, " "); return (n < 0 ? "−" : "") + i + (d ? "," + s[1] : ""); };
     const r2 = (x) => Math.round(x * 100) / 100;
@@ -228,7 +232,7 @@ class Component extends DCLogic {
       count: String(entries.length),
       entries,
       sum: fmt(sum),
-      balances: B.map(([acc, name, v, side]) => ({ acc, name, value: fmt(v), side: side === "Dt" ? "Debet" : "Kredit", sideFg: side === "Dt" ? "#2F6FDB" : "#0A5E4D" })),
+      balances: B.map(([acc, name, v, side]) => ({ acc, name, value: fmt(v), side: side === "Dt" ? "Debet" : "Kredit", sideFg: side === "Dt" ? "#1F4FA8" : "#0A5E4D" })),
       recost: [
         { product: "Shakar", wh: "Chilonzor-3", from: "28.09.2026", st: chip("Navbatda", "info"), attempts: "0", created: "16.10.2026 09:41", err: "", canRetry: false },
         { product: "Guruch «Lazer»", wh: "Yunusobod-1", from: "03.10.2026", st: chip("Xato", "danger"), attempts: "3", created: "15.10.2026 18:02", err: "Partiya qoldig'i manfiy: KR-000189 orqaga sanali qaytarish", canRetry: true },

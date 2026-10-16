@@ -246,6 +246,25 @@ CREATE TABLE platform.turnover_tax_rates (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (code, valid_from)
 );
+
+-- Karta BIN qoidalari (qaror #71) — global ma'lumotnoma (RLS istisnosi); erp_app — faqat SELECT, yozish — platforma
+-- admin yo'li. Integratsiyalangan terminal natijasida card_type bo'lmasa, terminal bergan BIN (PAN'ning birinchi
+-- 6–8 raqami) shu jadvaldan eng uzun prefiks bo'yicha qidiriladi; topilmasa — kassir bitta bosishda tanlaydi.
+-- To'liq PAN hech qachon saqlanmaydi: BIN faqat qidiruv paytida ishlatiladi, to'lov qatoriga card_mask (4+4) yoziladi.
+CREATE TABLE platform.card_bin_rules (
+  id          UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  bin_prefix  TEXT NOT NULL CHECK (bin_prefix ~ '^[0-9]{6,8}$'),
+  card_type   TEXT NOT NULL CHECK (card_type IN ('personal','corporate','social')),
+  card_scheme TEXT NULL CHECK (card_scheme IN ('uzcard','humo','visa','mastercard','unionpay','mir','other')),
+  issuer      TEXT NULL,          -- emitent bank nomi (ma'lumot uchun)
+  source      TEXT NOT NULL,      -- ro'yxat manbasi (ekvayer bank / Uzcard / Humo xati raqami va sanasi)
+  valid_from  DATE NOT NULL,
+  valid_to    DATE NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (bin_prefix, valid_from),
+  CHECK (valid_to IS NULL OR valid_to >= valid_from)
+);
 ```
 
 `platform_admins` — `app.users`ga FK bergani uchun 2.3-bo'limdan keyin (`users` yaratilgandan so'ng) joylashtiriladi.
@@ -374,7 +393,10 @@ CREATE TABLE app.tenants (
   -- {debt_receipt_split: 'single'|'per_sale' (standart 'single', qaror #45), credit_sale_receipt: 'none'|'credit_type'
   -- (standart 'none')}, marking_precheck ('off'|'warn'|'block', standart 'warn', qaror #62), bank_account (20 raqam),
   -- bank_mfo — tenantning yagona bank hisobi (qaror #49), payment_providers.{click|payme|uzum}.autofiscal_off_confirmed_at
-  -- (ISO vaqt — provayder avtofiskalizatsiyasi o'chirilgani tasdig'i, 20 #40d). Baholash usuli BU YERDA EMAS — valuation_method_history
+  -- (ISO vaqt — provayder avtofiskalizatsiyasi o'chirilgani tasdig'i, 20 #40d), card_manual_fallback ('allow'|
+  -- 'manager_approval'|'forbid' — karta rekvizitlarini qo'lda kiritish siyosati, qaror #71; kalit yo'q bo'lsa: faol
+  -- card_terminals bog'langan kassada 'manager_approval', boshqa kassada 'allow'; siyosat faqat faol terminal bog'langan
+  -- kassada qo'llanadi — terminalsiz kassada manual_reason='standalone_terminal' har doim ruxsat). Baholash usuli BU YERDA EMAS — valuation_method_history
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   version       INT NOT NULL DEFAULT 1
@@ -717,7 +739,8 @@ CREATE TABLE app.product_barcodes (
   units_per_barcode NUMERIC(18,3) NOT NULL DEFAULT 1 CHECK (units_per_barcode > 0),
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (tenant_id, barcode)
+  UNIQUE (tenant_id, barcode),
+  CHECK (kind <> 'internal' OR barcode ~ '^04[0-9]{11}$') -- internal_barcode_seq diapazoni (GS1 RCN 040–049)
 );
 
 CREATE TABLE app.product_prices (
@@ -743,9 +766,13 @@ CREATE TABLE app.label_print_queue (
 );
 CREATE INDEX idx_label_queue_pending ON app.label_print_queue (tenant_id) WHERE printed_at IS NULL;
 
+-- Ichki shtrix-kod (US-M09-05): EAN-13 = lpad(next_value, 12, '0') || nazorat raqami → '04' + 10 raqam + K.
+-- GS1 RCN-13 diapazoni 040–049 (kompaniya ichida ishlatish) — real GTIN'lar bilan ham, tarozi prefikslari
+-- (weight_barcode_templates, 20–29) bilan ham kesishmaydi.
 CREATE TABLE app.internal_barcode_seq (
   tenant_id  UUID PRIMARY KEY REFERENCES app.tenants(id),
-  next_value BIGINT NOT NULL DEFAULT 2000000000
+  next_value BIGINT NOT NULL DEFAULT 40000000000
+             CHECK (next_value BETWEEN 40000000000 AND 49999999999) -- 040000000000…049999999999
 );
 
 CREATE TABLE app.discount_rules (
@@ -836,7 +863,7 @@ CREATE TABLE app.approval_requests (
   branch_id            UUID NOT NULL REFERENCES app.branches(id),
   kind                 TEXT NOT NULL CHECK (kind IN ('discount_over_limit','return_over_limit','return_no_receipt',
                          'debt_over_limit','cash_withdrawal_over_limit','price_change','expense_over_limit',
-                         'write_off_over_limit')),
+                         'write_off_over_limit','card_manual_entry')), -- card_manual_entry — qaror #71
   permission_code      TEXT NOT NULL, -- tasdiqlovchida bo'lishi shart kod (`15-xavfsizlik-va-audit.md` §2.3 xaritasi)
   requested_value      NUMERIC(18,4) NULL, -- summa yoki foiz (role_permissions.limit_value bilan bir xil birlik)
   context              JSONB NOT NULL DEFAULT '{}',
@@ -868,12 +895,12 @@ CREATE INDEX idx_approval_requests_linked ON app.approval_requests (tenant_id, l
 CREATE TABLE app.doc_approvals (
   id                   UUID PRIMARY KEY DEFAULT app.uuidv7(),
   tenant_id            UUID NOT NULL REFERENCES app.tenants(id),
-  doc_type             TEXT NOT NULL, -- 'sales','returns','cash_movements','expenses','write_offs','price_changes'
+  doc_type             TEXT NOT NULL, -- 'sales','returns','cash_movements','expenses','write_offs','price_changes','debt_payments'
   doc_id               UUID NOT NULL,
-  line_id              UUID NULL, -- chegirma — sale_lines.id
+  line_id              UUID NULL, -- chegirma — sale_lines.id; card_manual_entry — sale_payments.id (debt_payments/returns'da NULL)
   kind                 TEXT NOT NULL CHECK (kind IN ('discount_over_limit','return_over_limit','return_no_receipt',
                          'debt_over_limit','cash_withdrawal_over_limit','price_change','expense_over_limit',
-                         'write_off_over_limit')),
+                         'write_off_over_limit','card_manual_entry')), -- card_manual_entry — qaror #71
   mode                 TEXT NOT NULL CHECK (mode IN ('local_pin','remote_request')),
   approved_by          UUID NOT NULL REFERENCES app.users(id),
   approval_request_id  UUID NULL REFERENCES app.approval_requests(id),
@@ -912,6 +939,61 @@ CREATE TABLE app.payment_checkouts (
 );
 CREATE INDEX idx_payment_checkouts_expiry ON app.payment_checkouts (expires_at) WHERE status = 'pending';
 -- Webhook tenant kontekstisiz keladi → 4.5-bo'limdagi SECURITY DEFINER funksiyalar.
+
+-- Integratsiyalangan bank karta terminallari reyestri (qaror #71). Bitta terminal — bitta filial; kassaga bog'lash
+-- ixtiyoriy (bir kassada bir nechta terminal bo'lishi mumkin, is_default — POS avtomatik tanlaydigani).
+-- adapter (21 §9.4): agent_ecr — AgentEcrAdapter, Do'kon agenti (127.0.0.1:47110/v1/card/*) orqali LAN/Wi-Fi'dagi
+-- terminal; cloud — CloudTerminalAdapter, server ↔ vendor bulut API (terminal ID bo'yicha); android_intent — Kotlin POS
+-- shu smart-terminaldagi vendor to'lov ilovasi (Intent/AIDL/SDK); softpos — SoftPosAdapter (NFC, MayaSoft SDK);
+-- fake — FakeCardTerminalAdapter (dev/test/staging va demo-tenant, prod guard; real pul yo'q).
+-- agent_id FK — 0028 store_agent da (fk_ct_agent), cash_registers.fiscal_agent_id naqshi.
+CREATE TABLE app.card_terminals (
+  id                       UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id                UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id                UUID NOT NULL REFERENCES app.branches(id),
+  cash_register_id         UUID NULL REFERENCES app.cash_registers(id),
+  name                     TEXT NOT NULL,                  -- BO-12 da ko'rinadigan nom ("Kassa 1 — Humo P3")
+  vendor                   TEXT NOT NULL CHECK (vendor ~ '^[a-z0-9_]{2,32}$'), -- 'rahmat','era','humo','smartone','mayasoft','fake'
+  model                    TEXT NULL,                      -- 'Sunmi P3', 'PAX A930' ...
+  adapter                  TEXT NOT NULL CHECK (adapter IN ('agent_ecr','cloud','android_intent','softpos','fake')),
+  driver                   TEXT NOT NULL CHECK (driver ~ '^[a-z0-9_]{2,40}$'), -- 'rahmat_lan','era_lan','arcus2_tcp','era_cloud','sunmi_intent','mayasoft_softpos','fake'
+  agent_id                 UUID NULL,                      -- adapter='agent_ecr': xizmat qiluvchi Do'kon agenti
+  local_id                 TEXT NULL,                      -- agent capabilities.card_terminal.devices[].local_id
+  host                     INET NULL,                      -- terminalning LAN manzili (faqat xususiy tarmoq)
+  port                     INT NULL CHECK (port IS NULL OR port BETWEEN 1 AND 65535),
+  vendor_terminal_ref      TEXT NULL,                      -- adapter='cloud': vendor bulutidagi terminal ID
+  tid                      TEXT NULL CHECK (tid IS NULL OR tid ~ '^[0-9A-Za-z]{1,16}$'), -- bank terminal ID (TID)
+  mid                      TEXT NULL CHECK (mid IS NULL OR mid ~ '^[0-9A-Za-z]{1,20}$'), -- merchant ID (MID)
+  acquirer_counterparty_id UUID NULL REFERENCES app.counterparties(id), -- ekvayer bank (bank_settlements solishtirish)
+  status                   TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','disabled','archived')),
+  is_default               BOOLEAN NOT NULL DEFAULT false,
+  capabilities             JSONB NOT NULL DEFAULT '{}',
+                           -- {refund, void, status_query, last_transaction, settlement, contactless, returns_card_type,
+                           --  returns_bin} — adapter/agent hello'dan; POS faqat true bo'lgan amallarni taklif qiladi.
+                           -- status — boshqaruv holati (BO-12); jonli holat — health_status (agent card.status vazifasi,
+                           -- har 5 daqiqa, yoki POS health() natijasi)
+  health_status            TEXT NOT NULL DEFAULT 'unknown' CHECK (health_status IN ('online','busy','offline','error','unknown')),
+  health_checked_at        TIMESTAMPTZ NULL,
+  created_by               UUID NOT NULL REFERENCES app.users(id),
+  created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
+  version                  INT NOT NULL DEFAULT 1,
+  CHECK (adapter <> 'agent_ecr' OR (agent_id IS NOT NULL AND local_id IS NOT NULL AND host IS NOT NULL)),
+  CHECK (adapter <> 'cloud' OR vendor_terminal_ref IS NOT NULL),
+  CHECK (adapter = 'agent_ecr' OR (agent_id IS NULL AND local_id IS NULL)),
+  CHECK ((adapter = 'fake') = (driver = 'fake')),
+  -- ixtiyoriy host yo'q: faqat RFC 1918 xususiy IPv4 (printer qoidasi kabi, 34 §14.3)
+  CHECK (host IS NULL OR host << inet '10.0.0.0/8' OR host << inet '172.16.0.0/12' OR host << inet '192.168.0.0/16'),
+  CHECK (adapter = 'fake' OR status <> 'active' OR tid IS NOT NULL),
+  CHECK (NOT is_default OR cash_register_id IS NOT NULL)
+);
+CREATE UNIQUE INDEX uq_card_terminals_agent_local ON app.card_terminals (agent_id, local_id)
+  WHERE agent_id IS NOT NULL AND status <> 'archived';
+CREATE UNIQUE INDEX uq_card_terminals_tid ON app.card_terminals (tenant_id, tid)
+  WHERE tid IS NOT NULL AND status <> 'archived';
+CREATE UNIQUE INDEX uq_card_terminals_default ON app.card_terminals (cash_register_id)
+  WHERE is_default AND status = 'active';
+CREATE INDEX idx_card_terminals_register ON app.card_terminals (tenant_id, cash_register_id) WHERE status = 'active';
 ```
 
 ### 2.6 Hujjatlar
@@ -1012,6 +1094,85 @@ CREATE TABLE app.sale_lines (
 );
 CREATE INDEX idx_sale_lines_product ON app.sale_lines (tenant_id, product_id);
 
+-- Karta terminali tranzaksiyalari (qaror #71). id = attempt_id: POS/qurilma beradi (UUIDv7), terminalga ERN/order
+-- ref sifatida uzatiladi — idempotentlik kaliti (agent jurnalida ham UNIQUE). Qator har bir urinishga bitta (kind):
+-- purchase (xarid), refund (qaytarish), void (shu kun, settlement'gacha bekor qilish). Holat so'rovi
+-- (get_status/get_last_transaction) yangi qator emas — shu qatorning status/resolved_by ustunlarini yangilaydi;
+-- settlement — card_terminal_settlements. Online: POS natijani POST /card-terminal-transactions bilan darhol yozadi;
+-- offline: natija sale.created / return.created / debt_payment.created payload'idagi card_result ichida (payments[] / refund_card / ildiz)
+-- keladi va server qatorni shu voqeadan upsert qiladi (16 §2.1, 18 §2.7). PAN/track/CVV hech qachon yozilmaydi.
+-- doc_type/doc_id — tranzaksiya qaysi hujjatga yopilgani (polimorfik). Sotuvsiz qolgan approved purchase avtomatik void
+-- qilinmaydi: 24 soatdan keyin sync_exceptions(kind='card_orphan_transaction') — qo'lda ko'rib chiqiladi (16 §2.1).
+CREATE TABLE app.card_terminal_transactions (
+  id                      UUID PRIMARY KEY,               -- = attempt_id, har doim qurilma beradi
+  tenant_id               UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id               UUID NOT NULL REFERENCES app.branches(id),
+  card_terminal_id        UUID NOT NULL REFERENCES app.card_terminals(id),
+  cash_register_id        UUID NULL REFERENCES app.cash_registers(id),
+  shift_id                UUID NULL REFERENCES app.shifts(id),
+  device_id               UUID NULL REFERENCES app.devices(id),
+  kind                    TEXT NOT NULL CHECK (kind IN ('purchase','refund','void')),
+  original_transaction_id UUID NULL REFERENCES app.card_terminal_transactions(id), -- refund/void: asl purchase
+  amount                  NUMERIC(18,2) NOT NULL CHECK (amount > 0),  -- so'ralgan summa
+  approved_amount         NUMERIC(18,2) NULL CHECK (approved_amount IS NULL OR approved_amount > 0), -- terminal tasdiqlagani
+  currency                TEXT NOT NULL DEFAULT 'UZS' CHECK (currency = 'UZS'),
+  status                  TEXT NOT NULL DEFAULT 'pending'
+                            CHECK (status IN ('pending','approved','declined','unknown','voided')),
+                            -- pending — terminalga yuborildi, javob kutilmoqda; unknown — taymaut/aloqa uzildi, natija
+                            -- noma'lum (yangi purchase bloklanadi); voided — approved purchase keyin void bilan bekor qilindi.
+                            -- CardTxResult.status xaritasi: approved → approved; declined/cancelled/error → declined
+                            -- (decline_code = 'cancelled'/'error'/bank kodi); timeout/unknown → unknown; holat so'rovi
+                            -- natijasi not_found → declined (decline_code='not_found')
+  approval_code           TEXT NULL CHECK (approval_code IS NULL OR approval_code ~ '^[0-9A-Za-z]{1,12}$'),
+  rrn                     TEXT NULL CHECK (rrn IS NULL OR rrn ~ '^[0-9A-Za-z]{6,32}$'),
+  stan                    TEXT NULL,
+  card_mask               TEXT NULL CHECK (card_mask IS NULL OR card_mask ~ '^[0-9]{4}[*]+[0-9]{4}$'), -- normallashtirilgan 4+4
+  card_scheme             TEXT NULL CHECK (card_scheme IN ('uzcard','humo','visa','mastercard','unionpay','mir','other')),
+  card_type               TEXT NULL CHECK (card_type IN ('personal','corporate','social','unknown')),
+  card_type_source        TEXT NULL CHECK (card_type_source IN ('terminal','bin_table','cashier')),
+  entry_mode              TEXT NULL CHECK (entry_mode IN ('chip','contactless','magstripe','fallback')), -- kartani o'qish usuli
+  tid                     TEXT NULL,
+  mid                     TEXT NULL,
+  acquirer                TEXT NULL,
+  decline_code            TEXT NULL,
+  decline_message         TEXT NULL,
+  resolved_by             TEXT NULL CHECK (resolved_by IN ('auto','status_query','manager')),
+                          -- auto — terminal javobi; status_query — get_status/get_last_transaction;
+                          -- manager — unknown'ni terminal chekiga qarab menejer qo'lda yopdi (card.manual_entry.approve)
+  resolved_by_user_id     UUID NULL REFERENCES app.users(id),
+  terminal_response       JSONB NOT NULL DEFAULT '{}',    -- adapterning sanitizatsiyalangan xom javobi (PAN/track yo'q)
+  slip_text               TEXT NULL,                      -- terminal cheki matni (ixtiyoriy)
+  client_event_id         UUID NULL,                      -- bog'langan sale/return/debt_payment voqeasi
+  doc_type                TEXT NULL CHECK (doc_type IN ('sales','returns','debt_payments')),
+  doc_id                  UUID NULL,
+  settlement_id           UUID NULL,                      -- FK 0018 da: fk_ctt_settlement → card_terminal_settlements
+  requested_at            TIMESTAMPTZ NOT NULL,           -- qurilma soati
+  tx_at                   TIMESTAMPTZ NULL,               -- terminal bergan tranzaksiya vaqti
+  resolved_at             TIMESTAMPTZ NULL,
+  created_by              UUID NOT NULL REFERENCES app.users(id),
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (kind <> 'void' OR original_transaction_id IS NOT NULL),  -- void doim asl purchase'ga bog'liq
+  CHECK (kind <> 'purchase' OR original_transaction_id IS NULL),
+  CHECK (kind = 'purchase' OR status <> 'voided'),
+  -- tasdiqlangan purchase/refund: RRN va niqob majburiy (fiskal chek rekviziti, qaror #64)
+  CHECK (status NOT IN ('approved','voided') OR kind = 'void' OR (rrn IS NOT NULL AND card_mask IS NOT NULL AND approved_amount IS NOT NULL)),
+  CHECK ((card_type IS NULL) = (card_type_source IS NULL)),
+  CHECK (status IN ('pending','unknown') OR resolved_at IS NOT NULL),
+  CHECK (resolved_by IS DISTINCT FROM 'manager' OR resolved_by_user_id IS NOT NULL),
+  CHECK ((doc_type IS NULL) = (doc_id IS NULL))
+);
+CREATE UNIQUE INDEX uq_ctt_purchase_rrn ON app.card_terminal_transactions (tenant_id, tid, rrn)
+  WHERE kind = 'purchase' AND rrn IS NOT NULL AND tid IS NOT NULL;
+-- bitta terminalda bir vaqtda bitta ochiq urinish (agent DeviceLane FIFO bilan bir xil qoida)
+CREATE UNIQUE INDEX uq_ctt_one_pending ON app.card_terminal_transactions (card_terminal_id) WHERE status = 'pending';
+CREATE INDEX idx_ctt_unresolved ON app.card_terminal_transactions (tenant_id, card_terminal_id)
+  WHERE status IN ('pending','unknown');
+CREATE INDEX idx_ctt_orphans ON app.card_terminal_transactions (tenant_id, created_at)
+  WHERE status = 'approved' AND doc_id IS NULL;
+CREATE INDEX idx_ctt_shift ON app.card_terminal_transactions (shift_id) WHERE shift_id IS NOT NULL;
+CREATE INDEX idx_ctt_original ON app.card_terminal_transactions (original_transaction_id) WHERE original_transaction_id IS NOT NULL;
+
 CREATE TABLE app.sale_payments (
   id             UUID PRIMARY KEY DEFAULT app.uuidv7(),
   tenant_id      UUID NOT NULL REFERENCES app.tenants(id),
@@ -1026,6 +1187,13 @@ CREATE TABLE app.sale_payments (
   qr_type        TEXT NULL CHECK (qr_type IN ('static','dynamic')),
   due_date       DATE NULL, -- method='debt': va'da sanasi → debt_moves.due_date manbasi
   checkout_ref   UUID NULL REFERENCES app.payment_checkouts(checkout_ref),
+  -- karta kiritish usuli (qaror #71): integrated — terminal natijasi avtomatik; manual — kassir terminal chekidan (#64)
+  card_entry_mode  TEXT NULL CHECK (card_entry_mode IN ('integrated','manual')),
+  card_terminal_transaction_id UUID NULL REFERENCES app.card_terminal_transactions(id),
+  approval_code    TEXT NULL CHECK (approval_code IS NULL OR approval_code ~ '^[0-9A-Za-z]{1,12}$'),
+  card_scheme      TEXT NULL CHECK (card_scheme IN ('uzcard','humo','visa','mastercard','unionpay','mir','other')),
+  card_type_source TEXT NULL CHECK (card_type_source IN ('terminal','bin_table','cashier')),
+  manual_reason    TEXT NULL CHECK (manual_reason IN ('terminal_offline','terminal_error','unknown_result','standalone_terminal')),
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
   CHECK (method = 'debt' OR due_date IS NULL),
   CHECK (method NOT IN ('click','payme','uzum') OR provider_tx_id IS NOT NULL),
@@ -1036,9 +1204,22 @@ CREATE TABLE app.sale_payments (
   -- karta: card_type majburiy (qaror #64); ijtimoiy kartada niqob va RRN ham majburiy
   CHECK ((method = 'card') = (card_type IS NOT NULL)),
   CHECK (card_type IS DISTINCT FROM 'social' OR (card_mask IS NOT NULL AND rrn IS NOT NULL)),
-  CHECK (method = 'card' OR (card_mask IS NULL AND rrn IS NULL))
+  CHECK (method = 'card' OR (card_mask IS NULL AND rrn IS NULL)),
+  -- qaror #71: karta qatorida kiritish usuli majburiy; integrated — tranzaksiya, RRN, niqob majburiy, sabab yo'q;
+  -- manual — tranzaksiyasiz, sabab majburiy, card_type kassir tanlaydi (#64 qoidalari o'zgarmaydi)
+  CHECK ((method = 'card') = (card_entry_mode IS NOT NULL)),
+  CHECK ((method = 'card') = (card_type_source IS NOT NULL)),
+  CHECK (card_entry_mode IS DISTINCT FROM 'integrated' OR (card_terminal_transaction_id IS NOT NULL
+         AND rrn IS NOT NULL AND card_mask IS NOT NULL AND manual_reason IS NULL)),
+  CHECK (card_entry_mode IS DISTINCT FROM 'manual' OR (card_terminal_transaction_id IS NULL
+         AND manual_reason IS NOT NULL AND card_type_source = 'cashier')),
+  CHECK (method = 'card' OR (approval_code IS NULL AND card_scheme IS NULL AND manual_reason IS NULL
+         AND card_terminal_transaction_id IS NULL))
 );
 CREATE INDEX idx_sale_payments_sale ON app.sale_payments (sale_id);
+-- bitta tasdiqlangan terminal tranzaksiyasi — bitta to'lov qatori
+CREATE UNIQUE INDEX uq_sale_payments_card_tx ON app.sale_payments (card_terminal_transaction_id)
+  WHERE card_terminal_transaction_id IS NOT NULL;
 
 CREATE TABLE app.returns (
   id               UUID PRIMARY KEY DEFAULT app.uuidv7(),
@@ -1056,6 +1237,16 @@ CREATE TABLE app.returns (
   refund_method    TEXT NOT NULL CHECK (refund_method IN ('cash','card','uzqr','click','payme','uzum','debt_adjustment')),
                    -- standart — asl to'lov usuli; qarzli sotuvda avval sotuvning ochiq qarzi kamayadi (debt_adjustment
                    -- qismi, chek yo'q), qolgani pul bilan (13 §2.5). Click/Payme/Uzum qaytarish — provayder kabinetida qo'lda
+  -- refund_method='card' rekvizitlari (qaror #71): integrated — shu terminalda refund (settlement'gacha void) natijasi;
+  -- manual — terminalda mustaqil qaytarilgan / terminal ishlamaydi (card_manual_fallback siyosati bo'yicha)
+  card_entry_mode  TEXT NULL CHECK (card_entry_mode IN ('integrated','manual')),
+  card_terminal_transaction_id UUID NULL REFERENCES app.card_terminal_transactions(id),
+  card_type        TEXT NULL CHECK (card_type IN ('personal','corporate','social','unknown')),
+  card_mask        TEXT NULL CHECK (card_mask IS NULL OR card_mask ~ '^[0-9]{4}[*]+[0-9]{4}$'),
+  rrn              TEXT NULL,
+  approval_code    TEXT NULL CHECK (approval_code IS NULL OR approval_code ~ '^[0-9A-Za-z]{1,12}$'),
+  card_scheme      TEXT NULL CHECK (card_scheme IN ('uzcard','humo','visa','mastercard','unionpay','mir','other')),
+  manual_reason    TEXT NULL CHECK (manual_reason IN ('terminal_offline','terminal_error','unknown_result','standalone_terminal')),
   is_offline       BOOLEAN NOT NULL DEFAULT false,
   approved_by      UUID NULL REFERENCES app.users(id),
   approved_at      TIMESTAMPTZ NULL,
@@ -1072,8 +1263,16 @@ CREATE TABLE app.returns (
   UNIQUE (tenant_id, device_id, temp_number),
   UNIQUE (tenant_id, client_event_id),
   CHECK (refund_method <> 'debt_adjustment' OR counterparty_id IS NOT NULL),
-  CHECK (sale_id IS NOT NULL OR approved_by IS NOT NULL) -- chek topilmagan qaytarish — har doim tasdiq bilan
+  CHECK (sale_id IS NOT NULL OR approved_by IS NOT NULL), -- chek topilmagan qaytarish — har doim tasdiq bilan
+  CHECK ((refund_method = 'card') = (card_entry_mode IS NOT NULL)),
+  CHECK (card_entry_mode IS DISTINCT FROM 'integrated' OR (card_terminal_transaction_id IS NOT NULL
+         AND rrn IS NOT NULL AND card_mask IS NOT NULL AND manual_reason IS NULL)),
+  CHECK (card_entry_mode IS DISTINCT FROM 'manual' OR (card_terminal_transaction_id IS NULL AND manual_reason IS NOT NULL)),
+  CHECK (refund_method = 'card' OR (card_type IS NULL AND card_mask IS NULL AND rrn IS NULL AND approval_code IS NULL
+         AND card_scheme IS NULL AND manual_reason IS NULL AND card_terminal_transaction_id IS NULL))
 );
+CREATE UNIQUE INDEX uq_returns_card_tx ON app.returns (card_terminal_transaction_id)
+  WHERE card_terminal_transaction_id IS NOT NULL;
 
 CREATE TABLE app.return_lines (
   id                 UUID PRIMARY KEY DEFAULT app.uuidv7(),
@@ -1496,6 +1695,12 @@ CREATE TABLE app.debt_payments (
   rrn             TEXT NULL,
   qr_type         TEXT NULL CHECK (qr_type IN ('static','dynamic')),
   checkout_ref    UUID NULL REFERENCES app.payment_checkouts(checkout_ref),
+  card_entry_mode  TEXT NULL CHECK (card_entry_mode IN ('integrated','manual')), -- qaror #71, sale_payments bilan bir xil qoida
+  card_terminal_transaction_id UUID NULL REFERENCES app.card_terminal_transactions(id),
+  approval_code    TEXT NULL CHECK (approval_code IS NULL OR approval_code ~ '^[0-9A-Za-z]{1,12}$'),
+  card_scheme      TEXT NULL CHECK (card_scheme IN ('uzcard','humo','visa','mastercard','unionpay','mir','other')),
+  card_type_source TEXT NULL CHECK (card_type_source IN ('terminal','bin_table','cashier')),
+  manual_reason    TEXT NULL CHECK (manual_reason IN ('terminal_offline','terminal_error','unknown_result','standalone_terminal')),
   promise_date    DATE NULL, -- qoldiq uchun yangi va'da sanasi (qarz daftari ko'rinishi oxirgisini oladi)
   receipt_seq     INT NULL CHECK (receipt_seq IS NULL OR receipt_seq > 0),
                   -- debt_settlement cheki raqami — qurilma beradi, smena ichida ketma-ket (qaror #12); bank'da NULL
@@ -1523,8 +1728,18 @@ CREATE TABLE app.debt_payments (
   CHECK ((method = 'card') = (card_type IS NOT NULL)),
   CHECK (card_type IS DISTINCT FROM 'social' OR (card_mask IS NOT NULL AND rrn IS NOT NULL)),
   CHECK (method = 'card' OR (card_mask IS NULL AND rrn IS NULL)),
+  CHECK ((method = 'card') = (card_entry_mode IS NOT NULL)),
+  CHECK ((method = 'card') = (card_type_source IS NOT NULL)),
+  CHECK (card_entry_mode IS DISTINCT FROM 'integrated' OR (card_terminal_transaction_id IS NOT NULL
+         AND rrn IS NOT NULL AND card_mask IS NOT NULL AND manual_reason IS NULL)),
+  CHECK (card_entry_mode IS DISTINCT FROM 'manual' OR (card_terminal_transaction_id IS NULL
+         AND manual_reason IS NOT NULL AND card_type_source = 'cashier')),
+  CHECK (method = 'card' OR (approval_code IS NULL AND card_scheme IS NULL AND manual_reason IS NULL
+         AND card_terminal_transaction_id IS NULL)),
   CHECK (unallocated_amount <= amount)
 );
+CREATE UNIQUE INDEX uq_debt_payments_card_tx ON app.debt_payments (card_terminal_transaction_id)
+  WHERE card_terminal_transaction_id IS NOT NULL;
 
 CREATE TABLE app.debt_payment_allocations (
   id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
@@ -1801,6 +2016,45 @@ CREATE TABLE app.bank_settlements (
   CHECK (gross_amount - commission_amount + variance_amount > 0)
 );
 CREATE INDEX idx_bank_settlements_branch_date ON app.bank_settlements (tenant_id, branch_id, doc_date);
+
+-- Terminal settlement'i («сверка итогов», kunni yopish; qaror #71): smena yopilishida POS/agent settlement()
+-- chaqiradi (POS yopiq bo'lsa — agent vazifasi card.settlement). Terminal jamlari bizning integrated tranzaksiyalar
+-- jami (expected_*) bilan solishtiriladi; farq — status='mismatch' + BO-14 ogohlantirishi. Bank ko'chirmasi
+-- (bank_settlements, method='card') shu partiyaga bank_settlement_id orqali bog'lanadi (13 §2.18a). Provodka yo'q.
+CREATE TABLE app.card_terminal_settlements (
+  id                UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id         UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id         UUID NOT NULL REFERENCES app.branches(id),
+  card_terminal_id  UUID NOT NULL REFERENCES app.card_terminals(id),
+  shift_id          UUID NULL REFERENCES app.shifts(id),
+  batch_no          TEXT NULL,                     -- terminal partiya raqami
+  business_date     DATE NOT NULL,
+  settled_at        TIMESTAMPTZ NOT NULL,          -- terminal vaqti
+  purchase_count    INT NOT NULL DEFAULT 0 CHECK (purchase_count >= 0),
+  purchase_total    NUMERIC(18,2) NOT NULL DEFAULT 0 CHECK (purchase_total >= 0),
+  refund_count      INT NOT NULL DEFAULT 0 CHECK (refund_count >= 0),
+  refund_total      NUMERIC(18,2) NOT NULL DEFAULT 0 CHECK (refund_total >= 0),
+  net_total         NUMERIC(18,2) GENERATED ALWAYS AS (purchase_total - refund_total) STORED,
+  expected_count    INT NOT NULL DEFAULT 0,        -- server: shu terminal partiyasidagi approved purchase soni
+  expected_total    NUMERIC(18,2) NOT NULL DEFAULT 0, -- server: Σ approved purchase − Σ approved refund
+  variance          NUMERIC(18,2) GENERATED ALWAYS AS (purchase_total - refund_total - expected_total) STORED,
+  status            TEXT NOT NULL CHECK (status IN ('matched','mismatch','failed')),
+  bank_settlement_id UUID NULL REFERENCES app.bank_settlements(id), -- bank tushumi tasdig'i bilan moslashtirilgach
+  terminal_response JSONB NOT NULL DEFAULT '{}',
+  client_event_id   UUID NULL,
+  device_id         UUID NULL REFERENCES app.devices(id),
+  created_by        UUID NULL REFERENCES app.users(id), -- NULL — agent vazifasi (card.settlement)
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, client_event_id),
+  CHECK (status <> 'matched' OR (purchase_total - refund_total) = expected_total)
+);
+CREATE UNIQUE INDEX uq_cts_batch ON app.card_terminal_settlements (card_terminal_id, batch_no) WHERE batch_no IS NOT NULL;
+CREATE INDEX idx_cts_terminal_date ON app.card_terminal_settlements (tenant_id, card_terminal_id, business_date);
+CREATE INDEX idx_cts_unmatched_bank ON app.card_terminal_settlements (tenant_id, business_date)
+  WHERE bank_settlement_id IS NULL AND status <> 'failed';
+ALTER TABLE app.card_terminal_transactions ADD CONSTRAINT fk_ctt_settlement
+  FOREIGN KEY (settlement_id) REFERENCES app.card_terminal_settlements(id);
 
 -- qo'lda buxgalteriya tuzatishi uchun hujjat; bir bosqichli (post darhol
 -- status=posted qaytaradi, draft bosqichi yo'q), doc_sequences kodi 'BX'.
@@ -2222,7 +2476,7 @@ CREATE TABLE app.ettn_documents (
 CREATE TABLE app.state_reports (
   id                 UUID PRIMARY KEY DEFAULT app.uuidv7(),
   tenant_id          UUID NOT NULL REFERENCES app.tenants(id),
-  tax_type           TEXT NOT NULL CHECK (tax_type IN ('vat','turnover','property','land','pit','social')),
+  tax_type           TEXT NOT NULL CHECK (tax_type IN ('vat','turnover')), -- MVP: QQS va aylanma solig'i (05 §1.3 — mol-mulk/yer/JShDS/ijtimoiy Won't)
   period             DATE NOT NULL,
   published_at       TIMESTAMPTZ NULL,
   deadline_at        TIMESTAMPTZ NULL, -- min(published_at + 5 ish kuni, topshirish muddati) (SK 5-modda 7-qism, 81-modda 6-qism)
@@ -2273,7 +2527,8 @@ CREATE TABLE app.tenant_secrets (
   tenant_id   UUID NOT NULL REFERENCES app.tenants(id),
   branch_id   UUID NULL REFERENCES app.branches(id), -- NULL = butun tenant uchun yagona (filialga xos bo'lmagan)
   cash_register_id UUID NULL REFERENCES app.cash_registers(id), -- uzqr: dinamik QR API kaliti har kassa uchun alohida
-  kind        TEXT NOT NULL CHECK (kind IN ('faktura_uz','crpt','click','payme','uzum','uzqr','fiscal_partner','eimzo')),
+  kind        TEXT NOT NULL CHECK (kind IN ('faktura_uz','crpt','click','payme','uzum','uzqr','fiscal_partner','eimzo',
+                                    'card_terminal_vendor')), -- card_terminal_vendor — CloudTerminalAdapter (qaror #71)
   ciphertext  BYTEA NOT NULL,
   key_version INT NOT NULL,
   rotated_at  TIMESTAMPTZ NULL,
@@ -2329,7 +2584,7 @@ CREATE TABLE app.sync_exceptions (
   kind            TEXT NOT NULL CHECK (kind IN ('price_mismatch','archived_product','stock_negative',
                     'debt_limit_exceeded_offline','approval_limit_exceeded_offline','receipt_seq_conflict',
                     'debt_overpayment_offline','debt_allocation_mismatch','late_in_closed_period','cost_unknown',
-                    'count_late_move')), -- 16 §5 ro'yxati
+                    'count_late_move','card_result_mismatch','card_orphan_transaction')), -- 16 §5 ro'yxati
   doc_type        TEXT NULL,
   doc_id          UUID NULL,
   details         JSONB NOT NULL DEFAULT '{}',
@@ -2686,11 +2941,13 @@ CREATE TABLE app.onec_agents (
 CREATE INDEX idx_onec_agents_tenant_status ON app.onec_agents (tenant_id, status);
 -- kassa ↔ agent bog'lanishi (lokal fiskal ko'prik, qaror #66); cash_registers.fiscal_agent_id 0002 da FK'siz
 ALTER TABLE app.cash_registers ADD CONSTRAINT fk_cr_fiscal_agent FOREIGN KEY (fiscal_agent_id) REFERENCES app.onec_agents(id);
+-- karta terminali ↔ agent (adapter='agent_ecr', qaror #71); card_terminals.agent_id 0010 da FK'siz
+ALTER TABLE app.card_terminals ADD CONSTRAINT fk_ct_agent FOREIGN KEY (agent_id) REFERENCES app.onec_agents(id);
 ```
 
 #### `onec_agent_tasks`
 
-Agent faqat shu jadvaldan vazifa oladi (pull, lease, imzo). Holat mashinasi — 33 §5.15. Xizmat vazifalari (`fiscal.*`, `print.raw`, `scale.plu_upload`; `purpose='device_service'`) — 1C bazasiz, payload'lari 34 §14.3. `base_id`, `batch_id`, `item_id`, `ref_create_request_id`, `reconciliation_id` FK'lari — `0029 onec_integration` da (kechiktirilgan FK bloki).
+Agent faqat shu jadvaldan vazifa oladi (pull, lease, imzo). Holat mashinasi — 33 §5.15. Xizmat vazifalari (`fiscal.*`, `print.raw`, `scale.plu_upload`, `card.status`, `card.settlement`; `purpose='device_service'`) — 1C bazasiz, payload'lari 34 §14.3. `card.status` — karta terminallari holati va hal qilinmagan `unknown` urinishlar (har 5 daqiqa) → `card_terminals.health_status`/`health_checked_at`, `card_terminal_transactions` holat so'rovi natijasi; `card.settlement` — POS'siz smena yopilishi/kun oxirida terminal settlement'i → `card_terminal_settlements` (`created_by` NULL) (qaror #71); ikkalasi faqat `capabilities.card_terminal.enabled = true` agentga navbatga qo'yiladi. `base_id`, `batch_id`, `item_id`, `ref_create_request_id`, `reconciliation_id` FK'lari — `0029 onec_integration` da (kechiktirilgan FK bloki).
 
 ```sql
 CREATE TABLE app.onec_agent_tasks (
@@ -2705,7 +2962,8 @@ CREATE TABLE app.onec_agent_tasks (
   kind                   TEXT NOT NULL CHECK (kind IN ('probe','discover_bases','read_metadata','read_refs',
                            'read_date_prohibition','read_totals','read_stock_balances','preview_object','write_object',
                            'post_object','unpost_object','mark_delete_object','collect_diagnostics',
-                           'fiscal.status','fiscal.resend_unsent','fiscal.zreport','print.raw','scale.plu_upload')),
+                           'fiscal.status','fiscal.resend_unsent','fiscal.zreport','print.raw','scale.plu_upload',
+                           'card.status','card.settlement')), -- card.* — karta terminali (qaror #71)
   purpose                TEXT NOT NULL CHECK (purpose IN ('onboarding','mapping','export','reconcile','correction',
                            'ref_create','diagnostics','user_test','device_service')),
   is_write               BOOLEAN GENERATED ALWAYS AS
@@ -2734,7 +2992,8 @@ CREATE TABLE app.onec_agent_tasks (
   CHECK (status <> 'leased' OR (lease_id IS NOT NULL AND lease_until IS NOT NULL AND signature IS NOT NULL)),
   CHECK (status NOT IN ('done','failed') OR outcome IS NOT NULL),
   CHECK (base_id IS NOT NULL OR kind IN ('probe','discover_bases','collect_diagnostics',
-         'fiscal.status','fiscal.resend_unsent','fiscal.zreport','print.raw','scale.plu_upload')),
+         'fiscal.status','fiscal.resend_unsent','fiscal.zreport','print.raw','scale.plu_upload',
+         'card.status','card.settlement')),
   CHECK ((kind LIKE '%.%') = (purpose = 'device_service')),
   CHECK (kind NOT LIKE '%.%' OR base_id IS NULL),
   CHECK (NOT is_write OR base_id IS NOT NULL)
@@ -3426,7 +3685,7 @@ CREATE TRIGGER trg_no_update_delete BEFORE UPDATE OR DELETE ON auth.login_attemp
   FOR EACH ROW EXECUTE FUNCTION app.forbid_mutation();
 ```
 
-`stock_lots`/`avg_costs`/`stock_balances`/`debt_balances` — **UPDATE ruxsat etilgan** (balans-keshi, 2.7-bo'limdagi upsert naqshi); ularning yaxlitligi FK + `CHECK (qty_left >= 0)` kabi cheklovlar va posting xizmatining `FOR UPDATE` qulfi bilan ta'minlanadi, DB darajasidagi `REVOKE` emas. `fiscal_receipts`, `marking_codes`, `outbox_jobs`, `recost_jobs`, `import_jobs`, `einvoices`, `ettn_documents`, `state_reports`, `state_report_diffs`, `refresh_tokens`, `sessions`, `otp_challenges`, `approval_requests`, `payment_checkouts`, `ai_ocr_jobs`, `ledger_adjustments` — holat-mashinasi jadvallari, `UPDATE` tabiiy ravishda kerak (status o'tishlari), append-only emas. 1C jadvallaridan `onec_task_results`, `onec_events`, `onec_agent_logs` — ilova faqat `INSERT` qiladi, lekin saqlash muddati tugagach `onec_cleanup` job'i `DELETE` qiladi (2.11-bo'lim jadvali), shuning uchun append-only ro'yxatida emas.
+`stock_lots`/`avg_costs`/`stock_balances`/`debt_balances` — **UPDATE ruxsat etilgan** (balans-keshi, 2.7-bo'limdagi upsert naqshi); ularning yaxlitligi FK + `CHECK (qty_left >= 0)` kabi cheklovlar va posting xizmatining `FOR UPDATE` qulfi bilan ta'minlanadi, DB darajasidagi `REVOKE` emas. `fiscal_receipts`, `marking_codes`, `outbox_jobs`, `recost_jobs`, `import_jobs`, `einvoices`, `ettn_documents`, `state_reports`, `state_report_diffs`, `refresh_tokens`, `sessions`, `otp_challenges`, `approval_requests`, `payment_checkouts`, `card_terminal_transactions`, `card_terminal_settlements`, `ai_ocr_jobs`, `ledger_adjustments` — holat-mashinasi jadvallari, `UPDATE` tabiiy ravishda kerak (status o'tishlari), append-only emas. 1C jadvallaridan `onec_task_results`, `onec_events`, `onec_agent_logs` — ilova faqat `INSERT` qiladi, lekin saqlash muddati tugagach `onec_cleanup` job'i `DELETE` qiladi (2.11-bo'lim jadvali), shuning uchun append-only ro'yxatida emas.
 
 ---
 
@@ -3545,12 +3804,13 @@ CREATE POLICY memberships_scope ON app.memberships
 
 ### 4.4 Global/platforma jadvallari — RLS o'rniga GRANT cheklovi
 
-`plans`, `addons`, `units`, `oauth_clients`, `signing_keys`, `label_templates`, `marking_product_groups`, `terms_versions`, `turnover_tax_rates`, `fx_rates` — `tenant_id`siz, RLS **yoqilmaydi**; o'rniga faqat `SELECT` beriladi (yozish — faqat `erp_migrator`/admin yo'li orqali). `platform_admins` — `erp_app`ga **umuman** grant yo'q (platforma admin BFF alohida, yuqori ishonchli yo'l orqali ishlaydi, `15-xavfsizlik-va-audit.md` §3.4).
+`plans`, `addons`, `units`, `oauth_clients`, `signing_keys`, `label_templates`, `marking_product_groups`, `terms_versions`, `turnover_tax_rates`, `fx_rates`, `card_bin_rules` — `tenant_id`siz, RLS **yoqilmaydi**; o'rniga faqat `SELECT` beriladi (yozish — faqat `erp_migrator`/admin yo'li orqali). `platform_admins` — `erp_app`ga **umuman** grant yo'q (platforma admin BFF alohida, yuqori ishonchli yo'l orqali ishlaydi, `15-xavfsizlik-va-audit.md` §3.4).
 
 ```sql
 GRANT SELECT ON platform.plans, platform.addons, platform.units,
                 platform.oauth_clients, platform.signing_keys, platform.label_templates,
-                platform.marking_product_groups, platform.terms_versions, platform.turnover_tax_rates
+                platform.marking_product_groups, platform.terms_versions, platform.turnover_tax_rates,
+                platform.card_bin_rules
   TO erp_app;
 -- kurs scheduler'i (erp_app ulanishi) yozadi (qaror #55)
 GRANT SELECT, INSERT, UPDATE ON platform.fx_rates TO erp_app;
@@ -4522,28 +4782,28 @@ INSERT INTO app.warehouses (tenant_id, branch_id, name, type, inventory_account)
 | 0004 | `label_templates` | `platform.label_templates`, `platform.marking_product_groups` (qaror #63) |
 | 0005 | `valuation_method_history` | `app.valuation_method_history` |
 | 0006 | `counterparties` | `counterparties` (+`debt_due_date`, `is_founder`), `debt_doubtful_flags` |
-| 0007 | `platform_global` | `platform.plans`, `addons`, `units`, `signing_keys` (`purpose` ichida `onec_task`/`agent_update`), `platform_admins`, `fx_rates` (qaror #55), `terms_versions` (qaror #61), `turnover_tax_rates` + `app.subscriptions`, `tenant_addons`, `billing_payments` (davr/kvitansiya ustunlari, +`kind`/`reason`/`actor_user_id`, qaror #56), `tenant_tax_regimes`, `consents` (qaror #61) |
+| 0007 | `platform_global` | `platform.plans`, `addons`, `units`, `signing_keys` (`purpose` ichida `onec_task`/`agent_update`), `platform_admins`, `fx_rates` (qaror #55), `terms_versions` (qaror #61), `turnover_tax_rates`, `card_bin_rules` (qaror #71) + `app.subscriptions`, `tenant_addons`, `billing_payments` (davr/kvitansiya ustunlari, +`kind`/`reason`/`actor_user_id`, qaror #56), `tenant_tax_regimes`, `consents` (qaror #61) |
 | 0008 | `catalog_pricing` | `product_categories`, `products` (`mxik_code` NULL ruxsat; `name_ru` nullable — qaror #29; `marking_group_code` — qaror #63; `turnover_tax_group`), `product_barcodes`, `product_prices`, `label_print_queue`, `internal_barcode_seq`, `discount_rules`; `products.package_code` uzunlik CHECK |
 | 0009 | `counterparty_statement_links` | `app.counterparty_statement_links` (`counterparties`dan keyin) |
-| 0010 | `approval_payment_infra` | `approval_requests`, `doc_approvals`, `payment_checkouts` — `docs_sales`dan **oldin**, `sale_payments.checkout_ref` FK uchun |
-| 0011 | `docs_sales` | `shifts` (`shift_no`/`variance`, `status` — `open`/`closed`), `sales` (+`is_offline`/`debt_limit_exceeded`), `sale_lines` (chegirma/QQS ustunlari, `settled_amount`), `sale_payments` (+`due_date`/`checkout_ref`, `card_type`/`card_mask`/`rrn` va UzQR CHECK'lari — qaror #64) |
-| 0012 | `docs_returns` | `returns` (+smena/kassa/qaytarish usuli — `uzqr`/`click`/`payme`/`uzum` bilan), `return_lines` (+QQS/marking, `restock` — qaror #48) |
+| 0010 | `approval_payment_infra` | `approval_requests`, `doc_approvals` (`kind` ichida `card_manual_entry`), `payment_checkouts`, `card_terminals` (qaror #71; `agent_id` FK'siz — `fk_ct_agent` 0028 da) — `docs_sales`dan **oldin**, `sale_payments.checkout_ref` FK uchun |
+| 0011 | `docs_sales` | `shifts` (`shift_no`/`variance`, `status` — `open`/`closed`), `sales` (+`is_offline`/`debt_limit_exceeded`), `sale_lines` (chegirma/QQS ustunlari, `settled_amount`), `card_terminal_transactions` (qaror #71; `shifts`dan keyin, `sale_payments`dan oldin; `settlement_id` FK'siz — `fk_ctt_settlement` 0018 da), `sale_payments` (+`due_date`/`checkout_ref`, `card_type`/`card_mask`/`rrn` va UzQR CHECK'lari — qaror #64; `card_entry_mode`/`card_terminal_transaction_id`/`approval_code`/`card_scheme`/`card_type_source`/`manual_reason` va ularning CHECK'lari, `uq_sale_payments_card_tx` — qaror #71) |
+| 0012 | `docs_returns` | `returns` (+smena/kassa/qaytarish usuli — `uzqr`/`click`/`payme`/`uzum` bilan; karta qaytarish rekvizitlari `card_entry_mode`/`card_terminal_transaction_id`/`card_type`/`card_mask`/`rrn`/`approval_code`/`card_scheme`/`manual_reason` + `uq_returns_card_tx` — qaror #71), `return_lines` (+QQS/marking, `restock` — qaror #48) |
 | 0013 | `docs_purchasing` | `purchase_orders` (+`warehouse_id`), `po_lines` (`price` ixtiyoriy), `goods_receipts` (+`source`/`einvoice_id`/`ai_ocr_job_id`/`ettn_ref`/`poa_id`/`poa_number`/`kind`), `receipt_lines` (+`vat_exemption_code`, `discrepancy_reason`) |
 | 0014 | `docs_inventory` | `transfers` (+`sent_at/by`, `received_at/by`), `transfer_lines` (`lot_id` yo'q, `lot_allocations` JSONB), `transfers` (+`transport_mode`/`ettn_ref`/`vehicle_plate`/`driver_name`), `stock_counts` (+`started_at`/`responsible_user_id`), `count_lines` (`counted` NULL, +`snapshot_qty`/`counted_at` — qaror #53), `write_offs` (+`responsible_user_id`/`promo_order_ref`/`source_return_id`), `write_off_lines` (+`expired_return`, `gift_kind`), `stock_openings`, `opening_lines` |
 | 0015 | `registers` | `stock_moves`, `stock_lots` (`source_doc_type` ko'plik, +`stock_counts`, `blocked_qty`) (+ `supplier_returns` (+`reason`) / `supplier_return_lines`), `avg_costs` (+`total_value`), `stock_balances`, `debt_moves` (+`limit_exceeded`), `debt_balances`, `cash_moves` (`method` CHECK + bank_account_id izohi), `ledger_entries` (+`branch_id`, hisob kodi formati CHECK), `vat_moves`; append-only `REVOKE`+trigger (3-bo'lim, **+`app.doc_approvals`) |
 | 0016 | `ledger_adjustments` | `app.ledger_adjustments` (doc_sequences kodi `BX`, +`analytics`) |
-| 0017 | `docs_pricing_debts` | `price_changes`, `price_change_lines` (+`valid_from`), `debt_openings` (+`due_date`), `debt_payments` (`method` to'liq ro'yxat + checkout/promise_date, +`card_type`/`card_mask`/`rrn`/`qr_type`, `receipt_seq`, `unallocated_amount`, bank ↔ kassasiz CHECK), `debt_payment_allocations` (`target_doc_type` CHECK, +`debt_writeoffs`), `debt_writeoffs` (+`reason`, `account_choice` default, `tax_writeoff_basis`), `supplier_payments` (+`cash_register_id`/`shift_id`), `supplier_payment_allocations` (`target_doc_type` CHECK) |
-| 0018 | `docs_expenses_cash` | `expense_categories` (+`version`, `code`/`default_account`/`source_ref`), `recurring_expenses`, `attachments` (+`content_type`/`original_name`/`sha256`/`kind` CHECK), `expenses` (+`tax_type`), `cash_movements` (+`counterparty_id`, `account`, `employee_id`, `reason`↔`direction` CHECK), `bank_statement_imports`, `bank_settlements` (qaror #42, `attachments`dan keyin; +`variance_amount`, `statement_import_id`), `tax_settlements` (kod `ST`; `vat_offset` — (tenant, davr), `turnover_tax` — (filial, davr) bo'yicha yagona); shu revizionda `attachments` mavjud bo'lgach `ALTER TABLE billing_payments ADD CONSTRAINT fk_bp_invoice_attachment ...` |
+| 0017 | `docs_pricing_debts` | `price_changes`, `price_change_lines` (+`valid_from`), `debt_openings` (+`due_date`), `debt_payments` (`method` to'liq ro'yxat + checkout/promise_date, +`card_type`/`card_mask`/`rrn`/`qr_type`, `receipt_seq`, `unallocated_amount`, bank ↔ kassasiz CHECK; qaror #71 karta ustunlari va `uq_debt_payments_card_tx` — `sale_payments` bilan bir xil), `debt_payment_allocations` (`target_doc_type` CHECK, +`debt_writeoffs`), `debt_writeoffs` (+`reason`, `account_choice` default, `tax_writeoff_basis`), `supplier_payments` (+`cash_register_id`/`shift_id`), `supplier_payment_allocations` (`target_doc_type` CHECK) |
+| 0018 | `docs_expenses_cash` | `expense_categories` (+`version`, `code`/`default_account`/`source_ref`), `recurring_expenses`, `attachments` (+`content_type`/`original_name`/`sha256`/`kind` CHECK), `expenses` (+`tax_type`), `cash_movements` (+`counterparty_id`, `account`, `employee_id`, `reason`↔`direction` CHECK), `bank_statement_imports`, `bank_settlements` (qaror #42, `attachments`dan keyin; +`variance_amount`, `statement_import_id`), `card_terminal_settlements` (qaror #71, `bank_settlements`dan keyin) + `fk_ctt_settlement`, `tax_settlements` (kod `ST`; `vat_offset` — (tenant, davr), `turnover_tax` — (filial, davr) bo'yicha yagona); shu revizionda `attachments` mavjud bo'lgach `ALTER TABLE billing_payments ADD CONSTRAINT fk_bp_invoice_attachment ...` |
 | 0019 | `doc_sequences` | `doc_sequences`, `app.next_doc_number()`; kod ro'yxatiga `BX`=ledger_adjustments, `BT`=bank_settlements, `ST`=tax_settlements |
 | 0020 | `fiscal_marking_edocs` | `fiscal_receipts` (`kind` + `debt_settlement`/`credit_sale`, `debt_payment_id`, `fm_terminal_id`/`fm_receipt_seq`/`fiscal_at`/`ofd_acked_at`, `payment_form`, `delivery`; qaror #30, #43, #45), `marking_codes`, `einvoices` (status CHECK + summalar + `uq_einvoice_out_per_doc`, `risk_flag` + `unknown`, `factura_type`/`related_einvoice_id`), `powers_of_attorney` (`einvoices` dan keyin), `ettn_documents` (+`transfer_id`/`transport_type`/`direction`/`counterparty_id`/`receipt_id`/`doc_date`/`payload`/`signed_at`/`last_error`, `status` CHECK `failed` bilan — qaror #63), `state_reports` (+solishtirish ustunlari, `confirmed`, `correction_comment`/`correction_portal_ref`/`confirmed_at`/`confirmed_by`), `state_report_diffs`; shu revizionda `einvoices`/`marking_codes`/`powers_of_attorney` mavjud bo'lgach `fk_gr_einvoice`, `fk_vm_einvoice`, `fk_sl_marking`, `fk_gr_poa` |
 | 0021 | `ai_ocr_jobs` | `app.ai_requests` (`ai_ocr_jobs.ai_request_id` FK uchun oldin), `app.ai_ocr_jobs` (`doc_type_hint` — `purchase`/`catalog`, `created_product_ids`) + `fk_gr_ocr_job` (`goods_receipts.ai_ocr_job_id` → `ai_ocr_jobs.id`) |
-| 0022 | `integration_sync` | `app.tenant_secrets` (integratsiya hisob ma'lumotlari, +`cash_register_id` — UzQR kaliti); `outbox_jobs` (17 qiymatli `kind` ro'yxati — `poa_send`, `marking_supplier_return`, `marking_writeoff`, `billing_webhook_reconcile` bilan; job-progress ustunlari), `sync_receipts`, `sync_exceptions` (qaror #56; `kind` CHECK — 16 §5 ro'yxati), `idempotency_keys`, `recost_jobs`, `import_jobs` (holatlar + `result`) |
+| 0022 | `integration_sync` | `app.tenant_secrets` (integratsiya hisob ma'lumotlari, +`cash_register_id` — UzQR kaliti); `outbox_jobs` (17 qiymatli `kind` ro'yxati — `poa_send`, `marking_supplier_return`, `marking_writeoff`, `billing_webhook_reconcile` bilan; job-progress ustunlari), `sync_receipts`, `sync_exceptions` (qaror #56; `kind` CHECK — 16 §5 ro'yxati, +`card_result_mismatch`/`card_orphan_transaction` — qaror #71), `idempotency_keys`, `recost_jobs`, `import_jobs` (holatlar + `result`) |
 | 0023 | `notifications_ai` | `telegram_links`, `notification_settings`, `notifications_log`, `ai_training_samples`, `ai_feedback`, `tenant_glossary` |
 | 0024 | `audit_periods` | `audit_log`, `period_closings` |
-| 0025 | `updated_at_triggers` | 2.10-bo'limdagi `DO` bloki |
-| 0026 | `rls_policies` | 4.2–4.4-bo'limlardagi `DO` bloki + maxsus siyosatlar + GRANT/REVOKE (+`platform.label_templates`/`marking_product_groups`/`terms_versions`/`turnover_tax_rates` SELECT, `platform.fx_rates` SELECT/INSERT/UPDATE) |
+| 0025 | `updated_at_triggers` | 2.10-bo'limdagi `DO` bloki (jumladan `card_terminals`, `card_terminal_transactions`, `card_terminal_settlements`, `platform.card_bin_rules`) |
+| 0026 | `rls_policies` | 4.2–4.4-bo'limlardagi `DO` bloki + maxsus siyosatlar + GRANT/REVOKE (+`platform.label_templates`/`marking_product_groups`/`terms_versions`/`turnover_tax_rates`/`card_bin_rules` SELECT, `platform.fx_rates` SELECT/INSERT/UPDATE) |
 | 0027 | `security_definer_functions` | 4.5-bo'limdagi 4 funksiya + `auth_consume_code`/`auth_rotate_refresh`/`auth_revoke_tenant`/`auth_suspend_tenant` + (`payments_checkout_by_provider_tx`, `payments_checkout_by_ref`, `billing_payment_by_id`, `public_statement_by_token`) + 14 ta AS yozuvchi/sessiya funksiyasi (`auth_issue_code` … `auth_telegram_chat_by_phone`) — jami 26; ular o'qiydigan `app` jadvallariga `erp_system` uchun nomma-nom `GRANT SELECT` |
-| 0028 | `store_agent` | Do'kon agenti umumiy registri (2.11-bo'lim, qaror #66): `app.onec_agents` (+`capabilities`), `app.onec_agent_tasks` (1C ustunlari FK'siz; fiskal/printer/tarozi xizmat vazifalari, `purpose='device_service'`), `app.onec_task_results`, `auth.onec_device_authorizations`; `fk_cr_fiscal_agent` (`cash_registers.fiscal_agent_id` → `onec_agents`); `updated_at` trigger'lari (2.10, 2 jadval); RLS uchligi (4.2, 3 jadval); grantlar (4.4); 6 ta `SECURITY DEFINER` funksiya (`onec_device_auth_start/lookup/approve/poll/deny`, `onec_agent_credentials`; 4.5). `0002`/`0007` dagi `devices`, `signing_keys`, `cash_registers` ga bog'liq. Bosqich 5 |
+| 0028 | `store_agent` | Do'kon agenti umumiy registri (2.11-bo'lim, qaror #66): `app.onec_agents` (+`capabilities`), `app.onec_agent_tasks` (1C ustunlari FK'siz; fiskal/printer/tarozi/karta terminali xizmat vazifalari — `card.status`, `card.settlement` (qaror #71), `purpose='device_service'`), `app.onec_task_results`, `auth.onec_device_authorizations`; `fk_cr_fiscal_agent` (`cash_registers.fiscal_agent_id` → `onec_agents`), `fk_ct_agent` (`card_terminals.agent_id` → `onec_agents`, qaror #71); `updated_at` trigger'lari (2.10, 2 jadval); RLS uchligi (4.2, 3 jadval); grantlar (4.4); 6 ta `SECURITY DEFINER` funksiya (`onec_device_auth_start/lookup/approve/poll/deny`, `onec_agent_credentials`; 4.5). `0002`/`0007` dagi `devices`, `signing_keys`, `cash_registers` ga bog'liq. Bosqich 5 |
 | 0029 | `onec_integration` | 1C integratsiyasi (2.11-bo'lim, `33-1c-integratsiya.md` §5): 15 ta `app.onec_*` jadval (FK tartibida: `onec_bases` → `onec_settings`, `onec_branch_bindings`, `onec_metadata_snapshots`, `onec_catalog_items`, `onec_mappings`, `onec_value_mappings`, `onec_ref_create_requests` → `onec_export_batches` → `onec_export_items` → `onec_export_item_sources`, `onec_object_refs` → `onec_reconciliations`, `onec_events`, `onec_agent_logs`); `onec_forbid_namespace_change` trigger'i; kechiktirilgan FK'lar, jumladan `onec_agent_tasks` ga `fk_oat_base`, `fk_oat_batch`, `fk_oat_item`, `fk_oat_ref_create`, `fk_oat_reconciliation`; `updated_at` trigger'lari (2.10, 11 jadval); RLS uchligi (4.2, 15 jadval); grantlar (4.4); `onec_tenants_due` (4.5). `onec_metadata_snapshots`/`onec_reconciliations`/`onec_events` `task_id` FK'lari `ON DELETE SET NULL` (o'qish vazifalari 30 kunda tozalanadi). `0018` dagi `attachments`ga bog'liq. Bosqich 7 |
 
 Seed (5-bo'lim) — **Alembic revizion emas** (`23-backend-arxitekturasi.md` §11: "bazani versiyalash bilan aralashtirmaslik uchun"), `migrate` konteyneridan keyin alohida `scripts/seed.py` bosqichi, faqat 5.1 (global) qismini bir marta ishga tushiradi; 5.2 (tenant-provisioning) — har signup'da ilova kodi tomonidan.
@@ -4558,7 +4818,7 @@ WITH exempt AS (
     'platform.plans', 'platform.addons', 'platform.units',
     'platform.oauth_clients', 'platform.signing_keys', 'platform.platform_admins',
     'platform.label_templates', 'platform.fx_rates', 'platform.terms_versions',
-    'platform.marking_product_groups', 'platform.turnover_tax_rates',
+    'platform.marking_product_groups', 'platform.turnover_tax_rates', 'platform.card_bin_rules',
     'auth.user_credentials', 'auth.otp_challenges', 'auth.login_attempts',
     'auth.authorization_codes', 'auth.refresh_tokens', 'auth.sessions',
     'auth.onec_device_authorizations', -- 1C agent device grant: tenant tasdiqqacha noma'lum, faqat SECURITY DEFINER orqali

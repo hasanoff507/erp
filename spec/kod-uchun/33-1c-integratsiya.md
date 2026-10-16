@@ -972,7 +972,7 @@ CREATE INDEX idx_onec_object_refs_drift ON app.onec_object_refs (base_id, last_w
 
 ### 5.15 `onec_agent_tasks`
 
-**Maqsad:** agent faqat shu jadvaldan vazifa oladi (pull, lease, imzo). Do'kon agenti xizmat vazifalari (`fiscal.*`, `print.raw`, `scale.plu_upload`) — `purpose='device_service'`, `base_id IS NULL` (§9.5). Jadval `0028 store_agent` da yaratiladi; `base_id`, `batch_id`, `item_id`, `ref_create_request_id`, `reconciliation_id` FK'lari — `0029 onec_integration` da (§5.21). Eksport itemi har urinishda yangi vazifa qatorini oladi (`attempt` = `onec_export_items.attempts`).
+**Maqsad:** agent faqat shu jadvaldan vazifa oladi (pull, lease, imzo). Do'kon agenti xizmat vazifalari (`fiscal.*`, `print.raw`, `scale.plu_upload`, `card.*`) — `purpose='device_service'`, `base_id IS NULL` (§9.5). Jadval `0028 store_agent` da yaratiladi; `base_id`, `batch_id`, `item_id`, `ref_create_request_id`, `reconciliation_id` FK'lari — `0029 onec_integration` da (§5.21). Eksport itemi har urinishda yangi vazifa qatorini oladi (`attempt` = `onec_export_items.attempts`).
 
 ```sql
 CREATE TABLE app.onec_agent_tasks (
@@ -987,7 +987,7 @@ CREATE TABLE app.onec_agent_tasks (
   kind                   TEXT NOT NULL CHECK (kind IN ('probe','discover_bases','read_metadata','read_refs',
                            'read_date_prohibition','read_totals','read_stock_balances','preview_object','write_object',
                            'post_object','unpost_object','mark_delete_object','collect_diagnostics',
-                           'fiscal.status','fiscal.resend_unsent','fiscal.zreport','print.raw','scale.plu_upload')),
+                           'fiscal.status','fiscal.resend_unsent','fiscal.zreport','print.raw','scale.plu_upload','card.status','card.settlement')),
   purpose                TEXT NOT NULL CHECK (purpose IN ('onboarding','mapping','export','reconcile','correction',
                            'ref_create','diagnostics','user_test','device_service')),
   is_write               BOOLEAN GENERATED ALWAYS AS
@@ -1016,7 +1016,7 @@ CREATE TABLE app.onec_agent_tasks (
   CHECK (status <> 'leased' OR (lease_id IS NOT NULL AND lease_until IS NOT NULL AND signature IS NOT NULL)),
   CHECK (status NOT IN ('done','failed') OR outcome IS NOT NULL),
   CHECK (base_id IS NOT NULL OR kind IN ('probe','discover_bases','collect_diagnostics',
-         'fiscal.status','fiscal.resend_unsent','fiscal.zreport','print.raw','scale.plu_upload')),
+         'fiscal.status','fiscal.resend_unsent','fiscal.zreport','print.raw','scale.plu_upload','card.status','card.settlement')),
   CHECK ((kind LIKE '%.%') = (purpose = 'device_service')),
   CHECK (kind NOT LIKE '%.%' OR base_id IS NULL),
   CHECK (NOT is_write OR base_id IS NOT NULL)
@@ -2291,7 +2291,8 @@ Ishga tushganda, har 600 s, baza ro'yxati yoki PK qulfi o'zgarganda darhol.
     "fiscal": {"enabled": false, "version": 0, "provider": null, "devices": []},
     "print":  {"enabled": true,  "version": 1,
                "devices": [{"local_id": "…", "transport": "tcp9100", "host": "192.168.1.50", "port": 9100, "status": "ok"}]},
-    "scale":  {"enabled": false, "version": 0, "devices": []}
+    "scale":  {"enabled": false, "version": 0, "devices": []},
+    "card_terminal": {"enabled": false, "version": 0, "devices": []}
   },
   "clock": "2026-10-15T18:02:11Z"
 }
@@ -2441,7 +2442,7 @@ Agent faqat shu 13 turni biladi; boshqasi → `ONEC_TASK_REJECTED`. **`delete` (
 
 `Target = {"meta_kind": "Document"|"Catalog", "meta_name": "…", "guid": "…"}`.
 
-**Do'kon agenti kengaytmasi (qaror #60, Bosqich 5).** Yuqoridagi 13 tur — 1C modulining oq ro'yxati, u o'zgarmaydi; 1C protokoli (§9) ham o'zgarmaydi. Xuddi shu agent va shu bulut kanali (A-01…A-10, imzoli vazifa, lease) orqali server navbatga qo'yadigan Do'kon agenti xizmat vazifalari — alohida oila oq ro'yxati, `base_id = null` (1C bazasi talab qilinmaydi), agent `hello` da modulni e'lon qilgandagina (`capabilities.<oila>.enabled = true`, aks holda `AgentTaskPort.enqueue` → `409 AGENT_CAPABILITY_DISABLED`): `fiscal.status`, `fiscal.resend_unsent`, `fiscal.zreport`, `print.raw`, `scale.plu_upload` (MVP'dan keyin). Bu vazifalar `purpose='device_service'` (§5.15 CHECK'lari: `kind` nuqtali ⇔ `purpose='device_service'`, `base_id IS NULL`). Payload'lar: `fiscal.status` / `fiscal.resend_unsent` — `{cash_register_id}`; `fiscal.zreport` — `{cash_register_id, shift_id}`; `print.raw` — `{printer_local_id, data_base64, encoding: "cp866"|"raster"}`; `scale.plu_upload` — `{scale_local_id, items:[{plu, name, price, barcode_prefix}]}`. Natija `fiscal.status` — `{cash_register_id, fm_state, pending_count, oldest_unacked_at, acked:[{fm_terminal_id, fm_receipt_seq, acked_at}]}` → `cash_registers.fm_state`, `fm_receipts_pending`, `last_unacked_receipt_at`, `acked[]` → `fiscal_receipts.ofd_acked_at`. Kassa bog'lanishi — `cash_registers.fiscal_agent_id` + `fiscal_local_device_id` (`capabilities.fiscal.devices[].local_id`). Vazifa va natija — `21-integratsiyalar.md` §16, ishlovchi modullar — `23-backend-arxitekturasi.md` §4.2, agent tomoni — `34-1c-agent.md` §14. Agent infratuzilmasining o'zi (A-01, A-03…A-10, ulash, token, imzo, lease, imzoli yangilanish, `0028 store_agent`) Bosqich 5 da quriladi (qaror #66); 1C vazifa turlari, A-02 va `0029 onec_integration` — Bosqich 7. Sotuv paytidagi fiskallashtirish, chek chop etish va tortish — server vazifasi emas: POS ularni agentning lokal API'si (`127.0.0.1`, `Origin` oq ro'yxati + qurilmaga bog'langan token; sxemalar — `21` §16.1) orqali bajaradi.
+**Do'kon agenti kengaytmasi (qaror #60, Bosqich 5).** Yuqoridagi 13 tur — 1C modulining oq ro'yxati, u o'zgarmaydi; 1C protokoli (§9) ham o'zgarmaydi. Xuddi shu agent va shu bulut kanali (A-01…A-10, imzoli vazifa, lease) orqali server navbatga qo'yadigan Do'kon agenti xizmat vazifalari — alohida oila oq ro'yxati, `base_id = null` (1C bazasi talab qilinmaydi), agent `hello` da modulni e'lon qilgandagina (`capabilities.<oila>.enabled = true`, aks holda `AgentTaskPort.enqueue` → `409 AGENT_CAPABILITY_DISABLED`): `fiscal.status`, `fiscal.resend_unsent`, `fiscal.zreport`, `print.raw`, `scale.plu_upload` (MVP'dan keyin), `card.status`, `card.settlement` (karta terminali, qaror #71). Bu vazifalar `purpose='device_service'` (§5.15 CHECK'lari: `kind` nuqtali ⇔ `purpose='device_service'`, `base_id IS NULL`). Payload'lar: `fiscal.status` / `fiscal.resend_unsent` — `{cash_register_id}`; `fiscal.zreport` — `{cash_register_id, shift_id}`; `print.raw` — `{printer_local_id, data_base64, encoding: "cp866"|"raster"}`; `scale.plu_upload` — `{scale_local_id, items:[{plu, name, price, barcode_prefix}]}`; `card.status` va `card.settlement` payload/natijalari — `21` §16. Natija `fiscal.status` — `{cash_register_id, fm_state, pending_count, oldest_unacked_at, acked:[{fm_terminal_id, fm_receipt_seq, acked_at}]}` → `cash_registers.fm_state`, `fm_receipts_pending`, `last_unacked_receipt_at`, `acked[]` → `fiscal_receipts.ofd_acked_at`. Kassa bog'lanishi — `cash_registers.fiscal_agent_id` + `fiscal_local_device_id` (`capabilities.fiscal.devices[].local_id`). Vazifa va natija — `21-integratsiyalar.md` §16, ishlovchi modullar — `23-backend-arxitekturasi.md` §4.2, agent tomoni — `34-1c-agent.md` §14. Agent infratuzilmasining o'zi (A-01, A-03…A-10, ulash, token, imzo, lease, imzoli yangilanish, `0028 store_agent`) Bosqich 5 da quriladi (qaror #66); 1C vazifa turlari, A-02 va `0029 onec_integration` — Bosqich 7. Sotuv paytidagi fiskallashtirish, chek chop etish va tortish — server vazifasi emas: POS ularni agentning lokal API'si (`127.0.0.1`, `Origin` oq ro'yxati + qurilmaga bog'langan token; sxemalar — `21` §16.1) orqali bajaradi.
 
 Turlar bo'yicha aniqliklar (agent 34 shu qoidalar bilan ishlaydi):
 
@@ -4080,7 +4081,7 @@ Faqat tashqi javob talab qiladigan bandlar; har biri `26-ochiq-savollar-reestri.
 | `16-offline-sync.md` | §3.1 push so'rovida `outbox_state`; §9 — `devices.outbox_*` yangilanishi (§7.3 bilan izchil) |
 | `17-api-umumiy.md` | §15 — 81 ta `ONEC_*` kod (§12; `warn` sinfi — `warnings[]` ichida, 4xx emas); §2 kesishma resurslar ro'yxatiga `/onec-agent/*` (agent tokeni, CSRF'siz) |
 | `20-api-moliya-admin.md` | M19 bo'limida faqat havola (pointer); W-01…W-55 indeksi va tafsiloti uchun kanonik manba — shu faylning §10. `bank_settlements` importi (`POST /bank-settlements/imports`) va tranzit qoldig'i (`GET /bank-settlements/transit-balances`) — `20` da (§6.7 havola qiladi) |
-| `21-integratsiyalar.md` | Yangi §15 «1C integratsiyasi (COM agent)» — qisqa xulosa + `33` ga havola; `outbox_jobs` emas `onec_agent_tasks` istisnosi; §16 Do'kon agenti — bulut vazifa turlari (`fiscal.status`, `fiscal.resend_unsent`, `fiscal.zreport`, `print.raw`, `scale.plu_upload`) shu fayl §9.5 izohi bilan bir xil |
+| `21-integratsiyalar.md` | Yangi §15 «1C integratsiyasi (COM agent)» — qisqa xulosa + `33` ga havola; `outbox_jobs` emas `onec_agent_tasks` istisnosi; §16 Do'kon agenti — bulut vazifa turlari (`fiscal.status`, `fiscal.resend_unsent`, `fiscal.zreport`, `print.raw`, `scale.plu_upload`, `card.status`, `card.settlement`) shu fayl §9.5 izohi bilan bir xil |
 | `23-backend-arxitekturasi.md` | §1 modul `onec_integration` (§4.1), `workers/cron.py` ga 5 cron (§4.4), `OneCChangeTracker` porti |
 | `24-frontend-arxitekturasi.md` | `pages/onec-settings`, `pages/onec-exports` (FSD), polling 2 s |
 | `25-nofunksional-talablar.md` | §15.1 hajm/vaqt maqsadlari |

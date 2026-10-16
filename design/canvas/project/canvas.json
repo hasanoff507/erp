@@ -39,7 +39,7 @@
       "x": 2892,
       "y": 0,
       "w": 1366,
-      "h": 768,
+      "h": 952,
       "title": "POS-03 · To'lov",
       "page": "pos"
     },
@@ -143,7 +143,7 @@
       "x": 4338,
       "y": 2904,
       "w": 1366,
-      "h": 768,
+      "h": 988,
       "title": "POS-16 · Uskunalar sozlamasi",
       "page": "pos"
     },
@@ -167,7 +167,7 @@
       "x": 3040,
       "y": 0,
       "w": 1440,
-      "h": 1080,
+      "h": 1104,
       "title": "BO-02 · Dashboard",
       "page": "bo",
       "expand": "fill"
@@ -257,7 +257,7 @@
       "x": 3040,
       "y": 3660,
       "w": 1440,
-      "h": 1370,
+      "h": 1565,
       "title": "BO-12 · Filiallar",
       "page": "bo",
       "expand": "fill"
@@ -329,7 +329,7 @@
       "x": 0,
       "y": 7380,
       "w": 1440,
-      "h": 1140,
+      "h": 1523,
       "title": "BO-20 · Telegram va bildirishnomalar",
       "page": "bo",
       "expand": "fill"
@@ -338,7 +338,7 @@
       "x": 1520,
       "y": 7380,
       "w": 1440,
-      "h": 2080,
+      "h": 3607,
       "title": "BO-22 · 1C integratsiyasi sozlamalari",
       "page": "bo",
       "expand": "fill"
@@ -347,7 +347,7 @@
       "x": 3040,
       "y": 7380,
       "w": 1440,
-      "h": 1560,
+      "h": 1906,
       "title": "BO-23 · 1C ga yuborish",
       "page": "bo",
       "expand": "fill"
@@ -356,7 +356,7 @@
       "x": 4560,
       "y": 7380,
       "w": 1440,
-      "h": 1360,
+      "h": 2128,
       "title": "BO-24 · Bank tushumi",
       "page": "bo",
       "expand": "fill"
@@ -365,7 +365,7 @@
       "x": 6080,
       "y": 7380,
       "w": 1440,
-      "h": 1120,
+      "h": 1240,
       "title": "ADM-01 · Tenantlar",
       "page": "bo",
       "expand": "fill"

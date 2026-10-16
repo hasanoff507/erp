@@ -132,7 +132,7 @@ Bu faylda har bir endpoint uchun: Maqsad, Ruxsat, So'rov, Javob, Xatolar, Idempo
 
 **Maqsad**: shtrix-kodsiz tovarga ichki kod berish (US-M09-05).
 **Ruxsat**: `catalog.manage`.
-**So'rov**: `{}` (parametrsiz). Server `internal_barcode_seq`dan keyingi qiymatni oladi, EAN-13 nazorat raqami bilan to'liq kod yaratadi, `kind="internal"` bilan yozadi.
+**So'rov**: `{}` (parametrsiz). Server `internal_barcode_seq`dan keyingi qiymatni oladi (`FOR UPDATE`), EAN-13 kodni yaratadi — `04` + 10 raqam + nazorat raqami (GS1 RCN 040–049; tarozi prefikslari 20–29 bilan kesishmaydi, `12-db-sxema.md` `internal_barcode_seq`) — va `kind="internal"` bilan yozadi; diapazon tugasa `422 VALIDATION_ERROR`.
 **Javob**: `201 {barcode, kind:"internal", units_per_barcode:"1.000"}`.
 **Idempotentlik**: `Idempotency-Key` majburiy (ikki marta bosilsa ikki kod berilmasligi uchun).
 **Bog'liq**: US-M09-05, BO-18.

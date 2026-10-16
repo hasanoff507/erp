@@ -42,7 +42,7 @@
 - Offlayn holatda markirovkalangan tovar sotiladi: kod chek ichida saqlanadi va chek bilan OFD orqali Asl belgisiga ketadi (qaror #62), qatorda "fiskal-pending" belgisi; narx qurilmada ma'lum bo'lmasa — "Offlaynda sotib bo'lmaydi, narx noma'lum" (taqiqlangan), `03-modullar-talablari.md` M01 Offline xatti-harakati.
 
 ### 1.4 Til (o'zbek/rus)
-- Standart til — o'zbek (lotin). Til almashtirish — yuqori o'ng burchakda bir xil belgi (masalan "UZ/RU") barcha ekranlarda.
+- Standart til — o'zbek (lotin). Til almashtirish — yuqori o'ng burchakda bir xil almashtirgich «UZ · RU» barcha ekranlarda.
 - (qaror #29) **Chek tili — ikki tilli (bilingual) qator**: fiskal chek (shu jumladan QR orqali elektron chek) **o'zbek (lotin) va rus tilida bir vaqtda** chiqariladi — har bir tovar qatorida ikki nom "o'zbekcha / ruscha" formatida ko'rsatiladi (masalan "non / хлеб"), rus nomi (`products.name_ru`, ixtiyoriy) kiritilmagan tovarlarda faqat o'zbekcha nom ko'rsatiladi. Chekning sarlavha/yakun matnlari (masalan "Jami" / "Итого", "Naqd" / "Наличные", "Qaytim" / "Возврат") ham ikki tilda chiqariladi; fiskal rekvizitlar (OFD talab qilgan maydonlar — STIR, MXIK, QQS, fiskal belgi) OFD talab qilgan formatda, o'zgarmaydi. Davlat tili talabi buzilmaydi, chunki o'zbekcha qator har doim birinchi va mavjud. Interfeys (UI) tili almashtirish tugmasi (yuqorida) bundan mustasno va mustaqil — u faqat ekran matnini almashtiradi, chekka ta'sir qilmaydi. Batafsil shablon — `08-dizayn-tizimi.md`, chek shabloni bo'limi; maydon — `07-ekran-tafsilotlari.md`, BO-05 (`nameRu`).
 
 ### 1.5 Katta shrift va kontrast
@@ -74,18 +74,19 @@
 - 1C bog'lanmagan tenant yoki `onec.view` yo'q — belgi umuman chizilmaydi.
 
 ### 1.9 Back-office navigatsiyasi (sidebar)
-Sidebar bo'limlari (`08-dizayn-tizimi.md` §6.2), har punkt ruxsat bo'yicha ko'rinadi (ruxsat yo'q — punkt yo'q):
+Sidebar (`08-dizayn-tizimi.md` §6.2) — to'q fon; tepada «ERP» logotipi va do'kon nomi, so'ng ikonkali menyu guruhlari, pastda foydalanuvchi kartasi (avatar, ism, rol; bosilganda — chiqish; til almashtirish — topbar'da, 1.4-bo'lim). Har punkt ruxsat bo'yicha ko'rinadi (ruxsat yo'q — punkt yo'q; guruhda birorta punkt qolmasa — guruh sarlavhasi ham yo'q). Joriy sahifa punkti fon bilan ajratiladi.
 
 | Guruh | Punktlar (ekran) |
 |---|---|
-| Bosh sahifa | Dashboard (BO-02) |
-| Savdo va ombor | Ombor qoldig'i (BO-03), Xarid (BO-04), Narxlar (BO-05), Yorliqlar (BO-18), Qarzlar (BO-06) |
-| Moliya | QQS (BO-07), Buxgalteriya jurnali (BO-08), **Bank tushumi (BO-24)**, Xarajatlar (BO-17), E-faktura (BO-15), Davlat hisobotini solishtirish (BO-10) |
-| Hisobotlar | Hisobotlar markazi (BO-09) |
-| 1C (Bosqich 7) | **1C ga yuborish (BO-23)** — `onec.view`; 1C bazasi hali ulanmagan bo'lsa ham ko'rinadi (bo'sh holat → BO-22 ga havola); sarlavha chipida agent holati 🟢/🟡/🔴/⚪ |
-| Tasdiqlar | Tasdiqlash navbati (BO-16) |
-| AI | AI yordamchi (BO-13) |
-| Sozlamalar | Do'kon (BO-14), Foydalanuvchilar (BO-11), Filiallar (BO-12), Telegram (BO-20), Obuna (BO-19), **1C integratsiyasi (BO-22)** — `onec.view` |
+| ASOSIY | Dashboard (BO-02); AI yordamchi (BO-13); Tasdiqlash navbati (BO-16) — punktda kutilayotgan so'rovlar soni badge'i (`GET /api/v1/approval-requests?status=pending`, foydalanuvchining `*.approve` huquqiga mos `kind`lar) |
+| SAVDO | Kassa (POS) — veb-kassani ochadi (`/pos/login`, POS-01; foydalanuvchida POS ruxsati bo'lsa — masalan `sales.create`); Qarzdorlar (BO-06); Tovarlar va narxlar (BO-05) |
+| OMBOR | Qoldiq va ko'chirish (BO-03); Xaridlar (BO-04); Yorliqlar (BO-18) |
+| MOLIYA | Xarajatlar (BO-17); **Bank tushumi (BO-24)**; E-faktura (BO-15); QQS va davlat hisoboti (BO-10; QQS ichki hisob-kitobi BO-07 — shu bo'lim ichidagi tab/havola) — punktda «Farq topildi» holatidagi davlat hisobotlari soni badge'i (`GET /api/v1/state-reports?status=diff_found`, `tax.vat.view`); Buxgalteriya (BO-08) |
+| BOSHQARUV | Hisobotlar (BO-09); **1C integratsiyasi** (Bosqich 7) → BO-23 «1C ga yuborish» — `onec.view`; 1C bazasi hali ulanmagan bo'lsa ham ko'rinadi (bo'sh holat → BO-22 ga havola); sarlavha chipida agent holati 🟢/🟡/🔴/⚪; Sozlamalar (BO-14) |
+
+**Sozlamalar ichki tablari** (sidebar'da alohida punkt emas): Do'kon (BO-14), Xodimlar (BO-11), Filiallar (BO-12), Telegram (BO-20), Obuna (BO-19), **1C (BO-22)** — `onec.view`. Har tab o'z route'iga ega (`07-ekran-tafsilotlari.md`), aktiv sidebar punkti — «Sozlamalar».
+
+**Yuqori panel (topbar)** — barcha BO ekranlarida (BO-01, BO-21 dan tashqari) bir xil: chapda sahifa sarlavhasi (ekran nomi, ID'siz); o'ngda (1) **qidiruv** maydoni — `Ctrl+K` buyruq paneli (`cmdk`, `08-dizayn-tizimi.md` §9): tovar (`GET /api/v1/products?search=`), kontragent/mijoz (`GET /api/v1/counterparties?search=`) va ekranlar bo'yicha navigatsiya, natijalar ruxsat bo'yicha filtrlanadi; (2) **filial tanlovi** (`Select`: foydalanuvchiga biriktirilgan filiallar + bir nechta filialga kirishi bo'lsa «Barcha filiallar» — konsolidatsiya; tanlov ekran filtrlari uchun standart qiymat bo'ladi); (3) **bildirishnomalar** ikonkasi — ogohlantirishlar ro'yxati (BO-02 «Diqqat talab qiladi» bloki bilan bir manba: `GET /api/v1/reports/dashboard` → `alerts[]`; `reports.sales.view` yo'q foydalanuvchida ikonka ko'rinmaydi), har ogohlantirish tegishli ekranga havola; (4) **til almashtirish** «UZ · RU» (1.4-bo'lim). Obuna `grace` banneri topbar ustida (`07-ekran-tafsilotlari.md`, «Qanday o'qish kerak»).
 
 Route'lar — `07-ekran-tafsilotlari.md` va `24-frontend-arxitekturasi.md` §1.1.
 
@@ -110,8 +111,8 @@ Route'lar — `07-ekran-tafsilotlari.md` va `24-frontend-arxitekturasi.md` §1.1
 | ID | Rol | Modul | Maqsad | Asosiy elementlar | Holatlar |
 |---|---|---|---|---|---|
 | POS-01 | Kassir | M01 | Kassaga kirish, smena ochish | Login/PIN, kassa/filial tanlash, "Smena ochish" tugmasi, boshlang'ich naqd summa kiritish; (qaror #34) "PIN/parolni unutdim" havolasi — OTP orqali tiklash, kod birinchi navbatda **Telegram bot**ga, Telegram ulanmagan bo'lsa **SMS** (zaxira) ga yuboriladi | Bo'sh: boshlang'ich holat; Xato: PIN noto'g'ri, kassa band; **Obuna muddati tugagan**: tenant `restricted` holatida — login butunlay rad etiladi, "Obuna muddati tugagan" xabari, Click/Payme to'lov havolasi va (qaror #20, #34) "Ma'lumotlarimni yuklab olish" (Telegram bot/zaxira SMS kod bilan tasdiqlangan eksport) havolasi ko'rsatiladi (US-M17-03); shu holatda ham, lokautdan oldin yaratilgan, hali yuborilmagan cheklar fon rejimida (`sync.drain`) OFD'ga yuborilishda davom etadi — kassir ekranida ko'rinmaydi, yangi sotuv ochilmaydi (qaror #19); Offline: PIN lokal tekshiriladi (agar qurilma litsenziyasi muddati o'tmagan bo'lsa), keyin sinxronlanadi — litsenziya muddati o'tgan bo'lsa qurilma mahalliy qulflangan bo'ladi |
-| POS-02 | Kassir | M01, M03, M09 | Asosiy sotish paneli — mahsulot qo'shish, chegirma, jami summa | Skaner maydoni, mahsulot ro'yxati (miqdor/narx), qidiruv, chegirma tugmasi, jami summa, "To'lov" tugmasi | Bo'sh: "Chekni boshlang" holati; Xato: mahsulot topilmadi / markirovka o'qilmadi; Offline: status panel 🟡/🔴 |
-| POS-03 | Kassir | M01 | To'lov usulini tanlash va hisoblash | Naqd/**Karta (qo'lda belgilash)**/**Yagona QR (UzQR)**/Payme/Click/Uzum/Nasiya tugmalari — (qaror #30) "Nasiya" tanlansa (to'liq yoki aralash) fiskal chek darhol chiqmaydi, nasiya qismi qarz to'langanda chek oladi, qaytim hisoblagichi, "Tasdiqlash". Har qanday to'lov usulida (QR/Click/Payme/Uzum/UzQR/karta) fiskal chekni **bizning kassa** chiqaradi (VMQ-943 1-ilova 6-band; 1a-ilova 2-band); provayderga faqat chek havolasi yuboriladi. **"Karta"** — mustaqil bank terminali orqali qabul qilingan to'lov qo'lda belgilanadi (qaror #64): **karta turi** (`card_type`: shaxsiy / korporativ / ijtimoiy / noma'lum; standart qiymat yo'q — kassir har to'lovda tanlaydi (qaror #64)) majburiy; ijtimoiy kartada **karta niqobi** (`card_mask`, `NNNN****NNNN`) va **RRN** (`rrn`, terminal chekidagi tranzaksiya raqami) majburiy, boshqa turlarda ixtiyoriy; online va offline'da mavjud. **UzQR**: statik QR (`qr_type=static`, faqat online) — kassir to'lovni qo'lda tasdiqlaydi (ixtiyoriy tranzaksiya raqami bilan); dinamik QR (`qr_type=dynamic`) — `UzqrPort` (API olingunga qadar stub), `provider_tx_id` faqat dinamik QR'da majburiy. Yakka tadbirkor (`tenants.legal_form=sole_proprietor`) uchun QR to'lov to'lov tashkiloti platformasining maxsus QR'i (Click/Payme/Uzum) bilan bajariladi (PQ-247) | Bo'sh: summa 0; Xato: yetarli naqd yo'q, to'lov tizimi javob bermadi, ijtimoiy kartada niqob/RRN kiritilmagan; ⛔ 48 soat blokida "Tasdiqlash" o'chiq (`FISCAL_OFFLINE_48H_BLOCKED`); Offline: **UzQR (statik ham — faqat online)/Payme/Click/Uzum to'lovlari o'chirilgan** — onlayn tasdiq (bank/push/Prepare-Complete/webhook) talab qiladi; offlaynda **naqd, qo'lda belgilangan "Karta", nasiya** mavjud (qaror #23) |
+| POS-02 | Kassir | M01, M03, M09 | Asosiy sotish paneli — mahsulot qo'shish, chegirma, jami summa | Skaner/qidiruv maydoni (skaner har doim faol — tanlangan ko'rinish va kategoriyadan qat'i nazar), tovar paneli: kategoriya tablari + **kartochka/ro'yxat** ko'rinishi almashtirgichi; chek paneli: mijoz, qatorlar (miqdor/narx, `−`/`+`), oraliq summa, chegirma, QQS, jami; Chegirma, Nasiya, Bekor, "To'lov" tugmalari; "📒 Qarz daftari" (POS-13) | Bo'sh: "Chekni boshlang" holati; Xato: mahsulot topilmadi / markirovka o'qilmadi; Offline: status panel 🟡/🔴 |
+| POS-03 | Kassir | M01 | To'lov usulini tanlash va hisoblash | Naqd/**Karta (terminal / qo'lda)**/**Yagona QR (UzQR)**/Payme/Click/Uzum/Aralash/Nasiya tugmalari. **"Karta" — integratsiyalangan terminal** (qaror #71): kassaga terminal bog'langan bo'lsa summa terminalga avtomatik yuboriladi, 4 qadamli holat ("Summa yuborildi" → "Mijoz kartani tegizadi / PIN" → "Bank javobi" → "Fiskal chek"), terminal holati chipi (Wi-Fi · ulangan / ulanmagan / band), karta niqobi, RRN / tasdiq kodi va karta turi terminaldan keladi (kassir yozmaydi), "Terminalda bekor qilish" / "Qayta yuborish", kutish taymeri; javob noma'lum bo'lsa holat so'rovi, yangi urinish bloklanadi; bank tasdig'idan keyin fiskal chek avtomatik; terminal ishlamasa qo'lda belgilash faqat `card_manual_fallback` siyosati bo'yicha (standart — Menejer/Egasi tasdig'i). Batafsil — `07` POS-03 — (qaror #30) "Nasiya" tanlansa (to'liq yoki aralash) fiskal chek darhol chiqmaydi, nasiya qismi qarz to'langanda chek oladi, qaytim hisoblagichi, "Tasdiqlash". Har qanday to'lov usulida (QR/Click/Payme/Uzum/UzQR/karta) fiskal chekni **bizning kassa** chiqaradi (VMQ-943 1-ilova 6-band; 1a-ilova 2-band); provayderga faqat chek havolasi yuboriladi. **"Karta (qo'lda)"** — kassaga terminal bog'lanmagan bo'lsa yoki zaxira sifatida mustaqil bank terminali orqali qabul qilingan to'lov qo'lda belgilanadi (qaror #64, #71): **karta turi** (`card_type`: shaxsiy / korporativ / ijtimoiy / noma'lum; standart qiymat yo'q — kassir har to'lovda tanlaydi (qaror #64)) majburiy; ijtimoiy kartada **karta niqobi** (`card_mask`, `NNNN****NNNN`) va **RRN** (`rrn`, terminal chekidagi tranzaksiya raqami) majburiy, boshqa turlarda ixtiyoriy; online va offline'da mavjud. **UzQR**: statik QR (`qr_type=static`, faqat online) — kassir to'lovni qo'lda tasdiqlaydi (ixtiyoriy tranzaksiya raqami bilan); dinamik QR (`qr_type=dynamic`) — `UzqrPort` (API olingunga qadar stub), `provider_tx_id` faqat dinamik QR'da majburiy. Yakka tadbirkor (`tenants.legal_form=sole_proprietor`) uchun QR to'lov to'lov tashkiloti platformasining maxsus QR'i (Click/Payme/Uzum) bilan bajariladi (PQ-247) | Bo'sh: summa 0; Kutish: summa terminalga yuborilgan, bank javobi kutilmoqda; Xato: yetarli naqd yo'q, to'lov tizimi javob bermadi, karta rad etildi (`CARD_DECLINED`), terminal javobi noma'lum (`CARD_OUTCOME_UNKNOWN`), terminal ulanmagan (`CARD_TERMINAL_UNREACHABLE`), ijtimoiy kartada niqob/RRN kiritilmagan; ⛔ 48 soat blokida "Tasdiqlash" va karta yuborish o'chiq (`FISCAL_OFFLINE_48H_BLOCKED`); Offline: **UzQR (statik ham — faqat online)/Payme/Click/Uzum to'lovlari o'chirilgan** — onlayn tasdiq (bank/push/Prepare-Complete/webhook) talab qiladi; offlaynda **naqd, integratsiyalangan "Karta" (Do'kon agenti va terminal ishlasa — terminal bankka o'z kanali bilan chiqadi), qo'lda belgilangan "Karta", nasiya** mavjud (qaror #23, #71) |
 | POS-04 | Kassir | M01 | Chekni chop etish / elektron chek (zahira) | Standart — bosma chek avtomatik; "Qayta chop etish ('NUSXA' belgisi, audit)", **"Elektron chek"** (QR/Telegram/SMS havola) — faqat printer ishlamasa yoki xaridor so'rasa, sabab tanlanadi (`delivery=electronic`, `delivery_reason`, audit); yangi chek boshlash | Bo'sh: —; Xato: printer ulanmagan/qog'oz tugagan → elektron chek taklifi va POS-16 havolasi; Offline: chek lokal saqlanadi, fiskal modul imzolaydi, OFD'ga yuborish "kutilmoqda" deb ko'rsatiladi |
 | POS-05 | Kassir | M02 | Mijozdan tovar qaytarish | Asl chekni qidirish (raqam/QR), qaytariladigan tovar(lar), sabab tanlash, balans/naqd qaytarish | Bo'sh: chek topilmagan; Xato: chek allaqachon qaytarilgan; Offline: oddiy tovar — qaytarish lokal yoziladi, serverga sinxronda tasdiqlanadi; **markirovkalangan tovar — "Qaytarish" tugmasi offline rejimda bloklanadi** ("Qaytarish uchun internet kerak" xabari), faqat online'da mumkin |
 | POS-06 | Kassir | M08 | Nasiyaga sotish | Mijoz tanlash/qo'shish, joriy qarz va limit ko'rsatish, to'lov muddati, tasdiqlash; mijoz yuridik shaxs (B2B) bo'lsa — chiquvchi e-faktura avtomatik yaratilishi haqida eslatma (Buxgalter BO-15'da E-IMZO bilan imzolaydi, BP-03) | Bo'sh: mijoz tanlanmagan; Xato: limitdan oshib ketdi — **Menejer PIN/tasdig'i talab qilinadi**, sotuv Menejer tasdiqlamaguncha yakunlanmaydi (`02-rollar-va-ssenariylar.md`ga mos; Menejer uzoqda bo'lsa so'rov BO-16 navbatiga tushadi); Offline: limit oxirgi sinxron ma'lumot asosida tekshiriladi, Menejer PIN'i lokal tasdiqlaydi, server qayta tekshiradi |
@@ -124,7 +125,7 @@ Route'lar — `07-ekran-tafsilotlari.md` va `24-frontend-arxitekturasi.md` §1.1
 | POS-10 | Omborchi | M05 | Inventarizatsiya — jismoniy sanash | Tovar ro'yxati (hali sanalmagan/sanalgan), skanerlash, qo'lda miqdor kiritish, farq ko'rsatuvi | Bo'sh: sanash boshlanmagan; Xato: tizimda yo'q shtrix-kod; Offline: sanash to'liq lokal, yakunida sinxron |
 | POS-11 | Kassir, Omborchi | M09 | Mahsulot va narxni tez qidirish | Qidiruv (nom/kod/shtrix-kod), narx, qoldiq ko'rsatuvi (faqat ko'rish) | Bo'sh: natija yo'q; Xato: —; Offline: oxirgi sinxronlangan narx/qoldiq ko'rsatiladi, "oxirgi yangilanish" vaqti bilan |
 | POS-12 | Barcha (tizim) | — | Offline/sinxronizatsiya holati va tafsilotlari | Sinxronlanmagan cheklar/hujjatlar ro'yxati, 48 soat hisoblagichi (24/40/46 soat bosqichlari, qaror #43), "Qayta urinish" tugmasi | Bo'sh: hammasi sinxron; Xato: sinxronizatsiya muvaffaqiyatsiz; ⛔ Bloklangan (48 soat): "Yangi chek chiqarib bo'lmaydi — cheklarni OFD'ga yuboring", faqat "Qayta yuborish" faol; Offline: asosiy holat — ro'yxat va hisoblagich faol |
-| POS-16 | Kassir, Egasi | M01 | Uskunalar sozlamasi (printer, tarozi, skaner) | Chek printeri: ulanish yo'li (Web Serial / WebUSB / Web Bluetooth (BLE) / Do'kon agenti orqali LAN 9100 / tizim printeri / bulut printer), qog'oz kengligi (58/80 mm), kod sahifasi (cp866), raster rejim (avtomatik), "Test chek"; tarozi: EAN-13 prefikslari (do'kon sozlamasidan, faqat ko'rish), jonli og'irlik (Web Serial — MVP'dan keyin); skaner: test maydoni; Do'kon agenti holati (qaror #60). Sozlama qurilmada saqlanadi | Bo'sh: printer tanlanmagan — "Printer ulang yoki elektron chek zahirasi ishlatiladi"; Xato: printer topilmadi / ruxsat berilmadi / agent javob bermadi; Offline: lokal transportlar (USB/Serial/BLE/agent) ishlaydi, bulut printer — yo'q |
+| POS-16 | Kassir, Egasi | M01 | Uskunalar sozlamasi (printer, tarozi, skaner) | Chek printeri: ulanish yo'li (Web Serial / WebUSB / Web Bluetooth (BLE) / Do'kon agenti orqali LAN 9100 / tizim printeri / bulut printer), qog'oz kengligi (58/80 mm), kod sahifasi (cp866), raster rejim (avtomatik), "Test chek"; tarozi: EAN-13 prefikslari (do'kon sozlamasidan, faqat ko'rish), jonli og'irlik (Web Serial — MVP'dan keyin); skaner: test maydoni; Do'kon agenti holati (qaror #60); **karta terminali** (qaror #71): shu kassaga bog'langan terminal (BO-12 dan — nom, TID, drayver, ulanish yo'li), holat (`online`/`busy`/`offline`/`error`), "Terminalni aniqlash" (agentning `card_terminal` imkoniyatidagi qurilmalar ro'yxati) va "Aloqani tekshirish" (`health`; pulli test tranzaksiya emas). Printer sozlamasi qurilmada saqlanadi; terminal bog'lanishi — serverda (BO-12) | Bo'sh: printer tanlanmagan — "Printer ulang yoki elektron chek zahirasi ishlatiladi"; terminal bog'lanmagan — "Karta qo'lda belgilanadi; terminalni back-office'da (Filiallar → Kassa) bog'lang"; Xato: printer topilmadi / ruxsat berilmadi / agent javob bermadi / terminal javob bermadi (`CARD_TERMINAL_UNREACHABLE`); Offline: lokal transportlar (USB/Serial/BLE/agent) va agent orqali terminal tekshiruvi ishlaydi, bulut printer — yo'q |
 
 ---
 
@@ -143,7 +144,7 @@ Route'lar — `07-ekran-tafsilotlari.md` va `24-frontend-arxitekturasi.md` §1.1
 | BO-09 | Egasi, Menejer, Buxgalter | M12 | Hisobotlar markazi (savdo, ombor, buxgalteriya, QQS) | Hisobot turi tanlash, davr, eksport (PDF/Excel) | Bo'sh: ma'lumot yo'q; Xato: eksport muvaffaqiyatsiz; Offline: faqat oxirgi keshlangan hisobot |
 | BO-10 | Buxgalter, Egasi | M12 | **Davlat hisobotini ichki hisob bilan solishtirish** | Soliq turi bo'yicha tablar: **QQS / Aylanma** (MVP) — ichki ma'lumot bilan to'liq solishtiriladi (MVP modullari buni qoplaydi, `spec/kod-uchun/04-biznes-jarayonlar.md`, Asosiy xulosalar #1); QQS tabida ichki ustunda **"kutilayotgan kredit"** alohida qator; **mol-mulk, yer, JShDS, ijtimoiy soliq** — API qabul qiladi, solishtirish yo'q (MVP'dan keyin; asosiy vositalar/kadr modullari MVP'da yo'q, qaror #52). Davlat hisoboti fayli (my.soliq.uz kabinetidan yuklab olingan PDF/Excel) foydalanuvchi tomonidan yuklanadi. Har bir tur uchun **5 ish kunlik** hisoblagich (hisobot kabinetga joylashtirilgan kundan keyingi kundan, hisobot topshirish muddatidan oshmaydi — SK 5-modda 7-qism; `04-biznes-jarayonlar.md`, BP-08), ogohlantirish **1-, 3- va 4-ish kunida** (qaror #50; 3-ish kunidan Egasiga ham ko'rinadi — 26 #3), "Farq topildi" holati `vat_diff_tolerance_amount` (standart `"1000.00"` so'm) dan boshlanadi; **har oyning 10-sanasida interaktiv ma'lumotlar eslatmasi** (ichki eslatma sanasi, sozlanadi; qonuniy muddat emas) — tizim aylanma (soliq solinmaydigan daromad, chegirmalar, imtiyozlar) va QQS (hisobga olinadigan QQS tuzatishlari, imtiyozlar) raqamlarini tayyorlab beradi; **AI-05: tafovutni tushuntirish** (`spec/kod-uchun/09-ai-funksiyalar.md`), "Kutilmoqda"/"Farq topildi"/"Tuzatish kiritildi"/"Muddat o'tdi — avtomatik qabul qilindi" holat belgisi. Ko'rinish darajasi: avval yig'ma, "Batafsil" — qator darajasi (26 #16); **QQS** — e-faktura darajasida (STIR + faktura raqami + sana bo'yicha moslashtirish) va yig'indi; **aylanma** — faqat yig'indi, manba (0101–0105: e-faktura / NKM / marketplace / eksport / boshqa) va stavka bo'yicha. "Kabinetda tuzatish" havolasi — tuzatish my.soliq.uz shaxsiy kabinetida "tasdiqlash" yoki "tuzatish kiritib taqdim etish" orqali (E-IMZO bilan) bajariladi, tizim farqlar ro'yxatini tayyorlaydi; muddat o'tgach — aniqlashtirilgan hisobot (SK 83-modda) | Bo'sh: davlat hisoboti hali yuklanmagan ("Kutilmoqda"); Xato: farq topildi; **Muddat o'tdi: "avtomatik qabul qilindi" belgisi** (5 ish kuni ichida javob berilmagan — SK 81-modda 6–7-qism); Offline: faqat ichki ustun ko'rinadi, davlat ustuni "internet kerak" bilan bo'sh |
 | BO-11 | Egasi | M13 | Foydalanuvchilar, huquqlar va sessiyalar | Xodim ro'yxati (telefon, ism, rol(lar), filial(lar) — US-M13-04), rol tayinlash (Kassir/Omborchi/Menejer/Buxgalter), operatsiya cheklovlari, har xodim qatorida **'Bloklash/Blokdan chiqarish'** va **'Parol/PIN tiklash'** amallari (US-M13-05/06); **'Qurilmalar' tabi** (qaror #56): qurilma nomi, turi, oxirgi sinxron vaqti, sinxronlanmagan voqealar soni, 'Bekor qilish' (yo'qolgan/o'g'irlangan; Egasi/Menejer) — sinxronlanmagan voqea bo'lsa ogohlantirish va `sync.drain` taklifi (`kod-uchun/16-offline-sync.md` §9); **'Sessiyalar' tabi**: har xodimning faol login sessiyalari (qurilma turi, kirgan vaqt, oxirgi faollik), 'Bekor qilish' tugmasi (US-M13-07) — bu foydalanuvchi login sessiyalari uchun, 'Qurilmalar' tabidagi kassa POS qurilmalaridan farqli; texnik asos `spec/kod-uchun/14-autentifikatsiya-oauth2.md` | Bo'sh: faqat Egasi; Xato: bir xil login takror; Offline: faqat ko'rish |
-| BO-12 | Egasi | M14 | Filiallar boshqaruvi | Filiallar ro'yxati, har biri bo'yicha konsolidatsiyalangan hisob, yangi filial qo'shish | Bo'sh: bitta filial; Xato: —; Offline: faqat ko'rish |
+| BO-12 | Egasi | M14 | Filiallar boshqaruvi | Filiallar ro'yxati, har biri bo'yicha konsolidatsiyalangan hisob, yangi filial qo'shish; kassalar jadvalida har kassa uchun **karta terminali** ustuni va "Terminalni bog'lash" dialogi (nom, vendor/model, ulanish turi — Do'kon agenti / bulut / Android ilova / SoftPOS / sinov, drayver, agent va lokal qurilma, LAN manzili, TID/MID, ekvayer bank, holat; kassada bir nechta terminal bo'lishi mumkin, bittasi standart — POS avtomatik tanlaydi) va do'kon darajasidagi "Karta qo'lda kiritish" siyosati (`card_manual_fallback`: ruxsat / Menejer tasdig'i bilan / taqiqlangan) (qaror #71) | Bo'sh: bitta filial; kassada terminal yo'q — "Karta qo'lda belgilanadi"; Xato: agent ulanmagan / TID band; Offline: faqat ko'rish |
 | BO-13 | Egasi, Menejer, Buxgalter | AI-01 | AI yordamchi — savol-javob chat | Chat oynasi, tez savollar ("Bugun qancha foyda?", "Qaysi tovar tugayapti?"), javobda manba/hisob-kitob ko'rsatuvi | Bo'sh: suhbat boshlanmagan; Xato: AI javob bera olmadi — "aniq emas" deb ko'rsatiladi (raqam o'ylab topilmaydi); Offline: AI chat ishlamaydi (internet/LLM API talab qiladi) |
 | BO-14 | Egasi | — | Tenant/do'kon sozlamalari | Do'kon nomi, til, valyuta, soliq rejimi, integratsiyalar holati (OFD, e-faktura, Asl belgisi; Bosqich 7 dan **«1C» qatori** — holat 🟢/🟡/🔴/⚪, oxirgi muvaffaqiyatli kun, navbatdagi kunlar, xato hujjatlar soni, «Tafsilot» → BO-23; manba W-55); **Do'kon agenti** holati (fiskal ko'prik, LAN printer, tarozi — qaror #60); to'lov provayderlari kabinetida **provayder tomonidagi avto-fiskallashtirish o'chirilgani** tasdiq belgisi (Click/Payme/Uzum); markirovka tekshiruvi rejimi `MARKING_PRECHECK` (`warn` standart / `block`, qaror #62); tarozi EAN-13 prefikslari (22 — og'irlik g, 21 — summa so'm); **AI va shaxsiy ma'lumot**: chet elga uzatish roziligi (`tenants.settings.ai_cross_border_enabled`; rozilik berilmaguncha AI-03 rasmlari yuborilmaydi, matnli so'rovlarda shaxsiy maydonlar har doim maskalanadi — qaror #61), foydalanish shartlari versiyasi; **"Sinxron istisnolari"** ro'yxati — har qator "Ko'rib chiqildi" (izoh majburiy, audit; provodkaga ta'sir yo'q — qaror #56) | Bo'sh: sozlanmagan; Xato: integratsiya ulanmagan; Offline: faqat ko'rish |
 | BO-15 | Buxgalter | M07, M10 | Kiruvchi va chiquvchi e-faktura markazi | Kiruvchi e-fakturalar ro'yxati (**Faktura.uz'dan — MVP'da yagona operator**; Didox'ni asoschi qayta ko'rishi tavsiya etiladi — 26 #167; BP-01), har biri uchun qabul/rad etish, E-IMZO bilan imzolash, **VM Qarori №830-son xavf-belgisi** (`risk_flag`: yashil / qizil / noma'lum — qizil yoki noma'lum bo'lsa QQS krediti to'lovgacha kechiktiriladi; noma'lumni Buxgalter my.soliq kabinetidan ko'rib qo'lda yashil qilishi mumkin, audit bilan); B2B nasiya sotuvidan avtomatik yaratilgan chiquvchi e-fakturalar ro'yxati (holati: yaratildi/imzolandi/yuborildi, BP-03); **"Chek asosida e-faktura chiqarish"** tugmasi — Buxgalter asl fiskal chekni (raqam/sana bo'yicha) qidirib tanlaydi va shu chekka bog'langan (`einvoices.related_doc_type`/`related_doc_id`) yangi chiquvchi e-faktura yaratadi (BP-13, US-M01-06); QQS qayta hisoblanmasligi ekranda aniq ko'rsatiladi | Bo'sh: faktura yo'q; Xato: E-IMZO imzolashda xato (sertifikat/parol); Offline: faqat ko'rish, imzolash internet talab qiladi (E-IMZO serverga bog'lanadi) |
@@ -190,7 +191,7 @@ Route'lar — `07-ekran-tafsilotlari.md` va `24-frontend-arxitekturasi.md` §1.1
 
 ```
 ┌───────────────────────────────────────┐
-│  ERP Kassa               [UZ/RU]  🔴   │
+│  ERP Kassa               [UZ·RU]  🔴   │
 ├───────────────────────────────────────┤
 │                                         │
 │        Filial: "Chilonzor-3"  ▾        │
@@ -219,27 +220,61 @@ yuborilmagan cheklar `sync.drain` orqali OFD'ga yuborilishda davom etadi (ekrand
 ### POS-02 — Sotish paneli (asosiy chek)
 
 ```
-┌───────────────────────────────────────┐
-│ 🟡 OFFLAYN · 3 chek kutmoqda · 22:41  │
-├───────────────────────────────────────┤
-│ Mijoz: tanlanmagan        [+ Mijoz]    │
-│ ┌─────────────────────────────────┐   │
-│ │ 1. Non "Bekhurmon"   x2   24 000 │   │
-│ │ 2. Coca-Cola 1.5L    x1   18 000 │   │
-│ │ 3. Sut "Oltin" 1L    x3   27 000 │   │
-│ └─────────────────────────────────┘   │
-│  [ 📷 Skanerlash ]   [ 🔍 Qidirish ]   │
-├───────────────────────────────────────┤
-│  JAMI:                   69 000 so'm   │
-│  [ CHEGIRMA ]  [ BEKOR ]  [ TO'LOV ▶ ] │
-└───────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│ Chilonzor-3 · Kassa 1 · Smena #214   🟡 OFFLAYN · 3 chek  🖨  [UZ·RU] Kassir│
+├────────────────────────────────────────┬─────────────────────────────┤
+│ [ Skanerlang yoki tovar nomi/kodi  F1 ] │ Chek #000483     [+ Mijoz F3]│
+│                 [Kartochka | Ro'yxat]   │ Non «Patir»   4 000×2 [−][+] 8 000│
+│ [Hammasi][Non][Sut][Bakaleya][Ichimlik] │ Guruch 1,250 kg×18 000   22 500│
+│ ┌────────┐┌────────┐┌────────┐┌───────┐ │ Gazli ichimlik  markirovka 18 000│
+│ │ NP     ││ S      ││ GL     ││ GI    │ │                              │
+│ │Non     ││Sut 1 l ││Guruch  ││Gazli  │ │ Oraliq summa         96 500  │
+│ │4 000   ││13 500  ││18 000  ││9 000  │ │ Chegirma             −2 000  │
+│ │ dona   ││ dona   ││ tarozi ││markir.│ │ Shu jumladan QQS 12% 10 125  │
+│ └────────┘└────────┘└────────┘└───────┘ │ JAMI            94 500 so'm  │
+│                        [📒 Qarz daftari] │ [CHEGIRMA] [NASIYA] [BEKOR]  │
+│                                         │ [   TO'LOVGA O'TISH  F4    ] │
+└────────────────────────────────────────┴─────────────────────────────┘
 Holat: Bo'sh — "Chekni boshlang, skanerlang" | Xato — "Markirovka
 o'qilmadi, qayta urinilmoqda..." → 3 urinishdan keyin "Qo'lda kirit"
 maydoni | Offline — status panel 🟡/🔴, TO'LOV tugmasi faol qoladi
 BEKOR — qator o'chirish / chekni bekor qilish (`sales.void`), audit voqeasi
+Skaner har doim faol: kartochka yoki ro'yxat ko'rinishida, istalgan kategoriyada
+skanerlangan kod chekka qator qo'shadi (tafsilot — `07-ekran-tafsilotlari.md`, POS-02)
 ```
 
 ### POS-03 — To'lov usuli va hisoblash
+
+Integratsiyalangan karta terminali (qaror #71) — karta tanlangan, bank javobi kutilmoqda:
+
+```
+┌──────────────────────────────────────────────────────────┬──────────────────────────┐
+│ To'lov  [Chek #000483]                              [✕]  │ Chek tarkibi             │
+│ [Naqd] [■ Karta — terminalga yuboriladi] [UzQR] [Click]  │ Non «Patir» ×2     8 000 │
+│ [Payme] [Uzum] [Aralash] [Nasiya]                        │ ...                      │
+│ ┌──────────────────────────────────────────────────────┐ │ Oraliq summa      96 500 │
+│ │ Summa terminalga yuborildi        (Wi-Fi · ulangan)  │ │ Chegirma          −2 000 │
+│ │ Mijoz kartani tegizsin yoki kiritsin va PIN tersin   │ │ Shu jumladan QQS 12%     │
+│ │ Terminal: [Bank] POS · TID ...   Do'kon agenti orqali│ │ To'lanadigan  94 500 so'm│
+│ │ (1✓ Summa yuborildi)(2● Kartani tegizadi / PIN)      │ │ Karta · terminal  94 500 │
+│ │ (3 Bank javobi)     (4 Fiskal chek — avtomatik)      │ │ Qoldiq                 0 │
+│ │ Karta (niqob) | RRN / tasdiq kodi | Karta turi       │ │ Bank tasdiqlagach fiskal │
+│ │  terminaldan keladi (kassir yozmaydi)                │ │ chek avtomatik chiqadi   │
+│ │ [Terminalda bekor qilish] [Qayta yuborish — o'chiq]  │ │ [ Bank javobi kutilmoqda…]│
+│ │                              Kutish: 00:18 / 02:00   │ │ [ Sotishga qaytish  Esc ]│
+│ └──────────────────────────────────────────────────────┘ │                          │
+│ ⓘ Karta raqami qo'lda kiritilmaydi — summa, natija va RRN│                          │
+│   terminal bilan avtomatik almashadi                     │                          │
+└──────────────────────────────────────────────────────────┴──────────────────────────┘
+Holat: Kutish — 2-qadam faol, "Qayta yuborish" o'chiq | Tasdiq — 3–4-qadam ✓, niqob/RRN/
+tur to'ladi, fiskal chek avtomatik → POS-04 | Rad — sabab, "Qayta yuborish" (yangi urinish)
+yoki boshqa usul | Noma'lum (taymaut/aloqa uzildi) — "Terminal javobini tekshiring",
+holat so'rovi; yangi urinish bloklangan; aniqlanmasa — "Menejer tasdig'i bilan qo'lda
+yopish" | Terminal ulanmagan — Karta tugmasida sabab; qo'lda belgilash `card_manual_fallback`
+bo'yicha | ⛔ 48 soat bloki — karta yuborish va TASDIQLASH o'chiq
+```
+
+Qo'lda belgilash (terminal bog'lanmagan kassa yoki zaxira, qaror #64), offline:
 
 ```
 ┌───────────────────────────────────────┐
@@ -253,6 +288,7 @@ BEKOR — qator o'chirish / chekni bekor qilish (`sales.void`), audit voqeasi
 │  Karta turi: [ Shaxsiy          ▾ ]    │
 │  Niqob / RRN (ijtimoiy kartada majburiy):│
 │  [ 8600****1234 ]  [ RRN          ]    │
+│  (zaxira bo'lsa: sabab + Menejer PIN)  │
 │  ⓘ Elektron to'lovlar onlayn tasdiq    │
 │    talab qiladi — offlaynda mavjud emas│
 │                                         │
@@ -263,7 +299,7 @@ BEKOR — qator o'chirish / chekni bekor qilish (`sales.void`), audit voqeasi
 └───────────────────────────────────────┘
 Holat: Bo'sh — usul tanlanmagan | Xato — "Payme javob bermadi, qayta
 urinish yoki naqd/karta/nasiya tanlang" | Offline — Payme/Click/Uzum va UzQR
-(statik ham) tugmalari o'chirilgan (kulrang), naqd/karta (qo'lda)/nasiya faol | ⛔ 48 soat
+(statik ham) tugmalari o'chirilgan (kulrang), naqd/karta/nasiya faol | ⛔ 48 soat
 bloki — TASDIQLASH o'chiq, "Cheklarni OFD'ga yuboring" (POS-12)
 ```
 
@@ -386,7 +422,7 @@ tasdig'ini olgach blok avtomatik yechiladi (qaror #43)
 
 ```
 ┌──────────────────────────────────────────────────┐
-│ ERP             Bugun ▾   Chilonzor-3 ▾   [UZ/RU] │
+│ ERP             Bugun ▾   Chilonzor-3 ▾   [UZ·RU] │
 ├──────────────────────────────────────────────────┤
 │  Bugungi savdo: 4 250 000 so'm   (↑ 12% kecha)    │
 │  ┌──────────────┐ ┌──────────────┐ ┌────────────┐│
@@ -409,8 +445,10 @@ yangilanish: 18 daqiqa oldin" belgisi butun panel ustida
 
 ```
 ┌──────────────────────────────────────────────────┐
-│ [QQS] [Aylanma] [Mulk*] [Yer*] [JShDS*] [Ijtimoiy*]│
-│ * = faqat davlat raqami, ichki solishtirish yo'q   │
+│ [QQS ⚠Farq] [Aylanma · rejimda yo'q]              │
+│ Mol-mulk, yer, JShDS, ijtimoiy soliq — MVP'dan keyin│
+│ Yuklandi → Solishtirildi → Farq topildi →          │
+│   Tuzatish qayd etildi → Tasdiqlandi               │
 ├──────────────────────────────────────────────────┤
 │  QQS — 2026-yil sentyabr                          │
 │  Holat: ⚠ FARQ TOPILDI                            │
@@ -439,7 +477,7 @@ faqat ichki ustun ko'rinadi, davlat ustuni "internet kerak" bilan bo'sh
 
 ```
 ┌──────────────────────────────────────────────────┐
-│  AI yordamchi                              [UZ/RU]│
+│  AI yordamchi                              [UZ·RU]│
 ├──────────────────────────────────────────────────┤
 │  Siz: Bugun qancha foyda qildim?                   │
 │                                                     │

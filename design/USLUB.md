@@ -42,7 +42,7 @@ Gradient, neon, chap-chegarali karta — ISHLATILMAYDI.
 - Chip/badge: `padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700` soft fon + kuchli rang matn.
 - Jadval: sarlavha qatori surface-2 fonda 12px/600 muted UPPERCASE yo'q (oddiy); qatorlar 52–56px, ajratuvchi `#F0F2F5`; pul ustunlari o'ngga, tabular-nums.
 - Bo'shliq: 8 px grid (8/12/16/20/24/32).
-- Sidebar (BO): logo «ERP» + do'kon nomi, ikonkali menyu guruhlari (Savdo, Ombor, Moliya, Hisobot, Sozlamalar), pastda foydalanuvchi kartasi. Yuqori panel (topbar): sahifa sarlavhasi, qidiruv, filial tanlash, bildirishnoma ikonkasi.
+- Sidebar (BO): logo «ERP» + do'kon nomi, ikonkali menyu guruhlari (ASOSIY, SAVDO, OMBOR, MOLIYA, BOSHQARUV — tarkibi `spec/kod-uchun/06-ekranlar-umumiy.md` §1.9), pastda foydalanuvchi kartasi (avatar, ism, rol). Yuqori panel (topbar): sahifa sarlavhasi, qidiruv, filial tanlash, bildirishnoma ikonkasi, til almashtirgichi «UZ · RU» (segmentli, aktiv — ink fon + oq matn). Foydalanuvchi topbar'da ko'rsatilmaydi.
 - POS: yuqori panel 64px (do'kon/kassa/smena, holat chipi online/offline, kassir), kontent kartalarda; asosiy amal tugmalari katta, pastda klaviatura yorlig'i belgisi (kichik kbd uslubi: `padding:2px 6px;border:1px solid #DCE1E7;border-radius:6px;font-size:11px`).
 
 ## Ikonkalar (24×24, `fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"`, `aria-hidden="true"`)

@@ -22,7 +22,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
       <div><div style="color: #FFFFFF; font-weight: 800; font-size: 15px;">ERP</div><div style="font-size: 12px; color: #8C99A8;">[Do'kon nomi]</div></div>
     </div>
     <sc-for list="{{menu}}" as="g" hint-placeholder-count="5">
-      <div style="padding: 14px 10px 6px; font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #6F7E90;">{{g.title}}</div>
+      <div style="padding: 14px 10px 6px; font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #8C99A8;">{{g.title}}</div>
       <sc-for list="{{g.items}}" as="m" hint-placeholder-count="3">
         <a href="{{m.href}}" style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 14px; font-weight: 600; text-decoration: none; color: {{m.fg}}; background: {{m.bg}};">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{m.icon}}"></path></svg>
@@ -38,17 +38,21 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
   </nav>
   <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column;">
     <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 28px; background: #FFFFFF; border-bottom: 1px solid #E7EAEE;">
-      <h1 style="margin: 0; font-size: 22px; font-weight: 800;">Bank tushumi</h1>
+      <h1 style="margin: 0; font-size: 26px; line-height: 34px; font-weight: 800;">Bank tushumi</h1>
       <div style="flex-grow: 1;"></div>
       <label style="display: flex; align-items: center; gap: 8px; height: 42px; padding: 0 12px; min-width: 240px; border: 1px solid #DCE1E7; border-radius: 12px; background: #F8FAFB;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7686" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
         <span style="position: absolute; width: 1px; height: 1px; overflow: hidden;">Qidiruv</span>
-        <input type="search" placeholder="Tovar, mijoz, hujjat…" style="flex-grow: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 14px; color: #0F1B2D;">
+        <input type="search" placeholder="Tovar, mijoz, ekran…" style="flex-grow: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 14px; color: #0F1B2D;">
       </label>
       <select aria-label="Filial" style="height: 42px; padding: 0 12px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; color: #0F1B2D;"><option>Barcha filiallar</option></select>
       <button type="button" aria-label="Bildirishnomalar" style="width: 42px; height: 42px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; color: #3D4A5C; display: flex; align-items: center; justify-content: center;">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0112 0v5l1.5 2h-15z"></path><path d="M10 20a2 2 0 004 0"></path></svg>
       </button>
+      <div role="group" aria-label="Interfeys tili" style="display: flex; gap: 2px; padding: 2px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF;">
+        <button type="button" aria-pressed="true" style="min-width: 40px; height: 36px; padding: 0 8px; border: 0; border-radius: 10px; background: #0F1B2D; color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 700;">UZ</button>
+        <button type="button" aria-pressed="false" style="min-width: 40px; height: 36px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; color: #3D4A5C; font: inherit; font-size: 13px; font-weight: 700;">RU</button>
+      </div>
     </header>
     <main style="padding: 24px 28px; display: flex; flex-direction: column; gap: 18px;">
       <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px;">
@@ -93,7 +97,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
           </div>
           <div style="overflow-x: auto;">
             <div style="min-width: 520px;">
-              <div style="display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr; gap: 12px; padding: 10px 12px; background: #F8FAFB; border-radius: 10px; font-size: 12px; font-weight: 600; color: #6B7686;">
+              <div style="display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr; gap: 12px; padding: 10px 12px; background: #F8FAFB; border-radius: 10px; font-size: 12px; font-weight: 600; color: #5B6675;">
                 <span>To'lov usuli</span><span style="text-align: right;">Chilonzor-3</span><span style="text-align: right;">Yunusobod-1</span><span style="text-align: right;">Jami</span>
               </div>
               <sc-for list="{{transit}}" as="t" hint-placeholder-count="6">
@@ -128,7 +132,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
         </div>
         <div style="overflow-x: auto;">
           <div style="min-width: 1060px;">
-            <div style="display: grid; grid-template-columns: 96px 1.5fr 1.1fr 96px 120px 100px 90px 120px 1.3fr; gap: 12px; padding: 10px 12px; background: #F8FAFB; border-radius: 10px; font-size: 12px; font-weight: 600; color: #6B7686;">
+            <div style="display: grid; grid-template-columns: 96px 1.5fr 1.1fr 96px 120px 100px 90px 120px 1.3fr; gap: 12px; padding: 10px 12px; background: #F8FAFB; border-radius: 10px; font-size: 12px; font-weight: 600; color: #5B6675;">
               <span>Sana</span><span>Raqam</span><span>Filial · usul</span><span>Davr</span><span style="text-align: right;">Yalpi</span><span style="text-align: right;">Komissiya</span><span style="text-align: right;">Farq</span><span style="text-align: right;">Sof</span><span>Holat</span>
             </div>
             <sc-for list="{{rows}}" as="r" hint-placeholder-count="7">
@@ -143,8 +147,8 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
                 <span style="text-align: right; font-weight: 800;">{{r.net}}</span>
                 <span style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
                   <span style="padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: {{r.stBg}}; color: {{r.stFg}};">{{r.status}}</span>
-                  <sc-if value="{{r.isImport}}" hint-placeholder-val="{{false}}"><span style="padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #E8F0FC; color: #2F6FDB;">Importdan</span></sc-if>
-                  <sc-if value="{{r.has1c}}" hint-placeholder-val="{{false}}"><a href="Bo23OneC.dc.html" style="padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #EFEAFC; color: #6D4AD8; text-decoration: none;">{{r.onec}}</a></sc-if>
+                  <sc-if value="{{r.isImport}}" hint-placeholder-val="{{false}}"><span style="padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #E8F0FC; color: #1F4FA8;">Importdan</span></sc-if>
+                  <sc-if value="{{r.has1c}}" hint-placeholder-val="{{false}}"><a href="Bo23OneC.dc.html" style="padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #E5F5EC; color: #1F6B3E; text-decoration: none;">{{r.onec}}</a></sc-if>
                 </span>
               </div>
             </sc-for>
@@ -187,20 +191,20 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; padding: 16px; border-radius: 14px; background: #F8FAFB;">
             <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #3D4A5C;">Yalpi summa (yo'ldagi puldan yopiladi)
               <input type="text" value="950 000,00" style="height: 44px; box-sizing: border-box; padding: 0 14px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 14px; font-weight: 700; color: #0F1B2D; text-align: right; font-variant-numeric: tabular-nums;">
-              <span style="font-size: 12px; font-weight: 500; color: #6B7686;">Yo'ldagi pul qoldig'i: 950 000,00</span>
+              <span style="font-size: 12px; font-weight: 500; color: #5B6675;">Yo'ldagi pul qoldig'i: 950 000,00</span>
             </label>
             <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #3D4A5C;">Komissiya (9430)
               <input type="text" value="9 500,00" style="height: 44px; box-sizing: border-box; padding: 0 14px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 14px; font-weight: 700; color: #0F1B2D; text-align: right; font-variant-numeric: tabular-nums;">
-              <span style="font-size: 12px; font-weight: 500; color: #6B7686;">Yalpidan 1,00%</span>
+              <span style="font-size: 12px; font-weight: 500; color: #5B6675;">Yalpidan 1,00%</span>
             </label>
-            <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #6B7686;">Farq (inkassa)
+            <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #5B6675;">Farq (inkassa)
               <input type="text" value="0,00" disabled style="height: 44px; box-sizing: border-box; padding: 0 14px; border: 1px solid #E7EAEE; border-radius: 12px; background: #F4F6F8; font: inherit; font-size: 14px; color: #6B7686; text-align: right; font-variant-numeric: tabular-nums;">
-              <span style="font-size: 12px; font-weight: 500; color: #6B7686;">Faqat Inkassa usulida</span>
+              <span style="font-size: 12px; font-weight: 500; color: #5B6675;">Faqat Inkassa usulida</span>
             </label>
             <div style="display: flex; flex-direction: column; gap: 6px;">
               <span style="font-size: 13px; font-weight: 600; color: #3D4A5C;">Bankka tushgan (sof)</span>
               <span style="height: 44px; display: flex; align-items: center; justify-content: flex-end; padding: 0 14px; border-radius: 12px; background: #E3F2EE; color: #0A5E4D; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums;">940 500,00</span>
-              <span style="font-size: 12px; color: #6B7686;">950 000,00 − 9 500,00 + 0,00</span>
+              <span style="font-size: 12px; color: #5B6675;">950 000,00 − 9 500,00 + 0,00</span>
             </div>
           </div>
           <div style="display: flex; flex-wrap: wrap; gap: 16px;">
@@ -210,7 +214,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7686" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"></path><path d="M14 3v4h4M9 13h6M9 17h6"></path></svg>
                 <span style="flex-grow: 1; font-size: 14px; font-weight: 600;">vypiska_15-10-2026.txt</span>
                 <span style="font-size: 12px; color: #6B7686;">18 KB</span>
-                <button type="button" aria-label="Faylni olib tashlash" style="width: 32px; height: 32px; border: 0; border-radius: 8px; background: #F4F6F8; color: #3D4A5C; display: flex; align-items: center; justify-content: center;">
+                <button type="button" aria-label="Faylni olib tashlash" style="width: 36px; height: 36px; border: 0; border-radius: 8px; background: #F4F6F8; color: #3D4A5C; display: flex; align-items: center; justify-content: center;">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
                 </button>
               </div>
@@ -220,7 +224,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
             </label>
           </div>
           <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-top: 4px;">
-            <button type="button" style="height: 44px; padding: 0 16px; border: 1px solid #FBEAE8; border-radius: 12px; background: #FBEAE8; color: #C8372D; font: inherit; font-size: 14px; font-weight: 700;">Bekor qilish</button>
+            <button type="button" style="height: 44px; padding: 0 16px; border: 1px solid #FBEAE8; border-radius: 12px; background: #FBEAE8; color: #A82B22; font: inherit; font-size: 14px; font-weight: 700;">Bekor qilish</button>
             <div style="flex-grow: 1;"></div>
             <button type="button" style="height: 44px; padding: 0 16px; display: flex; align-items: center; gap: 8px; border: 1px solid #E7EAEE; border-radius: 12px; background: #FFFFFF; color: #0F1B2D; font: inherit; font-size: 14px; font-weight: 700;">Saqlash <span style="padding: 2px 6px; border: 1px solid #DCE1E7; border-radius: 6px; font-size: 11px; color: #6B7686;">Ctrl+S</span></button>
             <button type="button" style="height: 44px; padding: 0 18px; display: flex; align-items: center; gap: 8px; border: 0; border-radius: 12px; background: #0E7C66; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 700;">O'tkazish <span style="padding: 2px 6px; border: 1px solid #4FA796; border-radius: 6px; font-size: 11px; color: #E3F2EE;">Ctrl+Enter</span></button>
@@ -230,7 +234,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
         <div style="flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 14px;">
           <section aria-labelledby="prov-h" style="background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 16px; padding: 20px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 6px 20px rgba(15,27,45,.05);">
             <h2 id="prov-h" style="margin: 0 0 12px; font-size: 17px; font-weight: 800;">Provodkalar (oldindan ko'rish)</h2>
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 8px; padding: 8px 10px; background: #F8FAFB; border-radius: 10px; font-size: 12px; font-weight: 600; color: #6B7686;"><span>Dt</span><span>Kt</span><span style="text-align: right;">Summa</span></div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 8px; padding: 8px 10px; background: #F8FAFB; border-radius: 10px; font-size: 12px; font-weight: 600; color: #5B6675;"><span>Dt</span><span>Kt</span><span style="text-align: right;">Summa</span></div>
             <sc-for list="{{prov}}" as="p" hint-placeholder-count="2">
               <div style="display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 8px; align-items: center; padding: 12px 10px; border-bottom: 1px solid #F0F2F5; font-size: 14px; font-variant-numeric: tabular-nums;">
                 <span style="display: flex; flex-direction: column;"><b>{{p.dt}}</b><span style="font-size: 12px; color: #6B7686;">{{p.dtName}}</span></span>
@@ -262,7 +266,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
   </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1360}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2128}}'>
 class Component extends DCLogic {
   renderVals() {
     const I = {
@@ -290,7 +294,7 @@ class Component extends DCLogic {
       ["14.10.2026", "BT-02-2026-000007", "Bank hujjati 121860", "UzQR", "Yunusobod-1", "13.10–13.10", 64000, 640, 0, "posted", false, "1C: № 0000-000411 ✓"],
       ["14.10.2026", "BT-01-2026-000010", "Bank hujjati 121844", "Click", "Chilonzor-3", "13.10–13.10", 410000, 4100, 0, "cancelled", false, ""]
     ];
-    const ST = { draft: ["Qoralama", "#F4F6F8", "#3D4A5C"], posted: ["O'tkazilgan", "#E5F5EC", "#1F8A4C"], cancelled: ["Bekor qilingan", "#FBEAE8", "#C8372D"] };
+    const ST = { draft: ["Qoralama", "#F4F6F8", "#3D4A5C"], posted: ["O'tkazilgan", "#E5F5EC", "#1F6B3E"], cancelled: ["Bekor qilingan", "#FBEAE8", "#A82B22"] };
     const posted = rowsRaw.filter(r => r[9] === "posted");
     const pg = posted.reduce((s, r) => s + r[6], 0), pc = posted.reduce((s, r) => s + r[7], 0), pv = posted.reduce((s, r) => s + r[8], 0);
     return {
@@ -301,14 +305,14 @@ class Component extends DCLogic {
         { title: "MOLIYA", items: [it("Xarajatlar", "wallet"), it("Bank tushumi", "bank", true), it("E-faktura", "receipt"), it("QQS va davlat hisoboti", "shield", false, "1"), it("Buxgalteriya", "book")] },
         { title: "BOSHQARUV", items: [it("Hisobotlar", "chart"), it("1C integratsiyasi", "link"), it("Sozlamalar", "gear")] }
       ],
-      transit: methods.map(m => ({ method: m[0], dot: m[1], a: f(m[2]), b: f(m[3]), aFg: m[2] ? "#0F1B2D" : "#9AA4B1", bFg: m[3] ? "#0F1B2D" : "#9AA4B1", sum: f(m[2] + m[3]) })),
+      transit: methods.map(m => ({ method: m[0], dot: m[1], a: f(m[2]), b: f(m[3]), aFg: m[2] ? "#0F1B2D" : "#6B7686", bFg: m[3] ? "#0F1B2D" : "#6B7686", sum: f(m[2] + m[3]) })),
       transitTot: { a: f(ta), b: f(tb), sum: f(ta + tb) },
       kpis: [
-        { label: "Yo'ldagi pul jami (5710)", value: f(ta + tb), note: "4 ta qoralama 1 548 000,00 ni yopadi", noteFg: "#2F6FDB" },
+        { label: "Yo'ldagi pul jami (5710)", value: f(ta + tb), note: "4 ta qoralama 1 548 000,00 ni yopadi", noteFg: "#1F4FA8" },
         { label: "Oktabr: bankka tushgan (sof)", value: "38 412 360,00", note: "41 ta o'tkazilgan hujjat", noteFg: "#6B7686" },
         { label: "Oktabr: komissiya (9430)", value: "352 840,00", note: "O'rtacha 0,91% yalpidan", noteFg: "#8A5A12" }
       ],
-      rows: rowsRaw.map(r => ({ date: r[0], no: r[1], ref: r[2] || "Qo'lda kiritilgan", method: r[3], branch: r[4], period: r[5], gross: f(r[6]), comm: f(r[7]), variance: f(r[8]), varFg: r[8] < 0 ? "#C8372D" : "#9AA4B1", net: f(r[6] - r[7] + r[8]), status: ST[r[9]][0], stBg: ST[r[9]][1], stFg: ST[r[9]][2], isImport: r[10], has1c: !!r[11], onec: r[11], noFg: r[9] === "draft" ? "#3D4A5C" : "#0E7C66", rowBg: r[9] === "cancelled" ? "#FCFCFD" : "transparent" })),
+      rows: rowsRaw.map(r => ({ date: r[0], no: r[1], ref: r[2] || "Qo'lda kiritilgan", method: r[3], branch: r[4], period: r[5], gross: f(r[6]), comm: f(r[7]), variance: f(r[8]), varFg: r[8] < 0 ? "#C8372D" : "#6B7686", net: f(r[6] - r[7] + r[8]), status: ST[r[9]][0], stBg: ST[r[9]][1], stFg: ST[r[9]][2], isImport: r[10], has1c: !!r[11], onec: r[11], noFg: r[9] === "draft" ? "#3D4A5C" : "#0E7C66", rowBg: "transparent" })),
       postedTot: { gross: f(pg), comm: f(pc), variance: f(pv), net: f(pg - pc + pv) },
       prov: [
         { dt: "5110", dtName: "Bank hisobi", kt: "5710", ktName: "Yo'ldagi pul", sum: f(940500) },

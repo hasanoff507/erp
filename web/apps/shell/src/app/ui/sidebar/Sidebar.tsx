@@ -14,7 +14,7 @@ import { hasPermissions, useGrantedAccess } from "@shared/state/permissions";
 import { $tenant } from "@shared/state/session";
 import { cn, Icon, LogoMark } from "@shared/ui";
 
-import { NAV_GROUPS, navItemForPath } from "./nav-items.ts";
+import { NAV_GROUPS, navItemForPath, navItemTarget } from "./nav-items.ts";
 import { UserCard } from "./UserCard.tsx";
 
 export interface SidebarProps {
@@ -77,7 +77,7 @@ export function Sidebar({ variant, onNavigate }: SidebarProps) {
               return (
                 <NavLink
                   key={item.key}
-                  to={item.to}
+                  to={navItemTarget(item, granted)}
                   onClick={onNavigate}
                   title={rail ? text : undefined}
                   aria-current={active ? "page" : undefined}

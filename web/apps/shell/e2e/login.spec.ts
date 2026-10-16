@@ -36,6 +36,9 @@ test("login page renders in Uzbek by default", async ({ page }) => {
   await expect(start).toHaveAttribute("href", "/auth/login/start?return_to=%2F");
   // No credential fields in the SPA (password only on the AS page, 14 §2.1).
   await expect(page.locator("input[type=password]")).toHaveCount(0);
+  // Default runtime config (googleEnabled false): no Google button; no dead #export / #terms links.
+  await expect(page.getByRole("link", { name: /Google bilan kirish/ })).toHaveCount(0);
+  await expect(page.locator('a[href="#terms"], a[href="#privacy"], a[href="#export"]')).toHaveCount(0);
   await expect(page.getByRole("button", { name: "UZ" })).toHaveAttribute("aria-pressed", "true");
   await expect(page).toHaveTitle(/Kirish/);
   // Money display is uz-formatted regardless of the browser's ICU data (NBSP grouping, 08 §8).
@@ -53,7 +56,7 @@ test("login page switches to Russian and remembers it", async ({ page }) => {
   await page.getByRole("button", { name: "RU" }).click();
   await expect(page.locator("html")).toHaveAttribute("lang", "ru");
   await expect(page.getByRole("heading", { level: 1, name: "Вход в систему" })).toBeVisible();
-  await expect(page.getByRole("link", { name: /^Войти/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /^Войти(?! через Google)/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "RU" })).toHaveAttribute("aria-pressed", "true");
 
   await page.reload();
@@ -103,6 +106,44 @@ test("callback errors are translated; unknown reasons never leak", async ({ page
 
   await page.goto("/login?error=subscription_restricted");
   await expect(page.getByText("Obuna muddati tugagan.", { exact: false })).toBeVisible();
+  // The data-export link waits for the B6 export flow (no dead #export link).
+  await expect(page.getByText("Ma'lumotlarimni yuklab olish")).toHaveCount(0);
+});
+
+test("terms / privacy links come from GET /auth/terms (text_url)", async ({ page }) => {
+  await stubAnonymousBackend(page);
+  await page.route("**/auth/terms", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        items: [
+          {
+            kind: "terms",
+            version: "1.2",
+            text_url: "/legal/terms-1.2.html",
+            text_sha256: "a".repeat(64),
+            effective_from: "2026-10-01",
+          },
+          {
+            kind: "privacy",
+            version: "1.0",
+            text_url: "/legal/privacy.html",
+            text_sha256: "b".repeat(64),
+            effective_from: "2026-10-01",
+          },
+        ],
+      }),
+    }),
+  );
+  await page.goto("/login");
+  await expect(page.getByRole("link", { name: "Foydalanish shartlari" })).toHaveAttribute(
+    "href",
+    "/legal/terms-1.2.html",
+  );
+  await expect(
+    page.getByRole("link", { name: "Shaxsiy ma'lumotlarni qayta ishlash siyosati" }),
+  ).toHaveAttribute("href", "/legal/privacy.html");
 });
 
 test("Manrope is self-hosted and the protected area redirects to login", async ({ page }) => {

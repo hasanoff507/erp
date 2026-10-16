@@ -33,10 +33,10 @@ from app.core.audit import AuditLog
 from app.core.error_codes import ErrorCode
 from app.core.ratelimit import hit, peek
 from app.modules.auth.application.passwords import verify_password
+from app.modules.auth.application.ports import AuthStore, MembershipRow
 from app.modules.auth.application.subscription import SubscriptionStatusService
 from app.modules.auth.domain.constants import LOCKED_SUBSCRIPTION_STATES
 from app.modules.auth.domain.models import AuthenticatedUser
-from app.modules.auth.infrastructure.repositories import AuthRepository, MembershipRow
 
 log = structlog.get_logger(__name__)
 
@@ -82,7 +82,7 @@ class LoginPolicy:
 class LoginService:
     def __init__(
         self,
-        repo: AuthRepository,
+        repo: AuthStore,
         redis: Callable[[], Redis],
         subscriptions: SubscriptionStatusService,
         audit: AuditLog,

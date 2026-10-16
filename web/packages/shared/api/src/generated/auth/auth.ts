@@ -5,13 +5,34 @@
  * OpenAPI spec version: 0.1.0
  */
 import type {
+  AdminUsersListParams,
   CallbackParams,
+  CredentialResetOut,
+  CredentialsIn,
   CsrfToken,
+  DeviceListOut,
+  GoogleCallbackParams,
+  GoogleStartParams,
+  GoogleTokenIn,
+  GoogleTokenOut,
   LoginStartParams,
   MembershipStatusOut,
-  MembershipStatusUpdate,
+  OtpRequestIn,
+  OtpRequestOut,
+  OtpVerifyIn,
+  OtpVerifyOut,
   RevokeAllResult,
-  SessionInfo
+  SessionInfo,
+  SessionListOut,
+  SessionsRevokedOut,
+  SignupIn,
+  SignupOut,
+  StaffCreate,
+  StaffCreatedOut,
+  StaffPageOut,
+  StaffUpdate,
+  SwitchTenantIn,
+  TermsListOut
 } from '@shared/models/generated';
 
 import { apiRequest } from '../../_base/instance.ts';
@@ -61,6 +82,27 @@ export const sessionGet = (
       options);
     }
   /**
+ * Tenant switch (14 §9): a fresh server-side code exchange for ``tenant_id``, the old session dies.
+ *
+ * Cookie session + ``X-CSRF-Token`` only. The answer is ``GET /auth/session`` of the new
+ * session and ``__Host-sid`` now points to it; the CSRF token of the old ``sid`` is dead —
+ * fetch a new one (``GET /api/v1/auth/csrf``). The current tenant itself is a no-op (same
+ * session, no cookie change). ``403 PERMISSION_DENIED`` — no active membership there;
+ * ``403 SUBSCRIPTION_RESTRICTED`` — that tenant is locked out (14 §16.1.2); in both cases the
+ * current session stays as it was.
+ * @summary Switch Tenant
+ */
+export const bffSwitchTenant = (
+    switchTenantIn: SwitchTenantIn,
+ options?: SecondParameter<typeof apiRequest<SessionInfo>>,) => {
+      return apiRequest<SessionInfo>(
+      {url: `/bff/switch-tenant`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: switchTenantIn
+    },
+      options);
+    }
+  /**
  * @summary Logout
  */
 export const logout = (
@@ -94,23 +136,245 @@ export const csrfGet = (
       options);
     }
   /**
+ * @summary List Users
+ */
+export const adminUsersList = (
+    params?: AdminUsersListParams,
+ options?: SecondParameter<typeof apiRequest<StaffPageOut>>,) => {
+      return apiRequest<StaffPageOut>(
+      {url: `/api/v1/admin/users`, method: 'GET',
+        params
+    },
+      options);
+    }
+  /**
+ * @summary Create User
+ */
+export const adminUsersCreate = (
+    staffCreate: StaffCreate,
+ options?: SecondParameter<typeof apiRequest<StaffCreatedOut>>,) => {
+      return apiRequest<StaffCreatedOut>(
+      {url: `/api/v1/admin/users`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: staffCreate
+    },
+      options);
+    }
+  /**
  * @summary Update User
  */
 export const adminUsersUpdate = (
     userId: string,
-    membershipStatusUpdate: MembershipStatusUpdate,
+    staffUpdate: StaffUpdate,
  options?: SecondParameter<typeof apiRequest<MembershipStatusOut>>,) => {
       return apiRequest<MembershipStatusOut>(
       {url: `/api/v1/admin/users/${userId}`, method: 'PATCH',
       headers: {'Content-Type': 'application/json', },
-      data: membershipStatusUpdate
+      data: staffUpdate
+    },
+      options);
+    }
+  /**
+ * @summary Reset Password
+ */
+export const adminUsersResetPassword = (
+    userId: string,
+ options?: SecondParameter<typeof apiRequest<CredentialResetOut>>,) => {
+      return apiRequest<CredentialResetOut>(
+      {url: `/api/v1/admin/users/${userId}/reset-password`, method: 'POST'
+    },
+      options);
+    }
+  /**
+ * @summary Reset Pin
+ */
+export const adminUsersResetPin = (
+    userId: string,
+ options?: SecondParameter<typeof apiRequest<CredentialResetOut>>,) => {
+      return apiRequest<CredentialResetOut>(
+      {url: `/api/v1/admin/users/${userId}/reset-pin`, method: 'POST'
+    },
+      options);
+    }
+  /**
+ * @summary List Sessions
+ */
+export const adminUsersSessionsList = (
+    userId: string,
+ options?: SecondParameter<typeof apiRequest<SessionListOut>>,) => {
+      return apiRequest<SessionListOut>(
+      {url: `/api/v1/admin/users/${userId}/sessions`, method: 'GET'
+    },
+      options);
+    }
+  /**
+ * @summary Revoke Sessions
+ */
+export const adminUsersRevokeSessions = (
+    userId: string,
+ options?: SecondParameter<typeof apiRequest<SessionsRevokedOut>>,) => {
+      return apiRequest<SessionsRevokedOut>(
+      {url: `/api/v1/admin/users/${userId}/revoke-sessions`, method: 'POST'
+    },
+      options);
+    }
+  /**
+ * @summary Revoke Session
+ */
+export const adminUsersRevokeSession = (
+    userId: string,
+    sessionId: string,
+ options?: SecondParameter<typeof apiRequest<SessionsRevokedOut>>,) => {
+      return apiRequest<SessionsRevokedOut>(
+      {url: `/api/v1/admin/users/${userId}/sessions/${sessionId}/revoke`, method: 'POST'
+    },
+      options);
+    }
+  /**
+ * @summary List Devices
+ */
+export const adminUsersDevicesList = (
+    userId: string,
+ options?: SecondParameter<typeof apiRequest<DeviceListOut>>,) => {
+      return apiRequest<DeviceListOut>(
+      {url: `/api/v1/admin/users/${userId}/devices`, method: 'GET'
+    },
+      options);
+    }
+  /**
+ * Telegram bot first, SMS fallback (14 §4.2); ``channel_used`` + ``TELEGRAM_NOT_LINKED`` warning.
+ * @summary Otp Request
+ */
+export const otpRequest = (
+    otpRequestIn: OtpRequestIn,
+ options?: SecondParameter<typeof apiRequest<OtpRequestOut>>,) => {
+      return apiRequest<OtpRequestOut>(
+      {url: `/auth/otp/request`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: otpRequestIn
+    },
+      options);
+    }
+  /**
+ * ``OTP_INVALID`` / ``OTP_EXPIRED`` / ``OTP_MAX_ATTEMPTS`` (5 attempts per challenge).
+ *
+ * ``429 RATE_LIMITED`` — per-IP attempt limit or the per-phone daily cap of wrong codes (14 §12).
+ * @summary Otp Verify
+ */
+export const otpVerify = (
+    otpVerifyIn: OtpVerifyIn,
+ options?: SecondParameter<typeof apiRequest<OtpVerifyOut>>,) => {
+      return apiRequest<OtpVerifyOut>(
+      {url: `/auth/otp/verify`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: otpVerifyIn
+    },
+      options);
+    }
+  /**
+ * New password and/or PIN after a verified code; ``204`` — then a normal login (no tokens here).
+ * @summary Credentials Set
+ */
+export const credentialsSet = (
+    credentialsIn: CredentialsIn,
+ options?: SecondParameter<typeof apiRequest<void>>,) => {
+      return apiRequest<void>(
+      {url: `/auth/credentials`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: credentialsIn
+    },
+      options);
+    }
+  /**
+ * 15 §1.5 provisioning in one transaction, then the owner is logged in (``__Host-sid``).
+ * @summary Signup
+ */
+export const signup = (
+    signupIn: SignupIn,
+ options?: SecondParameter<typeof apiRequest<SignupOut>>,) => {
+      return apiRequest<SignupOut>(
+      {url: `/auth/signup`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: signupIn
+    },
+      options);
+    }
+  /**
+ * 302 to Google; Google not configured / unavailable → 302 ``/login?error=google_auth_failed``.
+ *
+ * ``429 RATE_LIMITED`` past 30 starts / IP / 10 min (14 §12).
+ * @summary Google Start
+ */
+export const googleStart = (
+    params?: GoogleStartParams,
+ options?: SecondParameter<typeof apiRequest<unknown>>,) => {
+      return apiRequest<unknown>(
+      {url: `/auth/google/start`, method: 'GET',
+        params
+    },
+      options);
+    }
+  /**
+ * Known account → BFF login cookie; new account → ``/onboarding?method=google`` (BO-21 ①-Google).
+ * @summary Google Callback
+ */
+export const googleCallback = (
+    params?: GoogleCallbackParams,
+ options?: SecondParameter<typeof apiRequest<unknown>>,) => {
+      return apiRequest<unknown>(
+      {url: `/auth/google/callback`, method: 'GET',
+        params
+    },
+      options);
+    }
+  /**
+ * Android native Google Sign-In: verified ID token → one-time ``android-pos`` code.
+ *
+ * The app redeems it at ``/oauth/token`` (``authorization_code`` + its ``code_verifier``).
+ * @summary Google Token
+ */
+export const googleToken = (
+    googleTokenIn: GoogleTokenIn,
+ options?: SecondParameter<typeof apiRequest<GoogleTokenOut>>,) => {
+      return apiRequest<GoogleTokenOut>(
+      {url: `/auth/google/token`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: googleTokenIn
+    },
+      options);
+    }
+  /**
+ * @summary Terms Current
+ */
+export const termsCurrent = (
+
+ options?: SecondParameter<typeof apiRequest<TermsListOut>>,) => {
+      return apiRequest<TermsListOut>(
+      {url: `/auth/terms`, method: 'GET'
     },
       options);
     }
   export type LoginStartResult = NonNullable<Awaited<ReturnType<typeof loginStart>>>
 export type CallbackResult = NonNullable<Awaited<ReturnType<typeof callback>>>
 export type SessionGetResult = NonNullable<Awaited<ReturnType<typeof sessionGet>>>
+export type BffSwitchTenantResult = NonNullable<Awaited<ReturnType<typeof bffSwitchTenant>>>
 export type LogoutResult = NonNullable<Awaited<ReturnType<typeof logout>>>
 export type SessionsRevokeAllResult = NonNullable<Awaited<ReturnType<typeof sessionsRevokeAll>>>
 export type CsrfGetResult = NonNullable<Awaited<ReturnType<typeof csrfGet>>>
+export type AdminUsersListResult = NonNullable<Awaited<ReturnType<typeof adminUsersList>>>
+export type AdminUsersCreateResult = NonNullable<Awaited<ReturnType<typeof adminUsersCreate>>>
 export type AdminUsersUpdateResult = NonNullable<Awaited<ReturnType<typeof adminUsersUpdate>>>
+export type AdminUsersResetPasswordResult = NonNullable<Awaited<ReturnType<typeof adminUsersResetPassword>>>
+export type AdminUsersResetPinResult = NonNullable<Awaited<ReturnType<typeof adminUsersResetPin>>>
+export type AdminUsersSessionsListResult = NonNullable<Awaited<ReturnType<typeof adminUsersSessionsList>>>
+export type AdminUsersRevokeSessionsResult = NonNullable<Awaited<ReturnType<typeof adminUsersRevokeSessions>>>
+export type AdminUsersRevokeSessionResult = NonNullable<Awaited<ReturnType<typeof adminUsersRevokeSession>>>
+export type AdminUsersDevicesListResult = NonNullable<Awaited<ReturnType<typeof adminUsersDevicesList>>>
+export type OtpRequestResult = NonNullable<Awaited<ReturnType<typeof otpRequest>>>
+export type OtpVerifyResult = NonNullable<Awaited<ReturnType<typeof otpVerify>>>
+export type CredentialsSetResult = NonNullable<Awaited<ReturnType<typeof credentialsSet>>>
+export type SignupResult = NonNullable<Awaited<ReturnType<typeof signup>>>
+export type GoogleStartResult = NonNullable<Awaited<ReturnType<typeof googleStart>>>
+export type GoogleCallbackResult = NonNullable<Awaited<ReturnType<typeof googleCallback>>>
+export type GoogleTokenResult = NonNullable<Awaited<ReturnType<typeof googleToken>>>
+export type TermsCurrentResult = NonNullable<Awaited<ReturnType<typeof termsCurrent>>>

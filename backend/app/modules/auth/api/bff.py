@@ -68,6 +68,12 @@ class RevokeAllResult(BaseModel):
     sessions_revoked: int
 
 
+class SwitchTenantIn(BaseModel):
+    """``POST /bff/switch-tenant`` (14 §9): the tenant to make active in this browser."""
+
+    tenant_id: UUID
+
+
 def _set_cookie(response: Response, name: str, value: str, max_age: int) -> None:
     # __Host- prefix: Secure, Path=/, no Domain (14 §2.1 "Qo'shimcha himoya" 3)
     response.set_cookie(name, value, max_age=max_age, path="/", secure=True, httponly=True, samesite="lax")
@@ -153,6 +159,10 @@ async def session_info(
     Cheap enough for a ~30 s heartbeat: the session and subscription state come
     from Redis and the profile part is cached for 60 s (``SessionProfileService``).
     """
+    return await _session_response(request, principal)
+
+
+async def _session_response(request: Request, principal: Principal) -> Response:
     profile = await auth_module(request).profiles.profile(principal.tenant_id, principal.user_id)
     if profile is None:
         raise AppError(ErrorCode.PERMISSION_DENIED, params={"reason": "membership_inactive"})
@@ -170,6 +180,48 @@ async def session_info(
         access_expires_at=principal.expires_at,
     )
     return Response(info.model_dump_json(), media_type="application/json", headers=_NO_STORE)
+
+
+@router.post(
+    "/bff/switch-tenant",
+    operation_id="bff_switch_tenant",
+    response_model=SessionInfo,
+    responses={403: {"description": "PERMISSION_DENIED / SUBSCRIPTION_RESTRICTED / CSRF_INVALID"}},
+)
+async def switch_tenant(
+    request: Request, body: SwitchTenantIn, principal: Annotated[Principal, Depends(current_principal)]
+) -> Response:
+    """Tenant switch (14 §9): a fresh server-side code exchange for ``tenant_id``, the old session dies.
+
+    Cookie session + ``X-CSRF-Token`` only. The answer is ``GET /auth/session`` of the new
+    session and ``__Host-sid`` now points to it; the CSRF token of the old ``sid`` is dead —
+    fetch a new one (``GET /api/v1/auth/csrf``). The current tenant itself is a no-op (same
+    session, no cookie change). ``403 PERMISSION_DENIED`` — no active membership there;
+    ``403 SUBSCRIPTION_RESTRICTED`` — that tenant is locked out (14 §16.1.2); in both cases the
+    current session stays as it was.
+    """
+    sid = _require_cookie_session(principal)
+    if body.tenant_id == principal.tenant_id:
+        return await _session_response(request, principal)
+    module = auth_module(request)
+    try:
+        session = await module.bff.switch_tenant(
+            sid, principal.user_id, principal.tenant_id, body.tenant_id, request_meta(request)
+        )
+    except BffError as exc:
+        if exc.code is ErrorCode.SUBSCRIPTION_RESTRICTED:
+            raise AppError(
+                ErrorCode.SUBSCRIPTION_RESTRICTED, params={"tenant_id": str(body.tenant_id)}
+            ) from exc
+        raise AppError(ErrorCode.PERMISSION_DENIED, params={"reason": "membership_inactive"}) from exc
+    response = await _session_response(request, await module.gateway.session_principal(session))
+    _set_cookie(
+        response,
+        SID_COOKIE,
+        module.cookies.sign(UUID(session.sid)),
+        max(1, session.absolute_exp - int(time.time())),
+    )
+    return response
 
 
 @router.post("/auth/logout", operation_id="auth_logout", status_code=204)

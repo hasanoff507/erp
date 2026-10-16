@@ -12,7 +12,12 @@
     "./format": "./src/format/index.ts",
     "./phone": "./src/phone/index.ts",
     "./date": "./src/date/index.ts",
-    "./runtime-config": "./src/runtime-config/index.ts"
+    "./runtime-config": "./src/runtime-config/index.ts",
+    "./decimal-input": "./src/decimal-input/index.ts",
+    "./barcode": "./src/barcode/index.ts",
+    "./file": "./src/file/index.ts",
+    "./platform": "./src/platform/index.ts",
+    "./settings-tabs": "./src/settings-tabs/index.ts"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",

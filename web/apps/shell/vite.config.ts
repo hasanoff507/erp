@@ -3,9 +3,14 @@
  *
  * - Manrope is bundled from @fontsource-variable/manrope (24 §4.1): only latin, latin-ext, cyrillic,
  *   cyrillic-ext are emitted; the latin subset is preloaded; all four are precached by the PWA.
+ *   G-02: two Noto Sans files (latin, cyrillic-ext) back the glyphs Manrope lacks (src/noto-sans-
+ *   fallback.css, narrow unicode-range) — also precached, never preloaded.
  * - PWA via vite-plugin-pwa (24 Asosiy xulosa #6); registerSW is an external script (CSP-safe).
  * - Strict CSP meta in the built index.html + full security headers on `vite preview` (csp.ts); the
  *   style nonce placeholder is replaced per index.html response (24 §4.4, previewCspNonce).
+ * - Static host without nonces (24 §4.4): `ERP_CSP_MODE=hash` — sha256 list of the runtime <style>
+ *   texts instead of the nonce, plus a `_headers` file (cspHashMode, csp-hashes.ts).
+ * - cspInlineGuard fails the build on any inline script/style the policy does not allow.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -15,13 +20,22 @@ import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
-import { applyNonce, cspDirectives, generateNonce, securityHeaders, serializeCsp } from "./csp.ts";
+import {
+  applyNonce,
+  cspDirectives,
+  generateNonce,
+  securityHeaders,
+  serializeCsp,
+  type CspOptions,
+} from "./csp.ts";
+import { inlineCspViolations, runtimeStyleHashes, type CspMode } from "./csp-hashes.ts";
+import { staticHostHeaders } from "./deploy/render.ts";
 import { mockApi } from "./dev/mock-api.ts";
 
 const webRoot = fileURLToPath(new URL("../..", import.meta.url));
 
 /** Backend paths proxied in dev/preview — same origin keeps the HttpOnly BFF cookie first-party (14 §2.1). */
-const BACKEND_PATHS = ["/api", "/auth", "/oauth", "/health", "/.well-known", "/billing", "/sync"];
+const BACKEND_PATHS = ["/api", "/auth", "/bff", "/oauth", "/health", "/.well-known", "/billing", "/sync"];
 
 /** 24 §4.1: drop greek / vietnamese @font-face blocks so their files never reach dist/. */
 function manropeSubsets(): Plugin {
@@ -71,7 +85,7 @@ function fontPreload(): Plugin {
 }
 
 /** qaror #57: CSP <meta> in the production index.html (headers are set by the proxy — deploy/). */
-function cspMeta(agentPort: number): Plugin {
+function cspMeta(policy: CspOptions): Plugin {
   return {
     name: "erp-csp-meta",
     apply: "build",
@@ -83,12 +97,53 @@ function cspMeta(agentPort: number): Plugin {
             tag: "meta",
             attrs: {
               "http-equiv": "Content-Security-Policy",
-              content: serializeCsp(cspDirectives({ agentPort }), "meta"),
+              content: serializeCsp(cspDirectives(policy), "meta"),
             },
             injectTo: "head-prepend",
           },
         ];
       },
+    },
+  };
+}
+
+/**
+ * 24 §4.4 static-host fallback (`ERP_CSP_MODE=hash`): no nonce anywhere — the `csp-nonce` meta is
+ * removed (main.tsx then sets none and Radix <style> matches a sha256 instead) and `_headers`
+ * (Netlify / Cloudflare Pages) carries the full policy as an HTTP header (frame-ancestors).
+ */
+function cspHashMode(policy: CspOptions): Plugin {
+  return {
+    name: "erp-csp-hash-mode",
+    apply: "build",
+    transformIndexHtml: {
+      order: "post",
+      handler: (html) => html.replace(/\s*<meta property="csp-nonce"[^>]*>/, ""),
+    },
+    generateBundle() {
+      this.emitFile({
+        type: "asset",
+        fileName: "_headers",
+        source: staticHostHeaders(securityHeaders(policy)),
+      });
+    },
+  };
+}
+
+/** 24 §4.4 build gate: no inline script/style in the final index.html outside the CSP. */
+function cspInlineGuard(policy: CspOptions): Plugin {
+  return {
+    name: "erp-csp-inline-guard",
+    apply: "build",
+    enforce: "post",
+    writeBundle(options) {
+      const html = readFileSync(path.join(options.dir ?? "dist", "index.html"), "utf8");
+      const violations = inlineCspViolations(html, cspDirectives(policy));
+      if (violations.length) {
+        this.error(
+          ["CSP (24 §4.4): index.html has inline code the policy blocks:", ...violations].join("\n"),
+        );
+      }
     },
   };
 }
@@ -131,6 +186,10 @@ export default defineConfig(({ mode }) => {
   const useMock = env.ERP_API_MOCK === "1" || process.env.ERP_API_MOCK === "1";
   const apiTarget = env.ERP_DEV_API_TARGET || "http://localhost:8000";
   const agentPort = 47110;
+  // 24 §4.4: "nonce" (default — nginx / BFF / vite preview mint one per response) or "hash" (static host).
+  const cspMode: CspMode = (env.ERP_CSP_MODE || process.env.ERP_CSP_MODE) === "hash" ? "hash" : "nonce";
+  const policy: CspOptions =
+    cspMode === "hash" ? { agentPort, nonce: null, styleHashes: runtimeStyleHashes() } : { agentPort };
   const proxy = Object.fromEntries(
     BACKEND_PATHS.map((path) => [path, { target: apiTarget, changeOrigin: false, secure: false }]),
   );
@@ -142,8 +201,9 @@ export default defineConfig(({ mode }) => {
       manropeSubsets(),
       react(),
       fontPreload(),
-      cspMeta(agentPort),
-      previewCspNonce(agentPort),
+      cspMeta(policy),
+      cspMode === "hash" ? cspHashMode(policy) : previewCspNonce(agentPort),
+      cspInlineGuard(policy),
       VitePWA({
         registerType: "autoUpdate",
         injectRegister: "script",
@@ -167,11 +227,12 @@ export default defineConfig(({ mode }) => {
           ],
         },
         workbox: {
-          // 24 §4.1: the four Manrope subsets (woff2) are precached — fonts work on first offline start.
+          // 24 §4.1: the four Manrope subsets + two Noto fallback files (woff2) are precached — fonts
+          // (ʻ ʼ, Ққ Ғғ Ҳҳ included) work on the first offline start.
           globPatterns: ["**/*.{js,css,html,svg,png,woff2,webmanifest}"],
           globIgnores: ["**/*greek*", "**/*vietnamese*", "config.js"],
           navigateFallback: "/index.html",
-          navigateFallbackDenylist: [/^\/(api|auth|oauth|health|billing|sync|\.well-known)(\/|$)/],
+          navigateFallbackDenylist: [/^\/(api|auth|bff|oauth|health|billing|sync|\.well-known)(\/|$)/],
           cleanupOutdatedCaches: true,
           runtimeCaching: [
             {
@@ -194,7 +255,8 @@ export default defineConfig(({ mode }) => {
       port: 4173,
       strictPort: true,
       // Non-HTML responses; index.html gets per-response nonce headers from previewCspNonce().
-      headers: securityHeaders({ agentPort, nonce: null }),
+      // Hash mode: one static policy for everything, as on the static host.
+      headers: securityHeaders(cspMode === "hash" ? policy : { agentPort, nonce: null }),
       proxy,
     },
     build: {

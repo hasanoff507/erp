@@ -582,11 +582,18 @@ CREATE TABLE app.memberships (
   user_id    UUID NOT NULL REFERENCES app.users(id),
   role_ids   UUID[] NOT NULL DEFAULT '{}',
   branch_ids UUID[] NOT NULL DEFAULT '{}', -- bo'sh = barcha filial
-  status     TEXT NOT NULL CHECK (status IN ('active','blocked')) DEFAULT 'active',
+  status     TEXT NOT NULL CHECK (status IN ('active','blocked','invited')) DEFAULT 'active',
+  -- 'invited' — BO-11 boshqa tenantda allaqachon mavjud foydalanuvchini taklif qilgan, u hali kod bilan
+  -- qabul qilmagan (14 §18.2): login/tenant tanlovi/switch-tenant/sessiya profili uni e'tiborsiz qoldiradi
+  invited_name TEXT NULL,
+  -- taklif qiluvchi kiritgan ism: qabul qilinmaguncha (NOT NULL = hali qabul qilinmagan) BO-11 ro'yxatida
+  -- users.name o'rniga ko'rsatiladi; qabulda NULL bo'ladi. Qabul qilinmagan a'zolik bloklansa, blokdan
+  -- chiqarish uni 'invited'ga qaytaradi ('active'ga emas)
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   version    INT NOT NULL DEFAULT 1,
-  UNIQUE (tenant_id, user_id)
+  UNIQUE (tenant_id, user_id),
+  CHECK (status <> 'invited' OR invited_name IS NOT NULL)
 );
 
 CREATE TABLE app.roles (

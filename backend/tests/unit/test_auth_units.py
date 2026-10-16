@@ -113,3 +113,54 @@ def test_prod_guard_requires_auth_secrets() -> None:
         **base, kek=OTHER_KEK, web_bff_client_secret="y" * 40, public_base_url="https://app.example.uz/"
     )  # type: ignore[arg-type]
     assert ok.issuer == "https://app.example.uz"
+
+
+async def test_google_jwks_is_refetched_only_for_an_unknown_kid_with_a_cooldown() -> None:
+    """SEC-10: forged tokens with random ``kid``s cannot make us hammer Google's JWKS endpoint."""
+    import time
+
+    import httpx
+    from joserfc import jwt
+    from joserfc.jwk import KeySet, RSAKey
+
+    from app.modules.auth.application.ports import GoogleAuthError
+    from app.modules.auth.infrastructure.google_oidc import GoogleOidcAdapter
+
+    old = RSAKey.generate_key(2048, parameters={"kid": "old"})
+    new = RSAKey.generate_key(2048, parameters={"kid": "new"})
+    published: list[RSAKey] = [old]
+    fetches: list[str] = []
+
+    def jwks(request: httpx.Request) -> httpx.Response:
+        fetches.append(str(request.url))
+        return httpx.Response(200, json=KeySet(published).as_dict(private=False))
+
+    adapter = GoogleOidcAdapter(
+        lambda: httpx.AsyncClient(transport=httpx.MockTransport(jwks)),
+        client_id="web-client", client_secret=None, audiences=[], issuers=["https://accounts.google.com"],
+        auth_url="https://g/auth", token_url="https://g/token", jwks_url="https://g/certs",
+    )  # fmt: skip
+    now = int(time.time())
+    claims = {
+        "iss": "https://accounts.google.com", "aud": "web-client", "sub": "s-1", "exp": now + 300,
+        "iat": now, "email": "a@b.uz", "email_verified": True,
+    }  # fmt: skip
+
+    def token(key: RSAKey) -> str:
+        return jwt.encode({"alg": "RS256", "kid": key.kid}, claims, key)
+
+    assert (await adapter.verify_id_token(token(old))).sub == "s-1"
+    assert len(fetches) == 1
+    # a known kid never refetches; an unknown kid inside the 60 s cooldown does not either
+    await adapter.verify_id_token(token(old))
+    for _ in range(5):
+        with pytest.raises(GoogleAuthError):
+            await adapter.verify_id_token(token(new))
+    assert len(fetches) == 1
+    # Google rotated: after the cooldown one refetch picks the new key up
+    published.append(new)
+    adapter._keys_at -= 61  # simulate the cooldown passing
+    assert (await adapter.verify_id_token(token(new))).sub == "s-1"
+    assert len(fetches) == 2
+    await adapter.verify_id_token(token(new))
+    assert len(fetches) == 2

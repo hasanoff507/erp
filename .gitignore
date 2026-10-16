@@ -9,6 +9,7 @@ Thumbs.db
 .vscode/
 .playwright-mcp/
 .claude/worktrees/
+.claude-scratch/
 
 # --- backend ---
 backend/.venv/

@@ -143,7 +143,8 @@ async def test_qt_rls_04_no_platform_bypass_for_the_app_role(
         "INSERT INTO platform.units (code, is_fractional) VALUES ('zz', false)",
         "UPDATE platform.plans SET price_month = 1 WHERE code = 'standard'",
         "INSERT INTO platform.addons (code, name, price_month) VALUES ('x', 'x', 1)",
-        "DELETE FROM platform.units WHERE code = 'pcs'",
+        # a code no product references (catalog tests create products): only the privilege check can fail
+        "DELETE FROM platform.units WHERE code = 'zz-unused'",
     ],
 )
 async def test_qt_rls_05_app_role_cannot_write_global_tables(

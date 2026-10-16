@@ -1,5 +1,7 @@
 import { RouterProvider } from "react-router-dom";
 
+import { Toaster } from "@shared/ui";
+
 import { AuthProvider } from "#/features/auth-provider/index.ts";
 
 import { createAppRouter, LOGIN_SUBSCRIPTION_EXPIRED } from "./router/index.tsx";
@@ -15,6 +17,7 @@ export function App() {
   return (
     <AuthProvider onSubscriptionRestricted={goToSubscriptionLogin}>
       <RouterProvider router={router} />
+      <Toaster />
     </AuthProvider>
   );
 }

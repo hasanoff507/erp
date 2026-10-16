@@ -137,7 +137,7 @@ To'liq ma'lumotnoma ro'yxati (page pagination): `products`, `product-categories`
 ## 8. Optimistik qulflash
 
 - Ma'lumotnomalarda (`products`, `product-prices`, `roles`, `counterparties`, …) `version INT` maydoni javobda qaytariladi.
-- `PATCH`/`PUT` so'rov tanasida `version` **majburiy**; server joriy qiymat bilan solishtiradi, mos kelmasa `409 VERSION_CONFLICT`, javobda joriy (server) versiya qaytariladi — frontend foydalanuvchiga "ma'lumot boshqa joyda o'zgartirilgan, qayta yuklang" ko'rsatadi.
+- `PATCH`/`PUT` so'rov tanasida `version` **majburiy**; server joriy qiymat bilan solishtiradi, mos kelmasa `409 VERSION_CONFLICT`, javobda joriy (server) versiya `error.params.current_version` da qaytariladi — frontend foydalanuvchiga "ma'lumot boshqa joyda o'zgartirilgan, qayta yuklang" ko'rsatadi.
 - Hujjatlarda (`sales`, `goods-receipts`, …) `version` yo'q — `posted`dan keyin umuman o'zgarmaydi, tahrir o'rniga `POST /{id}/cancel` + yangi hujjat.
 
 ## 9. Hujjat hayot sikli endpoint naqshi
@@ -197,6 +197,12 @@ Har modul — bitta OpenAPI tag, `23-backend-arxitekturasi.md` §1dagi modul pap
 | M19 | `onec` (veb API; agent yo'llari `/onec-agent/*` ham shu modulda, `router_agent.py`) | `modules/onec_integration` (`33-1c-integratsiya.md` §4.1) |
 | AI | `ai` | `modules/ai` |
 | — | `sync`, `auth` | `modules/sync`, `modules/auth` (alohida fayllarda) |
+| M13a/M14 (tenant sozlamalari, 20 #40a–#40h) | `branches` | `modules/branches` |
+| M04 import ishlari (`import-jobs`, 19 §6) | `inventory` | `modules/imports` (bir nechta modulga yozadi) |
+| M09 katalog (`products`, `product-categories`, `units`, `mxik-codes`) | `pricing` | `modules/catalog` |
+| M17 `GET /auth/terms` (joriy oferta versiyasi) | `auth` | `modules/billing` |
+
+`operation_id` orval funksiya nomiga aylanganda tag prefiksi olib tashlanadi, shuning uchun prefiksdan keyingi qism butun API bo'yicha **noyob** bo'lishi kerak (masalan `branches_list_branches` → `listBranches`; `branches_list` → `list` boshqa tag bilan to'qnashadi).
 
 `operation_id` qo'lda beriladi: `<tag>_<harakat>` (masalan `debts_forgive`, `goods_receipts_post`) — orval shundan funksiya nomini oladi.
 
@@ -458,6 +464,7 @@ Quyidagi kalitlar xato **kodi emas** — katalogdagi kod bilan birga `details[].
 | message_key | Qayerda | Bog'liq kod / manba |
 |---|---|---|
 | `validation.required`, `validation.max_length`, `validation.phone_format` | `details[]` (har maydon), zod `errorMap`; `details[].field="Idempotency-Key"` — sarlavha yo'q (`required`) yoki 200 belgidan uzun (`max_length`), §6 | `VALIDATION_ERROR` |
+| `validation.credential_shared_across_tenants` | `details[].field="user_id"` — BO-11 `reset-password`/`reset-pin`: xodim taklifni qabul qilmagan (`invited`) yoki boshqa tenantda ham faol a'zo — parol/PIN global, shu tenant tiklay olmaydi (`14-autentifikatsiya-oauth2.md` §18.2) | `VALIDATION_ERROR` |
 | `validation.variance_note_required` | `details[].field="variance_note"` — smena yopishda farq bor, izoh yo'q (`18-api-kassa.md` §3) | `VALIDATION_ERROR` |
 | `validation.card_manual_details_forbidden` | `details[].field="payments[i].card_mask"`/`"rrn"`/`"card_type"`/`"card_type_source"`/`"approval_code"`/`"card_scheme"`/`"card_result"`/`"terminal_ref"` (shuningdek `refund_card.*`, `debt_payment` ildizi) — `card_entry_mode="manual"` (terminalsiz karta, rekvizitsiz) da karta rekviziti berilgan; shuningdek `POST /card-terminal-transactions`da `result.resolved_by="manager"` bilan `rrn`/`card_mask`/`approval_code`/`card_type` berilgan (qaror #64, #71) | `VALIDATION_ERROR` |
 | `validation.card_entry_mode_required` | `details[].field="payments[i].card_entry_mode"` — `method="card"` da kiritish usuli yo'q (qaror #71) | `VALIDATION_ERROR` |

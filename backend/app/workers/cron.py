@@ -2,7 +2,8 @@
 
 The scheduler runs no business queries itself: it asks the SECURITY DEFINER
 ``app.list_active_tenant_ids()`` for tenants and enqueues one job per tenant.
-The only tenant-less cron job is the ``auth.login_attempts`` retention purge.
+The only tenant-less cron job is the ``auth.login_attempts`` retention purge; the
+``idempotency_keys`` purge fans out one job per tenant.
 """
 
 from __future__ import annotations
@@ -15,11 +16,12 @@ from sqlalchemy import text
 
 from app.core.db.session import Database, unscoped_transaction
 from app.core.queue import JobQueue
-from app.workers.jobs.system import purge_login_attempts
+from app.workers.jobs.system import purge_idempotency_keys_fanout, purge_login_attempts
 
 # SAQ cron runs in UTC; Asia/Tashkent is UTC+5 all year (no DST)
 CRON_JOBS: list[CronJob[Any]] = [
     CronJob(purge_login_attempts, cron="15 22 * * *"),  # 03:15 Tashkent (23 §4)
+    CronJob(purge_idempotency_keys_fanout, cron="30 22 * * *"),  # 03:30 Tashkent, tenant fan-out (23 §4)
 ]
 
 _ACTIVE_TENANTS = text("SELECT app.list_active_tenant_ids()")

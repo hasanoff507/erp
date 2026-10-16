@@ -95,9 +95,107 @@ class Settings(BaseSettings):
     idempotency_lock_ttl_s: int = Field(default=60, ge=1)
     idempotency_retention_days: int = Field(default=30, ge=1)
 
+    # --- Bosqich 1 settings: auth/signup slice (OTP, Telegram, Eskiz, Google) ---
+    # OTP (14 §4.2, §12; qaror #34, #54): TTL 5 min; per-channel send limits
+    otp_ttl_s: int = Field(default=300, ge=60, le=900)
+    otp_telegram_per_phone_day: int = Field(default=10, ge=1)
+    otp_telegram_per_ip_hour: int = Field(default=20, ge=1)
+    otp_sms_per_phone_day: int = Field(default=5, ge=1)
+    otp_sms_per_ip_hour: int = Field(default=20, ge=1)
+    otp_sms_daily_budget: int = Field(default=2000, ge=1)  # global SMS/day (toll-fraud guard, alert)
+    otp_verified_ttl_s: int = Field(default=900, ge=60)  # verified signup/export ticket lifetime
+    otp_recovery_min_response_ms: int = Field(default=1500, ge=0, le=5000)  # timing oracle guard (14 §12)
+    otp_verify_per_ip_hour: int = Field(default=60, ge=1)  # /auth/otp/verify attempts per IP (14 §12)
+    otp_verify_fail_per_phone_day: int = Field(default=10, ge=1)  # wrong codes / phone / day, all challenges
+    # dev/test only (qaror #34) — both refused in staging/prod by the validator below
+    otp_dev_fakes: bool = False  # ERP_OTP_DEV_FAKES: recording Telegram/SMS fakes instead of real senders
+    otp_test_phones: list[str] = Field(default_factory=list)  # ERP_OTP_TEST_PHONES: test-number path
+    otp_test_code: SecretStr | None = None  # ERP_OTP_TEST_CODE: fixed 6-digit code of the test numbers
+    # credential-set session after an invite/reset/recovery code (14 §4.2, §18.2)
+    credential_token_ttl_s: int = Field(default=600, ge=60, le=3600)
+    signup_per_ip_hour: int = Field(default=10, ge=1)
+    # Telegram Bot API (21 §11, §11.1)
+    telegram_bot_token: SecretStr | None = None
+    telegram_api_base_url: str = "https://api.telegram.org"
+    # Eskiz SMS — fallback channel only (21 §10, 26 #45); test mode sends only the allowed test text
+    eskiz_test_mode: bool = True  # ERP_ESKIZ_TEST_MODE
+    eskiz_base_url: str = "https://notify.eskiz.uz"
+    eskiz_email: str | None = None
+    eskiz_password: SecretStr | None = None
+    eskiz_sender: str = "4546"
+    sms_brand: str = "ERP"
+    outbound_http_timeout_s: float = Field(default=10.0, gt=0, le=60)
+    # Google OIDC (14 §2.2, 21 §9.3)
+    google_client_id: str | None = None
+    google_client_secret: SecretStr | None = None
+    google_android_client_ids: list[str] = Field(default_factory=list)  # extra `aud` of native ID tokens
+    google_auth_url: str = "https://accounts.google.com/o/oauth2/v2/auth"
+    google_token_url: str = "https://oauth2.googleapis.com/token"  # noqa: S105 — URL, not a secret
+    google_jwks_url: str = "https://www.googleapis.com/oauth2/v3/certs"
+    google_issuers: list[str] = Field(
+        default_factory=lambda: ["https://accounts.google.com", "accounts.google.com"]
+    )
+
+    @model_validator(mode="after")
+    def _guard_otp_dev_paths(self) -> Self:
+        """qaror #34: fakes and the test-number path never run where real users are (staging/prod)."""
+        if self.otp_test_phones:
+            code = self.otp_test_code.get_secret_value() if self.otp_test_code else ""
+            if not (len(code) == 6 and code.isdigit()):
+                raise ValueError("ERP_OTP_TEST_PHONES uchun ERP_OTP_TEST_CODE (6 raqam) shart")
+        if self.environment in _HARDENED_ENVIRONMENTS and (self.otp_dev_fakes or self.otp_test_phones):
+            raise ValueError(
+                f"{self.environment}'da ERP_OTP_DEV_FAKES va ERP_OTP_TEST_PHONES ruxsat etilmaydi (qaror #34)"
+            )
+        return self
+
+    # --- Bosqich 1 settings: access/branches/tenant-settings slice ---
+    # --- Bosqich 1 settings: catalog/pricing/import slice ---
+    # MXIK classifier (21 §7): tasnif.soliq.uz; "fake" only for local/test (qaror #34)
+    mxik_provider: Literal["tasnif", "fake"] = "tasnif"
+    mxik_base_url: str = "https://tasnif.soliq.uz/api/cls-api"
+    mxik_timeout_s: float = Field(default=5.0, gt=0)
+    # 21 §7 retry: base=5s, cap=30s, max_attempts=3, then the last known cache entry
+    mxik_retry_base_s: float = Field(default=5.0, ge=0)
+    mxik_retry_cap_s: float = Field(default=30.0, ge=0)
+    mxik_max_attempts: int = Field(default=3, ge=1)
+    mxik_cache_fresh_s: int = Field(default=86_400, ge=0)
+    mxik_cache_ttl_s: int = Field(default=30 * 86_400, ge=60)
+    # import-jobs (17 §12, 19 §6; qaror #54 defaults): ≤ 10 MB, ≤ 20 000 rows
+    import_max_bytes: int = Field(default=10 * 1024 * 1024, ge=1024)
+    import_max_rows: int = Field(default=20_000, ge=1)
+    # uploaded files (attachments.s3_key) until the S3 StoragePort lands (23 §7 "Fayl ombori")
+    file_storage_dir: str = "./var/files"
+
     log_level: str = "INFO"
     log_json: bool = True
     cors_origins: list[str] = Field(default_factory=list)
+
+    # --- telemetry (23 §8, 25 §5; app/core/telemetry.py) — all off by default ---
+    metrics_enabled: bool = False  # GET /metrics + HTTP metrics middleware
+    # Prometheus scrape bearer token; mandatory in staging/prod when metrics are on
+    metrics_token: SecretStr | None = None
+    # SAQ worker/scheduler /metrics listener (None = off); same bearer token
+    worker_metrics_port: int | None = Field(default=None, ge=1, le=65535)
+    worker_metrics_host: str = "0.0.0.0"  # noqa: S104 — container-internal listener
+    # OpenTelemetry traces → OTLP/HTTP → self-hosted Grafana Tempo (26 #53)
+    otel_enabled: bool = False
+    otel_exporter_otlp_endpoint: str = "http://localhost:4318"
+    otel_sample_ratio: float = Field(default=1.0, ge=0.0, le=1.0)
+    sentry_dsn: SecretStr | None = None
+
+    @model_validator(mode="after")
+    def _guard_metrics_token(self) -> Self:
+        """/metrics never open to the network where real data lives (staging/prod)."""
+        exposed = self.metrics_enabled or self.worker_metrics_port is not None
+        if exposed and self.environment in _HARDENED_ENVIRONMENTS:
+            token = self.metrics_token.get_secret_value() if self.metrics_token else ""
+            if len(token) < _MIN_SECRET_LENGTH:
+                raise ValueError(
+                    f"{self.environment}'da /metrics uchun ERP_METRICS_TOKEN "
+                    f"(kamida {_MIN_SECRET_LENGTH} belgi) shart (23 §8)"
+                )
+        return self
 
     @model_validator(mode="after")
     def _enforce_production_security(self) -> Self:

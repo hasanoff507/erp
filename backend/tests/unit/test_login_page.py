@@ -6,8 +6,10 @@ import base64
 import hashlib
 import re
 from urllib.parse import parse_qs, urlsplit
+from uuid import UUID
 
 from app.modules.auth.api.login_page import STYLE, STYLE_HASH, pick_locale, render_login
+from app.modules.auth.application.login import TenantChoice
 
 PARAMS = {
     "response_type": "code",
@@ -53,7 +55,7 @@ def test_ui_locales_ru_renders_russian() -> None:
     html = response.body.decode()
     assert '<html lang="ru">' in html
     assert "Телефон" in html and "Пароль" in html and ">Войти</button>" in html
-    assert "Неверный номер телефона или пароль" in html
+    assert "Неверный телефон или пароль" in html
     assert '<input type="hidden" name="ui_locales" value="ru">' in html
 
 
@@ -81,3 +83,39 @@ def test_language_switch_preserves_oauth_params() -> None:
 def test_values_are_escaped() -> None:
     html = render_login({**PARAMS, "state": '"><script>x</script>'}, phone='"><b>').body.decode()
     assert "<script>x" not in html and "<b>" not in html
+
+
+def test_bo01_fields_and_links() -> None:
+    """07 BO-01: phone (max 17) + password (8–128) with autocomplete, «Parolni unutdim?», Google, invite, signup."""
+    html = render_login(PARAMS).body.decode()
+    assert '<label for="phone">Telefon</label>' in html and '<label for="password">Parol</label>' in html
+    assert 'autocomplete="username"' in html and 'maxlength="17"' in html
+    assert 'autocomplete="current-password"' in html and 'minlength="8" maxlength="128"' in html
+    assert '<a href="/recover">Parolni unutdim?</a>' in html
+    assert 'href="/auth/google/start?tenant_id=' in html and "Google bilan kirish" in html
+    assert 'href="/invite"' in html and 'href="/onboarding"' in html
+    assert "Kassirlar kassadan PIN bilan kiradi" in html
+    assert 'aria-invalid="true"' not in html and 'role="alert"' not in html
+
+
+def test_android_page_has_no_web_only_entry_points() -> None:
+    html = render_login({**PARAMS, "client_id": "android-pos"}).body.decode()
+    assert "/auth/google/start" not in html and "/onboarding" not in html
+    assert 'href="/recover"' in html and 'href="/invite"' in html
+
+
+def test_error_marks_fields_invalid_without_revealing_which() -> None:
+    html = render_login(PARAMS, error_code="INVALID_CREDENTIALS").body.decode()
+    assert '<p class="err" id="login-error" role="alert">' in html
+    assert html.count('aria-invalid="true" aria-describedby="login-error"') == 2  # phone and password
+    assert "Telefon yoki parol noto&#x27;g&#x27;ri" in html
+
+
+def test_tenant_chooser_is_labelled_required_select() -> None:
+    tenants = [TenantChoice(UUID(int=1), "Do'kon A"), TenantChoice(UUID(int=2), "Do'kon <B>")]
+    html = render_login(
+        {k: v for k, v in PARAMS.items() if k != "tenant_id"}, error_code="VALIDATION_ERROR", tenants=tenants
+    ).body.decode()
+    assert '<label for="tenant_id">Do&#x27;kon</label>' in html
+    assert '<select id="tenant_id" name="tenant_id" required aria-invalid="true"' in html
+    assert html.count("<option ") == 2 and "Do&#x27;kon &lt;B&gt;" in html

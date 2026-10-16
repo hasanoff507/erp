@@ -19,7 +19,7 @@ import structlog
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
 
-from app.modules.auth.infrastructure.repositories import AuthRepository
+from app.modules.auth.application.ports import AuthStore
 
 log = structlog.get_logger(__name__)
 
@@ -54,7 +54,7 @@ class SessionProfile:
 
 
 class SessionProfileService:
-    def __init__(self, repo: AuthRepository, redis: Callable[[], Redis]) -> None:
+    def __init__(self, repo: AuthStore, redis: Callable[[], Redis]) -> None:
         self._repo = repo
         self._redis = redis
 

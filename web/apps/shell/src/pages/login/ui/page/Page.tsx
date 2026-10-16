@@ -10,7 +10,7 @@
  *   reason=subscription_expired | error=subscription_restricted → restricted-subscription banner
  */
 import { useUnit } from "effector-react";
-import { CreditCard, Download } from "lucide-react";
+import { CreditCard } from "lucide-react";
 import { useEffect } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 
@@ -22,9 +22,16 @@ import {
   $sessionError,
   $subscriptionRestriction,
 } from "@shared/state/session";
-import { Banner, Button, Icon } from "@shared/ui";
+import { Banner, Button } from "@shared/ui";
 
-import { loginErrorReason, safeNextPath, safeTenantId, SUBSCRIPTION_REASON } from "../../model/index.ts";
+import {
+  $legalLinks,
+  legalLinksRequested,
+  loginErrorReason,
+  safeNextPath,
+  safeTenantId,
+  SUBSCRIPTION_REASON,
+} from "../../model/index.ts";
 import { BranchStep } from "../branch-step/BranchStep.tsx";
 import { LoginHeader } from "../header/LoginHeader.tsx";
 import { PromoPanel } from "../promo/PromoPanel.tsx";
@@ -32,11 +39,14 @@ import { LoginStart } from "../start/LoginStart.tsx";
 
 export function LoginPage({ defaultPath }: { defaultPath: string }) {
   const { t } = useTranslation("auth");
-  const [status, branchChoiceRequired, restriction, sessionError] = useUnit([
+  const { t: to } = useTranslation("onboarding");
+  const [status, branchChoiceRequired, restriction, sessionError, legal, requestLegal] = useUnit([
     $authStatus,
     $branchChoiceRequired,
     $subscriptionRestriction,
     $sessionError,
+    $legalLinks,
+    legalLinksRequested,
   ]);
   const [params] = useSearchParams();
   const title = t("login.pageTitle");
@@ -46,6 +56,9 @@ export function LoginPage({ defaultPath }: { defaultPath: string }) {
   useEffect(() => {
     document.title = `${title} · ERP`;
   }, [title]);
+  useEffect(() => {
+    requestLegal();
+  }, [requestLegal]);
 
   if (status === "authenticated" && !branchChoiceRequired) return <Navigate to={returnTo} replace />;
 
@@ -59,7 +72,7 @@ export function LoginPage({ defaultPath }: { defaultPath: string }) {
         <div className="flex grow items-center justify-center py-5">
           <div className="flex w-full max-w-[420px] flex-col gap-3.5">
             <div className="flex flex-col gap-1.5">
-              <h1 className="text-[28px] font-extrabold leading-tight">{t("login.title")}</h1>
+              <h1 className="text-h1">{t("login.title")}</h1>
               <p className="text-[14px] text-foreground-secondary">{t("login.subtitle")}</p>
             </div>
 
@@ -79,11 +92,8 @@ export function LoginPage({ defaultPath }: { defaultPath: string }) {
                   ) : undefined
                 }
               >
+                {/* «Ma'lumotlarimni yuklab olish» comes with the B6 data-export flow — no dead link until then. */}
                 <span className="block">{t("login.subscriptionExpired")}</span>
-                <a href="#export" className="mt-1 inline-flex items-center gap-1 text-destructive-strong">
-                  <Icon as={Download} size="sm" />
-                  {t("login.exportData")}
-                </a>
               </Banner>
             ) : null}
 
@@ -105,11 +115,23 @@ export function LoginPage({ defaultPath }: { defaultPath: string }) {
                 {t("login.register")}
               </Link>
             </p>
-            <p className="text-center text-[12px] leading-normal text-foreground-secondary">
-              {t("login.termsPrefix")} <a href="#terms">{t("login.terms")}</a> {t("login.and")}{" "}
-              <a href="#privacy">{t("login.privacy")}</a>
-              {t("login.termsSuffix")}
+            <p className="text-center text-[13px]">
+              <Link to="/install">{to("login.install")}</Link>
             </p>
+            {/* Documents from GET /auth/terms (`text_url`); hidden until both are known — no `#terms` stubs. */}
+            {legal ? (
+              <p className="text-center text-[12px] leading-normal text-foreground-secondary">
+                {t("login.termsPrefix")}{" "}
+                <a href={legal.terms} target="_blank" rel="noreferrer">
+                  {t("login.terms")}
+                </a>{" "}
+                {t("login.and")}{" "}
+                <a href={legal.privacy} target="_blank" rel="noreferrer">
+                  {t("login.privacy")}
+                </a>
+                {t("login.termsSuffix")}
+              </p>
+            ) : null}
           </div>
         </div>
       </main>

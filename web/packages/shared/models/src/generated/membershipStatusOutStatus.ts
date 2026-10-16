@@ -11,4 +11,5 @@ export type MembershipStatusOutStatus = typeof MembershipStatusOutStatus[keyof t
 export const MembershipStatusOutStatus = {
   active: 'active',
   blocked: 'blocked',
+  invited: 'invited',
 } as const;

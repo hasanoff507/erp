@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@fontsource-variable/manrope": "catalog:",
+    "@fontsource-variable/noto-sans": "catalog:",
     "@pages/ai-assistant": "workspace:*",
     "@pages/billing": "workspace:*",
     "@pages/catalog": "workspace:*",
@@ -38,7 +39,7 @@
     "@shared/ui": "workspace:*",
     "effector": "catalog:",
     "effector-react": "catalog:",
-    "get-nonce": "^1.0.1",
+    "get-nonce": "catalog:",
     "lucide-react": "catalog:",
     "patronum": "catalog:",
     "react": "catalog:",

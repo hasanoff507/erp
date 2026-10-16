@@ -1,0 +1,699 @@
+{
+  "title": "Sozlamalar",
+  "nav": {
+    "label": "Sozlamalar bo'limlari",
+    "tenant": "Do'kon",
+    "users": "Xodimlar",
+    "branches": "Filiallar",
+    "telegram": "Telegram",
+    "billing": "Obuna",
+    "onec": "1C"
+  },
+  "offline": {
+    "readOnly": "Internet yo'q — faqat ko'rish rejimi. O'zgartirishlar internet tiklangach mumkin."
+  },
+  "nextStage": {
+    "chip": "Keyingi bosqichda"
+  },
+  "users": {
+    "title": "Xodimlar va huquqlar",
+    "description": "Xodim qo'shish, bloklash, PIN va parolni tiklash, seans va qurilmalarni boshqarish. Limitlar rolga bog'langan.",
+    "add": "Xodim qo'shish",
+    "tabs": {
+      "label": "Bo'lim",
+      "staff": "Xodimlar",
+      "roles": "Rollar",
+      "devices": "Qurilmalar",
+      "sessions": "Sessiyalar"
+    },
+    "fields": {
+      "phone": "Telefon",
+      "fullName": "To'liq ism",
+      "roles": "Rol(lar)",
+      "branches": "Filial(lar)"
+    },
+    "table": {
+      "person": "Xodim",
+      "rolesBranches": "Rol · filial",
+      "status": "Holat",
+      "lastLogin": "Oxirgi kirish",
+      "lastLoginAt": "Oxirgi kirish: {{at}}",
+      "neverLoggedIn": "Hali kirmagan",
+      "you": "(siz)",
+      "allBranches": "Barcha filiallar",
+      "search": "Ism yoki telefon bo'yicha qidirish",
+      "noResults": "Xodim topilmadi",
+      "counts": "{{total}} xodim · {{active}} faol · {{blocked}} bloklangan · {{invited}} taklif",
+      "countsPartial": "Ko'rsatilgan: {{total}} xodim · {{active}} faol · {{blocked}} bloklangan · {{invited}} taklif — qolganlari hali yuklanmagan"
+    },
+    "status": {
+      "active": "Faol",
+      "blocked": "Bloklangan",
+      "invited": "Taklif yuborildi",
+      "pending": "Taklif yuborilgan",
+      "invitedVia": {
+        "telegram": "Taklif yuborildi · Telegram",
+        "sms": "Taklif yuborildi · SMS"
+      }
+    },
+    "empty": {
+      "title": "Hozircha faqat siz",
+      "description": "Kassir, omborchi yoki menejer qo'shing — taklif kodi Telegram yoki SMS orqali boradi."
+    },
+    "invite": {
+      "title": "Yangi xodimni taklif qilish",
+      "description": "Taklif kodi avval Telegram bot orqali, bo'lmasa SMS bilan yuboriladi. Xodim kod bilan o'z parol va PIN kodini o'zi o'rnatadi.",
+      "submit": "Taklif yuborish",
+      "sentTitle": "Xodim qo'shildi",
+      "sentVia": {
+        "telegram": "Kod Telegram orqali yuborildi",
+        "sms": "Kod SMS orqali yuborildi"
+      }
+    },
+    "edit": {
+      "title": "{{name}} — rol va filiallar",
+      "description": "Operatsiya limitlari rolga bog'langan — ularni «Rollar» bo'limida o'zgartiring.",
+      "saved": "Rol va filiallar saqlandi"
+    },
+    "actions": {
+      "groupLabel": "Xodim amallari",
+      "edit": "Tahrirlash",
+      "block": "Bloklash",
+      "unblock": "Blokdan chiqarish",
+      "resetPassword": "Parolni tiklash",
+      "resetPin": "PINni qayta o'rnatish",
+      "cannotBlockSelf": "O'zingizni bloklab bo'lmaydi",
+      "blocked": "Xodim bloklandi",
+      "unblocked": "Xodim blokdan chiqarildi",
+      "sessionsEnded": "Tugatilgan seanslar: {{count}}",
+      "passwordResetDone": "Parol bekor qilindi, barcha seanslar tugatildi",
+      "pinResetDone": "PIN bekor qilindi — keyingi kirishda yangisi o'rnatiladi"
+    },
+    "confirm": {
+      "block": {
+        "title": "Xodimni bloklaysizmi?",
+        "description": "{{name}} ning barcha faol seanslari darhol tugatiladi va u blokdan chiqarilmaguncha kira olmaydi.",
+        "confirm": "Bloklash"
+      },
+      "unblock": {
+        "title": "Blokdan chiqarasizmi?",
+        "description": "{{name}} yana tizimga kira oladi.",
+        "confirm": "Blokdan chiqarish"
+      },
+      "resetPassword": {
+        "title": "Parolni tiklaysizmi?",
+        "description": "{{name}} ning eski paroli va PIN kodi bekor qilinadi, barcha seanslari tugatiladi. Tiklash kodi avval Telegram bot orqali, ulanmagan bo'lsa SMS bilan yuboriladi. Parol hech qachon ko'rsatilmaydi va yuborilmaydi.",
+        "confirm": "Parolni tiklash"
+      },
+      "resetPin": {
+        "title": "PINni qayta o'rnatasizmi?",
+        "description": "{{name}} ning eski PIN kodi bekor qilinadi, keyingi kirishda yangi PIN o'rnatish majburiy. Kod avval Telegram bot orqali, bo'lmasa SMS bilan yuboriladi. Seanslar saqlanadi.",
+        "confirm": "PINni qayta o'rnatish"
+      }
+    },
+    "sessions": {
+      "title": "Faol seanslar",
+      "listLabel": "Seanslar ro'yxati",
+      "empty": "Faol seans yo'q",
+      "current": "Joriy seans",
+      "times": "Kirdi {{created}} · oxirgi faollik {{seen}}",
+      "kind": {
+        "web": "Veb-brauzer",
+        "android": "Android kassa",
+        "other": "Boshqa qurilma"
+      },
+      "revokeOne": "Tugatish",
+      "revokeOneLabel": "Seansni tugatish: {{device}}",
+      "revokeAll": "Barcha seanslarni tugatish",
+      "revoked": "Seans tugatildi — boshqa seanslarga ta'sir qilmadi",
+      "revokedAll": "Tugatilgan seanslar: {{count}}",
+      "user": "Xodim",
+      "pickUser": "Xodimni tanlang",
+      "pickUserHint": "Seanslarini ko'rish uchun xodimni tanlang"
+    },
+    "userDevices": {
+      "title": "Qurilmalari",
+      "empty": "Qurilma yo'q",
+      "loading": "Yuklanmoqda…"
+    }
+  },
+  "roles": {
+    "listTitle": "Rollar",
+    "system": "Tizim",
+    "create": "Yangi rol",
+    "createTitle": "Yangi rol",
+    "createHint": "Rol yaratilgach unga ruxsat va limitlarni belgilang.",
+    "created": "Rol yaratildi",
+    "name": "Rol nomi",
+    "renamed": "Rol nomi saqlandi",
+    "systemNameReadOnly": "Tizim roli — nomi o'zgarmaydi",
+    "ownerReadOnly": "Egasi barcha ruxsatlarga cheklovsiz ega — bu rolni o'zgartirib bo'lmaydi.",
+    "editorHint": "Ruxsatni belgilang; limitli ruxsatlarda chegarani kiriting (bo'sh — limitsiz). O'zgarish darhol kuchga kiradi.",
+    "catalogEmpty": "Ruxsatlar katalogi bo'sh",
+    "limitLabel": "Limit: {{code}}",
+    "limitPlaceholder": "Limitsiz",
+    "unlimited": "Limitsiz",
+    "som": "so'm",
+    "savePermissions": "«{{role}}» ruxsatlarini saqlash",
+    "saved": "Ruxsatlar saqlandi",
+    "savedHint": "Yangi ruxsat va limitlar darhol kuchga kirdi"
+  },
+  "permissions": {
+    "sales": {
+      "create": "Chek yaratish/yakunlash",
+      "void": "Yakunlanmagan chekni bekor qilish"
+    },
+    "shift": {
+      "open": "Smena ochish",
+      "close": "Smena yopish (Z-hisobot)"
+    },
+    "cash_register": {
+      "manage": "Kassa/filial sozlash"
+    },
+    "returns": {
+      "create": "Qaytarish boshlash",
+      "approve": "Limitdan yuqori yoki asl cheksiz qaytarishni tasdiqlash"
+    },
+    "discount": {
+      "give": "Chekka chegirma berish",
+      "approve": "Limitdan yuqori chegirmani PIN bilan tasdiqlash",
+      "rule": {
+        "manage": "Avtomatik chegirma/aksiya qoidasi"
+      }
+    },
+    "stock": {
+      "view": "Qoldiqni ko'rish",
+      "writeoff": "Hisobdan chiqarish",
+      "count": {
+        "create": "Inventarizatsiya boshlash, sanash",
+        "post": "Sanash natijasini tasdiqlab balansga o'tkazish"
+      },
+      "opening": {
+        "manage": "Boshlang'ich tovar qoldig'i va boshlang'ich qarz"
+      }
+    },
+    "transfer": {
+      "create": "Ko'chirish hujjati yaratish (yuborish)",
+      "receive": "Ko'chirishni qabul qilish"
+    },
+    "purchases": {
+      "create": "Xaridnoma yaratish",
+      "receive": "Tovarni jismoniy qabul qilish",
+      "post": "Kirim hujjatini/e-fakturani yakuniy o'tkazish (buxgalteriya)",
+      "pay": "Yetkazib beruvchiga to'lov qayd etish",
+      "return": "Yetkazib beruvchiga qaytarish"
+    },
+    "einvoice": {
+      "sign": "E-IMZO bilan kiruvchi/chiquvchi e-fakturani imzolash",
+      "create": "Chiquvchi e-faktura qoralamasini yaratish va yuborish"
+    },
+    "debts": {
+      "create": "Mijozga nasiya/qarz yozish",
+      "approve": "Kredit limitidan yuqori nasiyani tasdiqlash",
+      "forgive": "Qarzni kechish/\"undirib bo'lmaydigan\" deb yopish",
+      "limit": {
+        "manage": "Mijoz kredit limitini belgilash/o'zgartirish"
+      },
+      "payment": {
+        "accept": "Qarz to'lovini qabul qilish"
+      },
+      "remind": "Mijozga qarz eslatmasini yuborish (Telegram/SMS)"
+    },
+    "prices": {
+      "edit": "Narx/chegirma qoidasini o'zgartirish",
+      "approve": "Katta narx o'zgarishini tasdiqlash"
+    },
+    "labels": {
+      "print": "Yorliq/shtrix-kod chop etish"
+    },
+    "catalog": {
+      "manage": "Mahsulot/kategoriya/shtrix-kod CRUD, mahsulot importi, ombor sozlamalari"
+    },
+    "tax": {
+      "vat": {
+        "view": "Ichki QQS hisobini ko'rish"
+      },
+      "compare": {
+        "review": "Davlat hisoboti bilan farqni ko'rib chiqish"
+      },
+      "correction": {
+        "submit": "Davlat hisobotiga tuzatish yoki tasdiqni qayd etish"
+      }
+    },
+    "accounting": {
+      "post": "Buxgalteriya yozuvini ko'rish/qo'lda tuzatish",
+      "period": {
+        "close": "Hisob davrini yopish"
+      }
+    },
+    "valuation": {
+      "settings": {
+        "manage": "FIFO/AVECO usulini almashtirish (faqat keyingi yildan)"
+      }
+    },
+    "reports": {
+      "sales": {
+        "view": "Savdo/ombor hisobotlarini ko'rish"
+      },
+      "finance": {
+        "view": "Moliyaviy (foyda-zarar, balans) hisobotlarni ko'rish"
+      },
+      "export": "Hisobotni Excel/PDF eksport qilish"
+    },
+    "settings": {
+      "users": "Xodim qo'shish, rol/limit tayinlash",
+      "branches": "Filial qo'shish/boshqarish",
+      "tenant": "Do'kon sozlamalari, integratsiya kalitlari, soliq rejimi o'zgarishi"
+    },
+    "integrations": {
+      "retry": "OFD/e-faktura/markirovka integratsiya ishini qo'lda qayta navbatga qo'yish"
+    },
+    "expenses": {
+      "create": "Xarajat yozish",
+      "approve": "Katta/takrorlanuvchi xarajatni tasdiqlash"
+    },
+    "cash": {
+      "deposit": "Kassaga pul qo'yish",
+      "withdraw": "Kassadan pul olish",
+      "count": {
+        "shift": "Smena yopishda naqdni sanash"
+      }
+    },
+    "card": {
+      "manual_entry": {
+        "approve": "Terminalsiz (rekvizitsiz) karta to'lovini va noma'lum natijani tasdiqlash"
+      }
+    },
+    "devices": {
+      "revoke": "Qurilmalar ro'yxatini ko'rish va qurilmani bekor qilish"
+    },
+    "bank_settlements": {
+      "manage": "Bank tushumi tasdig'i (5710 → 5110): yaratish, o'tkazish, bekor qilish"
+    },
+    "billing": {
+      "manage": "Obuna to'lovi (oy/yil), qo'shimcha kassa, to'lovlar tarixi"
+    },
+    "notifications": {
+      "manage": "Telegram/ogohlantirish sozlamalari"
+    },
+    "telegram": {
+      "link": "O'z Telegram akkauntini ulash"
+    },
+    "ai": {
+      "chat": {
+        "use": "AI yordamchi chatdan foydalanish"
+      },
+      "ocr": {
+        "use": "Hujjat fotosidan AI orqali kiritish"
+      }
+    },
+    "onec": {
+      "view": "1C integratsiyasi holati, partiyalar, jurnal, solishtirishlar",
+      "settings": {
+        "manage": "1C: kompyuterni ulash/uzish, bazalar, filial bog'lash, siyosatlar"
+      },
+      "mapping": {
+        "edit": "1C: moslashtirish ustasi, auto-match, tasdiqlash"
+      },
+      "refs": {
+        "create": "1C'da yangi ma'lumotnoma elementini yaratishni tasdiqlash"
+      },
+      "export": {
+        "prepare": "1C: kunni tayyorlash, qayta qurish, sinov ko'rinishi",
+        "approve": "1C: tasdiqlash va yuborish, bekor qilish",
+        "correct": "1C: xatolarni qayta yuborish, tuzatuvchi partiya"
+      }
+    },
+    "platform": {
+      "admin": "Platforma admin paneli"
+    }
+  },
+  "modules": {
+    "M01": "Kassa (POS)",
+    "M02": "Qaytarish",
+    "M03": "Chegirma",
+    "M04": "Ombor qoldig'i",
+    "M05": "Inventarizatsiya",
+    "M06": "Ko'chirish",
+    "M07": "Xarid",
+    "M08": "Nasiya (mijoz qarzi)",
+    "M09": "Narxlar",
+    "M10": "QQS",
+    "M11": "Buxgalteriya",
+    "M12": "Hisobotlar",
+    "M13": "Huquqlar",
+    "M14": "Filiallar",
+    "M15": "Xarajatlar",
+    "M16": "Kassa pul harakati",
+    "M17": "Obuna",
+    "M18": "Bildirishnomalar va Telegram bot",
+    "M19": "1C integratsiyasi",
+    "AI-01": "AI yordamchi chat",
+    "AI-03": "Hujjat fotosidan kiritish (OCR)",
+    "AI-05": "Soliq tafovutini tushuntirish",
+    "AI-06": "Nasiya eslatma matni",
+    "ADM-01": "Platforma admin paneli"
+  },
+  "devices": {
+    "kind": {
+      "web": "Veb-kassa",
+      "android": "Android POS",
+      "onec_agent": "Do'kon agenti"
+    },
+    "table": {
+      "device": "Qurilma",
+      "lastSync": "Oxirgi sinxron",
+      "pending": "Kutmoqda",
+      "status": "Holat",
+      "actions": "Amallar"
+    },
+    "lastSync": "sinxron {{at}}",
+    "neverSynced": "Sinxronlanmagan",
+    "pendingCount": "{{count}} ta kutmoqda",
+    "status": {
+      "active": "Faol",
+      "revoked": "Bekor qilingan"
+    },
+    "filters": {
+      "branch": "Filial",
+      "allBranches": "Barcha filiallar",
+      "kind": "Turi",
+      "allKinds": "Barcha turlar",
+      "includeRevoked": "Bekor qilinganlarni ham ko'rsatish"
+    },
+    "addNew": "Yangi qurilma qo'shish",
+    "empty": "Qurilma yo'q",
+    "onecAgentHint": "1C sozlamalarida uziladi",
+    "revoke": "Bekor qilish",
+    "revokeConfirm": "Qurilmani bekor qilish",
+    "revoked": "«{{name}}» bekor qilindi",
+    "confirm": {
+      "title": "Qurilmani bekor qilasizmi?",
+      "description": "«{{name}}» tokenlari va litsenziyasi bekor qilinadi, unda PIN bilan kirgan xodimlar PINni almashtiradi."
+    },
+    "reason": "Sabab",
+    "reasonPlaceholder": "Masalan: qurilma yo'qolgan",
+    "pendingWarning": "Qurilmada {{count}} ta yuborilmagan voqea bor — avval sinxronlang.",
+    "syncDrainHint": "Iloji bo'lsa, qurilmada «Sinxronlash» (sync.drain) ni bajaring. Bekor qilinsa, yuborilmagan voqealar yo'qolishi mumkin.",
+    "confirmPendingLoss": "Yuborilmagan voqealar yo'qolishi mumkinligini tushunaman",
+    "pendingAppeared": "Qurilmada yuborilmagan voqealar bor — ogohlantirishni o'qib, tasdiqlang."
+  },
+  "branches": {
+    "title": "Filiallar",
+    "description": "Filial, kassa va omborlar. Har bir kassa savdodan oldin filial manzili bo'yicha soliq organida alohida ro'yxatdan o'tadi.",
+    "add": "Filial qo'shish",
+    "listTitle": "Filiallar ({{count}})",
+    "default": "Asosiy",
+    "empty": "Filial yo'q",
+    "singleHint": "Hozircha bitta filial. Yangi do'kon ochsangiz — «Filial qo'shish».",
+    "noAddress": "Manzil kiritilmagan",
+    "fields": {
+      "name": "Filial nomi",
+      "address": "Manzil",
+      "settlementCategory": "Aholi punkti toifasi",
+      "warehouseType": "Ombor turi"
+    },
+    "category": {
+      "city_100k_plus": "Shahar, 100 ming+ aholi — 4%",
+      "other": "Boshqa aholi punkti — 2%",
+      "remote_mountain": "Tog'li / borish qiyin hudud — 1%",
+      "help": "Chakana savdo aylanma solig'i stavkasi filial joylashuviga bog'liq (SK 467-modda).",
+      "defaultHint": "Toifa tanlanmasa «Shahar, 100 ming+» (4%) qo'yiladi — filial joylashuvini tekshirib tanlang."
+    },
+    "categoryHint": {
+      "city_100k_plus": "Standart, eng ehtiyotkor stavka",
+      "other": "Aholisi 100 mingdan kam shahar yoki qishloq",
+      "remote_mountain": "Tog'li yoki borish qiyin tumanni Egasi o'zi tanlaydi"
+    },
+    "activity": {
+      "retail": "Chakana savdo",
+      "other": "Boshqa faoliyat"
+    },
+    "warehouseType": {
+      "store": "Savdo zali · 2920",
+      "stock": "Ombor · 2910"
+    },
+    "warehouseTypeHint": "Filial bilan birga bitta ombor yaratiladi; tovar hisobi turidan qo'yiladi.",
+    "createTitle": "Yangi filial",
+    "createHint": "Filial o'z ombori va kassalari bilan alohida birlik bo'ladi. Kassalarni keyin qo'shasiz.",
+    "saveNew": "Filialni saqlash",
+    "created": "«{{name}}» filiali yaratildi (kod {{code}})",
+    "editTitle": "{{name}} — tahrirlash",
+    "editHint": "Toifa o'zgarsa yangi stavka joriy oyning 1-sanasidan qo'llanadi.",
+    "saved": "Filial saqlandi",
+    "confirmEdit": {
+      "title": "O'zgarishlarni saqlaysizmi?",
+      "category": "Yangi toifa «{{category}}» faqat {{date}} dan qo'llanadi; oldingi davrlar qayta hisoblanmaydi.",
+      "address": "Manzil o'zgarsa, shu filial kassalarini 3 ish kunida yangi manzil bo'yicha qayta ro'yxatdan o'tkazing."
+    },
+    "addressReminder": "Filial manzili o'zgardi — shu filial kassalarini 3 ish kunida yangi manzil bo'yicha qayta ro'yxatdan o'tkazing.",
+    "verifyHint": {
+      "text": "Aholi punkti toifasi standart qiymatda qoldi («Shahar, 100 ming+», 4%). Filial joylashuvini tekshirib, kerak bo'lsa o'zgartiring.",
+      "check": "Tekshirish",
+      "short": "Toifani tekshiring"
+    },
+    "kpi": {
+      "todaySales": "Bugungi savdo",
+      "stockValue": "Qoldiq qiymati"
+    },
+    "tax": {
+      "title": "Toifa tarixi",
+      "hint": "Har bir qator o'z sanasidan amal qiladi; o'tgan oylar qayta hisoblanmaydi.",
+      "validFrom": "Amal qiladi",
+      "validFromMonth": "Qaysi oydan",
+      "activityType": "Faoliyat turi",
+      "empty": "Tarix yo'q — joriy toifa amal qilmoqda",
+      "add": "Kelgusi oydan qo'shish",
+      "addTitle": "{{name}} — yangi toifa qiymati",
+      "addHint": "O'tgan oyga yozib bo'lmaydi. Bir oyda ikki marta o'zgarsa, oxirgisi amal qiladi.",
+      "added": "Toifa qiymati qo'shildi"
+    },
+    "warehouses": {
+      "title": "Omborlar va tovar hisobi",
+      "account": "{{name}} — tovar hisobi",
+      "account2920": "2920 — Savdo zali",
+      "account2910": "2910 — Ombor",
+      "saved": "Tovar hisobi saqlandi"
+    },
+    "registers": {
+      "title": "Kassalar",
+      "name": "Kassa nomi",
+      "kindLabel": "Kassa turi",
+      "kind": {
+        "web": "Veb-kassa",
+        "android": "Android POS"
+      },
+      "taxRegistration": "Soliq ro'yxati · TXKM",
+      "notRegistered": "Ro'yxatdan o'tmagan",
+      "ofd": {
+        "pending": "Ro'yxat kutilmoqda",
+        "registered": "Ro'yxatdan o'tgan",
+        "active": "Faol",
+        "suspended": "To'xtatilgan",
+        "deregistered": "Ro'yxatdan chiqarilgan"
+      },
+      "fiscalModule": "Fiskal modul",
+      "fm": {
+        "ok": "Ishlayapti",
+        "locked": "Bloklangan",
+        "ack_overdue": "Tasdiq kechikdi",
+        "memory_full": "Xotira to'lgan",
+        "unknown": "Noma'lum"
+      },
+      "fiscalAgent": "Fiskal agent",
+      "cloudFiscal": "Bulut fiskal (hamkor API)",
+      "agentLinked": "Do'kon agenti orqali",
+      "cardTerminal": "Karta terminali",
+      "noTerminal": "Yo'q — karta terminalsiz (faqat summa)",
+      "terminalLater": "Terminal bog'lash keyingi bosqichda",
+      "status": "Holat",
+      "active": "Faol",
+      "archived": "Arxivda",
+      "showArchived": "Arxivlanganlarni ko'rsatish",
+      "empty": "Bu filialda kassa yo'q",
+      "footnote": "Tarifdan ortiq har bir kassa — +39 000 so'm/oy (Obuna). Fiskal agentni ulash — Do'kon agenti bilan keyingi bosqichda.",
+      "add": "Kassa qo'shish",
+      "addTitle": "{{branch}} — yangi kassa",
+      "addHint": "Kassa savdodan oldin filial manzili bo'yicha soliq organida ro'yxatdan o'tadi.",
+      "added": "«{{name}}» kassasi qo'shildi",
+      "addon": {
+        "title": "Qo'shimcha kassa kerak",
+        "description": "Qo'shimcha kassa — +39 000 so'm/oy. Obunaga qo'shasizmi?",
+        "goToBilling": "Obunaga o'tish"
+      },
+      "rename": "Nomini o'zgartirish",
+      "renameTitle": "Kassa nomi",
+      "renamed": "Kassa nomi saqlandi",
+      "archive": "Arxivlash",
+      "archiveTitle": "«{{name}}» kassasini arxivlaysizmi?",
+      "archiveHint": "Kassa faol kassalar sonidan chiqadi va unda savdo qilinmaydi.",
+      "archivedToast": "«{{name}}» arxivlandi"
+    },
+    "cardPolicy": {
+      "title": "Terminalsiz karta (rekvizitsiz)",
+      "hint": "Do'kon bo'yicha · faol terminal bog'langan kassada terminal ishlamasa (ulanmagan, xato, natija noma'lum) kassir karta to'lovini faqat summa bilan belgilay oladimi.",
+      "allow": "Ruxsat",
+      "allowHint": "Kassir sabab tanlab, o'zi belgilaydi",
+      "manager_approval": "Menejer tasdig'i bilan",
+      "manager_approvalHint": "Standart · Menejer/Egasi tasdig'i (PIN yoki masofaviy)",
+      "forbid": "Taqiqlangan",
+      "forbidHint": "Terminal ishlamasa — boshqa to'lov usuli",
+      "noTerminalNote": "Terminal bog'lanmagan kassada karta har doim faqat summa bilan, tasdiqsiz qabul qilinadi. Karta ma'lumoti hech qachon kiritilmaydi.",
+      "save": "Siyosatni saqlash",
+      "saved": "Siyosat saqlandi",
+      "forbidConfirmTitle": "Taqiqlaysizmi?",
+      "forbidConfirm": "Terminal ishlamasa karta to'lovi qabul qilinmaydi."
+    }
+  },
+  "tenant": {
+    "title": "Do'kon sozlamalari",
+    "description": "Do'kon ma'lumotlari, soliq rejimi, integratsiyalar va xavfsizlik. O'zgartirish faqat Egasida.",
+    "saved": "Sozlamalar saqlandi",
+    "unsaved": "Saqlanmagan o'zgarishlar bor",
+    "errorsInTabs": "Saqlanmadi — xatolarni tuzating: {{tabs}}",
+    "tabs": {
+      "label": "Sozlamalar bo'limi",
+      "shop": "Do'kon",
+      "tax": "Soliq rejimi",
+      "integrations": "Integratsiyalar",
+      "fiscal": "Fiskal",
+      "receipt": "Chek",
+      "security": "Xavfsizlik",
+      "hasErrors": "xato bor"
+    },
+    "fields": {
+      "storeName": "Do'kon nomi",
+      "legalForm": "Yuridik shakli",
+      "bankAccount": "Bank hisob raqami",
+      "bankAccountHint": "20 ta raqam; MVP'da do'konning yagona hisobi",
+      "bankMfo": "Bank MFO",
+      "goLiveDate": "Ishga tushirilgan sana",
+      "acceptedTerms": "Qabul qilingan foydalanish shartlari",
+      "acceptedTermsValue": "versiya {{version}} · {{at}}",
+      "vatDiffTolerance": "QQS farq chegarasi",
+      "vatDiffToleranceHint": "Davlat hisoboti bilan farq shu summadan oshsa «Farq topildi» bo'ladi",
+      "turnoverTaxAccount": "Aylanma solig'i xarajati hisobi",
+      "discountPosting": "Chegirmani hisobda aks ettirish",
+      "ownerWithdrawalAccount": "Ta'sischi olgan pul hisobi",
+      "paymentOrgCommissionAccount": "To'lov tashkiloti komissiyasi hisobi",
+      "markingPrecheck": "Markirovka tekshiruvi",
+      "markingPrecheckHint": "Sotuvdan oldin Asl belgisi kodini tekshirish rejimi",
+      "negativeStockPolicy": "Manfiy qoldiq",
+      "debtReceiptSplit": "Qarz to'lovi cheki",
+      "creditSaleReceipt": "Nasiya savdo cheki",
+      "supplierOverpayPolicy": "Yetkazib beruvchiga ortiqcha to'lov",
+      "supplierOverpayPolicyHint": "Ogohlantirish — qarzdan ortig'i avans (4310) sifatida yoziladi; Bloklash — qarzdan ortiq to'lov rad etiladi.",
+      "aiTrainingConsent": "AI'ni yaxshilash uchun anonim ma'lumotdan foydalanish",
+      "aiTrainingConsentHint": "Shaxsiy ma'lumotlar yuborilmaydi"
+    },
+    "legalForm": {
+      "llc": "MChJ",
+      "jsc": "AJ",
+      "private_enterprise": "Xususiy korxona",
+      "sole_proprietor": "Yakka tartibdagi tadbirkor"
+    },
+    "accounts": {
+      "9430": "9430 — Boshqa operatsion xarajatlar",
+      "9820": "9820 — Soliq xarajatlari",
+      "9410": "9410 — Sotish xarajatlari",
+      "4890": "4890 — Boshqa debitorlar",
+      "8720": "8720 — Taqsimlanmagan foyda"
+    },
+    "discountPosting": {
+      "gross_9050": "Yalpi — 9050 chegirmalar hisobi",
+      "net": "Sof — tushumdan ayirib"
+    },
+    "markingPrecheck": {
+      "off": "O'chiq",
+      "warn": "Ogohlantirish",
+      "block": "Bloklash"
+    },
+    "negativeStock": {
+      "allow": "Ruxsat",
+      "block": "Taqiqlangan"
+    },
+    "debtReceiptSplit": {
+      "single": "Bitta chek",
+      "per_sale": "Har sotuv bo'yicha alohida"
+    },
+    "creditSaleReceipt": {
+      "none": "Chek chiqarilmaydi",
+      "credit_type": "Kredit turidagi chek"
+    },
+    "supplierOverpay": {
+      "warn": "Ogohlantirish (avans)",
+      "block": "Bloklash"
+    },
+    "accounting": {
+      "title": "Hisob siyosati"
+    },
+    "taxRegime": {
+      "title": "Soliq rejimi",
+      "regime": {
+        "vat": "QQS to'lovchi",
+        "turnover": "Aylanma solig'i"
+      },
+      "notSet": "Belgilanmagan",
+      "change": "Rejimni o'zgartirish",
+      "changeTitle": "Soliq rejimini o'zgartirish",
+      "changeHint": "Yangi rejim faqat keyingi oyning 1-sanasidan ({{date}}) kuchga kiradi.",
+      "confirm": "{{date}} dan o'zgartirish",
+      "saved": "Soliq rejimi {{date}} dan o'zgaradi",
+      "scheduled": "Rejalashtirilgan: {{regime}} — {{date}} dan",
+      "hint": "Rejim o'zgarishi keyingi oydan, zaxira usuli — keyingi hisobot yilidan kuchga kiradi.",
+      "history": "Rejimlar tarixi"
+    },
+    "costing": {
+      "title": "Zaxira baholash usuli (AVECO / FIFO)",
+      "description": "Usulni o'zgartirish keyingi bosqichda qo'shiladi; hozircha joriy usul amal qiladi."
+    },
+    "integrations": {
+      "summary": "{{connected}} / {{total}} ulangan",
+      "ofd": "OFD (fiskal)",
+      "crpt": "Asl belgisi (CRPT)",
+      "connected": "Ulangan",
+      "notConnected": "Kalit yo'q",
+      "keysTitle": "Integratsiya kalitlarini kiritish",
+      "keysDescription": "Faktura.uz, Asl belgisi, Click/Payme/Uzum va UzQR kalitlarini kiritish keyingi bosqichda ochiladi."
+    },
+    "onec": {
+      "title": "1C",
+      "description": "1C integratsiyasi holati Bosqich 7 da qo'shiladi."
+    },
+    "agent": {
+      "title": "Do'kon agenti",
+      "description": "Fiskal ko'prik, LAN printer va tarozi uchun kompyuterni ulash keyingi bosqichda."
+    },
+    "scales": {
+      "title": "Tarozi shtrix-kod shablonlari",
+      "description": "Standart: 22 = og'irlik (g), 21 = summa (so'm). Tahrirlash keyingi bosqichda."
+    },
+    "receipt": {
+      "title": "Chek shabloni",
+      "description": "Chek ko'rinishini sozlash keyingi bosqichda."
+    },
+    "syncExceptions": {
+      "title": "Sinxron istisnolari",
+      "description": "Offline sinxron istisnolarini ko'rib chiqish keyingi bosqichda."
+    },
+    "ai": {
+      "label": "Ma'lumotni AI xizmatiga (chet elga) uzatishga rozilik",
+      "hint": "Rozilik berilmaguncha hujjat rasmlari AI'ga yuborilmaydi. Faqat Egasi beradi yoki qaytarib oladi.",
+      "given": "Berilgan",
+      "notGiven": "Berilmagan",
+      "lastChange": "Oxirgi o'zgarish: {{at}} · shartlar {{version}}",
+      "termsUnavailable": "Rozilik matni yuklanmadi — keyinroq urinib ko'ring",
+      "maskingNote": "AI'ga yuboriladigan matnda shaxsiy maydonlar rozilikdan qat'i nazar har doim maskalanadi.",
+      "giveTitle": "Chet elga uzatishga rozilik",
+      "giveText": "Hujjat rasmlari (masalan, yuk xati) AI provayderiga — O'zbekistondan tashqariga — yuboriladi. Rozilikni istalgan vaqtda qaytarib olishingiz mumkin.",
+      "termsVersion": "Rozilik matni: versiya {{version}}, {{date}} dan",
+      "readTerms": "Matnni o'qish",
+      "giveConfirm": "Roziman",
+      "withdrawTitle": "Rozilikni qaytarib olasizmi?",
+      "withdrawText": "Hujjat rasmlarini AI orqali o'qish (AI-03) o'chadi.",
+      "withdrawConfirm": "Qaytarib olish",
+      "givenToast": "Rozilik berildi",
+      "withdrawnToast": "Rozilik qaytarib olindi"
+    }
+  }
+}

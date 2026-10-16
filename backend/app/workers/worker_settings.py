@@ -21,6 +21,13 @@ from app.core.config import get_settings
 from app.core.db.session import Database
 from app.core.logging import configure_logging
 from app.core.queue import make_queue
+from app.core.telemetry import (
+    job_finished,
+    job_started,
+    observe_engine,
+    setup_telemetry,
+    start_worker_metrics_server,
+)
 from app.workers.cron import CRON_JOBS
 from app.workers.jobs import FUNCTIONS
 
@@ -33,7 +40,11 @@ LEADER_POLL_S = 15.0
 async def startup(ctx: dict[str, Any]) -> None:
     settings = get_settings()
     configure_logging(settings.log_level, json=settings.log_json)
+    # 23 §1 tree: Sentry/OTel init + worker /metrics listener (all settings-gated, off by default)
+    setup_telemetry(settings, service=f"{settings.app_name}-worker")
+    start_worker_metrics_server(settings)
     ctx["db"] = Database.from_settings(settings)
+    observe_engine("worker", ctx["db"].engine.sync_engine)
 
 
 async def shutdown(ctx: dict[str, Any]) -> None:
@@ -78,6 +89,8 @@ def _worker_settings() -> SettingsDict[Any]:
         "concurrency": get_settings().worker_concurrency,
         "startup": startup,
         "shutdown": shutdown,
+        "before_process": job_started,
+        "after_process": job_finished,
     }
 
 
@@ -89,6 +102,8 @@ def _scheduler_settings() -> SettingsDict[Any]:
         "cron_jobs": CRON_JOBS,
         "startup": scheduler_startup,
         "shutdown": scheduler_shutdown,
+        "before_process": job_started,
+        "after_process": job_finished,
     }
 
 

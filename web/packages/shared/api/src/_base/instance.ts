@@ -8,15 +8,39 @@
  * - 403 CSRF_INVALID → refresh token once and retry; 409 IDEMPOTENCY_IN_PROGRESS → retry the same key
  *   after Retry-After (max 3); 401 / 403 SUBSCRIPTION_RESTRICTED / network → shell hooks; any server
  *   answer → `onOnline`. A canceled request (REQUEST_CANCELED) triggers no hook at all.
+ * - `{ erpPublic: true }` (per-request option, typed below) — pre-session calls (signup, OTP,
+ *   credential set / recovery): see `AxiosRequestConfig.erpPublic`.
  */
 import axios, { type AxiosError, type AxiosRequestConfig, type InternalAxiosRequestConfig } from "axios";
 import { v7 as uuidv7 } from "uuid";
 
 import { getRuntimeConfig } from "@shared/lib/runtime-config";
 
-import { CSRF_PATH, SKIP_INTERCEPTORS_HEADER, getCsrfToken, resetCsrfToken } from "./csrf.ts";
+import { CSRF_PATH, getCsrfToken, resetCsrfToken } from "./csrf.ts";
 import { NETWORK_ERROR, toApiError } from "./errors.ts";
 import { apiHooks } from "./hooks.ts";
+
+declare module "axios" {
+  interface AxiosRequestConfig {
+    /**
+     * Public, pre-session request (`/auth/otp/*`, `/auth/signup`, `/auth/credentials`,
+     * `/auth/terms/current`). There is no session yet, so there is no CSRF token to fetch
+     * (`GET /api/v1/auth/csrf` needs one): the backend guards these root-path endpoints with the
+     * same-origin `Origin` / `Sec-Fetch-Site` check instead (14 §2.1, §20 signup row) — which the
+     * browser sends by itself. Hence: no `X-CSRF-Token`, no CSRF retry, no `Idempotency-Key` (only
+     * enforced on tenant-scoped `/api/v1` writes, 17 §6), no `X-Branch-Id`; `Accept-Language` is
+     * kept (OTP texts). A 401 here is not a lost session → no `onUnauthorized`. This is a client-side
+     * flag only: axios never serialises it, nothing extra reaches the server.
+     */
+    erpPublic?: boolean;
+    /**
+     * The request is about *another* tenant (`POST /bff/switch-tenant`, 14 §9): its
+     * `403 SUBSCRIPTION_RESTRICTED` means that tenant is locked out — the current session stays as
+     * it was, so `onSubscriptionRestricted` (sign-out + /login banner) is not called. Client-side only.
+     */
+    erpForeignTenant?: boolean;
+  }
+}
 
 const WRITE_METHODS = new Set(["post", "put", "patch", "delete"]);
 /**
@@ -45,12 +69,9 @@ function pathOf(config: InternalAxiosRequestConfig): string {
 
 http.interceptors.request.use(async (config) => {
   config.baseURL ??= getRuntimeConfig().apiBaseUrl;
-  if (config.headers.has(SKIP_INTERCEPTORS_HEADER)) {
-    config.headers.delete(SKIP_INTERCEPTORS_HEADER);
-    return config;
-  }
-
   config.headers.set("Accept-Language", apiHooks.getLanguage());
+  if (config.erpPublic) return config;
+
   const branchId = apiHooks.getBranchId();
   if (branchId) config.headers.set("X-Branch-Id", branchId);
 
@@ -90,14 +111,22 @@ http.interceptors.response.use(
     // Any HTTP answer (even 4xx/5xx) proves the server is reachable; canceled requests prove nothing.
     if (error.response) apiHooks.onOnline();
 
-    if (config && apiError.status === 403 && apiError.code === "CSRF_INVALID" && !config._csrfRetried) {
+    const isPublic = config?.erpPublic === true;
+
+    if (
+      config &&
+      !isPublic &&
+      apiError.status === 403 &&
+      apiError.code === "CSRF_INVALID" &&
+      !config._csrfRetried
+    ) {
       config._csrfRetried = true;
       resetCsrfToken();
       config.headers.delete("X-CSRF-Token");
       return http.request(config);
     }
 
-    if (config && apiError.status === 409 && apiError.code === "IDEMPOTENCY_IN_PROGRESS") {
+    if (config && !isPublic && apiError.status === 409 && apiError.code === "IDEMPOTENCY_IN_PROGRESS") {
       const attempt = (config._idempotencyRetries ?? 0) + 1;
       if (attempt <= MAX_IDEMPOTENCY_RETRIES) {
         config._idempotencyRetries = attempt;
@@ -107,8 +136,12 @@ http.interceptors.response.use(
     }
 
     if (apiError.code === NETWORK_ERROR) apiHooks.onNetworkError(apiError);
-    else if (apiError.status === 401) apiHooks.onUnauthorized(apiError);
-    else if (apiError.status === 403 && apiError.code === "SUBSCRIPTION_RESTRICTED") {
+    else if (apiError.status === 401 && !isPublic) apiHooks.onUnauthorized(apiError);
+    else if (
+      apiError.status === 403 &&
+      apiError.code === "SUBSCRIPTION_RESTRICTED" &&
+      config?.erpForeignTenant !== true
+    ) {
       apiHooks.onSubscriptionRestricted(apiError);
     }
 

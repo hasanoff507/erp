@@ -619,7 +619,7 @@ Rol/huquqlar markazdan sinxronlanadi; offline rejimda faqat oxirgi sinxronlangan
 - Given manba filial tanlangan, When Menejer "nusxalash"ni bosib maqsad filialni tanlaydi, Then narx/chegirma qoidalari maqsad filialga ko'chiriladi.
 
 **US-M14-03**: Egasi sifatida yangi filial (do'kon) qo'shishni istayman.
-- Given biznes yangi do'kon ochyapti, When Egasi yangi filialni ro'yxatdan o'tkazadi (nom, manzil, kassa soni), Then filial tenant ichida yangi mustaqil ombor/kassa birligi sifatida yaratiladi.
+- Given biznes yangi do'kon ochyapti, When Egasi yangi filialni ro'yxatdan o'tkazadi (nom, manzil; kassa(lar) — `POST /cash-registers` bilan, tarif limiti/`ADDON_REQUIRED`), Then filial tenant ichida yangi mustaqil ombor/kassa birligi sifatida yaratiladi.
 
 **US-M14-04**: Egasi sifatida har bir filial uchun "aholi punkti toifasi"ni belgilashni istayman, chunki chakana savdoda aylanma solig'i stavkasi joylashuvga bog'liq (Soliq kodeksi 467-modda, O'RQ-1108 tahririda, 2026-01-01'dan).
 - Given yangi filial yaratilmoqda yoki tahrirlanmoqda, When Egasi "aholi punkti toifasi"ni tanlaydi (Shahar, aholisi 100 ming+ / Boshqa aholi punkti / Borish qiyin yoki tog'li tuman), Then filialning chakana savdo aylanmasiga mos stavka (4% / 2% / 1%) qo'llanadi.

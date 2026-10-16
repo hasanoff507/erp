@@ -5,13 +5,12 @@
 import type { AxiosInstance } from "axios";
 
 export const CSRF_PATH = "/api/v1/auth/csrf";
-export const SKIP_INTERCEPTORS_HEADER = "X-Erp-Skip-Interceptors";
 
 let cached: Promise<string> | null = null;
 
 export function getCsrfToken(http: AxiosInstance): Promise<string> {
   cached ??= http
-    .get<{ csrf_token: string }>(CSRF_PATH, { headers: { [SKIP_INTERCEPTORS_HEADER]: "1" } })
+    .get<{ csrf_token: string }>(CSRF_PATH)
     .then((r) => r.data.csrf_token)
     .catch((e: unknown) => {
       cached = null;

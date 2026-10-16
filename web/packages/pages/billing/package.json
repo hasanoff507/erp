@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Tarif va to'lov, ro'yxatdan o'tish (M17)",
+  "description": "Tarif va to'lov, ro'yxatdan o'tish (M17): BO-21 onboarding, UX-INSTALL, /recover, /invite",
   "imports": {
     "#*": "./src/*"
   },
@@ -12,9 +12,11 @@
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@shared/api": "workspace:*",
     "@shared/i18n": "workspace:*",
     "@shared/lib": "workspace:*",
     "@shared/models": "workspace:*",
@@ -38,6 +40,7 @@
     "eslint": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

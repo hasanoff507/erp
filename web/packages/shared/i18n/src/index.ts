@@ -11,6 +11,13 @@ import { NAMESPACES, resources } from "./resources.ts";
 
 export { NAMESPACES, resources, type Namespace } from "./resources.ts";
 export { Trans, useTranslation } from "react-i18next";
+export {
+  hasServerMessage,
+  serverErrorText,
+  translateServerMessage,
+  type ServerErrorLike,
+  type ServerMessageOptions,
+} from "./server-messages.ts";
 
 export const SUPPORTED_LANGUAGES = ["uz", "ru"] as const;
 export type UiLanguage = (typeof SUPPORTED_LANGUAGES)[number];

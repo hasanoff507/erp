@@ -9,6 +9,8 @@ export const sessionHeartbeatEnabled = createEvent();
 export const logoutRequested = createEvent();
 /** End all of my sessions (POST /auth/sessions/revoke-all). */
 export const revokeAllSessionsRequested = createEvent();
+/** Switch the session to another tenant of the user (14 §9) — `tenant_id`. */
+export const tenantSwitchRequested = createEvent<string>();
 /** Branch picked on the BO-01 step or in the topbar (ALL_BRANCHES = all branches). */
 export const branchSelected = createEvent<string>();
 

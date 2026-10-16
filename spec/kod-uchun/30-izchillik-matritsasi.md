@@ -148,7 +148,7 @@
 | US-M13-04 | Xodimni admin panel orqali to'liq ma'lumoti bilan qo'shish | Must | **— (gap)** | BO-11 | `POST /admin/users` (`purpose=invite`) (14 §20) | `app.users`, `auth.otp_challenges` | — | `settings.users` | 1 |
 | US-M13-05 | Xodimni vaqtincha bloklash/blokdan chiqarish | Must | **— (gap)** | BO-11 | `PATCH /admin/users/{id}` | `app.users` (blocked_at) | — | `settings.users` | 1 |
 | US-M13-06 | Xodimning parolini/PIN kodini qayta tiklash | Must | **— (gap)** | POS-01, BO-01, BO-11 | `POST /admin/users/{id}/reset-password`, `/reset-pin` (BO-11 manbai) | `auth.user_credentials`, `auth.otp_challenges` | — | `settings.users` | 1 |
-| US-M13-07 | Xodim sessiyalarini ko'rish va bekor qilish | Must | **— (gap)** | BO-11 ("Qurilmalar" tabi, qaror #56 a) | `GET /admin/users/{id}/sessions`, `GET /{id}/devices`, `POST /{id}/revoke-sessions`; `GET /devices`, `POST /devices/{id}/revoke` (20 #29a–29b) | `auth.sessions`, `app.devices` | — | `settings.users`; qurilmalar — `devices.revoke` | 1 |
+| US-M13-07 | Xodim sessiyalarini ko'rish va bekor qilish | Must | **— (gap)** | BO-11 ("Qurilmalar" tabi, qaror #56 a) | `GET /admin/users/{id}/sessions`, `GET /{id}/devices`, `POST /{id}/revoke-sessions`, `POST /{id}/sessions/{session_id}/revoke`; `GET /devices`, `POST /devices/{id}/revoke` (20 #29a–29b) | `auth.sessions`, `app.devices` | — | `settings.users`; qurilmalar — `devices.revoke` | 1 |
 | US-M13-08 | Platforma admini: tenant va Egasi hisobini boshqarish | Must | **— (gap)** | ADM-01, BO-11 | `GET/POST /platform/tenants/{id}/owner/...` (14 §18.1) | `platform.platform_admins`, `app.users` | — | `platform.admin` | 6 |
 
 ### M14 — Filiallar
@@ -296,6 +296,9 @@ Har bir fayl o'zining endpoint indeksidagi tartib raqami bilan berilgan (`18-api
 | `/platform/tenants/{id}/owner/...` | US-M13-08 |
 | `/admin/users...` | US-M13-01, US-M13-02, US-M13-04, US-M13-05 |
 | `/admin/users/{id}/reset-password` | US-M13-06 |
+| `/admin/users/{id}/sessions/{session_id}/revoke` | US-M13-07 |
+| `/auth/credentials` (taklif/tiklash kodi bilan kredensial o'rnatish) | US-M13-04, US-M13-06 |
+| `/auth/terms` (joriy oferta/rozilik versiyasi) | US-M17-01 |
 
 #### 18-api-kassa.md (§1, 46 qator)
 

@@ -52,6 +52,55 @@ test("storekeeper: /app/dashboard by URL shows NoPermissionState; / lands on sto
   await expect(page).toHaveURL(/\/app\/warehouse\/stock$/);
 });
 
+test("storekeeper with catalog.manage but no price rights reaches «Tovarlar» from the sidebar (06 §1.9)", async ({
+  page,
+}) => {
+  await signInAs(page, "storekeeper", ["stock.view", "catalog.manage", "labels.print"]);
+  await page.route("**/api/v1/**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const body =
+      path === "/api/v1/products" || path === "/api/v1/product-categories"
+        ? { items: [], total: 0, page: 1, size: 25 }
+        : { items: [] };
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+  });
+
+  await page.goto("/app/warehouse/stock");
+  const nav = page.getByRole("navigation", { name: "Asosiy menyu" });
+  await expect(nav.getByRole("link", { name: "Tovarlar va narxlar" })).toHaveCount(0);
+  await nav.getByRole("link", { name: "Tovarlar", exact: true }).click();
+  await expect(page).toHaveURL(/\/app\/catalog\/products$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Tovarlar" })).toBeVisible();
+  await expect(page.getByText(NO_PERMISSION)).toHaveCount(0);
+  await expect(nav.getByRole("link", { name: "Tovarlar", exact: true })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+});
+
+test("«Tovarlar» needs stock.view — catalog.manage alone neither shows nor opens it (19 §1)", async ({
+  page,
+}) => {
+  await signInAs(page, "custom", ["catalog.manage", "labels.print"]);
+  await page.route("**/api/v1/**", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [] }) }),
+  );
+  await page.goto("/app/catalog/products");
+  await expect(page.getByText(NO_PERMISSION)).toBeVisible();
+  const nav = page.getByRole("navigation", { name: "Asosiy menyu" });
+  await expect(nav.getByRole("link", { name: "Tovarlar", exact: true })).toHaveCount(0);
+});
+
+test("«Sozlamalar» links to the first Settings tab the user may open", async ({ page }) => {
+  await signInAs(page, "admin", ["settings.users", "notifications.manage"]);
+  await page.route("**/api/v1/**", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [] }) }),
+  );
+  await page.goto("/app/settings/users");
+  const nav = page.getByRole("navigation", { name: "Asosiy menyu" });
+  await expect(nav.getByRole("link", { name: "Sozlamalar" })).toHaveAttribute("href", "/app/settings/users");
+});
+
 test("cashier: / opens the web POS; back-office screens are refused", async ({ page }) => {
   await signInAs(page, "cashier", ["sales.create"]);
 

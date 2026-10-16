@@ -25,11 +25,11 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.core.config import get_settings
 from app.core.db.base import uuid7
 from app.core.db.session import Database, make_engine, tenant_transaction, unscoped_transaction
-from app.modules.access.application.provisioning import provision_system_roles
 from app.modules.access.domain.permissions import SystemRole
-from app.modules.auth.application.passwords import hash_password
-from app.modules.branches.application.services import ensure_default_branch
-from app.modules.expenses.application.services import create_default_categories
+from app.modules.access.wiring import provision_system_roles
+from app.modules.auth.wiring import hash_password
+from app.modules.branches.wiring import ensure_default_branch, ensure_default_cash_register
+from app.modules.expenses.wiring import create_default_categories
 
 cli = typer.Typer(add_completion=False, no_args_is_help=True)
 
@@ -119,7 +119,9 @@ async def seed_demo_tenant(
         )
         await provision_system_roles(session, tenant_id)
         await create_default_categories(session, tenant_id)
-        await ensure_default_branch(session, tenant_id, branch_name, settlement_category)
+        branch_id = await ensure_default_branch(session, tenant_id, branch_name, settlement_category)
+        # the plan's included web register "Kassa 1" — exactly what real signup provisions (CORR-07b)
+        await ensure_default_cash_register(session, tenant_id, branch_id)
         # 15 §1.5: a new tenant starts on a 30-day trial (the RS treats "no subscription" as restricted)
         await session.execute(_INSERT_TRIAL, {"tenant_id": tenant_id})
     return tenant_id
@@ -158,6 +160,33 @@ async def seed_demo_user(
     async with db.session_factory() as session, unscoped_transaction(session):
         await session.execute(_SET_PASSWORD, {"user_id": uid, "password_hash": hash_password(password)})
     return uid
+
+
+_PUBLISH_TERMS = (
+    text(
+        "UPDATE platform.terms_versions SET is_current = false "
+        "WHERE kind = :kind AND is_current AND version <> :version"
+    ),
+    text(
+        "INSERT INTO platform.terms_versions (version, kind, text_url, text_sha256, effective_from, is_current) "
+        "VALUES (:version, :kind, :text_url, :text_sha256, now(), true) "
+        "ON CONFLICT (version) DO UPDATE SET is_current = true "
+        "WHERE platform.terms_versions.kind = EXCLUDED.kind"
+    ),
+)
+
+
+async def publish_terms(
+    engine: AsyncEngine, *, kind: str, version: str, text_url: str, text_sha256: str
+) -> None:
+    """Make ``version`` the current text of ``kind`` (deploy-time data, qaror #61; 12 terms_versions).
+
+    The legally approved text itself (26 #127) is published at ``text_url``; only its SHA-256 is stored.
+    """
+    params = {"kind": kind, "version": version, "text_url": text_url, "text_sha256": text_sha256}
+    async with engine.begin() as conn:
+        for statement in _PUBLISH_TERMS:
+            await conn.execute(statement, params)
 
 
 @cli.command("global")
@@ -227,6 +256,32 @@ def demo_user_cmd(
             await db.dispose()
 
     typer.echo(f"demo user: {asyncio.run(run())}")
+
+
+@cli.command("terms")
+def terms_cmd(
+    version: Annotated[str, typer.Option(help="Version label, e.g. v1")],
+    text_url: Annotated[str, typer.Option(help="Public URL of the text")],
+    text_sha256: Annotated[str, typer.Option(help="SHA-256 (hex) of the published text")],
+    kind: Annotated[str, typer.Option(help="terms | privacy | ai_cross_border")] = "terms",
+) -> None:
+    """Publish the current Terms/consent text version (runs as erp_migrator; signup needs kind=terms)."""
+    if kind not in ("terms", "privacy", "ai_cross_border"):
+        raise typer.BadParameter("kind must be terms, privacy or ai_cross_border")
+
+    async def run() -> None:
+        engine = make_engine(
+            get_settings().migrator_database_url.get_secret_value(), pool_size=1, max_overflow=0
+        )
+        try:
+            await publish_terms(
+                engine, kind=kind, version=version, text_url=text_url, text_sha256=text_sha256
+            )
+        finally:
+            await engine.dispose()
+
+    asyncio.run(run())
+    typer.echo(f"terms: {kind} {version} is current")
 
 
 if __name__ == "__main__":

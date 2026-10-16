@@ -22,6 +22,8 @@ DERIVED_SCOPES_WILDCARD: Final = "*"
 
 SID_COOKIE: Final = "__Host-sid"
 LOGIN_COOKIE: Final = "__Host-erp_login"
+GOOGLE_LOGIN_COOKIE: Final = "__Host-erp_google_login"  # state of /auth/google/start (10 min)
+GOOGLE_PENDING_COOKIE: Final = "__Host-erp_google"  # verified Google identity awaiting signup (30 min)
 CSRF_HEADER: Final = "x-csrf-token"
 
 WEB_BFF_CLIENT_ID: Final = "web-bff"

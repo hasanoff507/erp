@@ -22,8 +22,8 @@ from joserfc.jwk import ECKey, KeySet, OctKey, OKPKey, RSAKey
 from joserfc.jws import extract_compact
 
 from app.core.secrets import EnvelopeCipher
+from app.modules.auth.application.ports import AuthStore, SigningKeyRow
 from app.modules.auth.domain.constants import ACCESS_ALG, AUD_API, TYP_ACCESS
-from app.modules.auth.infrastructure.repositories import AuthRepository, SigningKeyRow
 
 # 14 §6 mandates "EdDSA" (Ed25519); RFC 9864 deprecates the polymorphic name in
 # favour of "Ed25519". We keep the spec's value and silence only that notice.
@@ -60,7 +60,7 @@ class _Snapshot:
 
 
 class SigningKeyRing:
-    def __init__(self, repo: AuthRepository, cipher: EnvelopeCipher, *, purpose: str, overlap_s: int) -> None:
+    def __init__(self, repo: AuthStore, cipher: EnvelopeCipher, *, purpose: str, overlap_s: int) -> None:
         self._repo = repo
         self._cipher = cipher
         self._purpose = purpose

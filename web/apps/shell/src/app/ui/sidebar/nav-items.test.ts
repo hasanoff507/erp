@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { firstAllowedNavItem, NAV_GROUPS, navItemForPath, requiresForPath } from "./nav-items.ts";
+import { hasPermissions } from "@shared/state/permissions";
+
+import {
+  firstAllowedNavItem,
+  NAV_GROUPS,
+  navItemForPath,
+  navItemTarget,
+  requiresForPath,
+} from "./nav-items.ts";
 
 const access = (permissions: string[]) => ({
   permissions,
@@ -17,6 +25,50 @@ describe("route permissions come from the sidebar definition (24 §2, 06 §1.9)"
     expect(requiresForPath("/app/billing")).toEqual(navItemForPath("/app/settings/tenant")?.requires);
     expect(requiresForPath("/pos/sale")).toEqual({ permission: "sales.create" });
     expect(requiresForPath("/pos")).toEqual({ permission: "sales.create" });
+  });
+
+  it("«Tovarlar» opens the product catalogue without any price permission (06 §1.9)", () => {
+    const products = navItemForPath("/app/catalog/products");
+    expect(products?.key).toBe("products");
+    // The card and the import screen belong to the same item; prices keep their own.
+    expect(navItemForPath("/app/catalog/products/new")?.key).toBe("products");
+    expect(navItemForPath("/app/catalog/products/import")?.key).toBe("products");
+    expect(navItemForPath("/app/catalog/prices")?.key).toBe("catalogPrices");
+
+    const visible = (permissions: string[]) =>
+      NAV_GROUPS.flatMap((g) => g.items)
+        .filter((item) => hasPermissions(access(permissions), item.requires))
+        .map((item) => item.key);
+    // Storekeeper (15 §2.2): catalog.manage + stock.view, no prices.* → «Tovarlar», not «Narxlar».
+    const storekeeper = visible(["catalog.manage", "stock.view", "labels.print"]);
+    expect(storekeeper).toContain("products");
+    expect(storekeeper).not.toContain("catalogPrices");
+    // The list needs stock.view (page + backend GET /products, 19 §1); catalog.manage alone is not enough.
+    expect(visible(["catalog.manage"])).not.toContain("products");
+    expect(visible(["stock.view"])).toContain("products"); // read-only list (GET /products)
+    expect(visible(["sales.create"])).not.toContain("products");
+    // The storekeeper still lands on stock — «Tovarlar» comes after it.
+    expect(firstAllowedNavItem(access(["catalog.manage", "stock.view"]))?.to).toBe("/app/warehouse/stock");
+    expect(firstAllowedNavItem(access(["catalog.manage"]))).toBeNull();
+  });
+
+  it("«Sozlamalar» opens the first Settings tab the user may open (06 §1.9 tabs)", () => {
+    const settings = NAV_GROUPS.flatMap((g) => g.items).find((item) => item.key === "settings");
+    if (!settings) throw new Error("settings item missing");
+    const target = (permissions: string[]) => navItemTarget(settings, access(permissions));
+    expect(target(["settings.tenant", "settings.users"])).toBe("/app/settings/tenant");
+    expect(target(["settings.users"])).toBe("/app/settings/users");
+    expect(target(["devices.revoke"])).toBe("/app/settings/users");
+    expect(target(["cash_register.manage"])).toBe("/app/settings/branches");
+    expect(target(["notifications.manage"])).toBe("/app/settings/telegram");
+    expect(target(["billing.manage"])).toBe("/app/billing");
+    expect(target(["onec.view"])).toBe("/app/settings/onec");
+    // notifications.manage alone shows the item (Telegram tab).
+    expect(hasPermissions(access(["notifications.manage"]), settings.requires)).toBe(true);
+    expect(hasPermissions(access(["sales.create"]), settings.requires)).toBe(false);
+    // Other items keep their route.
+    const stock = navItemForPath("/app/warehouse/stock");
+    if (stock) expect(navItemTarget(stock, access(["stock.view"]))).toBe("/app/warehouse/stock");
   });
 
   it("does not match on a bare string prefix", () => {

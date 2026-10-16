@@ -120,6 +120,14 @@ export function mockApi(): Plugin {
             ? send(res, 200, session, { "Cache-Control": "no-store" })
             : send(res, 401, error("UNAUTHORIZED", "errors.unauthorized"));
         }
+        if (isWrite && path === "/bff/switch-tenant") {
+          // 14 §9: the dev mock has a single tenant → a switch elsewhere has no membership (403).
+          if (req.headers["x-csrf-token"] !== CSRF) {
+            return send(res, 403, error("CSRF_INVALID", "errors.csrf_invalid"));
+          }
+          if (!hasSession(req)) return send(res, 401, error("UNAUTHORIZED", "errors.unauthorized"));
+          return send(res, 403, error("PERMISSION_DENIED", "errors.permission_denied"));
+        }
         if (isWrite && (path === "/auth/logout" || path === "/auth/sessions/revoke-all")) {
           if (req.headers["x-csrf-token"] !== CSRF) {
             return send(res, 403, error("CSRF_INVALID", "errors.csrf_invalid"));

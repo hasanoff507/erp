@@ -1,9 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { cspDirectives, serializeCsp } from "../csp.ts";
+import { runtimeStyleHashes, scrollLockCss } from "../csp-hashes.ts";
+
 /**
  * 24 §4.4 on the production build (`vite preview`): index.html gets a fresh style nonce per response
  * (CSP header + CSP <meta> + `<meta property="csp-nonce">`, Cache-Control: no-store); the modal Radix
  * menu's scroll-lock <style> (react-remove-scroll) carries that nonce via get-nonce → no violation.
+ * Static-host fallback: the same document under the hash-mode policy (sha256 list, no nonce).
  */
 const session = {
   user: { id: "u-1", full_name: "Akmal Karimov", phone_masked: "+998 90 *** ** 67" },
@@ -85,5 +89,55 @@ test("Radix modal menu injects its scroll-lock <style> with the nonce — no CSP
 
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menuitem", { name: "Chiqish" })).toHaveCount(0);
+  expect(violations).toEqual([]);
+});
+
+test("static-host fallback (ERP_CSP_MODE=hash): Radix scroll-lock <style> matches a sha256 — no nonce, no violation", async ({
+  page,
+}, testInfo) => {
+  const violations = collectCspViolations(page);
+  // The policy a hash-mode build ships (csp-hashes.ts): no nonce, sha256 of every runtime <style>.
+  const directives = cspDirectives({ nonce: null, styleHashes: runtimeStyleHashes() });
+  await page.route("**/auth/session", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(session) }),
+  );
+  // Serve the document the way a static host serves a hash-mode build.
+  await page.route("**/app/dashboard", async (route) => {
+    const original = await route.fetch();
+    const html = (await original.text())
+      .replace(/\s*<meta property="csp-nonce"[^>]*>/, "")
+      .replace(
+        /<meta http-equiv="Content-Security-Policy" content="[^"]*">/,
+        `<meta http-equiv="Content-Security-Policy" content="${serializeCsp(directives, "meta")}">`,
+      );
+    expect(html).not.toMatch(/csp-nonce|nonce-/);
+    await route.fulfill({
+      response: original,
+      body: html,
+      headers: { ...original.headers(), "content-security-policy": serializeCsp(directives, "header") },
+    });
+  });
+  await page.goto("/app/dashboard");
+  await expect(page.getByText("Xayrli kun, Akmal")).toBeVisible();
+  // A classic scrollbar → non-zero gap in the injected CSS (CSSOM assignment is not CSP-governed).
+  const gap = await page.evaluate(() => {
+    document.documentElement.style.overflowY = "scroll";
+    return window.innerWidth - document.documentElement.clientWidth;
+  });
+  testInfo.annotations.push({ type: "scrollbar-gap", description: `${gap}px` });
+
+  await page.getByRole("button", { name: "Foydalanuvchi menyusi" }).click();
+  await expect(page.getByRole("menuitem", { name: "Chiqish" })).toBeVisible();
+
+  const scrollLock = await page.evaluate(() =>
+    Array.from(document.querySelectorAll("style"))
+      .filter((el) => el.textContent?.includes("data-scroll-locked"))
+      .map((el) => ({ nonce: el.nonce, css: el.textContent ?? "" })),
+  );
+  expect(scrollLock).toHaveLength(1);
+  expect(scrollLock[0]?.nonce).toBe("");
+  expect(scrollLock[0]?.css).toBe(scrollLockCss(gap));
+  // Applied (not blocked): the locked body gets the gap as its right margin.
+  await expect(page.locator("body")).toHaveCSS("margin-right", `${gap}px`);
   expect(violations).toEqual([]);
 });

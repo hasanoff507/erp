@@ -2,28 +2,58 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from typing import cast
+from uuid import UUID
 
+import httpx
 from redis.asyncio import Redis
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit import AuditLog
 from app.core.auth.tokens import CsrfTokens, SessionCookieSigner
 from app.core.config import Settings
 from app.core.db.session import Database
 from app.core.secrets import EnvelopeCipher
+from app.modules.access.wiring import provision_system_roles
 from app.modules.auth.application.admin_users import AdminUsersService
 from app.modules.auth.application.bff import BffService
-from app.modules.auth.application.gateway import ErpAuthGateway
+from app.modules.auth.application.credentials import CredentialService
+from app.modules.auth.application.gateway import AccessGuard, ErpAuthGateway
+from app.modules.auth.application.google import GoogleSignInService
 from app.modules.auth.application.keys import AccessTokenCodec, SigningKeyRing
 from app.modules.auth.application.login import LoginPolicy, LoginService
 from app.modules.auth.application.oauth_server import ErpAuthorizationServer
+from app.modules.auth.application.otp import OtpPolicy, OtpService
+from app.modules.auth.application.passwords import hash_password
+from app.modules.auth.application.ports import AuthStore, GoogleOidcPort, MessageSender, TenantProvisioning
 from app.modules.auth.application.revocation import RevocationCache
 from app.modules.auth.application.session_profile import SessionProfileService
+from app.modules.auth.application.signup import SignupService
 from app.modules.auth.application.subscription import SubscriptionStatusService
 from app.modules.auth.application.tokens import ClientRegistry, TokenPolicy, TokenService
 from app.modules.auth.domain.constants import PURPOSE_ACCESS
+from app.modules.auth.infrastructure.admin_repositories import MembershipAdminRepository
+from app.modules.auth.infrastructure.google_oidc import GoogleOidcAdapter
 from app.modules.auth.infrastructure.repositories import AuthRepository, ClientRow
+from app.modules.auth.infrastructure.signup_repository import IdentityRepository, SignupRepository
+from app.modules.billing.wiring import start_trial
+from app.modules.branches.wiring import (
+    ActivityType,
+    SettlementCategory,
+    ensure_default_branch,
+    ensure_default_cash_register,
+)
+from app.modules.expenses.wiring import create_default_categories
+from app.modules.integrations.otp.wiring import (
+    FakeOutbox,
+    FakeSender,
+    build_eskiz_sender,
+    build_telegram_sender,
+)
+
+__all__ = ["AuthModule", "build_auth_module", "build_auth_store", "build_cipher", "hash_password"]
 
 
 def client_secret_aad(client_id: str) -> bytes:
@@ -56,6 +86,125 @@ class AuthModule:
     admin_users: AdminUsersService
     cookies: SessionCookieSigner
     profiles: SessionProfileService
+    otp: OtpService
+    otp_dev_outbox: FakeOutbox | None  # only with ERP_OTP_DEV_FAKES (local dev)
+    signup: SignupService
+    credentials: CredentialService
+    google: GoogleSignInService
+
+
+def build_auth_store(db: Database) -> AuthStore:
+    """The auth SQL store for other callers (worker jobs, scripts) — 23 §1: never import infrastructure."""
+    return AuthRepository(db.session_factory)
+
+
+def outbound_http(settings: Settings) -> Callable[[], httpx.AsyncClient]:
+    """Short-lived client per external call (Telegram, Eskiz, Google) — nothing to close at shutdown."""
+
+    def factory() -> httpx.AsyncClient:
+        return httpx.AsyncClient(timeout=settings.outbound_http_timeout_s, follow_redirects=False)
+
+    return factory
+
+
+def build_otp(
+    settings: Settings, repo: AuthRepository, redis: Callable[[], Redis], audit: AuditLog
+) -> tuple[OtpService, FakeOutbox | None]:
+    """OTP channels (14 §4.2, qaror #34): Telegram bot → Eskiz SMS; recording fakes only in dev."""
+    http = outbound_http(settings)
+    outbox: FakeOutbox | None = None
+    telegram: MessageSender | None = None
+    sms: MessageSender
+    if settings.otp_dev_fakes:
+        outbox = FakeOutbox()
+        telegram, sms = FakeSender("telegram", outbox), FakeSender("sms", outbox)
+    else:
+        if settings.telegram_bot_token is not None:
+            telegram = build_telegram_sender(
+                http,
+                token=settings.telegram_bot_token.get_secret_value(),
+                base_url=settings.telegram_api_base_url,
+            )
+        sms = build_eskiz_sender(
+            http,
+            base_url=settings.eskiz_base_url,
+            email=settings.eskiz_email,
+            password=settings.eskiz_password.get_secret_value() if settings.eskiz_password else None,
+            sender=settings.eskiz_sender,
+            test_mode=settings.eskiz_test_mode,
+        )
+    policy = OtpPolicy(
+        ttl_s=settings.otp_ttl_s,
+        verified_ttl_s=settings.otp_verified_ttl_s,
+        telegram_per_phone_day=settings.otp_telegram_per_phone_day,
+        telegram_per_ip_hour=settings.otp_telegram_per_ip_hour,
+        sms_per_phone_day=settings.otp_sms_per_phone_day,
+        sms_per_ip_hour=settings.otp_sms_per_ip_hour,
+        sms_daily_budget=settings.otp_sms_daily_budget,
+        verify_per_ip_hour=settings.otp_verify_per_ip_hour,
+        verify_fail_per_phone_day=settings.otp_verify_fail_per_phone_day,
+        recovery_min_response_s=settings.otp_recovery_min_response_ms / 1000,
+        test_phones=frozenset(settings.otp_test_phones),
+        test_code=settings.otp_test_code.get_secret_value() if settings.otp_test_code else None,
+        brand=settings.sms_brand,
+    )
+    service = OtpService(
+        repo,
+        redis,
+        audit,
+        telegram=telegram,
+        sms=sms,
+        policy=policy,
+        hash_key=settings.auth_secret.get_secret_value().encode(),
+    )
+    return service, outbox
+
+
+async def _ensure_default_branch(
+    session: AsyncSession, tenant_id: UUID, name: str, settlement: str, activity_type: str
+) -> UUID:
+    return await ensure_default_branch(
+        session,
+        tenant_id,
+        name,
+        cast(SettlementCategory, settlement),
+        activity_type=cast(ActivityType, activity_type),
+    )
+
+
+async def _ensure_cash_register(session: AsyncSession, tenant_id: UUID, branch_id: UUID) -> UUID:
+    return await ensure_default_cash_register(session, tenant_id, branch_id)
+
+
+async def _provision_roles(session: AsyncSession, tenant_id: UUID) -> Mapping[str, UUID]:
+    roles = await provision_system_roles(session, tenant_id)
+    return {str(role): role_id for role, role_id in roles.items()}
+
+
+TENANT_PROVISIONING = TenantProvisioning(
+    provision_roles=_provision_roles,
+    ensure_default_branch=_ensure_default_branch,
+    ensure_default_cash_register=_ensure_cash_register,
+    create_default_categories=create_default_categories,
+    start_trial=start_trial,
+)
+
+
+def build_google_port(settings: Settings) -> GoogleOidcPort | None:
+    if not settings.google_client_id:
+        return None
+    return GoogleOidcAdapter(
+        outbound_http(settings),
+        client_id=settings.google_client_id,
+        client_secret=settings.google_client_secret.get_secret_value()
+        if settings.google_client_secret
+        else None,
+        audiences=settings.google_android_client_ids,
+        issuers=settings.google_issuers,
+        auth_url=settings.google_auth_url,
+        token_url=settings.google_token_url,
+        jwks_url=settings.google_jwks_url,
+    )
 
 
 def build_auth_module(settings: Settings, db: Database, redis: Callable[[], Redis]) -> AuthModule:
@@ -120,6 +269,13 @@ def build_auth_module(settings: Settings, db: Database, redis: Callable[[], Redi
         refresh_lock_ttl_s=settings.refresh_lock_ttl_s,
     )
     cookies = SessionCookieSigner(settings.auth_secret.get_secret_value())
+    # BO-11 / RS access guard: revoked device (16 §9) and claims stale (14 §5) — slice A2
+    access_guard = AccessGuard(
+        repo,
+        redis,
+        access_ttl_s=settings.access_token_ttl_s,
+        device_check_cache_s=settings.session_check_cache_s,
+    )
     gateway = ErpAuthGateway(
         codec=codec,
         revocation=revocation,
@@ -128,10 +284,40 @@ def build_auth_module(settings: Settings, db: Database, redis: Callable[[], Redi
         bff=bff,
         cookies=cookies,
         csrf=CsrfTokens(settings.auth_secret.get_secret_value(), settings.session_absolute_s),
+        guard=access_guard,
     )
     profiles = SessionProfileService(repo, redis)
-    admin_users = AdminUsersService(db.session_factory, revocation, bff.drop, profiles.forget)
+    otp, otp_outbox = build_otp(settings, repo, redis, audit)
+    admin_users = AdminUsersService(
+        db.session_factory,
+        MembershipAdminRepository(),
+        revocation,
+        bff.drop,
+        profiles.forget,
+        access_guard,
+        otp,
+    )
+    signup = SignupService(
+        db.session_factory,
+        SignupRepository(),
+        TENANT_PROVISIONING,
+        otp,
+        repo,
+        redis,
+        per_ip_hour=settings.signup_per_ip_hour,
+    )
+    credentials = CredentialService(repo, redis, revocation, audit, ttl_s=settings.credential_token_ttl_s)
+    google = GoogleSignInService(
+        build_google_port(settings),
+        IdentityRepository(db.session_factory),
+        repo,
+        bff,
+        tokens,
+        audit,
+        redis,
+        issuer=settings.issuer,
+    )
     return AuthModule(
         settings, repo, cipher, ring, codec, clients, revocation, subscriptions, login, tokens, server, bff,
-        gateway, admin_users, cookies, profiles,
+        gateway, admin_users, cookies, profiles, otp, otp_outbox, signup, credentials, google,
     )  # fmt: skip

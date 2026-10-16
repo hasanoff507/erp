@@ -9,7 +9,6 @@ subscriptions) is read inside :func:`tenant_transaction`, i.e. under RLS.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
@@ -19,139 +18,40 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.db.session import tenant_transaction, unscoped_transaction
+from app.modules.auth.application.ports import (
+    BranchRow,
+    ClientRow,
+    CodeRow,
+    InviteAcceptance,
+    IssuedTokens,
+    MembershipContext,
+    MembershipRow,
+    OtpOutcome,
+    RefreshRow,
+    RevokedFamily,
+    RotateResult,
+    SessionProfileRow,
+    SessionRow,
+    SigningKeyRow,
+    UserCredentialRow,
+)
 
-
-@dataclass(frozen=True, slots=True)
-class ClientRow:
-    id: UUID
-    client_id: str
-    client_type: str
-    name: str
-    client_secret_encrypted: str | None
-    redirect_uris: tuple[str, ...]
-    allowed_grant_types: tuple[str, ...]
-    allowed_scopes: tuple[str, ...]
-    status: str
-
-
-@dataclass(frozen=True, slots=True)
-class SigningKeyRow:
-    kid: UUID
-    algorithm: str
-    purpose: str
-    public_key: str
-    private_key_encrypted: str
-    status: str
-    activated_at: datetime | None
-    retired_at: datetime | None
-
-
-@dataclass(frozen=True, slots=True)
-class UserCredentialRow:
-    user_id: UUID
-    password_hash: str | None
-    failed_login_count: int
-    locked_until: datetime | None
-
-
-@dataclass(frozen=True, slots=True)
-class MembershipRow:
-    tenant_id: UUID
-    tenant_name: str
-    role_ids: tuple[UUID, ...]
-    branch_ids: tuple[UUID, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class CodeRow:
-    client_id: UUID
-    user_id: UUID
-    tenant_id: UUID | None
-    code_challenge: str
-    code_challenge_method: str
-    redirect_uri: str
-    scope: str
-
-
-@dataclass(frozen=True, slots=True)
-class IssuedTokens:
-    session_id: UUID | None
-    refresh_token_id: UUID
-    family_id: UUID
-
-
-@dataclass(frozen=True, slots=True)
-class RefreshRow:
-    refresh_token_id: UUID
-    family_id: UUID
-    client_id: UUID
-    user_id: UUID
-    tenant_id: UUID | None
-    device_id: UUID | None
-    scope: str
-    issued_at: datetime
-    expires_at: datetime
-    used_at: datetime | None
-    revoked_at: datetime | None
-    suspended_at: datetime | None
-    family_issued_at: datetime
-    session_id: UUID | None
-    session_revoked_at: datetime | None
-
-
-@dataclass(frozen=True, slots=True)
-class RotateResult:
-    outcome: str  # rotated | grace_replay | reuse_revoked | invalid
-    refresh_token_id: UUID | None
-    family_id: UUID | None
-    suspended: bool
-
-
-@dataclass(frozen=True, slots=True)
-class SessionRow:
-    session_id: UUID
-    user_id: UUID
-    tenant_id: UUID | None
-    client_id: UUID
-    device_id: UUID | None
-    idle_expires_at: datetime
-    absolute_expires_at: datetime
-    revoked_at: datetime | None
-
-
-@dataclass(frozen=True, slots=True)
-class RevokedFamily:
-    session_id: UUID | None
-    user_id: UUID
-    tenant_id: UUID | None
-
-
-@dataclass(frozen=True, slots=True)
-class BranchRow:
-    branch_id: UUID
-    name: str
-
-
-@dataclass(frozen=True, slots=True)
-class SessionProfileRow:
-    """Display data of ``GET /auth/session`` (14 §20), read under RLS in one transaction."""
-
-    full_name: str
-    phone: str
-    tenant_name: str
-    branches: tuple[BranchRow, ...]
-    membership: MembershipContext
-
-
-@dataclass(frozen=True, slots=True)
-class MembershipContext:
-    """The live authorization facts of a user in a tenant (read under RLS)."""
-
-    status: str
-    role_ids: tuple[UUID, ...]
-    branch_ids: tuple[UUID, ...]
-    role_codes: tuple[str, ...]
-    permission_codes: frozenset[str]
+__all__ = [
+    "AuthRepository",
+    "BranchRow",
+    "ClientRow",
+    "CodeRow",
+    "IssuedTokens",
+    "MembershipContext",
+    "MembershipRow",
+    "RefreshRow",
+    "RevokedFamily",
+    "RotateResult",
+    "SessionProfileRow",
+    "SessionRow",
+    "SigningKeyRow",
+    "UserCredentialRow",
+]
 
 
 _CLIENTS = text(
@@ -204,7 +104,22 @@ _REVOKE_SESSION = text("SELECT app.auth_revoke_session(:sid, :reason)")
 _REVOKE_USER = text("SELECT app.auth_revoke_user(:user_id, :tenant_id, :reason)")
 _USER_SESSIONS = text("SELECT session_id FROM app.auth_list_user_sessions(:user_id, :tenant_id)")
 _SET_CREDENTIALS = text("SELECT app.auth_set_credentials(:user_id, :password_hash, :pin_hash)")
+_PIN_HASH = text("SELECT pin_hash FROM app.auth_get_pin_hash(:user_id)")
+# 14 §18.2: redeeming the invite code accepts the inviting tenant's membership (RLS: own row)
+_ACCEPT_INVITE = text(
+    "UPDATE app.memberships SET status = 'active', invited_name = NULL, version = version + 1 "
+    "WHERE tenant_id = :tenant_id AND user_id = :user_id AND status = 'invited' RETURNING id"
+)
+_MEMBERSHIP_STATUS = text(
+    "SELECT id, status FROM app.memberships WHERE tenant_id = :tenant_id AND user_id = :user_id"
+)
 _PURGE_LOGIN_ATTEMPTS = text("SELECT app.auth_purge_login_attempts(make_interval(days => :days))")
+_OTP_CREATE = text("SELECT app.auth_otp_create(:phone, :purpose, :channel, :code_hash, :ttl)")
+_OTP_VERIFY = text("SELECT app.auth_otp_verify(:challenge_id, :code_hash)")
+_TELEGRAM_CHAT = text("SELECT app.auth_telegram_chat_by_phone(:phone)")
+_DEVICE_REVOKED = text(
+    "SELECT revoked_at IS NOT NULL FROM app.devices WHERE tenant_id = :tenant_id AND id = :device_id"
+)
 
 _MEMBERSHIP = text(
     "SELECT status, role_ids, branch_ids FROM app.memberships "
@@ -280,6 +195,50 @@ class AuthRepository:
             await s.execute(
                 _SET_CREDENTIALS, {"user_id": user_id, "password_hash": password_hash, "pin_hash": pin_hash}
             )
+
+    async def has_pin(self, user_id: UUID) -> bool:
+        async with self._sf() as s, unscoped_transaction(s):
+            value = (await s.execute(_PIN_HASH, {"user_id": user_id})).scalar()
+        return value is not None
+
+    async def accept_invite(self, tenant_id: UUID, user_id: UUID) -> InviteAcceptance | None:
+        params = {"tenant_id": tenant_id, "user_id": user_id}
+        async with self._sf() as s, tenant_transaction(s, tenant_id, user_id=user_id):
+            accepted = (await s.execute(_ACCEPT_INVITE, params)).scalar()
+            if accepted is not None:
+                return InviteAcceptance(accepted, "active", accepted_now=True)
+            row = (await s.execute(_MEMBERSHIP_STATUS, params)).first()
+        return InviteAcceptance(row.id, str(row.status), accepted_now=False) if row else None
+
+    # --- OTP (14 §4.2) -------------------------------------------------------------------------
+    async def create_challenge(
+        self, phone: str, purpose: str, channel: str, code_hash: str, ttl_s: int
+    ) -> UUID:
+        params = {
+            "phone": phone,
+            "purpose": purpose,
+            "channel": channel,
+            "code_hash": code_hash,
+            "ttl": ttl_s,
+        }
+        async with self._sf() as s, unscoped_transaction(s):
+            value = (await s.execute(_OTP_CREATE, params)).scalar_one()
+        return UUID(str(value))
+
+    async def verify_challenge(self, challenge_id: UUID, code_hash: str) -> OtpOutcome:
+        async with self._sf() as s, unscoped_transaction(s):
+            value = (
+                await s.execute(_OTP_VERIFY, {"challenge_id": challenge_id, "code_hash": code_hash})
+            ).scalar_one()
+        outcome = str(value)
+        if outcome not in ("ok", "invalid", "expired", "locked", "used"):
+            return "invalid"
+        return outcome  # type: ignore[return-value]
+
+    async def telegram_chat_by_phone(self, phone: str) -> str | None:
+        async with self._sf() as s, unscoped_transaction(s):
+            value = (await s.execute(_TELEGRAM_CHAT, {"phone": phone})).scalar()
+        return str(value) if value else None
 
     # --- authorization codes ---------------------------------------------------------------------
     async def issue_code(
@@ -436,48 +395,15 @@ class AuthRepository:
             ).all()
         return [r.limit_value for r in rows]
 
+    async def device_revoked(self, tenant_id: UUID, device_id: UUID) -> bool:
+        """14 §21 "Qurilma bekor qilish": a missing device counts as revoked (fail-closed)."""
+        async with self._sf() as s, tenant_transaction(s, tenant_id):
+            value = (
+                await s.execute(_DEVICE_REVOKED, {"tenant_id": tenant_id, "device_id": device_id})
+            ).scalar()
+        return value is None or bool(value)
+
     async def subscription_status(self, tenant_id: UUID) -> str | None:
         async with self._sf() as s, tenant_transaction(s, tenant_id):
             value = (await s.execute(_SUBSCRIPTION, {"tenant_id": tenant_id})).scalar()
         return str(value) if value is not None else None
-
-
-@dataclass(frozen=True, slots=True)
-class LockedMembership:
-    id: UUID
-    status: str
-
-
-_LOCK_MEMBERSHIP = text(
-    "SELECT id, status FROM app.memberships WHERE tenant_id = :tenant_id AND user_id = :user_id FOR UPDATE"
-)
-_SET_MEMBERSHIP_STATUS = text(
-    "UPDATE app.memberships SET status = :status, version = version + 1 WHERE id = :id"
-)
-
-
-class MembershipAdminRepository:
-    """SQL of the owner's block/unblock (14 §18.2).
-
-    Every method runs on the caller's session: the status change, the session
-    revocation, the audit row and the Idempotency-Key journal commit together.
-    """
-
-    @staticmethod
-    async def lock(s: AsyncSession, tenant_id: UUID, user_id: UUID) -> LockedMembership | None:
-        row = (await s.execute(_LOCK_MEMBERSHIP, {"tenant_id": tenant_id, "user_id": user_id})).first()
-        return LockedMembership(row.id, row.status) if row else None
-
-    @staticmethod
-    async def set_status(s: AsyncSession, membership_id: UUID, status: str) -> None:
-        await s.execute(_SET_MEMBERSHIP_STATUS, {"status": status, "id": membership_id})
-
-    @staticmethod
-    async def session_ids(s: AsyncSession, user_id: UUID, tenant_id: UUID) -> list[UUID]:
-        rows = (await s.execute(_USER_SESSIONS, {"user_id": user_id, "tenant_id": tenant_id})).all()
-        return [r.session_id for r in rows]
-
-    @staticmethod
-    async def revoke_user(s: AsyncSession, user_id: UUID, tenant_id: UUID, reason: str) -> int:
-        params = {"user_id": user_id, "tenant_id": tenant_id, "reason": reason}
-        return int((await s.execute(_REVOKE_USER, params)).scalar_one() or 0)

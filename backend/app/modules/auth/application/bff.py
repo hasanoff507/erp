@@ -33,10 +33,11 @@ from app.core.errors import AppError
 from app.core.secrets import EnvelopeCipher, SecretDecryptionError
 from app.modules.auth.application.keys import AccessTokenCodec
 from app.modules.auth.application.oauth_server import ErpAuthorizationServer, ErpOAuth2Request
+from app.modules.auth.application.ports import AuthStore
 from app.modules.auth.application.revocation import RevocationCache
-from app.modules.auth.application.tokens import RequestMeta
+from app.modules.auth.application.tokens import RequestMeta, token_hash
 from app.modules.auth.domain.constants import WEB_BFF_CLIENT_ID
-from app.modules.auth.infrastructure.repositories import AuthRepository
+from app.modules.auth.domain.models import AuthenticatedUser
 
 log = structlog.get_logger(__name__)
 
@@ -85,7 +86,7 @@ class BffService:
         *,
         server: ErpAuthorizationServer,
         codec: AccessTokenCodec,
-        repo: AuthRepository,
+        repo: AuthStore,
         revocation: RevocationCache,
         audit: AuditLog,
         cipher: EnvelopeCipher,
@@ -156,6 +157,83 @@ class BffService:
         session = await self._store_tokens(body)
         return session, record["return_to"]
 
+    async def login_direct(
+        self, user_id: UUID, tenant_id: UUID, meta: RequestMeta, *, method: str
+    ) -> BffSession:
+        """First-party login without the password page — right after signup or a Google login.
+
+        The identity is already proven (verified OTP + new credentials, or a verified Google ID
+        token), so the BFF issues itself a one-time code with a fresh PKCE pair and runs the very
+        same ``authorization_code`` exchange as ``/auth/callback`` (14 §2.1): same session row,
+        same cookie, same subscription/membership checks.
+        """
+        session = await self._direct_exchange(user_id, tenant_id, meta)
+        await self._audit.write(
+            tenant_id=tenant_id, user_id=user_id, action="login_success", entity="users", entity_id=user_id,
+            ip=meta.ip, after={"method": method},
+        )  # fmt: skip
+        return session
+
+    async def switch_tenant(
+        self, sid: UUID, user_id: UUID, from_tenant: UUID, to_tenant: UUID, meta: RequestMeta
+    ) -> BffSession:
+        """``POST /bff/switch-tenant`` (14 §9): a new session in ``to_tenant``, the old one dies.
+
+        The identity is the live cookie session; the target tenant is never trusted from the
+        client — the membership is checked here and again (with the subscription, 14 §16.1.2) by
+        the server-side ``authorization_code`` exchange. Only after the new session exists is the
+        old ``sid`` revoked together with its refresh family and that family's live access
+        tokens (``sid``/``fam`` markers) — a failed switch leaves the current session untouched.
+        """
+        ctx = await self._repo.membership_context(to_tenant, user_id)
+        if ctx is None or ctx.status != "active":
+            raise BffError(ErrorCode.PERMISSION_DENIED, "membership_inactive")
+        old = await self.session(sid)
+        new = await self._direct_exchange(user_id, to_tenant, meta)
+        family = None
+        if old is not None:
+            row = await self._repo.lookup_refresh(token_hash(old.refresh_token))
+            family = row.family_id if row is not None else None
+        await self._repo.revoke_session(sid, "tenant_switch")
+        await self._revocation.mark_revoked(sids=[sid], families=[family])
+        await self.drop(sid)
+        await self._audit.write(
+            tenant_id=from_tenant, user_id=user_id, action="session_revoked", entity="sessions",
+            entity_id=sid, ip=meta.ip, after={"reason": "tenant_switch"},
+        )  # fmt: skip
+        await self._audit.write(
+            tenant_id=to_tenant, user_id=user_id, action="tenant_switched", entity="sessions",
+            entity_id=UUID(new.sid), ip=meta.ip, after={"from_tenant_id": str(from_tenant)},
+        )  # fmt: skip
+        return new
+
+    async def _direct_exchange(self, user_id: UUID, tenant_id: UUID, meta: RequestMeta) -> BffSession:
+        """One-time code with a fresh PKCE pair, redeemed through the in-process ``/oauth/token``."""
+        await self._server.clients.refresh()
+        client = self._server.clients.get(WEB_BFF_CLIENT_ID)
+        if client is None:
+            raise BffError(ErrorCode.UNAUTHORIZED, "client_unavailable")
+        verifier = secrets.token_urlsafe(64)
+        code = secrets.token_urlsafe(32)
+        await self._server.tokens.save_code(
+            code,
+            client,
+            AuthenticatedUser(user_id, tenant_id),
+            create_s256_code_challenge(verifier),
+            self.redirect_uri,
+            client.get_allowed_scope(None),
+        )
+        body = await self._token_call(
+            [
+                ("grant_type", "authorization_code"),
+                ("code", code),
+                ("redirect_uri", self.redirect_uri),
+                ("code_verifier", verifier),
+            ],
+            meta,
+        )
+        return await self._store_tokens(body)
+
     # --- per request -----------------------------------------------------------------------------
     async def session(self, sid: UUID) -> BffSession | None:
         try:
@@ -171,12 +249,16 @@ class BffService:
             return None
         return BffSession(**data)
 
-    async def fresh_session(self, sid: UUID, meta: RequestMeta) -> BffSession | None:
-        """Session with a usable access token; one refresh per sid at a time (single-flight)."""
+    async def fresh_session(self, sid: UUID, meta: RequestMeta, *, force: bool = False) -> BffSession | None:
+        """Session with a usable access token; one refresh per sid at a time (single-flight).
+
+        ``force=True`` refreshes even a still-valid access token — "claims stale" (14 §5): the
+        new token carries the current roles/branches.
+        """
         current = await self.session(sid)
         if current is None:
             return None
-        if current.access_exp - REFRESH_SKEW_S > time.time():
+        if not force and current.access_exp - REFRESH_SKEW_S > time.time():
             return current
         seen = current.access_token
         lock_key = f"bff:refresh_lock:{sid}"

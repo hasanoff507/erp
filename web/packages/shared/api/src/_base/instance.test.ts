@@ -73,6 +73,62 @@ describe("@shared/api instance — 24 §3", () => {
   });
 });
 
+describe("public (pre-session) requests — { erpPublic: true }, 14 §2.1 / §20", () => {
+  const body = { phone: "+998901234567", purpose: "signup" } as const;
+
+  it("skip the CSRF fetch, X-CSRF-Token, Idempotency-Key and X-Branch-Id; keep Accept-Language", async () => {
+    configureApi({ getLanguage: () => "ru", getBranchId: () => "branch-1" });
+    await expect(api.auth.otpRequest(body, { erpPublic: true })).resolves.toMatchObject({
+      challenge_id: "challenge-1",
+    });
+    expect(state.csrfFetches).toBe(0);
+    const headers = state.lastPublicHeaders;
+    expect(headers?.get("x-csrf-token")).toBeNull();
+    expect(headers?.get("idempotency-key")).toBeNull();
+    expect(headers?.get("x-branch-id")).toBeNull();
+    expect(headers?.get("accept-language")).toBe("ru");
+  });
+
+  it("the option is client-side only — no internal header reaches the server", async () => {
+    await api.auth.otpRequest(body, { erpPublic: true });
+    const names = [...(state.lastPublicHeaders?.keys() ?? [])];
+    expect(names.filter((name) => name.startsWith("x-"))).toEqual([]);
+    expect(names.join(" ")).not.toMatch(/erp|skip|public/i);
+  });
+
+  it("without the option a pre-session write would need a session for its CSRF token", async () => {
+    const onUnauthorized = vi.fn();
+    configureApi({ onUnauthorized });
+    const error = (await api.auth.otpRequest(body).catch((e: unknown) => e)) as ApiError;
+    expect(error).toMatchObject({ status: 401, code: "UNAUTHORIZED" });
+    expect(state.csrfFetches).toBe(1);
+    expect(state.lastPublicHeaders).toBeNull();
+  });
+
+  it("403 CSRF_INVALID (cross-origin) is not retried with a token; 401 does not fire onUnauthorized", async () => {
+    const onUnauthorized = vi.fn();
+    configureApi({ onUnauthorized });
+    state.crossOrigin = true;
+    const error = (await api.auth.otpRequest(body, { erpPublic: true }).catch((e: unknown) => e)) as ApiError;
+    expect(error).toMatchObject({ status: 403, code: "CSRF_INVALID" });
+    expect(state.csrfFetches).toBe(0);
+
+    server.use(
+      mswHttp.post(`${BASE}/auth/otp/request`, () =>
+        HttpResponse.json(
+          { error: { code: "UNAUTHORIZED", message_key: "x", details: [] } },
+          { status: 401 },
+        ),
+      ),
+    );
+    const unauthorized = (await api.auth
+      .otpRequest(body, { erpPublic: true })
+      .catch((e: unknown) => e)) as ApiError;
+    expect(unauthorized.status).toBe(401);
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+});
+
 describe("online / offline hooks — WEB-3", () => {
   const hooks = () => {
     const onOnline = vi.fn();

@@ -544,7 +544,7 @@
 
 ## M13 — Huquqlar
 
-> Foydalanuvchi (xodim) CRUD, taklif/bloklash/parol-PIN tiklash, sessiya/qurilma boshqaruvi — **`14-autentifikatsiya-oauth2.md` §18.2'da allaqachon to'liq**: `POST /admin/users`, `PATCH /admin/users/{id}`, `POST /admin/users/{id}/reset-pin`, `POST /admin/users/{id}/reset-password`, `POST /admin/users/{id}/revoke-sessions`, `GET /admin/users/{id}/sessions`, `GET /admin/users/{id}/devices`. Bu fayl ularni takrorlamaydi. Quyida **rol/ruxsat/limit** boshqaruvi (`15-xavfsizlik-va-audit.md` §2.1–2.2 katalogiga mos) va tenant kesimidagi qurilmalar ro'yxati — BO-11 «Qurilmalar» tabi (29a/29b, qaror #56).
+> Foydalanuvchi (xodim) CRUD, taklif/bloklash/parol-PIN tiklash, sessiya/qurilma boshqaruvi — **`14-autentifikatsiya-oauth2.md` §18.2'da allaqachon to'liq**: `POST /admin/users`, `PATCH /admin/users/{id}`, `POST /admin/users/{id}/reset-pin`, `POST /admin/users/{id}/reset-password`, `POST /admin/users/{id}/revoke-sessions`, `POST /admin/users/{id}/sessions/{session_id}/revoke` (bitta sessiya), `GET /admin/users/{id}/sessions`, `GET /admin/users/{id}/devices`. Bu fayl ularni takrorlamaydi. Quyida **rol/ruxsat/limit** boshqaruvi (`15-xavfsizlik-va-audit.md` §2.1–2.2 katalogiga mos) va tenant kesimidagi qurilmalar ro'yxati — BO-11 «Qurilmalar» tabi (29a/29b, qaror #56).
 
 ### 24. `GET /roles`
 
@@ -553,7 +553,7 @@
 | Maqsad | Rollar ro'yxati (5 standart + tenant maxsus rollari) |
 | Ruxsat | `settings.users` |
 | So'rov | Page pagination |
-| Javob | `{items: [{id, name, is_system, version}], total, page, size}` |
+| Javob | `{items: [{id, name, is_system, system_code: "owner"\|"manager"\|"cashier"\|"storekeeper"\|"accountant"\|null, version}], total, page, size}` — tizim rolini nom emas, `system_code` bo'yicha aniqlang |
 | Xatolar | — |
 | Idempotency-Key | Kerak emas |
 | Offline | Oxirgi sinxronlangan ro'yxat (huquqlar faqat online o'zgaradi, `03-modullar-talablari.md` M13) |
@@ -606,7 +606,7 @@
 | Ruxsat | `settings.users` |
 | So'rov | `{permissions: [{code: string (kod — `15-xavfsizlik-va-audit.md` §2.1 ro'yxatidan), limit_value: string\|null (pul/foiz, kod `discount.give`/`returns.approve`/`cash.withdraw` kabi limitli kodlarda)}]}` |
 | Javob | `200 {role_id, permissions: [...]}` |
-| Xatolar | `VALIDATION_ERROR` (noma'lum kod yoki limit talab qilinmaydigan kodga limit berilsa) |
+| Xatolar | `VALIDATION_ERROR` (noma'lum kod yoki limit talab qilinmaydigan kodga limit berilsa; Egasi roli — `field="permissions"`, `validation.owner_role_readonly`; faqat-Egasi kodi boshqa rolga — `validation.owner_only_permission`). `version` tanada yo'q — har muvaffaqiyatli PUT `roles.version` ni oshiradi (17 §8 dan istisno: to'plam to'liq almashtiriladi) |
 | Idempotency-Key | Majburiy |
 | Offline | Yo'q |
 | Bog'langan | US-M13-03; BO-11; audit: huquq/limit o'zgarishi majburiy (`15-xavfsizlik-va-audit.md` §6.1) |
@@ -645,7 +645,7 @@
 | Ruxsat | `devices.revoke` (Egasi, Menejer — qaror #56) |
 | So'rov | `{reason: string (majburiy), confirm_pending_loss: bool (standart false)}` |
 | Javob | `200 {id, revoked_at, outbox_pending_count}` |
-| Xatolar | `NOT_FOUND`, `VALIDATION_ERROR` (`has_pending=true` va `confirm_pending_loss=false` — `details[].field="confirm_pending_loss"`, `params.outbox_pending_count`), `409 {code:"RESOURCE_ARCHIVED"}` (allaqachon bekor qilingan) |
+| Xatolar | `NOT_FOUND`, `VALIDATION_ERROR` (`has_pending=true` va `confirm_pending_loss=false` — `details[].field="confirm_pending_loss"`, `params.outbox_pending_count`), `409 {code:"RESOURCE_ARCHIVED"}` (allaqachon bekor qilingan); `kind='onec_agent'` qurilma — `VALIDATION_ERROR` (`field="id"`, `validation.onec_agent_device`; bekor qilish — `33-1c-integratsiya.md` §10) |
 | Idempotency-Key | Majburiy |
 | Offline | Yo'q |
 | Bog'langan | US-M13-07; BO-11; audit majburiy |
@@ -674,7 +674,7 @@
 | Maqsad | Yangi filial yaratish (US-M14-03) — avtomatik 1 ombor (`warehouse.type` bo'yicha tovar hisobi bilan) + sozlamalar bo'yicha kassa talabi |
 | Ruxsat | `settings.branches` |
 | So'rov | `{name: string (majburiy), address: string, code: string (ixtiyoriy — bo'sh bo'lsa server keyingi bo'sh ikki xonali raqamni beradi), settlement_category: "city_100k_plus"\|"other"\|"remote_mountain" (standart: `city_100k_plus`, US-M14-04), activity_type: "retail"\|"other", warehouse?: {type: "store"\|"stock"} (standart `store`)}` — server `warehouses.inventory_account` ni `type` dan qo'yadi: `store` (savdo zali) → `2920`, `stock` (ombor) → `2910` |
-| Javob | `201 {id, name, address, code, settlement_category, activity_type, version: 1, warehouse: {id, type, inventory_account}}` — birga `warehouses` yozuvi avtomatik yaratiladi (MVP: 1 ombor/filial); `code` hujjat raqamidagi filial kodi (`11-malumotlar-modeli.md`) |
+| Javob | `201 {id, name, address, code, settlement_category, activity_type, version: 1, warehouse: {id, type, inventory_account}}` — birga `warehouses` yozuvi avtomatik yaratiladi (MVP: 1 ombor/filial); `code` hujjat raqamidagi filial kodi (`11-malumotlar-modeli.md`). `settlement_category` yuborilmasa standart `city_100k_plus` qo'yiladi — UI shu holatda Egasiga "toifani tekshiring" eslatmasini ko'rsatadi (US-M14-04, QT-M14-04); kassalar alohida `POST /cash-registers` bilan |
 | Xatolar | `VALIDATION_ERROR` |
 | Idempotency-Key | Majburiy |
 | Offline | Yo'q |
@@ -684,7 +684,7 @@
 
 | | |
 |---|---|
-| Maqsad | Filial tafsiloti + konsolidatsiyalangan qisqa hisob (savdo/qoldiq) |
+| Maqsad | Filial tafsiloti + konsolidatsiyalangan qisqa hisob (savdo/qoldiq): `today_sales` — bugungi (Toshkent) `doc_date` bilan o'tkazilgan `sales.total_amount` yig'indisi, `stock_value` — filial omborlari `stock_balances.value` yig'indisi |
 | Ruxsat | `—` (branch scope tekshiradi) |
 | So'rov | — |
 | Javob | `{id, name, address, is_default, settlement_category, activity_type, version, today_sales, stock_value}` |
@@ -725,7 +725,7 @@
 |---|---|
 | Maqsad | Yangi toifa qiymatini qo'lda qo'shish (masalan kelajak sana bilan rejalashtirish) |
 | Ruxsat | `settings.branches` |
-| So'rov | `{valid_from: date (majburiy, o'tgan oyga yozib bo'lmaydi), settlement_category, activity_type}` — `(branch_id, valid_from)` bo'yicha upsert (shu `valid_from` qatori bor bo'lsa — oxirgisi amal qiladi) |
+| So'rov | `{valid_from: date (majburiy, oyning 1-sanasi; o'tgan oyga yozib bo'lmaydi), settlement_category, activity_type}` — `(branch_id, valid_from)` bo'yicha upsert (shu `valid_from` qatori bor bo'lsa — oxirgisi amal qiladi) |
 | Javob | `201 {branch_id, valid_from, settlement_category, activity_type}` |
 | Xatolar | `VALIDATION_ERROR` (`valid_from` o'tgan davrda) |
 | Idempotency-Key | Majburiy |
@@ -832,7 +832,8 @@
 | `settings.discount_posting` | `"gross_9050"\|"net"`, standart `"gross_9050"` | `tenants.settings`, `13-provodka-qoidalari.md` |
 | `settings.owner_withdrawal_account` | `"4890"\|"8720"` — ta'sischi olgan pul (M16 `owner_withdrawal`); standart `legal_form` dan: `sole_proprietor` → `"8720"`, qolganlari → `"4890"` | `tenants.settings` |
 | `settings.payment_org_commission_account` | `"9430"\|"9410"`, standart `"9430"` — faqat `click`/`payme`/`uzum` to'lov tashkiloti komissiyasi (55e); `card`/`uzqr` komissiyasi — doim `9430` | `tenants.settings` |
-| `settings.negative_stock_policy` | `"allow"\|"block"` — manfiy qoldiqqa chiqim siyosati (`block` — `NEGATIVE_STOCK_NOT_ALLOWED`, `19-api-ombor.md`) | `tenants.settings` |
+| `settings.card_manual_fallback` | `"allow"\|"manager_approval"\|"forbid"`, standart `"manager_approval"` — karta rekvizitlarini qo'lda kiritish siyosati (qaror #71, BO-12) | `tenants.settings` |
+| `settings.negative_stock_policy` | `"allow"\|"block"`, standart `"allow"` — manfiy qoldiqqa chiqim siyosati (`block` — `NEGATIVE_STOCK_NOT_ALLOWED`, `19-api-ombor.md`) | `tenants.settings` |
 | `settings.ai_training_consent` | bool — anonimlashtirilgan ma'lumotdan AI'ni yaxshilashda foydalanishga rozilik | `tenants.settings` |
 | `settings.turnover_tax_account` | `"9430"\|"9820"`, standart `"9430"` — aylanma solig'i xarajati (8c) | `tenants.settings` |
 | `settings.fiscal_policy` | `{debt_receipt_split: "single"\|"per_sale" (standart "single", qaror #45), credit_sale_receipt: "none"\|"credit_type" (standart "none")}` | `tenants.settings` |
@@ -845,7 +846,7 @@
 | Maqsad | Do'kon sozlamalari + integratsiya holati umumiy ko'rinishi |
 | Ruxsat | `settings.tenant` |
 | So'rov | — |
-| Javob | `TenantSettings` + `{tax_regime: {current, history: [...]}, integrations: {ofd: {status}, faktura_uz: {status, connected_at}, crpt: {status, key_last4}, click: {status, connected_at}, payme: {status, connected_at}, uzum: {status, connected_at}, uzqr: {status, connected_at, cash_register_ids: [...]}}, version}` — sirlar hech qachon qaytmaydi |
+| Javob | `TenantSettings` + `{tax_regime: {current, history: [...]}, integrations: {ofd: {status}, faktura_uz: {status, connected_at}, crpt: {status, key_last4}, click: {status, connected_at}, payme: {status, connected_at}, uzum: {status, connected_at}, uzqr: {status, connected_at, cash_register_ids: [...]}}, version}` — `status`: `"connected"\|"not_connected"`; `ofd.status` `cash_registers.ofd_status` (`registered`/`active`) dan hosila; sirlar hech qachon qaytmaydi |
 | Xatolar | — |
 | Idempotency-Key | Kerak emas |
 | Offline | Oxirgi sinxronlangan |
@@ -857,9 +858,9 @@
 |---|---|
 | Maqsad | Do'kon nomi (`tenants.name`), yuridik shakli, bank hisobi va tenant siyosatlarini (`tenants.settings`) yangilash; soliq rejimi — 40c, integratsiya kalitlari — 40d, AI roziligi — 40h orqali |
 | Ruxsat | `settings.tenant`; tanada faqat `settings.vat_diff_tolerance_amount` bo'lsa — `tax.compare.review` ham yetarli (Buxgalter, qaror #50) |
-| So'rov | `{name?, legal_form?, settings?: {bank_account?, bank_mfo?, supplier_overpay_policy?, vat_diff_tolerance_amount?, marking_precheck?, discount_posting?, owner_withdrawal_account?, payment_org_commission_account?, turnover_tax_account?, negative_stock_policy?, ai_training_consent?, fiscal_policy?: {debt_receipt_split?, credit_sale_receipt?}}, version: int (majburiy)}` — qisman yangilash (merge); `ai_cross_border_enabled`, `go_live_date`, `accepted_terms_*` qabul qilinmaydi |
+| So'rov | `{name?, legal_form?, settings?: {bank_account?, bank_mfo?, supplier_overpay_policy?, vat_diff_tolerance_amount?, marking_precheck?, discount_posting?, owner_withdrawal_account?, payment_org_commission_account?, turnover_tax_account?, negative_stock_policy?, card_manual_fallback?, ai_training_consent?, fiscal_policy?: {debt_receipt_split?, credit_sale_receipt?}}, version: int (majburiy)}` — qisman yangilash (merge); `ai_cross_border_enabled`, `go_live_date`, `accepted_terms_*` qabul qilinmaydi |
 | Javob | `200 TenantSettings` |
-| Xatolar | `VALIDATION_ERROR` (enum tashqarisidagi qiymat, `vat_diff_tolerance_amount < 0`, `bank_account` 20 raqam emas, `ai_cross_border_enabled` tanada), `VERSION_CONFLICT` |
+| Xatolar | `VALIDATION_ERROR` (enum tashqarisidagi qiymat, `vat_diff_tolerance_amount < 0`, `bank_account` 20 raqam emas, `bank_mfo` 5 raqam emas, `ai_cross_border_enabled`/`go_live_date`/`accepted_terms_*` tanada), `VERSION_CONFLICT` (`params.current_version`) |
 | Idempotency-Key | Majburiy |
 | Offline | Yo'q |
 | Bog'langan | BO-14; audit majburiy |
@@ -870,7 +871,7 @@
 |---|---|
 | Maqsad | Soliq rejimini (QQS/aylanma) o'zgartirish — faqat keyingi oy 1-sanasidan kuchga kiradi |
 | Ruxsat | `settings.tenant` |
-| So'rov | `{regime: "vat"\|"turnover", valid_from: date (keyingi oy 1-sanasi)}` |
+| So'rov | `{regime: "vat"\|"turnover", valid_from: date (aynan keyingi oyning 1-sanasi, Toshkent vaqti)}` |
 | Javob | `201 {regime, valid_from}` |
 | Xatolar | `VALIDATION_ERROR` (`valid_from` noto'g'ri sana) |
 | Idempotency-Key | Majburiy |
@@ -939,7 +940,7 @@
 | Ruxsat | `settings.tenant` (**faqat Egasi**) |
 | So'rov | `{purpose: "ai_cross_border" (majburiy), terms_version: string (majburiy — joriy `terms_versions` versiyasi), accepted: bool (majburiy; `false` — qaytarib olish)}` |
 | Javob | `201 {purpose, terms_version, accepted, at, ai_cross_border_enabled}` (`at` = `consents.at`) |
-| Xatolar | `VALIDATION_ERROR` (noma'lum `purpose`; `terms_version` joriy versiya emas — `params.current_version`) |
+| Xatolar | `VALIDATION_ERROR` (noma'lum `purpose`; `terms_version` joriy versiya emas — `params.current_version`; joriy versiya = `platform.terms_versions` dagi `kind = purpose` (`ai_cross_border`), `is_current` qatori, `GET /auth/terms`) |
 | Idempotency-Key | Majburiy |
 | Offline | Yo'q |
 | Bog'langan | BO-14; AI-01/AI-03; `22-ai-qatlami.md` §7; audit majburiy (`ip` bilan) |

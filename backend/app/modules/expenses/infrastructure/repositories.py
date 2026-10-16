@@ -18,6 +18,13 @@ _INSERT = text(
 )
 
 
+class ExpenseCategoryRepository:
+    async def insert_system_categories(
+        self, session: AsyncSession, tenant_id: UUID, categories: Iterable[ExpenseCategoryTemplate]
+    ) -> None:
+        await insert_system_categories(session, tenant_id, categories)
+
+
 async def insert_system_categories(
     session: AsyncSession, tenant_id: UUID, categories: Iterable[ExpenseCategoryTemplate]
 ) -> None:

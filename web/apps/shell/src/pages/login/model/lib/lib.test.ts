@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { loginErrorReason, MAX_NEXT_LENGTH, safeNextPath, safeTenantId } from "./index.ts";
+import {
+  isOnboardingReason,
+  loginErrorReason,
+  MAX_NEXT_LENGTH,
+  safeNextPath,
+  safeTenantId,
+} from "./index.ts";
 
 describe("BO-01 login helpers", () => {
   it("accepts only in-app next paths", () => {
@@ -38,5 +44,16 @@ describe("BO-01 login helpers", () => {
     expect(loginErrorReason("<script>")).toBe("default");
     expect(loginErrorReason("subscription_restricted")).toBeNull();
     expect(loginErrorReason(null)).toBeNull();
+  });
+
+  it("maps the Google callback reasons (14 §2.2) to the onboarding texts", () => {
+    for (const reason of ["google_email_not_verified", "tenant_required"] as const) {
+      expect(loginErrorReason(reason)).toBe(reason);
+      expect(isOnboardingReason(reason)).toBe(true);
+    }
+    // Google unavailable / failed has its own BO-01 text (auth namespace).
+    expect(loginErrorReason("google_auth_failed")).toBe("google_auth_failed");
+    expect(isOnboardingReason("google_auth_failed")).toBe(false);
+    expect(isOnboardingReason("state_mismatch")).toBe(false);
   });
 });

@@ -160,10 +160,21 @@ def bearer(token: str) -> dict[str, str]:
 
 
 async def bff_login(
-    client: httpx.AsyncClient, phone: str, password: str = PASSWORD, return_to: str = "/"
+    client: httpx.AsyncClient,
+    phone: str,
+    password: str = PASSWORD,
+    return_to: str = "/",
+    *,
+    tenant_id: UUID | None = None,
 ) -> str:
-    """Full 14 §2.1 flow: /auth/login/start → AS page → password POST → /auth/callback → cookie."""
-    start = await client.get("/auth/login/start", params={"return_to": return_to})
+    """Full 14 §2.1 flow: /auth/login/start → AS page → password POST → /auth/callback → cookie.
+
+    ``tenant_id`` preselects the shop of a user with several memberships (no chooser step).
+    """
+    params = {"return_to": return_to}
+    if tenant_id is not None:
+        params["tenant_id"] = str(tenant_id)
+    start = await client.get("/auth/login/start", params=params)
     assert start.status_code == 302, start.text
     authorize_url = start.headers["location"]
     assert authorize_url.startswith(f"{ISSUER}/oauth/authorize?")

@@ -9,7 +9,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./styles.css": "./src/styles/globals.css",
-    "./theme.css": "./src/styles/theme.css"
+    "./theme.css": "./src/styles/theme.css",
+    "./form": "./src/form/index.ts"
   },
   "sideEffects": [
     "**/*.css"
@@ -20,13 +21,28 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@hookform/resolvers": "catalog:",
+    "@radix-ui/react-checkbox": "catalog:",
+    "@radix-ui/react-dialog": "catalog:",
     "@radix-ui/react-dropdown-menu": "catalog:",
     "@radix-ui/react-label": "catalog:",
+    "@radix-ui/react-popover": "catalog:",
+    "@radix-ui/react-radio-group": "catalog:",
+    "@radix-ui/react-select": "catalog:",
     "@radix-ui/react-slot": "catalog:",
+    "@radix-ui/react-switch": "catalog:",
+    "@radix-ui/react-tabs": "catalog:",
+    "@radix-ui/react-toast": "catalog:",
+    "@radix-ui/react-tooltip": "catalog:",
+    "@shared/api": "workspace:*",
+    "@shared/i18n": "workspace:*",
+    "@shared/lib": "workspace:*",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
     "lucide-react": "catalog:",
-    "tailwind-merge": "catalog:"
+    "react-hook-form": "catalog:",
+    "tailwind-merge": "catalog:",
+    "zod": "catalog:"
   },
   "peerDependencies": {
     "react": "^19.0.0",
@@ -35,7 +51,9 @@
   "devDependencies": {
     "@shared/eslint-config": "workspace:*",
     "@shared/typescript-config": "workspace:*",
+    "@testing-library/jest-dom": "catalog:",
     "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "eslint": "catalog:",

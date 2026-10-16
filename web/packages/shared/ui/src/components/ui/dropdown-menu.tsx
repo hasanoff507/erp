@@ -2,6 +2,7 @@
  * shadcn/ui DropdownMenu (Radix), themed: popover surface, shadow-popover, rounded-lg.
  * Use modal={false} on the Root: modal mode injects a scroll-lock <style> element, which the
  * strict CSP (style-src 'self', qaror #57) blocks.
+ * Content uses z-dialog (not z-dropdown) so a menu opened inside a Sheet/Dialog is not hidden under it.
  */
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import type { ComponentProps } from "react";
@@ -22,7 +23,7 @@ export function DropdownMenuContent({
       <DropdownMenuPrimitive.Content
         sideOffset={sideOffset}
         className={cn(
-          "z-dropdown min-w-[12rem] overflow-hidden rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-popover",
+          "z-dialog min-w-[12rem] overflow-hidden rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-popover",
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           className,
         )}

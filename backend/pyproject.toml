@@ -23,6 +23,15 @@ dependencies = [
     "joserfc>=1.0",
     "python-multipart>=0.0.18",
     "cryptography>=44",
+    "httpx>=0.28",
+    "openpyxl>=3.1",
+    "prometheus-client>=0.26",
+    "opentelemetry-sdk>=1.45",
+    "opentelemetry-exporter-otlp-proto-http>=1.45",
+    "opentelemetry-instrumentation-fastapi>=0.66b1",
+    "opentelemetry-instrumentation-sqlalchemy>=0.66b1",
+    "opentelemetry-instrumentation-httpx>=0.66b1",
+    "sentry-sdk>=2.72",
 ]
 
 [dependency-groups]
@@ -32,11 +41,12 @@ dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
     "testcontainers[postgres,redis]>=4.9",
-    "httpx>=0.28",
     "asyncpg-stubs>=0.30",
     "pip-audit>=2.7",
     "schemathesis>=4.31.1",
     "zxing-cpp>=3.1.1",
+    "import-linter>=2.1",
+    "types-openpyxl>=3.1.5.20260827",
 ]
 
 [build-system]
@@ -85,3 +95,43 @@ markers = [
     "db: needs a real PostgreSQL 16 (testcontainers or ERP_TEST_PG_ADMIN_URL)",
     "redis: needs a real Redis",
 ]
+
+# 23 §1 module layering, enforced in CI (`uv run lint-imports`, 27 Bosqich 1):
+# api → (wiring) → infrastructure → application → domain inside each module; application/domain never
+# import any module's infrastructure/api directly (other modules only via application/domain/wiring);
+# app.core never imports app.modules; domain stays free of DB/web frameworks.
+[tool.importlinter]
+root_package = "app"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Module layers (23 §1): api > wiring > infrastructure > application > domain"
+type = "layers"
+containers = ["app.modules.*"]
+layers = ["(api)", "(wiring)", "(infrastructure)", "(application)", "(domain)"]
+
+[[tool.importlinter.contracts]]
+name = "application/domain see infrastructure only through ports (23 §1)"
+type = "forbidden"
+source_modules = ["app.modules.*.application", "app.modules.*.domain", "app.modules.*.*.application", "app.modules.*.*.domain"]
+forbidden_modules = ["app.modules.*.infrastructure", "app.modules.*.api", "app.modules.*.*.infrastructure", "app.modules.*.*.api"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "api does not reach into infrastructure (23 §1)"
+type = "forbidden"
+source_modules = ["app.modules.*.api", "app.modules.*.*.api"]
+forbidden_modules = ["app.modules.*.infrastructure", "app.modules.*.*.infrastructure"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "core is module-agnostic (23 §1)"
+type = "forbidden"
+source_modules = ["app.core"]
+forbidden_modules = ["app.modules", "app.main", "app.workers"]
+
+[[tool.importlinter.contracts]]
+name = "domain is pure Python (23 §1)"
+type = "forbidden"
+source_modules = ["app.modules.*.domain", "app.modules.*.*.domain"]
+forbidden_modules = ["sqlalchemy", "fastapi", "starlette", "redis", "asyncpg", "httpx", "saq"]

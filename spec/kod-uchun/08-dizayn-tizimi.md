@@ -280,7 +280,7 @@ Gradient, neon rang va chap-chegarali (rangli chap chiziqli) karta ishlatilmaydi
 
 ## 2. Tipografiya
 
-Shrift: **Manrope** (400, 500, 600, 700, 800) — ilova bilan birga bundle qilingan woff2 (`@fontsource-variable/manrope`, subsetlar latin, latin-ext, cyrillic, cyrillic-ext; ulash — `24-frontend-arxitekturasi.md` §4.1); runtime'da CDN/Google Fonts yuklanmaydi (CSP `default-src 'self'`, offline PWA keshi — qaror #57). Stek: `font-family: 'Manrope Variable', 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`. Manrope'da U+02BB/U+02BC (ʻ — `oʻ`, `gʻ`) va `Ққ Ғғ Ҳҳ` gliflari **yo'q** (`Ўў` va rus kirill bor) — ular stekdagi tizim shriftidan chiqadi (Bosqich 0 spike: `research_notes/ochiq-savollar/spike-font.md`); self-hosted Noto Sans subset'ini zaxira qatoriga qo'shish — 26 #141 (qaror #57).
+Shrift: **Manrope** (400, 500, 600, 700, 800) — ilova bilan birga bundle qilingan woff2 (`@fontsource-variable/manrope`, subsetlar latin, latin-ext, cyrillic, cyrillic-ext; ulash — `24-frontend-arxitekturasi.md` §4.1); runtime'da CDN/Google Fonts yuklanmaydi (CSP `default-src 'self'`, offline PWA keshi — qaror #57). Stek: `font-family: 'Manrope Variable', 'Manrope', 'Noto Sans Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`. Manrope'da U+02BB/U+02BC (ʻ ʼ — `oʻ`, `gʻ`) va `Ққ Ғғ Ҳҳ` gliflari **yo'q** (`Ўў` va rus kirill bor) — ular self-hosted Noto Sans zaxirasidan chiqadi (`@fontsource-variable/noto-sans`: ʻ ʼ — `latin` fayli, `Ққ Ғғ Ҳҳ` — `cyrillic-ext` fayli; `@font-face` `unicode-range` faqat shu 8 belgi bilan cheklangan, shuning uchun Noto faqat shu belgi ekranda bo'lganda yuklanadi; PWA precache'da; `apps/shell/src/noto-sans-fallback.css`, test `e2e/font-glyphs.spec.ts`). Asoschi qarori — 26 #141 (qaror #57).
 
 | Token | `font-size` / `line-height`, og'irlik | Back-office qo'llanishi | POS qo'llanishi |
 |---|---|---|---|
@@ -331,7 +331,7 @@ Qoidalar:
 | `shadow-pos-sheet` | `0 -8px 24px -4px rgb(15 27 45 / .12)` | Bottom sheet (kuchliroq yuqori soya) |
 | `ring-focus-soft` | `border-2 border-primary` + `0 0 0 4px hsl(var(--primary-soft))` | Faol skaner/qidiruv maydoni (POS-02 F1), fokusdagi input |
 
-- **Z-index skeleti**: `z-dropdown:40`, `z-sticky-header:30`, `z-overlay:50`, `z-dialog:60`, `z-toast:70`, `z-pos-statusbar:80` (offline badge har doim eng tepada).
+- **Z-index skeleti**: `z-dropdown:40`, `z-sticky-header:30`, `z-overlay:50`, `z-dialog:60`, `z-toast:70`, `z-pos-statusbar:80` (offline badge har doim eng tepada). Portal orqali ochiladigan suzuvchi qatlamlar (`Select`, `Popover`, `DropdownMenu`, `Combobox`) `z-dialog` dan foydalanadi — `Sheet`/`Dialog` ustida ochilishi uchun; `z-dropdown` faqat portal'siz menyular uchun.
 
 ---
 
@@ -469,13 +469,13 @@ Bitta ustun, pastki tab-bar (`Bosh sahifa / Hisobotlar / Qarzlar / AI / Sozlamal
 
 ### 7.1 shadcn/ui (to'g'ridan-to'g'ri, o'zgarishsiz yoki minimal tema bilan)
 
-`Button`, `Input`, `Textarea`, `Select`, `Combobox` (cmdk asosida), `Checkbox`, `RadioGroup`, `Switch`, `Dialog`, `Sheet`, `AlertDialog`, `Popover`, `Tooltip`, `Tabs`, `Card`, `Badge`, `Avatar`, `Table` (TanStack bilan birga), `Calendar` (react-day-picker ^9.14), `Form` (react-hook-form + zod wrapper), `Toast`/`Sonner`, `Command` (cmdk), `DropdownMenu`, `NavigationMenu`/`Sidebar` (shadcn `sidebar` bloki), `Skeleton`, `Progress`, `Separator`, `ScrollArea`, `HoverCard`.
+`Button`, `Input`, `Textarea`, `Select`, `Combobox` (cmdk asosida), `Checkbox`, `RadioGroup`, `Switch`, `Dialog`, `Sheet`, `AlertDialog`, `Popover`, `Tooltip`, `Tabs`, `Card`, `Badge`, `Avatar`, `Table` (TanStack bilan birga), `Calendar` (react-day-picker ^9.14), `Form` (react-hook-form + zod wrapper), `Toast` (Radix — Sonner qat'iy CSP bilan mos emas), `Command` (cmdk), `DropdownMenu`, `NavigationMenu`/`Sidebar` (shadcn `sidebar` bloki), `Skeleton`, `Progress`, `Separator`, `ScrollArea`, `HoverCard`.
 
 ### 7.2 Maxsus (loyiha) komponentlar — `packages/shared/ui/`
 
 | Komponent | Vazifa | Asosiy proplar |
 |---|---|---|
-| **`MoneyInput`** | Pul kiritish — ekranda butun son, minglik ajratgich avtomatik, so'm belgisi suffiks; chiqishda kasr-satr (`"12000.00"`) | `value: string`, `onChange`, `max?`, `allowNegative?` |
+| **`MoneyInput`** | Pul kiritish — ekranda butun son, minglik ajratgich avtomatik, so'm belgisi suffiks; chiqishda kasr-satr (`"12000.00"`) | `value: string`, `onChange`, `max?`, `allowNegative?` — `precision` 0 da yozilgan `,`/`.` e'tiborsiz qoldiriladi, joylashtirilgan `1240000,50` → 1 240 000 (ajratgich sonni tugatadi). `PhoneInput` 9 ta milliy raqam qaytaradi — API'ga `toE164()` bilan yuboriladi |
 | **`PriceInput`** | Tannarx/xarid narxi kiritish — 4 xonagacha kasr (xarid qatori narxi, ochilish qoldig'i tannarxi kabi joylarda) | `value: string`, `onChange`, `max?`, `precision?: 4` |
 | **`QtyInput`** | Miqdor kiritish — o'lchov birligiga qarab butun/kasr (dona=butun, kg=**3 xonali kasr**), +/− stepper tugmalari | `value`, `unit: "dona"\|"kg"\|"litr"...`, `step`, `onChange` |
 | **`BarcodeField`** (`useBarcodeWedge` hook asosida) | Skaner-fokus maydoni — belgilar orasi <30ms + Enter suffiksini HID skaner sifatida taniydi, qo'lda yozishdan ajratadi | `onScan(code: string)`, `autoFocus`, `placeholder` |
@@ -486,7 +486,7 @@ Bitta ustun, pastki tab-bar (`Bosh sahifa / Hisobotlar / Qarzlar / AI / Sozlamal
 | **`PrinterSetup`** | POS-16 printer sozlash: transport tanlovi (Web Serial / WebUSB / Web Bluetooth BLE / Do'kon agenti / tizim / bulut), qog'oz kengligi, kod sahifasi, «Test chek» | `transport`, `width: 58\|80`, `onTest` |
 | **`SyncStatus`** | POS-12 ro'yxati — har bir outbox voqeasi holati (kutmoqda/xato/muvaffaqiyatli) | `events: SyncEvent[]`, `onRetry` |
 | **`ApprovalDialog`** | Limitdan oshgan amal uchun Menejer/Egasi PIN so'rovi (bottom sheet, POS) yoki modal (BO-16) | `reason`, `amount`, `onApprove(pin)`, `onReject(comment)` |
-| **`DataTable`** preset'lari | TanStack Table ustida: `DataTable.Compact` (back-office, saralash/filtr/sahifalash/eksport), `DataTable.Mobile` (karta ko'rinishi) | `columns`, `data`, `isLoading`, `emptyState`, `onRowClick` |
+| **`DataTable`** preset'lari | Bosqich 1: server tomonida boshqariladigan (sahifalash/saralash/filtr sahifa modelida, page/cursor — 17 §4); TanStack Table — mijoz saralashi/virtualizatsiya kerak bo'lganda: `DataTable.Compact` (back-office, saralash/filtr/sahifalash/eksport), `DataTable.Mobile` (karta ko'rinishi) | `columns`, `data`, `isLoading`, `emptyState`, `onRowClick` |
 | **`EmptyState`** | Bo'sh holat — ikon + sarlavha + qisqa izoh + ixtiyoriy CTA | `icon`, `title`, `description`, `action?` |
 | **`ErrorState`** | Xato holati — ikon + xabar (i18n kaliti, raw JSON hech qachon) + "Qayta urinish" | `message`, `retryable`, `onRetry` |
 | **`NoPermissionState`** | `403 PERMISSION_DENIED` — qulf ikon + "Sizda bu bo'limga kirish huquqi yo'q" | — |
@@ -618,7 +618,7 @@ Back-office'da F-tugmalar band qilinmaydi (brauzer standart xatti-harakati saqla
 1. **Kontrast**: matn/fon nisbati kamida **4.5:1** (WCAG AA), katta matn (≥24px) kamida 3:1. Token darajasida tasdiqlangan: yumshoq fondagi matn doim `X-strong` (`success-strong` 5.8:1, `warning-strong` 5.4:1, `info-strong` 6.7:1, `destructive-strong` 6.0:1, `primary-strong` 6.7:1, `awaiting-approval` 4.9:1); `warning` (`#B7791F`) va `success` (`#1F8A4C`) asosiy ranglari matn uchun ishlatilmaydi (oq fonda ham 4.5:1 dan past) — matnda `-strong`; to'ldirilgan amber/success tugma foni — `-strong`. `muted-foreground` (`#6B7686`, oq fonda 4.6:1) faqat oq (`card`) fonda; `background`/`muted`/`accent`/`track` fonlarida ikkinchi darajali matn — `foreground-secondary`. `disabled-foreground` faqat o'chirilgan element matni (WCAG istisnosi). Sidebar: matn 11.3:1, guruh sarlavhasi `sidebar-muted-foreground` 6.0:1.
 2. **Teginish nishoni**: POS ≥48×48px, back-office ≥36×36px (5-bo'lim) — maket o'lchami bundan kichik bo'lsa (qty stepper, kategoriya tabi, ikonka-tugma, segment), komponent minimumgacha kattalashtiriladi.
 3. **Klaviatura navigatsiyasi**: har bir interaktiv element `Tab` bilan yetadigan, `focus-visible` halqasi (`ring-2 ring-ring`) ko'rinadigan bo'lishi shart — POS'da ham (tashqi klaviatura/skaner holatlari uchun).
-4. **`aria-live`**: toast (Sonner) va offline holat o'zgarishi `aria-live="polite"`; fiskal/xavfsizlik ogohlantirishlari (40/46/48 soat, obuna tugashi) `aria-live="assertive"`.
+4. **`aria-live`**: toast (Radix Toast) va offline holat o'zgarishi `aria-live="polite"`; fiskal/xavfsizlik ogohlantirishlari (40/46/48 soat, obuna tugashi) `aria-live="assertive"`.
 5. **Rang yagona belgi emas**: har bir semantik rang (success/warning/destructive) doim ikon/matn bilan birga (masalan 🟡 + "Offlayn" matni, faqat rang emas) — rang ko'rlik uchun.
 6. **Jadval**: `DataTable` klaviatura bilan qator o'tish (yuqori/past strelka) va `Enter` bilan ochish qo'llab-quvvatlaydi.
 7. **Shrift o'lchami**: brauzer/OS darajasidagi zoom (`rem` asosida, `px` qulflanmagan) ishlaydi, maksimal 200% zoomda layout buzilmaydi (asosan back-office uchun, POS qurilmasi odatda qulflangan ekranda).
@@ -647,7 +647,7 @@ settings:users.resetPinConfirm
 
 Qoidalar:
 - Tugma matnlari — `actions.*` (umumiy) yoki `<ekran>.<nom>Button`.
-- Validatsiya xabarlari — `common:validation.required`, `common:validation.maxLength`, `common:validation.phoneFormat` (zod `errorMap` shu kalitlarga bog'lanadi).
+- Validatsiya xabarlari — `common:validation.required`, `common:validation.max_length`, `common:validation.phone_format` (zod `errorMap` shu kalitlarga bog'lanadi).
 - Server xatosi HTTP javobida `error.message_key` maydonini qaytaradi (masalan `"errors.debt_limit_exceeded"`) — bu satr **o'zgarishsiz** `common` namespace ichida i18n kalit sifatida ishlatiladi: `t('common:' + message_key)`. Agar kalit tarjima fayllarida topilmasa — `common:errors.internal_error`ga zahira qilinadi. Maydon darajasidagi validatsiya xatolari (`details[].message_key`, har bir noto'g'ri maydon uchun bitta) `validation.*` prefiksi bilan keladi — bu frontend zod `errorMap`i ishlatadigan kalitlar bilan bir xil. **Hech qachon** xom kod/JSON ekranga chiqmaydi.
 - Rus tarjimasi har doim o'zbek kalit bilan bir fayl tuzilmasida (`uz.json`/`ru.json`, bir xil kalitlar), tarjima yo'q qolganda **o'zbekcha** fallback (hech qachon kalit nomi ko'rsatilmaydi).
 

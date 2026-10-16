@@ -7,7 +7,7 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useGrantedAccess } from "@shared/state/permissions";
 
 import { ProtectedRoute } from "#/features/protected-route/index.ts";
-import { firstAllowedNavItem, requiresForPath } from "../ui/sidebar/nav-items.ts";
+import { firstAllowedNavItem, navItemTarget, requiresForPath } from "../ui/sidebar/nav-items.ts";
 import { NoPermissionPage, Splash } from "../ui/status/index.tsx";
 
 /** Wraps the child routes of a layout: the current path's sidebar permission is required. */
@@ -26,8 +26,9 @@ export function RoutePermissionGuard({ inline = true }: { inline?: boolean }) {
 
 /** `/` and `/app`: the first screen the user may open; NoPermissionState when there is none. */
 export function DefaultRedirect({ inline = false }: { inline?: boolean }) {
-  const target = firstAllowedNavItem(useGrantedAccess());
-  return target ? <Navigate to={target.to} replace /> : <NoPermissionPage inline={inline} />;
+  const granted = useGrantedAccess();
+  const target = firstAllowedNavItem(granted);
+  return target ? <Navigate to={navItemTarget(target, granted)} replace /> : <NoPermissionPage inline={inline} />;
 }
 
 /** `/` is outside every layout: check the session first (anonymous → /login?next=%2F). */

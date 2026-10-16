@@ -33,14 +33,35 @@ const KNOWN_REASONS = [
   "state_mismatch",
   "authorization_denied",
   "invalid_grant",
+  // GET /auth/google/start or /callback failed — also when Google OAuth is not configured (14 §2.2).
+  "google_auth_failed",
 ] as const;
+/**
+ * Reasons of GET /auth/google/callback → `/login?error=<reason>` (backend auth/application/google.py)
+ * and BFF `client_unavailable`; their texts live in the `onboarding` namespace (`login.errors.*`).
+ */
+const ONBOARDING_REASONS = [
+  "google_email_not_verified",
+  "tenant_required",
+  "no_active_membership",
+  "not_a_member",
+  "client_unavailable",
+] as const;
+export type OnboardingErrorReason = (typeof ONBOARDING_REASONS)[number];
 /** `no_membership` comes from GET /auth/session 403 PERMISSION_DENIED, not from the callback. */
-export type LoginErrorReason = (typeof KNOWN_REASONS)[number] | "no_membership" | "default";
+export type LoginErrorReason =
+  (typeof KNOWN_REASONS)[number] | OnboardingErrorReason | "no_membership" | "default";
+
+export function isOnboardingReason(reason: LoginErrorReason): reason is OnboardingErrorReason {
+  return (ONBOARDING_REASONS as readonly string[]).includes(reason);
+}
 
 /** `subscription_restricted` is not an error message but the restricted-subscription banner. */
 export const SUBSCRIPTION_REASON = "subscription_restricted";
 
 export function loginErrorReason(error: string | null): LoginErrorReason | null {
   if (!error || error === SUBSCRIPTION_REASON) return null;
-  return (KNOWN_REASONS as readonly string[]).includes(error) ? (error as LoginErrorReason) : "default";
+  if ((KNOWN_REASONS as readonly string[]).includes(error)) return error as LoginErrorReason;
+  if ((ONBOARDING_REASONS as readonly string[]).includes(error)) return error as LoginErrorReason;
+  return "default";
 }

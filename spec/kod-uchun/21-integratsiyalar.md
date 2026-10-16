@@ -434,7 +434,7 @@ class ClassifierAdapter(Protocol):
     async def get_vat_category(self, mxik_code: str) -> VatCategory: ...
 ```
 
-**Ma'lumot moslashtirish**: `products.mxik_code` (17 belgi), `products.vat_rate`. Natija **lokal kesh** jadvalida (`mxik_cache(code, name, vat_hint, cached_at)`) saqlanadi — tez-tez o'zgarmaydigan ma'lumot, offline/tez qidiruv uchun.
+**Ma'lumot moslashtirish**: `products.mxik_code` (17 belgi), `products.vat_rate`. Natija platforma darajasidagi **Redis keshida** (`mxik:*`, tenant ma'lumotisiz) saqlanadi — `ERP_MXIK_CACHE_FRESH_S` davomida yangi hisoblanadi, `ERP_MXIK_CACHE_TTL_S` gacha (tashqi tizim ishlamaganda `stale_cache`) saqlanadi; alohida DB jadvali yo'q (tenant ichida MXIK katalogi saqlanmaydi, `15-xavfsizlik-va-audit.md` §1.5). tasnif.soliq.uz rasmiy API hujjatiga ega emas — adapter yo'llari sozlanadigan `ERP_MXIK_BASE_URL` ostida, jonli sayt bilan tekshirilishi kerak (26 Jadval B).
 
 **Idempotentlik**: kerak emas (faqat o'qish, side-effect yo'q).
 
@@ -744,7 +744,7 @@ class SmsAdapter(Protocol):   # OtpPort ichidagi SMS kanali; adapterlar: EskizSm
     async def send(self, phone: str, text: str) -> SmsSendResult: ...
     async def get_status(self, provider_message_id: str) -> SmsStatus: ...
 ```
-Sozlamalar: `sms.sender="4546"`, `ERP_ESKIZ_TEST_MODE=true` (faqat ruxsat etilgan test matni), token keshi har 25 kunda yangilanadi; OTP shabloni: "Kod: {code}. [Brend] tizimiga kirish. Hech kimga bermang."
+Sozlamalar: `sms.sender="4546"`, `ERP_ESKIZ_TEST_MODE=true` (faqat ruxsat etilgan test matni — **test rejimida OTP kodi SMS bilan yetkazilmaydi**; Eskiz shartnomasigacha real foydalanuvchi Telegram botdan foydalanadi), token keshi har 25 kunda yangilanadi; **test-raqam yo'li** (qaror #34): `ERP_OTP_TEST_PHONES` + `ERP_OTP_TEST_CODE` — haqiqiy oqim (limitlar, challenge yozuvi, tekshiruv) yuborishsiz; `ERP_OTP_DEV_FAKES` (kodni yozib oluvchi FakeTelegram/FakeSms) — faqat lokal dev/test, ikkalasi ham staging/prod'da Settings tomonidan rad etiladi; OTP shabloni: "Kod: {code}. [Brend] tizimiga kirish. Hech kimga bermang."
 
 **Ma'lumot moslashtirish**: `notifications_log(tenant_id, channel=sms, recipient, template, status, cost)` (`11-malumotlar-modeli.md`, 10-bo'lim).
 

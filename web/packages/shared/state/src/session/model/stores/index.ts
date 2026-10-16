@@ -49,3 +49,10 @@ export const $sessionUnavailable = $sessionCheckError.map((e) => e !== null);
  * `t("common:session.logoutFailed")`. Cleared on the next attempt or once signed out.
  */
 export const $logoutError = createStore<ApiError | null>(null);
+
+/**
+ * Last refused tenant switch (403 PERMISSION_DENIED `membership_inactive`, 403
+ * SUBSCRIPTION_RESTRICTED with `pay_url`/`amount_due`, …): the current session is unchanged.
+ * Cleared on the next attempt or a successful switch.
+ */
+export const $tenantSwitchError = createStore<ApiError | null>(null);

@@ -32,26 +32,52 @@ DEFAULT_LOCALE: Final[Locale] = "uz"
 STYLE: Final = (
     "body{font-family:Manrope,system-ui,sans-serif;background:#F4F6F8;color:#0F1B2D;margin:0;display:flex;"
     "min-height:100vh;align-items:center;justify-content:center}"
-    "main{width:min(380px,calc(100vw - 32px))}"
+    "main{width:min(420px,calc(100vw - 32px));padding:24px 0}"
     "form{background:#FFFFFF;padding:32px;border:1px solid #E7EAEE;border-radius:16px;"
     "box-shadow:0 8px 24px rgba(15,27,45,.06)}"
-    ".brand{font-size:24px;font-weight:800;color:#0E7C66;text-align:center;margin:0 0 4px}"
-    "h1{font-size:18px;font-weight:700;margin:0 0 20px;text-align:center}"
-    ".lang{display:flex;justify-content:center;gap:6px;margin:0 0 16px;font-size:13px}"
-    ".lang a,.lang span{padding:4px 10px;border-radius:999px;text-decoration:none;color:#3D4A5C}"
-    ".lang span{background:#E3F2EE;color:#0A5E4D;font-weight:700}"
-    ".lang a:hover{background:#F4F6F8}"
-    "label{display:block;font-size:14px;color:#3D4A5C;margin:12px 0 4px}"
-    "input,select{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #DCE1E7;"
-    "border-radius:10px;font:inherit;font-size:16px;color:#0F1B2D;background:#FFFFFF}"
+    ".top{display:flex;align-items:center;gap:10px;margin:0 0 24px}"
+    ".mark{width:38px;height:38px;flex-shrink:0;border-radius:11px;background:#0E7C66;color:#FFFFFF;"
+    "display:flex;align-items:center;justify-content:center;font-weight:800}"
+    ".brand{flex-grow:1;margin:0;font-size:16px;font-weight:800;line-height:1.2}"
+    ".brand small{display:block;font-size:12px;font-weight:500;color:#5B6675}"
+    "h1{font-size:28px;font-weight:800;margin:0 0 6px}"
+    ".hint{margin:0 0 8px;font-size:14px;color:#5B6675}"
+    ".lang{display:flex;gap:2px;padding:3px;border:1px solid #E7EAEE;border-radius:10px;font-size:12px}"
+    ".lang a,.lang span{min-width:40px;padding:8px 10px;box-sizing:border-box;border-radius:8px;"
+    "text-align:center;text-decoration:none;font-weight:700;color:#3D4A5C}"
+    ".lang span{background:#0F1B2D;color:#FFFFFF}"
+    ".lang a:hover{background:#F4F6F8;text-decoration:none}"
+    ".row{display:flex;align-items:baseline;justify-content:space-between;gap:8px}"
+    "label{display:block;font-size:13px;font-weight:600;color:#3D4A5C;margin:14px 0 6px}"
+    "input,select{width:100%;box-sizing:border-box;height:48px;padding:0 14px;border:1px solid #DCE1E7;"
+    "border-radius:12px;font:inherit;font-size:15px;color:#0F1B2D;background:#FFFFFF}"
+    "input[type=tel]{font-variant-numeric:tabular-nums;font-weight:600}"
+    "input[aria-invalid=true],select[aria-invalid=true]{border-color:#C8372D}"
     "input:focus,select:focus{outline:2px solid #0E7C66;outline-offset:1px;border-color:#0E7C66}"
-    "button{margin-top:20px;width:100%;min-height:44px;padding:12px;border:0;border-radius:10px;"
-    "background:#0E7C66;color:#FFFFFF;font:inherit;font-size:16px;font-weight:700;cursor:pointer}"
+    "button{margin-top:20px;width:100%;height:50px;border:0;border-radius:12px;"
+    "background:#0E7C66;color:#FFFFFF;font:inherit;font-size:16px;font-weight:800;cursor:pointer}"
     "button:hover,button:active{background:#0A5E4D}"
-    "button:focus-visible{outline:2px solid #0E7C66;outline-offset:2px}"
+    "button:focus-visible,a:focus-visible{outline:2px solid #0E7C66;outline-offset:2px}"
     ".err{background:#FBEAE8;color:#A82B22;border:1px solid #F3CFCB;padding:10px 12px;border-radius:10px;"
-    "font-size:14px;margin:0 0 8px}"
+    "font-size:13px;font-weight:600;margin:12px 0 0}"
+    ".or{display:flex;align-items:center;gap:12px;margin:20px 0 0;color:#5B6675;font-size:12px;"
+    "font-weight:600}"
+    ".or::before,.or::after{content:'';flex:1;border-top:1px solid #E7EAEE}"
+    "a{color:#0E7C66;font-weight:700;text-decoration:none}a:hover{color:#0A5E4D;text-decoration:underline}"
+    ".google{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px;height:48px;"
+    "border:1px solid #DCE1E7;border-radius:12px;color:#0F1B2D;font-size:15px}"
+    ".google:hover{background:#F4F6F8;color:#0F1B2D;text-decoration:none}"
+    ".google b{width:24px;height:24px;border-radius:50%;border:1.5px solid #3D4A5C;display:inline-flex;"
+    "align-items:center;justify-content:center;font-size:13px;font-weight:800}"
+    ".row a{font-size:13px}"
+    ".links{display:flex;flex-direction:column;align-items:center;gap:8px;margin:20px 0 0;font-size:14px;"
+    "color:#3D4A5C}"
 )
+# BO-01 entry points (07 BO-01, qaror #34): Google login (web BFF only) and the one-time-code flows
+GOOGLE_START_PATH: Final = "/auth/google/start"
+RECOVERY_PATH: Final = "/recover"  # SPA: OTP purpose=recovery → POST /auth/credentials
+SIGNUP_PATH: Final = "/onboarding"  # SPA: BO-21 self-service signup (web only)
+INVITE_PATH: Final = "/invite"  # SPA: staff invite / reset code → POST /auth/credentials
 STYLE_HASH: Final = "sha256-" + base64.b64encode(hashlib.sha256(STYLE.encode()).digest()).decode()
 
 SECURITY_HEADERS: Final = {
@@ -68,7 +94,7 @@ SECURITY_HEADERS: Final = {
 
 MESSAGES: Final[dict[Locale, dict[str, str]]] = {
     "uz": {
-        "INVALID_CREDENTIALS": "Telefon raqami yoki parol noto'g'ri",
+        "INVALID_CREDENTIALS": "Telefon yoki parol noto'g'ri. Qayta urinib ko'ring yoki parolni tiklang.",
         "ACCOUNT_LOCKED": "Hisob vaqtincha bloklangan, keyinroq urinib ko'ring",
         "RATE_LIMITED": "Juda ko'p urinish, biroz kutib qayta urinib ko'ring",
         "SUBSCRIPTION_RESTRICTED": "Obuna muddati tugagan, to'lov qiling",
@@ -76,7 +102,7 @@ MESSAGES: Final[dict[Locale, dict[str, str]]] = {
         "VALIDATION_ERROR": "Do'konni tanlang va parolni qayta kiriting",
     },
     "ru": {
-        "INVALID_CREDENTIALS": "Неверный номер телефона или пароль",
+        "INVALID_CREDENTIALS": "Неверный телефон или пароль. Попробуйте ещё раз или восстановите пароль.",
         "ACCOUNT_LOCKED": "Учётная запись временно заблокирована, попробуйте позже",
         "RATE_LIMITED": "Слишком много попыток, подождите и попробуйте снова",
         "SUBSCRIPTION_RESTRICTED": "Срок подписки истёк, оплатите подписку",
@@ -88,21 +114,37 @@ MESSAGES: Final[dict[Locale, dict[str, str]]] = {
 LABELS: Final[dict[Locale, dict[str, str]]] = {
     "uz": {
         "title": "Kirish",
+        "tagline": "Do'kon boshqaruv paneli",
         "heading": "Tizimga kirish",
+        "hint": "Egasi, menejer va buxgalter uchun. Kassirlar kassadan PIN bilan kiradi.",
         "phone": "Telefon",
         "password": "Parol",
         "tenant": "Do'kon",
         "submit": "Kirish",
         "lang": "Til",
+        "or": "yoki",
+        "google": "Google bilan kirish",
+        "forgot": "Parolni unutdim?",
+        "invite": "Taklif kodi bor",
+        "no_account": "Hisobingiz yo'qmi?",
+        "signup": "Ro'yxatdan o'ting",
     },
     "ru": {
         "title": "Вход",
+        "tagline": "Панель управления магазином",
         "heading": "Вход в систему",
+        "hint": "Для владельца, менеджера и бухгалтера. Кассиры входят на кассе по PIN-коду.",
         "phone": "Телефон",
         "password": "Пароль",
         "tenant": "Магазин",
         "submit": "Войти",
         "lang": "Язык",
+        "or": "или",
+        "google": "Войти через Google",
+        "forgot": "Забыли пароль?",
+        "invite": "Есть код приглашения",
+        "no_account": "Нет учётной записи?",
+        "signup": "Зарегистрируйтесь",
     },
 }
 
@@ -156,6 +198,10 @@ def _switch(params: Mapping[str, str], current: Locale, label: str) -> str:
     return f'<nav class="lang" aria-label="{escape(label)}">' + "".join(items) + "</nav>"
 
 
+def _invalid(flag: bool) -> str:
+    return ' aria-invalid="true" aria-describedby="login-error"' if flag else ""
+
+
 def render_login(
     params: Mapping[str, str],
     *,
@@ -174,36 +220,62 @@ def render_login(
         if k in params
     )
     hidden += f'<input type="hidden" name="{UI_LOCALES_PARAM}" value="{locale}">'
+    # 07 BO-01 "error": which part is wrong is not revealed, so both credentials are marked
+    invalid_credentials = error_code in ("INVALID_CREDENTIALS", "ACCOUNT_LOCKED")
+    invalid_tenant = bool(tenants) and error_code in ("VALIDATION_ERROR", "PERMISSION_DENIED")
     tenant_field = ""
     if tenants:
         options = "".join(
             f'<option value="{escape(str(t.tenant_id))}">{escape(t.tenant_name)}</option>' for t in tenants
         )
         label = f'<label for="tenant_id">{escape(labels["tenant"])}</label>'
-        tenant_field = f'{label}<select id="tenant_id" name="tenant_id">{options}</select>'
+        tenant_field = (
+            f'{label}<select id="tenant_id" name="tenant_id" required{_invalid(invalid_tenant)}>'
+            f"{options}</select>"
+        )
     elif params.get("tenant_id"):
         tenant_field = f'<input type="hidden" name="tenant_id" value="{escape(params["tenant_id"])}">'
     error = (
-        f'<p class="err" role="alert">{escape(MESSAGES[locale].get(error_code, error_code))}</p>'
+        '<p class="err" id="login-error" role="alert">'
+        f"{escape(MESSAGES[locale].get(error_code, error_code))}</p>"
         if error_code
         else ""
     )
     switch = _switch(params, locale, labels["lang"])
+    web = params.get("client_id") == "web-bff"
+    extras = ""
+    if web:
+        tenant = {"tenant_id": params["tenant_id"]} if params.get("tenant_id") else {}
+        google_href = GOOGLE_START_PATH + ("?" + urlencode(tenant) if tenant else "")
+        extras += (
+            f'<p class="or">{escape(labels["or"])}</p>'
+            f'<a class="google" href="{escape(google_href)}"><b aria-hidden="true">G</b>'
+            f"{escape(labels['google'])}</a>"
+        )
+    links = f'<a href="{INVITE_PATH}">{escape(labels["invite"])}</a>'
+    if web:  # BO-21 signup is a web flow
+        signup = f'<a href="{SIGNUP_PATH}">{escape(labels["signup"])}</a>'
+        links += f"<span>{escape(labels['no_account'])} {signup}</span>"
+    extras += f'<nav class="links">{links}</nav>'
     body = (
         f'<!doctype html><html lang="{locale}"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         f"<title>{escape(labels['title'])}</title>"
         f"<style>{STYLE}</style></head><body><main>"
-        '<form method="post" action="/oauth/authorize" autocomplete="on">'
-        f'<p class="brand">ERP</p><h1>{escape(labels["heading"])}</h1>{switch}'
+        '<form method="post" action="/oauth/authorize" autocomplete="on" aria-labelledby="login-title">'
+        '<div class="top"><span class="mark" aria-hidden="true">E</span>'
+        f'<p class="brand">ERP<small>{escape(labels["tagline"])}</small></p>{switch}</div>'
+        f'<h1 id="login-title">{escape(labels["heading"])}</h1><p class="hint">{escape(labels["hint"])}</p>'
         f"{error}{hidden}"
         f'<label for="phone">{escape(labels["phone"])}</label>'
-        f'<input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="username" required '
-        f'placeholder="+998901234567" value="{escape(phone)}">'
-        f'<label for="password">{escape(labels["password"])}</label>'
+        '<input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="username" required '
+        f'maxlength="17" placeholder="+998 90 123 45 67" value="{escape(phone)}"'
+        f"{_invalid(invalid_credentials)}>"
+        f'<div class="row"><label for="password">{escape(labels["password"])}</label>'
+        f'<a href="{RECOVERY_PATH}">{escape(labels["forgot"])}</a></div>'
         '<input id="password" name="password" type="password" autocomplete="current-password" required '
-        'minlength="8" maxlength="128">'
+        f'minlength="8" maxlength="128"{_invalid(invalid_credentials)}>'
         f"{tenant_field}"
-        f'<button type="submit">{escape(labels["submit"])}</button></form></main></body></html>'
+        f'<button type="submit">{escape(labels["submit"])}</button>{extras}</form></main></body></html>'
     )
     return HTMLResponse(body, status_code=status_code, headers={**SECURITY_HEADERS, **(headers or {})})

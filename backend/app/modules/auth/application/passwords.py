@@ -36,5 +36,15 @@ def verify_password(password_hash: str | None, password: str) -> bool:
     return ok and password_hash is not None
 
 
+PIN_MIN: Final = 4
+PIN_MAX: Final = 6  # 4–6 digits (qaror #54, 14 §13)
+
+
+def hash_pin(pin: str) -> str:
+    if not (PIN_MIN <= len(pin) <= PIN_MAX and pin.isdigit()):
+        raise ValueError("pin must be 4..6 digits")
+    return _HASHER.hash(pin)
+
+
 def needs_rehash(password_hash: str) -> bool:
     return _HASHER.check_needs_rehash(password_hash)

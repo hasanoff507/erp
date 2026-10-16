@@ -26,6 +26,10 @@ _SENSITIVE_KEYS = frozenset({"api_key", "private_key", "code_hash", "set-cookie"
 _PHONE = re.compile(r"\+?998[\s-]?\d{2}[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}")
 _CARD = re.compile(r"\b(?:\d[ -]?){13,19}\b")
 _PINFL = re.compile(r"\b\d{14}\b")
+# secrets that travel inside URLs/strings (SEC-06): the Telegram bot token is a path segment
+# (``/bot<id>:<secret>/sendMessage``); bearer tokens may end up in exception texts
+_BOT_TOKEN = re.compile(r"/bot\d+:[A-Za-z0-9_-]+")
+_BEARER = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+")
 
 _SAFE_KEYS = frozenset({"request_id", "tenant_id", "user_id", "event", "level", "timestamp", "logger"})
 
@@ -37,7 +41,14 @@ def is_sensitive_key(key: str) -> bool:
     return any(token in _SENSITIVE_TOKENS for token in re.split(r"[_\-.]", lowered))
 
 
+def scrub_url(value: str) -> str:
+    """Strip credentials that are part of a URL (Telegram ``/bot<token>/``) — span/breadcrumb URLs."""
+    return _BOT_TOKEN.sub("/bot***", value)
+
+
 def _scrub_text(value: str) -> str:
+    value = scrub_url(value)
+    value = _BEARER.sub(f"Bearer {REDACTED}", value)
     value = _PHONE.sub(REDACTED, value)
     value = _CARD.sub(REDACTED, value)
     return _PINFL.sub(REDACTED, value)

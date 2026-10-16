@@ -5,6 +5,7 @@
  */
 import {
   BookOpen,
+  Boxes,
   ChartColumn,
   Check,
   FileText,
@@ -24,6 +25,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { SETTINGS_TABS, settingsTabCodes } from "@shared/lib/settings-tabs";
 import { hasPermissions, type GrantedAccess, type PermissionRequirement } from "@shared/state/permissions";
 
 export type NavGroupKey = "main" | "sales" | "warehouse" | "finance" | "management";
@@ -35,6 +37,7 @@ export type NavItemKey =
   | "debtors"
   | "catalogPrices"
   | "stock"
+  | "products"
   | "purchases"
   | "labels"
   | "expenses"
@@ -120,6 +123,15 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     key: "warehouse",
     items: [
       { key: "stock", to: "/app/warehouse/stock", icon: Package, requires: { permission: "stock.view" } },
+      // 06 §1.9: the product catalogue (19 §1–§3) for users without price rights (e.g. the
+      // storekeeper). The list needs stock.view (backend GET /products, 19 §1 — same as the page);
+      // catalog.manage only adds editing inside it. Also the route guard of /app/catalog/products/*.
+      {
+        key: "products",
+        to: "/app/catalog/products",
+        icon: Boxes,
+        requires: { permission: "stock.view" },
+      },
       {
         key: "purchases",
         to: "/app/purchases",
@@ -184,20 +196,13 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         requires: { permission: "onec.view" },
         activePrefixes: ["/app/onec"],
       },
+      // Shown when any Settings tab is allowed (06 §1.9 tabs, @shared/lib/settings-tabs); the link
+      // opens the first allowed tab (navItemTarget), not always «Do'kon».
       {
         key: "settings",
         to: "/app/settings/tenant",
         icon: Settings,
-        requires: {
-          anyOf: [
-            "settings.tenant",
-            "settings.users",
-            "settings.branches",
-            "telegram.link",
-            "billing.manage",
-            "onec.view",
-          ],
-        },
+        requires: { anyOf: settingsTabCodes() },
         activePrefixes: ["/app/settings", "/app/billing"],
       },
     ],
@@ -231,6 +236,15 @@ export function navItemForPath(pathname: string): NavItem | null {
  */
 export function requiresForPath(pathname: string): PermissionRequirement {
   return navItemForPath(pathname)?.requires ?? {};
+}
+
+/**
+ * Where an item's link goes for this user: «Sozlamalar» → the first Settings tab the user may open
+ * (same order and permissions as the Settings tab bar); every other item → its route.
+ */
+export function navItemTarget(item: NavItem, granted: GrantedAccess): string {
+  if (item.key !== "settings") return item.to;
+  return SETTINGS_TABS.find((tab) => hasPermissions(granted, tab.requires))?.to ?? item.to;
 }
 
 /** Landing screen on `/` and `/app`: the first sidebar item the user may open (06 §1.9), or none. */

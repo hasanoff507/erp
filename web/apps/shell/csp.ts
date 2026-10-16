@@ -15,6 +15,8 @@
  * `<meta property="csp-nonce">`); the layer that serves index.html replaces it with a fresh nonce per
  * response, sends the same value in the CSP header and `Cache-Control: no-store`. The SPA hands the
  * nonce to `get-nonce` (main.tsx) so Radix stamps it on its <style> elements.
+ * Static host without per-response nonces: `ERP_CSP_MODE=hash` build — sha256 list of the runtime
+ * <style> texts instead of the nonce (csp-hashes.ts, 24 §4.4).
  * Dev server is exempt (Vite HMR/React Refresh inject inline scripts); build + preview are strict.
  */
 export const CSP_NONCE_PLACEHOLDER = "__CSP_NONCE__";
@@ -32,6 +34,11 @@ export interface CspOptions {
    * `null` — no nonce (responses that are not index.html: their CSP does not govern the document).
    */
   nonce?: string | null;
+  /**
+   * Static-host fallback (24 §4.4, csp-hashes.ts): sha256 hash-sources of the runtime <style>
+   * texts, used instead of a nonce when nothing can mint one per response.
+   */
+  styleHashes?: readonly string[];
 }
 
 export type CspDirectives = Record<string, readonly string[]>;
@@ -40,11 +47,12 @@ export function cspDirectives({
   agentPort = 47110,
   connectSrc = [],
   nonce = CSP_NONCE_PLACEHOLDER,
+  styleHashes = [],
 }: CspOptions = {}): CspDirectives {
   return {
     "default-src": ["'self'"],
     "script-src": ["'self'"],
-    "style-src": nonce ? ["'self'", `'nonce-${nonce}'`] : ["'self'"],
+    "style-src": ["'self'", ...(nonce ? [`'nonce-${nonce}'`] : []), ...styleHashes],
     "img-src": ["'self'"],
     "font-src": ["'self'"],
     "connect-src": ["'self'", `http://127.0.0.1:${agentPort}`, ...connectSrc],

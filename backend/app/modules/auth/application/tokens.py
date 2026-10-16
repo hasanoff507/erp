@@ -32,6 +32,7 @@ from redis.exceptions import RedisError
 from app.core.audit import AuditLog
 from app.core.db.base import uuid7
 from app.modules.auth.application.keys import AccessTokenCodec, InvalidAccessTokenError
+from app.modules.auth.application.ports import AuthStore, ClientRow, MembershipContext
 from app.modules.auth.application.revocation import RevocationCache
 from app.modules.auth.application.subscription import SubscriptionStatusService
 from app.modules.auth.domain.constants import LOCKED_SUBSCRIPTION_STATES, SCOPE_SYNC_DRAIN
@@ -43,7 +44,6 @@ from app.modules.auth.domain.models import (
     RefreshCredential,
 )
 from app.modules.auth.domain.scopes import effective_scopes, scope_to_set, scope_to_str
-from app.modules.auth.infrastructure.repositories import AuthRepository, ClientRow, MembershipContext
 
 log = structlog.get_logger(__name__)
 
@@ -91,7 +91,7 @@ class ClientRegistry:
 
     _TTL_S: Final = 60.0
 
-    def __init__(self, repo: AuthRepository, decrypt_secret: Callable[[ClientRow], str | None]) -> None:
+    def __init__(self, repo: AuthStore, decrypt_secret: Callable[[ClientRow], str | None]) -> None:
         self._repo = repo
         self._decrypt = decrypt_secret
         self._by_client_id: dict[str, OAuthClient] = {}
@@ -170,7 +170,7 @@ class _GraceCache:
 class TokenService:
     def __init__(
         self,
-        repo: AuthRepository,
+        repo: AuthStore,
         clients: ClientRegistry,
         codec: AccessTokenCodec,
         revocation: RevocationCache,
@@ -260,6 +260,11 @@ class TokenService:
         if row is None or row.tenant_id is None or row.client_id != client.id:
             raise InvalidGrantError()
         tenant_id = row.tenant_id
+        if row.device_id is not None and await self._repo.device_revoked(tenant_id, row.device_id):
+            # 14 §21 "Qurilma bekor qilish": a revoked device gets no new tokens — the family dies too
+            await self._repo.revoke_refresh_family(credential.token_hash, "device_revoked")
+            await self._revocation.mark_revoked(sids=[row.session_id], families=[row.family_id])
+            raise InvalidGrantError(description="device_revoked")
         fresh = row.used_at is None and row.revoked_at is None
         ctx: MembershipContext | None = None
         sub_status: str | None = None
@@ -319,12 +324,10 @@ class TokenService:
     ) -> None:
         # app.auth_rotate_refresh already revoked the family and its sessions (14 §7, QT-OAUTH-03):
         # only the reused family's access tokens die — the user's other sessions/devices survive
-        if sid is not None:
-            await self._revocation.mark_sessions_revoked([sid])
-        elif family_id is not None:
-            await self._revocation.mark_family_revoked(family_id)  # sid-less tokens carry ``fam``
-        else:
+        if sid is None and family_id is None:
             await self._revocation.mark_user_revoked(user_id, tenant_id)  # last-resort fallback
+        else:
+            await self._revocation.mark_revoked(sids=[sid], families=[family_id])
         await self._audit.write(
             tenant_id=tenant_id, user_id=user_id, action="refresh_token_reuse_detected", entity="sessions",
             entity_id=sid, ip=meta.ip,
@@ -347,11 +350,16 @@ class TokenService:
         return None
 
     async def revoke(self, credential: AccessCredential | RefreshCredential, meta: RequestMeta) -> None:
+        """RFC 7009. A refresh token takes its whole family down — and the family's live access
+        tokens with it (``fam``/``sid`` markers, G-04); an access token dies by ``jti`` (and its BFF
+        session, if it has one)."""
         if isinstance(credential, RefreshCredential):
+            row = await self._repo.lookup_refresh(credential.token_hash)
             revoked = await self._repo.revoke_refresh_family(credential.token_hash, "revoked_by_client")
             if revoked is None:
                 return
             sid, user_id, tenant_id = revoked.session_id, revoked.user_id, revoked.tenant_id
+            await self._revocation.mark_revoked(sids=[sid], families=[row.family_id if row else None])
         else:
             claims = credential.claims
             sid = UUID(claims["sid"]) if claims.get("sid") else None
@@ -359,7 +367,7 @@ class TokenService:
             if sid is not None:
                 await self._repo.revoke_session(sid, "revoked_by_client")
             await self._revocation.mark_jti_revoked(str(claims["jti"]), int(claims["exp"]))
-        await self._revocation.mark_sessions_revoked([sid])
+            await self._revocation.mark_sessions_revoked([sid])
         if sid is not None and tenant_id is not None:
             await self._audit.write(
                 tenant_id=tenant_id, user_id=user_id, action="session_revoked", entity="sessions",
@@ -429,8 +437,10 @@ class TokenService:
         }
         if sid is not None:
             claims["sid"] = str(sid)
-        elif family_id is not None:
-            claims["fam"] = str(family_id)  # revocation key of a sid-less refresh family (14 §7)
+        if family_id is not None:
+            # every token names its refresh family: revoking the family (``/oauth/revoke``, reuse,
+            # tenant switch) kills its live access tokens through ``auth:fam_revoked:*`` (14 §5, §7)
+            claims["fam"] = str(family_id)
         if device_id is not None:
             claims["device_id"] = str(device_id)
         return await self._codec.mint(claims), ttl

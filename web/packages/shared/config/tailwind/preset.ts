@@ -18,6 +18,8 @@ const preset = {
         sans: [
           "'Manrope Variable'",
           "Manrope",
+          // 24 §4.1 (G-02): only ʻ ʼ / Ққ Ғғ Ҳҳ resolve here (apps/shell/src/noto-sans-fallback.css).
+          "'Noto Sans Variable'",
           "system-ui",
           "-apple-system",
           "'Segoe UI'",

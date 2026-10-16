@@ -2,8 +2,15 @@ import { allSettled, fork } from "effector";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { ApiError, http, NETWORK_ERROR, resetCsrfToken } from "@shared/api";
-import { createAuthHandlers, createAuthState, mockSession } from "@shared/api/mocks";
+import { ApiError, configureApi, http, NETWORK_ERROR, resetCsrfToken } from "@shared/api";
+import {
+  createAuthHandlers,
+  createAuthState,
+  MOCK_TENANT_LOCKED,
+  MOCK_TENANT_NO_MEMBERSHIP,
+  mockSecondTenantSession,
+  mockSession,
+} from "@shared/api/mocks";
 
 import {
   $activeBranch,
@@ -27,6 +34,9 @@ import {
   revokeAllSessionsRequested,
   sessionCheckRequested,
   sessionRetryDelay,
+  $tenantSwitchError,
+  subscriptionRestrictedReceived,
+  tenantSwitchRequested,
 } from "./index.ts";
 
 const BASE = "http://state.test";
@@ -246,6 +256,67 @@ describe("active branch re-resolved on every session answer (WEB-6)", () => {
     });
     await allSettled(sessionCheckRequested, { scope });
     expect(scope.getState($activeBranchId)).toBe("only");
+  });
+});
+
+describe("tenant switch — POST /bff/switch-tenant (14 §9)", () => {
+  it("the answer becomes the session; the old CSRF token is dropped and refetched", async () => {
+    state.session = "active";
+    const scope = fork();
+    await allSettled(sessionCheckRequested, { scope });
+    await allSettled(branchSelected, { scope, params: "0192a0f0-0000-7000-8000-0000000000b1" });
+    expect(state.csrfFetches).toBe(0);
+
+    await allSettled(tenantSwitchRequested, { scope, params: mockSecondTenantSession.tenant.id });
+    expect(scope.getState($tenant)).toEqual(mockSecondTenantSession.tenant);
+    expect(scope.getState($permissions)).toEqual(["stock.view", "catalog.manage"]);
+    // The previous tenant's branch is gone; the single new branch is picked.
+    expect(scope.getState($activeBranch)?.name).toBe("Sergeli");
+    expect(scope.getState($authStatus)).toBe("authenticated");
+    expect(state.csrfFetches).toBe(1);
+
+    // Next write: a fresh token for the new sid (no CSRF_INVALID round-trip).
+    state.rejectCsrfOnce = false;
+    await allSettled(logoutRequested, { scope });
+    expect(state.csrfFetches).toBe(2);
+    expect(scope.getState($authStatus)).toBe("anonymous");
+  });
+
+  it("403 PERMISSION_DENIED (membership_inactive) keeps the current session", async () => {
+    state.session = "active";
+    const scope = fork();
+    await allSettled(sessionCheckRequested, { scope });
+    await allSettled(tenantSwitchRequested, { scope, params: MOCK_TENANT_NO_MEMBERSHIP });
+    expect(scope.getState($tenant)).toEqual(mockSession.tenant);
+    expect(scope.getState($authStatus)).toBe("authenticated");
+    expect(scope.getState($tenantSwitchError)).toMatchObject({
+      status: 403,
+      code: "PERMISSION_DENIED",
+      params: { reason: "membership_inactive" },
+    });
+  });
+
+  it("403 SUBSCRIPTION_RESTRICTED of the other tenant does not sign out (no API hook)", async () => {
+    const onSubscriptionRestricted = vi.fn();
+    configureApi({ onSubscriptionRestricted });
+    state.session = "active";
+    const scope = fork();
+    await allSettled(sessionCheckRequested, { scope });
+    await allSettled(tenantSwitchRequested, { scope, params: MOCK_TENANT_LOCKED });
+    expect(onSubscriptionRestricted).not.toHaveBeenCalled();
+    expect(scope.getState($authStatus)).toBe("authenticated");
+    expect(scope.getState($tenant)).toEqual(mockSession.tenant);
+    expect(scope.getState($tenantSwitchError)).toMatchObject({
+      code: "SUBSCRIPTION_RESTRICTED",
+      params: { pay_url: "https://pay.example/checkout/2" },
+    });
+    // A real subscription block of the *current* tenant still signs out.
+    await allSettled(subscriptionRestrictedReceived, {
+      scope,
+      params: scope.getState($tenantSwitchError) as ApiError,
+    });
+    expect(scope.getState($authStatus)).toBe("anonymous");
+    expect(scope.getState($tenantSwitchError)).toBeNull();
   });
 });
 

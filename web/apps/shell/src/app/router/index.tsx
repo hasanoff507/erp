@@ -10,8 +10,8 @@
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
 
 import { routes as aiAssistantRoutes } from "@pages/ai-assistant";
-import { routes as billingRoutes } from "@pages/billing";
-import { routes as catalogRoutes } from "@pages/catalog";
+import { routes as billingRoutes, createPublicRoutes, startInstallPromptCapture } from "@pages/billing";
+import { ImportProductsFlow, routes as catalogRoutes } from "@pages/catalog";
 import { routes as debtsRoutes } from "@pages/debts";
 import { routes as financeRoutes } from "@pages/finance";
 import { routes as onecRoutes } from "@pages/onec";
@@ -20,6 +20,7 @@ import { routes as reportsRoutes } from "@pages/reports";
 import { routes as settingsRoutes } from "@pages/settings";
 import { routes as warehouseRoutes } from "@pages/warehouse";
 
+import { IosPosGate } from "#/features/ios-install-gate/index.ts";
 import { ProtectedRoute } from "#/features/protected-route/index.ts";
 import {
   ComingSoonPage,
@@ -27,7 +28,6 @@ import {
   NotFoundPage,
   RouteErrorPage,
   Splash,
-  StandaloneComingSoonPage,
 } from "../ui/status/index.tsx";
 
 import { DefaultRedirect, RootRedirect, RoutePermissionGuard } from "./guards.tsx";
@@ -64,8 +64,14 @@ export const appRoutes: RouteObject[] = [
         },
         hydrateFallbackElement: <Splash />,
       },
-      // BO-21 onboarding (@pages/billing, 07) — not built in Bosqich 0.
-      { path: "/onboarding", element: <StandaloneComingSoonPage /> },
+      // BO-21 /onboarding, UX-INSTALL /install, /recover, /invite (@pages/billing) — outside the
+      // protected layouts; ③a gets the catalog import flow here (pages never import each other, 24 §1).
+      ...createPublicRoutes({
+        productImport: ImportProductsFlow,
+        manualProductHref: "/app/catalog/products/new",
+        dashboardPath: "/app/dashboard",
+        fallback: <Splash />,
+      }),
       {
         path: "/app",
         lazy: async () => {
@@ -88,9 +94,11 @@ export const appRoutes: RouteObject[] = [
           const { PosLayout } = await import("../ui/layout/pos/PosLayout.tsx");
           return {
             element: (
-              <ProtectedRoute pending={<Splash />} noPermission={<NoPermissionPage />}>
-                <PosLayout />
-              </ProtectedRoute>
+              <IosPosGate>
+                <ProtectedRoute pending={<Splash />} noPermission={<NoPermissionPage />}>
+                  <PosLayout />
+                </ProtectedRoute>
+              </IosPosGate>
             ),
           };
         },
@@ -104,5 +112,7 @@ export const appRoutes: RouteObject[] = [
 ];
 
 export function createAppRouter() {
+  // UX-INSTALL: keep Chrome's one-shot install prompt for the «O'rnatish» button.
+  startInstallPromptCapture();
   return createBrowserRouter(appRoutes);
 }

@@ -16,6 +16,7 @@ import {
   persistBranchFx,
   readBranchFx,
   revokeAllSessionsFx,
+  switchTenantFx,
 } from "../effects/index.ts";
 import {
   branchSelected,
@@ -25,6 +26,7 @@ import {
   sessionCheckRequested,
   sessionHeartbeatEnabled,
   subscriptionRestrictedReceived,
+  tenantSwitchRequested,
   unauthorizedReceived,
 } from "../events/index.ts";
 import {
@@ -42,6 +44,7 @@ import {
   $sessionCheckError,
   $sessionError,
   $subscriptionRestriction,
+  $tenantSwitchError,
 } from "../stores/index.ts";
 
 sample({ clock: sessionCheckRequested, target: getSessionFx });
@@ -113,6 +116,19 @@ sample({
 });
 sample({ clock: branchSelected, target: [$activeBranchId, persistBranchFx] });
 
+// Tenant switch (14 §9): the answer is the new session — permissions, branches and tenant follow
+// from $session; the branch is resolved again (the old one belongs to the previous tenant).
+sample({ clock: tenantSwitchRequested, target: switchTenantFx });
+sample({ clock: switchTenantFx.doneData, target: $session });
+sample({ clock: switchTenantFx.done, fn: () => null, target: $activeBranchId });
+sample({ clock: switchTenantFx.done, fn: () => undefined, target: readBranchFx });
+sample({
+  clock: switchTenantFx.failData,
+  filter: (error) => error.status !== 401, // 401: the session is gone → signed out by the API hook
+  target: $tenantSwitchError,
+});
+$tenantSwitchError.reset(tenantSwitchRequested, switchTenantFx.done);
+
 // Logout / lost session. Never automatic on network errors (POS keeps its outbox, 24 §3).
 sample({ clock: logoutRequested, target: logoutFx });
 sample({ clock: revokeAllSessionsRequested, target: revokeAllSessionsFx });
@@ -137,6 +153,7 @@ const signedOut = [
 sample({ clock: signedOut, fn: () => null, target: [$session, $activeBranchId] });
 sample({ clock: signedOut, fn: () => "anonymous" as const, target: $authStatus });
 $logoutError.reset(logoutRequested, ...signedOut);
+$tenantSwitchError.reset(signedOut);
 
 // Heartbeat (14 §16.1.4): enabled by the shell, runs while authenticated.
 const $heartbeatEnabled = createStore(false).on(sessionHeartbeatEnabled, () => true);

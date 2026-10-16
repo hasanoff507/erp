@@ -4,8 +4,10 @@ Per request the RS does one ``MGET``:
 
 * ``auth:sid_revoked:{sid}`` — session revoked (logout, reuse, admin, block);
 * ``auth:jti_revoked:{jti}`` — a single token revoked via ``/oauth/revoke``;
-* ``auth:fam_revoked:{family}`` — a sid-less refresh family revoked on reuse
-  (14 §7: only the reused family dies, other devices of the user survive);
+* ``auth:fam_revoked:{family}`` — a refresh family revoked (``/oauth/revoke`` of a refresh
+  token, reuse detection, device revoke, tenant switch). Every access token carries its
+  family in ``fam`` (BFF tokens also ``sid``), so the family's live access tokens die with
+  it (14 §7: only that family dies, other devices of the user survive);
 * ``auth:user_revoked:{tenant}:{user}`` / ``auth:user_revoked:*:{user}`` —
   watermark (epoch seconds): tokens issued before it are dead (Android
   tokens have no ``sid``);
@@ -28,7 +30,7 @@ import structlog
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
 
-from app.modules.auth.infrastructure.repositories import AuthRepository
+from app.modules.auth.application.ports import AuthStore
 
 log = structlog.get_logger(__name__)
 
@@ -60,7 +62,7 @@ def _user_revoked(tenant: str, user: str) -> str:
 class RevocationCache:
     def __init__(
         self,
-        repo: AuthRepository,
+        repo: AuthStore,
         redis: Callable[[], Redis],
         *,
         access_ttl_s: int,
@@ -83,6 +85,25 @@ class RevocationCache:
                 await pipe.execute()
         except RedisError:
             log.warning("sid_revoke_cache_unavailable", count=len(keys))
+
+    async def mark_revoked(
+        self, *, sids: Iterable[UUID | None] = (), families: Iterable[UUID | None] = ()
+    ) -> None:
+        """Sessions and refresh families in one pipeline — their live access tokens die at once."""
+        sid_keys = [str(s) for s in sids if s is not None]
+        fam_keys = [str(f) for f in families if f is not None]
+        if not sid_keys and not fam_keys:
+            return
+        try:
+            async with self._redis().pipeline(transaction=False) as pipe:
+                for sid in sid_keys:
+                    pipe.set(_sid_revoked(sid), "1", ex=self._marker_ttl)
+                    pipe.delete(_sid_ok(sid))
+                for family in fam_keys:
+                    pipe.set(_family_revoked(family), "1", ex=self._marker_ttl)
+                await pipe.execute()
+        except RedisError:
+            log.warning("revoke_cache_unavailable", sessions=len(sid_keys), families=len(fam_keys))
 
     async def mark_user_revoked(self, user_id: UUID, tenant_id: UUID | None) -> None:
         scope = str(tenant_id) if tenant_id is not None else "*"

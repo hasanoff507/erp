@@ -717,7 +717,8 @@ Tovarsiz "eski qarz"ni kiritish faqat BO-06 → "Boshlang'ich qarz" (`POST /api/
 |---|---|---|---|
 | KIRISH (SPA `/login`) | — | Yo'q | `GET /auth/login/start` → AS login sahifasi (telefon+parol) → `GET /auth/callback` → `__Host-sid` cookie → `return_to` (`14-autentifikatsiya-oauth2.md` §2.1) |
 | **Google bilan kirish** | — | Yo'q | Google OIDC'ga redirect (bizning OAuth AS'da tashqi provayder) → qaytgach BFF cookie; birinchi marta kirishda hisob telefon raqami bilan bog'lanishi so'raladi (STIR/fiskal uchun) |
-| Parolni unutdim | — | Yo'q | OTP oynasi (`purpose=recovery`) — kod birinchi navbatda **Telegram bot**ga, Telegram ulanmagan bo'lsa **SMS**ga (zaxira) → yangi parol o'rnatish |
+| Parolni unutdim | — | Yo'q | SPA `/recover`: `POST /auth/otp/request` (`purpose=recovery`; kod birinchi navbatda **Telegram bot**ga, Telegram ulanmagan bo'lsa **SMS**ga — zaxira) → `POST /auth/otp/verify` → `credential_token` → `POST /auth/credentials` (yangi parol) → oddiy kirish |
+| Taklif kodi bor | — | Yo'q | SPA `/invite`: telefon + kod + kod turi (`invite` / `admin_reset` / `pin_reset`, BO-11 yuborgan) → `POST /auth/otp/verify {phone, purpose, code}` → `credential_kinds` bo'yicha parol va/yoki PIN → `POST /auth/credentials` (`14-autentifikatsiya-oauth2.md` §4.2) |
 | Ma'lumotlarimni yuklab olish (faqat `subscription-restricted`da ko'rinadi) | — | OTP (`purpose=data_export`) — Telegram bot birinchi, SMS zaxira | Bir martalik eksport havolasi (24 soat, qaror #51) |
 | To'lash (Click/Payme, faqat `subscription-restricted`da) | — | Yo'q | `pay_url`ga o'tish |
 
@@ -856,7 +857,7 @@ AI-03 sariq belgi chegarasi: summa <95%, sana <90%, miqdor/nom <80%; past ishonc
 
 - **Maqsad**: tovar narxini yangilash (tarix bilan), avtomatik chegirma qoidalarini sozlash.
 - **Rollar/ruxsat**: Menejer (`prices.edit`, `discount.rule.manage`); >limit narx o'zgarishi — `prices.approve` (Egasi).
-- **Route**: `/app/catalog/prices`
+- **Route**: `/app/catalog/prices`; tovarlar katalogi — `/app/catalog/products`, `/app/catalog/products/new`, `/app/catalog/products/{id}` (tovar kartasi `Sheet`da: `19-api-ombor.md` §1 maydonlari, shtrix-kodlar, ichki shtrix-kod, MXIK qidiruv), import — `/app/catalog/products/import` (yuklash → tekshirish/xatolar → tasdiqlash; BO-21 ③a shu oqimni ichiga oladi)
 - **Maket**:
 
 ```
@@ -876,7 +877,7 @@ AI-03 sariq belgi chegarasi: summa <95%, sana <90%, miqdor/nom <80%; past ishonc
 | Maydon | Label (uz) | Label (ru) | Tur/komponent | Majburiy | Validatsiya | Default | Max |
 |---|---|---|---|---|---|---|---|
 | `newPrice` | Yangi narx | Новая цена | `MoneyInput` | Ha | >0 | Joriy narx | — |
-| `effectiveFrom` | Amal qilish sanasi | Дата применения | `Calendar` | Ha | ≥ bugun | Bugun | — |
+| `effectiveFrom` | Amal qilish sanasi | Дата применения | `Input type=date` (`min` = bugun) | Ha | ≥ bugun | Bugun | — |
 | `nameRu` (qaror #29) | Rus tilidagi nomi | Название на русском | `Input` | Yo'q (ixtiyoriy) | Max 255 | Bo'sh | 255 — chekda "{name} / {nameRu}" ko'rinishida chiqadi (bo'sh bo'lsa faqat `name`), `products.name_ru` |
 | `rule.category` | Kategoriya | Категория | `Select` | Ha (qoida) | — | — | — |
 | `rule.percent` | Chegirma % | Скидка % | `Input` number | Ha (qoida) | 0–100 | — | 100 |
@@ -1112,8 +1113,8 @@ Limitlar "Rollar" tabida — xodim formasida faqat `roleIds`, `branchIds`.
 |---|---|---|---|
 | + Xodim qo'shish | `settings.users` | Yo'q | (qaror #34) Taklif kodi (`purpose=invite`) — Telegram bot birinchi, SMS zaxira |
 | Bloklash/Blokdan chiqarish | `settings.users` | "Xodimni bloklaysizmi?" | Sessiyalar darhol revoke |
-| Parolni tiklash | `settings.users` | Yo'q | (qaror #34) Tiklash kodi (`purpose=admin_reset`) — Telegram bot birinchi, SMS zaxira |
-| PINni qayta o'rnatish | `settings.users` | Yo'q | Eski PIN bekor, keyingi kirishda yangi PIN majburiy |
+| Parolni tiklash | `settings.users` | «Parolni tiklaysizmi? Barcha sessiyalari tugaydi; kod avval Telegram, so'ng SMS orqali yuboriladi» | (qaror #34) Tiklash kodi (`purpose=admin_reset`) — Telegram bot birinchi, SMS zaxira |
+| PINni qayta o'rnatish | `settings.users` | «PINni qayta o'rnatasizmi?» | Eski PIN bekor, keyingi kirishda yangi PIN majburiy |
 | Seanslarni tugatish | `settings.users` | Yo'q | Tanlangan sessiya/barcha sessiya bekor |
 | Qurilmani bekor qilish | `devices.revoke` (Egasi/Menejer) | "Qurilmani bekor qilasizmi?" — `reason` (majburiy); `outbox_pending_count > 0` bo'lsa «Yuborilmagan voqealar yo'qolishi mumkin» ogohlantirishi va `confirm_pending_loss` checkbox (belgilanmaguncha tasdiqlash o'chiq) | `POST /api/v1/devices/{id}/revoke` (`{reason, confirm_pending_loss}`) → `devices.revoked_at`, token/litsenziya bekor |
 
@@ -1173,7 +1174,7 @@ Filial ichida "Kassalar" ro'yxati: har bir kassa qatorida soliq ro'yxatidan o'ti
 | Fiskal agentni bog'lash (kassa qatori) | `cash_register.manage` | Yo'q | `PATCH /api/v1/cash-registers/{id}` `{fiscal_agent_id, fiscal_local_device_id, version}` (qaror #66) |
 | Tahrir/Saqlash | `settings.branches` | Toifa o'zgartirilsa "Yangi stavka faqat shu sanadan qo'llanadi"; manzil o'zgartirilsa — kassalarni qayta ro'yxatdan o'tkazish eslatmasi | `branch_tax_settings` yangi yozuv (`valid_from`) |
 | + Kassa qo'shish | `cash_register.manage` | `ADDON_REQUIRED` bo'lsa dialog «Qo'shimcha kassa — +39 000 so'm/oy. Obunaga qo'shasizmi?» → BO-19 | `POST /cash-registers` |
-| Arxivlash (kassa) | `cash_register.manage` | Yo'q | `POST /api/v1/cash-registers/{id}/archive` (`{}`) |
+| Arxivlash (kassa) | `cash_register.manage` | «{nom} kassasini arxivlaysizmi?» | `POST /api/v1/cash-registers/{id}/archive` (`{}`) |
 | Terminalni bog'lash / tahrirlash (kassa qatori, qaror #71) | `cash_register.manage` | Yo'q | `POST /api/v1/card-terminals` yoki `PATCH /api/v1/card-terminals/{id}` (`version`); terminal filialga tegishli, `cash_register_id` — shu kassa; `agent_ecr` da agent qurilmalari ro'yxati agent `hello.capabilities.card_terminal` dan |
 | Aloqani tekshirish (terminal) | `cash_register.manage` | Yo'q | `health` (pulli tranzaksiya emas) — agent/bulut orqali; `health_status` yangilanadi |
 | Terminalni uzish / arxivlash | `cash_register.manage` | "Kassa {nom} kartani terminalsiz (rekvizitsiz) qabul qiladi. Davom etasizmi?"; `pending`/`unknown` tranzaksiyasi bor terminalda — rad, `CARD_OUTCOME_UNKNOWN` (avval natijani aniqlang) | `PATCH /api/v1/card-terminals/{id}` `{status: 'disabled'\|'archived'}` |
@@ -1478,7 +1479,7 @@ Sahifa (sidebarsiz, 1440×900): **chap panel** — «ERP» logotipi, «2 daqiqad
 | ① | `ownerName` | Ism | Имя | `Input` | Ha | 2–100 | — | 100 |
 | ①-Google | — | — | — | Google OIDC redirect tugmasi | Ha (Google yo'li) | — | — | Qaytgandan keyin telefon raqami (STIR/fiskal uchun) so'raladi |
 | ② | `storeName` | Do'kon nomi | Название магазина | `Input` | Ha | 2–100 | — | 100 |
-| ② | `businessType` | Faoliyat turi | Вид деятельности | `Select` | Ha | Ro'yxatdan biri | — | — |
+| ② | `businessType` | Faoliyat turi | Вид деятельности | `Select` | Ha | `retail` (Chakana savdo) \| `other` (Boshqa) — `branches.activity_type`; standart filial aholi punkti toifasi `city_100k_plus` (eng yuqori stavka) bo'lib, Egasi BO-12 da o'zgartiradi | `retail` | — |
 | ② | `legalForm` | Tashkiliy-huquqiy shakl | Организационно-правовая форма | `RadioGroup` kartalari (MChJ / AJ / Xususiy korxona / Yakka tadbirkor, har birida qisqa izoh) | Ha | `llc\|jsc\|private_enterprise\|sole_proprietor` (yakka tadbirkorda QR to'lov — to'lov tashkiloti maxsus QR'i, bank UzQR emas) | `llc` | — |
 | ② | `acceptTerms` | Foydalanish shartlariga roziman | Принимаю условия использования | `Checkbox` + shartlar matni havolasi (o'zbek tilida, versiyali) | **Ha** | Belgilanmasa "Davom" o'chiq | O'chiq | — |
 | ② | `aiCrossBorderConsent` | Ma'lumotlarni AI xizmatiga (chet elga — Anthropic, AQSh) uzatishga roziman | Согласен на передачу данных AI-сервису (за рубеж) | `Checkbox` (alohida, ixtiyoriy) + tushuntirish | Yo'q | Belgilanmasa AI-03 (hujjat rasmini o'qish) o'chiq qoladi, keyin BO-14 da yoqiladi; matnli AI maskalangan holda ishlaydi | O'chiq | — |
@@ -1492,7 +1493,7 @@ Sahifa (sidebarsiz, 1440×900): **chap panel** — «ERP» logotipi, «2 daqiqad
 
 | Tugma | Ruxsat | Tasdiqlash dialogi | Natija |
 |---|---|---|---|
-| Davom (② dan keyin) | — | Yo'q | `POST /auth/signup` `{phone\|google_id_token, otp, password, owner_name, store_name, business_type, legal_form, accepted_terms_version, ai_cross_border_consent}` — tenant ①② dan keyin darhol yaratiladi, ③–⑥ dan oldin (aks holda import qiladigan tenant yo'q); ② da `tenants.accepted_terms_version/accepted_terms_at/accepted_terms_ip` va (rozilik berilgan bo'lsa) `POST /api/v1/tenant/consents` → `consents` yozuvi + `settings.ai_cross_border_enabled=true` (qaror #61) |
+| Davom (② dan keyin) | — | Yo'q | `POST /auth/signup` `{otp_challenge_id (tasdiqlangan, purpose=signup; telefon tanasida yuborilmaydi — server uni shu tasdiqlangan challenge'dan oladi), password? (Google yo'lida yo'q), owner_name, store_name, business_type, legal_form, accepted_terms_version (`GET /auth/terms` dagi joriy `terms` versiyasi), ai_cross_border_consent}` (`14-autentifikatsiya-oauth2.md` §20) — tenant ①② dan keyin darhol yaratiladi, ③–⑥ dan oldin (aks holda import qiladigan tenant yo'q); ② da `tenants.accepted_terms_version/accepted_terms_at/accepted_terms_ip` va (rozilik berilgan bo'lsa) `POST /api/v1/tenant/consents` → `consents` yozuvi + `settings.ai_cross_border_enabled=true` (qaror #61) |
 | Davom (①, ③–⑥ bosqichlarida) | — | Yo'q | Keyingi bosqich |
 | Orqaga | — | Yo'q | Oldingi bosqich |
 | O'tkazib yuborish (④,⑤,⑥ bosqichlarida) | — | Yo'q | Keyinroq sozlamalarda bajarish mumkin |

@@ -2,7 +2,9 @@
  * Back-office layout — 08 §6.2, 06 §1.9, mockup Bo02Dashboard.dc.html.
  * ≥1024px: sidebar always open (260px); 768–1023px: icon rail (w-16); <768px: off-canvas drawer over
  * the content (burger in the topbar). Content padding px-7 py-6; density `compact`.
- * The drawer is a plain fixed panel (no scroll-lock <style> injection — strict CSP, qaror #57).
+ * The drawer is a plain fixed panel (no scroll-lock <style> injection — strict CSP, qaror #57). It is a
+ * modal dialog: focus moves to its close button, Tab / Shift+Tab cycle inside it, Escape closes it,
+ * and on close focus returns to the element that opened it (the topbar burger).
  */
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -11,9 +13,12 @@ import { Outlet } from "react-router-dom";
 import { useTranslation } from "@shared/i18n";
 import { Button, Icon } from "@shared/ui";
 
+import { IosInstallBanner } from "#/features/ios-install-gate/index.ts";
+
 import { Sidebar } from "../../sidebar/Sidebar.tsx";
 import { useDocumentAttributes } from "../document-attributes.ts";
 
+import { trapTab } from "./focus-trap.ts";
 import { Topbar } from "./Topbar.tsx";
 
 export function BackOfficeLayout() {
@@ -21,15 +26,30 @@ export function BackOfficeLayout() {
   const { t } = useTranslation();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!drawerOpen) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     closeRef.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setDrawerOpen(false);
+      if (event.key === "Escape") {
+        setDrawerOpen(false);
+        return;
+      }
+      const container = drawerRef.current;
+      const target = container ? trapTab(container, event) : null;
+      if (target) {
+        event.preventDefault();
+        target.focus();
+      }
     };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      // Back to the burger (or whatever opened the drawer), if it is still on the page.
+      if (opener?.isConnected) opener.focus();
+    };
   }, [drawerOpen]);
 
   return (
@@ -40,6 +60,7 @@ export function BackOfficeLayout() {
 
       {drawerOpen ? (
         <div
+          ref={drawerRef}
           className="fixed inset-0 z-overlay flex md:hidden"
           role="dialog"
           aria-modal="true"
@@ -68,6 +89,8 @@ export function BackOfficeLayout() {
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col">
+        {/* UX-INSTALL (b): iOS Safari tab → install banner only (POS is blocked, back-office is not). */}
+        <IosInstallBanner />
         <Topbar onOpenMenu={() => setDrawerOpen(true)} />
         <main id="main" className="flex-1 px-4 py-6 md:px-7">
           <Outlet />

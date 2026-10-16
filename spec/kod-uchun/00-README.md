@@ -57,6 +57,8 @@ Bu papka — ilovani yozish uchun **yagona va to'liq** spetsifikatsiya. Kod faqa
 | 33 | `33-1c-integratsiya.md` | ERP → 1C kunlik eksport: server moduli `onec_integration`, `onec_*` jadvallar, agent↔server protokoli, veb API W-01…W-55, ruxsatlar, `ONEC_*` xato kodlari, BO-22/BO-23, M19 | Bosqich 7 oldidan |
 | 34 | `34-1c-agent.md` | Do'kon agenti (C#/.NET Fx 4.8, tray + worker'lar, DPAPI, 1C yozish algoritmi, avto-yangilanish; fiskal ko'prik/printer/tarozi — §14 «Do'kon agenti kengaytmasi») — repo `agent-1c/` | Bosqich 5 (agent infratuzilmasi, qaror #66) va 7 (1C) |
 
+> **Implementatsiya holati:** `spec/implementatsiya/00-holat.md` — har bosqichning vazifa, US, endpoint, ekran, jadval va QT bandlari ✅/🟡/⬜/⛔/⏭ holati kod va test dalili bilan (generator: `python spec/implementatsiya/_scripts/gen_holat.py`); ish siklida "keyingi nima" shu fayldan olinadi.
+
 ## Bosqich bo'yicha minimal o'qish to'plami
 
 | Bosqich | O'qiladigan fayllar |

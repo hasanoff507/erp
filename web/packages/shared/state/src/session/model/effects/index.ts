@@ -37,3 +37,17 @@ export const revokeAllSessionsFx = createEffect<void, number, ApiError>(async ()
 
 export const readBranchFx = createEffect<void, string | null>(() => readStoredBranchId());
 export const persistBranchFx = createEffect<string, void>((id) => writeStoredBranchId(id));
+
+/**
+ * POST /bff/switch-tenant (14 §9): the answer is the new session (same shape as GET /auth/session)
+ * and `__Host-sid` points to it; the old sid's CSRF token is dead → dropped, refetched on the next
+ * write. On 403 (PERMISSION_DENIED membership_inactive / SUBSCRIPTION_RESTRICTED of that tenant) the
+ * current session stays — `erpForeignTenant` keeps the API hook from signing the user out.
+ */
+export const switchTenantFx = createEffect<string, Session, ApiError>(async (tenantId) => {
+  const session = assertSession(
+    await api.auth.bffSwitchTenant({ tenant_id: tenantId }, { erpForeignTenant: true }),
+  );
+  resetCsrfToken();
+  return session;
+});

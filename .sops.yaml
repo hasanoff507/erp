@@ -1,0 +1,32 @@
+# SOPS + age (qaror #65, 23 §7, 10 §3): UzCloud has no KMS/secret store, so deploy secrets live
+# in this repository ENCRYPTED, one file per environment. Only age PUBLIC keys (recipients) go
+# here; the private age keys are kept by the founder (offline, outside UzCloud) and on the
+# deploy machine / CI secret (`SOPS_AGE_KEY`). Runbook: backend/ops/RUNBOOK-backup-restore.md §3.
+#
+# ⛔ PLACEHOLDERS: replace every `age1...PLACEHOLDER...` with real recipients (`age-keygen -y`)
+# before the first `sops --encrypt`. Each rule lists two recipients: the deploy key of that
+# environment + the founder's offline break-glass key (losing one key never locks the secrets).
+#
+#   sops --encrypt --in-place deploy/secrets/prod.enc.yaml      # after filling in plaintext
+#   sops deploy/secrets/prod.enc.yaml                           # edit
+#   sops updatekeys deploy/secrets/prod.enc.yaml                # after a recipient change
+creation_rules:
+  # application env (ERP_* settings, backend/.env.example names) — 23 §7
+  - path_regex: ^deploy/secrets/prod\.enc\.ya?ml$
+    age: >-
+      age1PRODDEPLOYKEYPLACEHOLDERxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,
+      age1FOUNDERBREAKGLASSPLACEHOLDERxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  - path_regex: ^deploy/secrets/staging\.enc\.ya?ml$
+    age: >-
+      age1STAGINGDEPLOYKEYPLACEHOLDERxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,
+      age1FOUNDERBREAKGLASSPLACEHOLDERxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  # backup VM env (WAL-G, rclone, libsodium key) — backend/ops/backup, 15 §7
+  - path_regex: ^deploy/secrets/backup-prod\.enc\.env$
+    age: >-
+      age1BACKUPPRODKEYPLACEHOLDERxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,
+      age1FOUNDERBREAKGLASSPLACEHOLDERxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  - path_regex: ^deploy/secrets/backup-staging\.enc\.env$
+    age: >-
+      age1BACKUPSTAGINGKEYPLACEHOLDERxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,
+      age1FOUNDERBREAKGLASSPLACEHOLDERxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# no catch-all rule on purpose: sops refuses a file that matches none of the rules above

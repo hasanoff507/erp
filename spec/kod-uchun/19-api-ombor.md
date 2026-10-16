@@ -76,7 +76,17 @@ Bu faylda har bir endpoint uchun: Maqsad, Ruxsat, So'rov, Javob, Xatolar, Idempo
 | `low_stock` | bool | yo'q | `true` — faqat `qty <= min_stock` bo'lgan tovarlar (ombor join, X-Branch-Id ombori) |
 | `page`, `size` | int | yo'q | **page pagination** (ma'lumotnoma, cursor emas), standart `size=50`, max `200` |
 
-**Javob**: `200 {items:[Product], total, page, size}`. `Product`: `id, name, name_ru, category_id, unit_code, mxik_code, package_code, vat_rate, vat_exemption_code, is_marked, marking_group_code, is_weighed, min_stock, archived_at, version, barcodes:[{id,barcode,kind,units_per_barcode}]` — `name_ru` ixtiyoriy.
+**Javob**: `200 {items:[Product & {current_price}], total, page, size}`. `Product`: `id, name, name_ru, category_id, unit_code, mxik_code, package_code, vat_rate, vat_exemption_code, is_marked, marking_group_code, is_weighed, min_stock, archived_at, version, barcodes:[{id,barcode,kind,units_per_barcode}]` — `name_ru` ixtiyoriy.
+`current_price` — faqat ro'yxatda (`GET /products/{id}` va yozuvchi javoblarda yo'q): hozir amaldagi chakana narx, decimal string 4 kasr (`"12000.0000"`), narx hali o'rnatilmagan bo'lsa `null`. Hisoblash §4 qoidalari bilan bir xil: `valid_from <= now()` bo'lgan oxirgi yozuv (teng `valid_from` da keyingi `id`), filial narxi bo'lsa — u, aks holda global (`branch_id=null`) narx; kelajakdagi `valid_from` hisobga olinmaydi. Filial: `X-Branch-Id`; sarlavha bo'lmasa — standart filial (barcha filialli foydalanuvchi) yoki foydalanuvchining yagona filiali; bir nechta filial bilan cheklangan va sarlavhasiz — faqat global narx. Sahifa uchun **bitta** so'rov (N+1 yo'q). Alohida narx-ko'rish ruxsati yo'q: narx tarixi (§4) ham `stock.view` bilan ochiq, shuning uchun `stock.view` egasi `current_price` ni ham ko'radi.
+
+```json
+{"items":[{"id":"0192…","name":"Coca-Cola 1.5L","name_ru":null,"category_id":null,"unit_code":"box",
+  "mxik_code":null,"package_code":null,"vat_rate":"12.00","vat_exemption_code":null,"is_marked":false,
+  "marking_group_code":null,"is_weighed":false,"min_stock":null,"archived_at":null,"version":1,
+  "barcodes":[{"id":"0192…","barcode":"4870001234567","kind":"ean","units_per_barcode":"1.000"}],
+  "current_price":"12000.0000"}],
+ "total":1,"page":1,"size":50}
+```
 **Xatolar**: — (bo'sh ro'yxat — oddiy `200`).
 **Idempotentlik**: shart emas (o'qish).
 **Offline**: POS uchun katalog `/sync/pull?scope=catalog` orqali keshlanadi (`16-offline-sync.md` §1); bu endpoint faqat online back-office uchun.
@@ -114,7 +124,7 @@ Bu faylda har bir endpoint uchun: Maqsad, Ruxsat, So'rov, Javob, Xatolar, Idempo
 
 **Ruxsat**: `stock.view` (GET), `catalog.manage` (PATCH).
 **So'rov**: `PATCH` tanasi — yuqoridagi maydonlarning istalgan to'plami + **majburiy** `version`.
-**Xatolar**: `404 NOT_FOUND` (`params.resource="product"`), `409 VERSION_CONFLICT`, `409 RESOURCE_ARCHIVED` (arxivlangan tovarni tahrirlashga urinish — avval `unarchive`).
+**Xatolar**: `404 NOT_FOUND` (`params.resource="product"`), `409 VERSION_CONFLICT`, `409 RESOURCE_ARCHIVED` (arxivlangan tovarni tahrirlashga urinish — avval `unarchive`). Shtrix-kod `PATCH` maydoni emas — faqat `/barcodes` endpointlari orqali o'zgaradi.
 
 ### `POST /products/{id}/archive` · `POST /products/{id}/unarchive`
 
@@ -148,7 +158,7 @@ Bu faylda har bir endpoint uchun: Maqsad, Ruxsat, So'rov, Javob, Xatolar, Idempo
 
 Kodni tasdiqlash + QQS toifasi.
 **Ruxsat**: `catalog.manage`.
-**Xatolar**: `404 NOT_FOUND` (`params.resource="mxik_code"`) agar kod kesh/tashqi tizimda topilmasa; tashqi tizim ishlamasa — `200` lekin `{items:[], source:"stale_cache"}` (3-urinishdan keyin oxirgi ma'lum kesh, `21-integratsiyalar.md` §7 qayta urinish siyosati). Qattiq xato yo'q — foydalanuvchi kodni qo'lda kiritadi.
+**Xatolar**: `404 NOT_FOUND` (`params.resource="mxik_code"`) agar kod kesh/tashqi tizimda topilmasa; tashqi tizim ishlamasa — `200` lekin `{items:[], source:"stale_cache"}` (3-urinishdan keyin oxirgi ma'lum kesh, `21-integratsiyalar.md` §7 qayta urinish siyosati). Muvaffaqiyatli javob shakli bir xil: `{items:[{code, name, vat_hint}], source: "live"\|"cache"\|"stale_cache"}`. Qattiq xato yo'q — foydalanuvchi kodni qo'lda kiritadi.
 **Bog'liq**: BO-04, M09.
 
 ---
@@ -165,11 +175,11 @@ Kodni tasdiqlash + QQS toifasi.
 
 ### `PATCH /product-categories/{id}`
 
-**Ruxsat**: `catalog.manage`. **So'rov**: `{name?, parent_id?, version}`.
+**Ruxsat**: `catalog.manage`. **So'rov**: `{name?, parent_id?, version}`. Arxivlangan kategoriyani tahrirlab bo'lmaydi — `409 RESOURCE_ARCHIVED`.
 
 ### `POST /product-categories/{id}/archive`
 
-**Ruxsat**: `catalog.manage`. **So'rov**: `{}`. Arxivlashdan oldin server tekshiradi: agar arxivlanmagan tovar shu kategoriyaga bog'langan bo'lsa → `409 CATEGORY_HAS_PRODUCTS` (avval tovarlarni boshqa kategoriyaga ko'chirish/arxivlash kerak).
+**Ruxsat**: `catalog.manage`. **So'rov**: `{}`. Arxivlashdan oldin server tekshiradi: agar arxivlanmagan tovar shu kategoriyaga bog'langan bo'lsa → `409 CATEGORY_HAS_PRODUCTS` (avval tovarlarni boshqa kategoriyaga ko'chirish/arxivlash kerak); arxivlanmagan quyi kategoriyalari bo'lsa → `422 VALIDATION_ERROR` (`validation.category_has_children`).
 **Xatolar**: `404 NOT_FOUND` (`params.resource="product_category"`), `409 VERSION_CONFLICT`, `409 CATEGORY_HAS_PRODUCTS`.
 **Offline**: kategoriyalar `/sync/pull?scope=catalog` bilan birga keshlanadi.
 
@@ -191,7 +201,16 @@ Kodni tasdiqlash + QQS toifasi.
 **Maqsad**: narx tarixi (US-M09-01).
 **Ruxsat**: `stock.view`.
 **So'rov**: `branch_id?` (bo'sh — barcha filial uchun umumiy narxlar).
-**Javob**: `{items:[{price, valid_from, valid_to, set_by, price_change_doc_id, branch_id}], next_cursor}` — `valid_to` hisoblanadigan maydon (keyingi yozuvning `valid_from`'i, oxirgisida `null`).
+**Javob**: `{items:[{price, valid_from, valid_to, set_by, set_by_name, price_change_doc_id, branch_id}], next_cursor}` — `valid_to` hisoblanadigan maydon (keyingi yozuvning `valid_from`'i, oxirgisida `null`). `set_by_name` — narxni o'rnatgan foydalanuvchining ko'rinadigan ismi (`product_prices.set_by` → `app.users.name`, sahifa uchun bitta so'rov); `set_by` `null` (tizim/eski yozuv) yoki foydalanuvchi joriy tenant a'zosi bo'lmasa (`users` RLS) — `null`. Import (US-M04-04) narxlari importni bajargan foydalanuvchi nomi bilan qaytadi.
+
+```json
+{"items":[
+  {"price":"13000.0000","valid_from":"2026-10-16T09:00:00Z","valid_to":null,"set_by":"0192…",
+   "set_by_name":"Dilshod Karimov","price_change_doc_id":"0192…","branch_id":null},
+  {"price":"12000.0000","valid_from":"2026-10-01T06:00:00Z","valid_to":"2026-10-16T09:00:00Z",
+   "set_by":null,"set_by_name":null,"price_change_doc_id":null,"branch_id":null}],
+ "next_cursor":null}
+```
 
 ### `POST /price-changes`
 
@@ -211,6 +230,8 @@ Kodni tasdiqlash + QQS toifasi.
 **Javob**: `201 {id, status:"draft", number:null, lines:[...]}` (`version` yo'q — bu hujjatda optimistik qulflash ishlatilmaydi).
 **Xatolar**: `422 VALIDATION_ERROR` (manfiy/nol narx).
 
+**Vaqtinchalik (aksiya) narx — ikki qator konventsiyasi** (QT-M09-09): `product_prices` faqat qo'shiladigan tarix, alohida `valid_to`/«aksiya» ustuni yo'q. Aksiya ikki qator bilan beriladi (bitta hujjatda ikki `lines[]` yoki ikki hujjat): aksiya narxi (`valid_from` = boshlanishi) va yana oddiy narx (`valid_from` = tugashi). Qator o'z `valid_from`'idan shu seriyaning (bir mahsulot + bir `branch_id`; `null` — barcha filial) keyingi qatori `valid_from`'igacha amal qiladi; kelajakdagi `valid_from` hali kuchda emas; bir xil `valid_from` da keyin yaratilgan (UUIDv7 `id`) qator ustun; filial narxi globalni bosadi. Tugash vaqti kelganda oddiy narx avtomatik qaytadi (cron kerak emas). Hisoblash — `pricing.domain.resolution` toza funksiyalari (POS ham shuni ishlatadi). Sotuvni o'tkazishda (`sale.created`) serverning narxni qayta tekshirishi — **Bosqich 3** (POS/sotuv bilan); Bosqich 1 da narx faqat katalog/yorliq/import uchun hal qilinadi.
+
 ### `POST /price-changes/{id}/post`
 
 **Maqsad**: hujjatni o'tkazish (faqat `draft` holatidan). Har qator uchun server joriy narx bilan farqni (%) hisoblaydi va `prices.approve` limitiga (`role_permissions.limit_value`) solishtiradi. Formula: `base` = filial narxi, yo'q bo'lsa global narx; `base` yo'q — limit tekshirilmaydi; `pct = |new − base| / base × 100`; bitta qator limitdan oshsa butun hujjat tasdiqqa yuboriladi, `requested_value = max(pct)`.
@@ -218,6 +239,7 @@ Kodni tasdiqlash + QQS toifasi.
 - Limitdan katta → `202 {status:"pending_approval", approval_request_id}` (`APPROVAL_REQUIRED`) — `approval_requests(kind='price_change')` yozuvi yaratiladi (`linked_doc_type="price_changes"`); `price_changes` — `pending_approval` ga o'tadigan yagona hujjat turi (qaror #25); `product_prices` hali o'zgarmaydi.
 
 **Ruxsat**: `prices.edit`.
+**Aniqlashtirishlar**: postlovchida `prices.approve` granti bo'lmasa limit `10.00`% deb olinadi (26 #5) — aks holda Menejerning har narx o'zgarishi tasdiqqa tushardi (QT-M09-01). Hujjat `branch_id` si = `X-Branch-Id`; sarlavha bo'lmasa — standart filial (barcha filialli foydalanuvchi) yoki foydalanuvchining yagona filiali, aks holda `422`. Filial bilan cheklangan foydalanuvchi global narx (`lines[].branch_id=null`) qo'ya olmaydi — `403 BRANCH_SCOPE_DENIED`. Javob (201/200/202) — to'liq hujjat + `approval_request_id` + `warnings` (202 da `["APPROVAL_REQUIRED"]`).
 **Xatolar**: `404 {code:"NOT_FOUND", params:{resource:"price_change"}}`, `409 {code:"DOC_NOT_DRAFT"}`, `409 DOC_INVALID_STATE` (`pending_approval` holatidagi hujjatni `post` qilish).
 **Idempotentlik**: `Idempotency-Key` majburiy.
 **Bog'liq**: US-M09-01, US-M09-02, BO-05.
@@ -286,7 +308,7 @@ Uchta `kind`: `products` (US-M04-04), `opening_stock` (US-M04-04), `opening_debt
 ### `GET /import-jobs/templates/{kind}`
 
 **Ruxsat**: `stock.opening.manage` (`opening_stock`/`opening_debts`) yoki `catalog.manage` (`products`).
-**Javob**: CSV fayl (`Content-Disposition: attachment`), UTF-8, `;` ajratgich — ustunlar `kind`ga qarab (`11-malumotlar-modeli.md` §10 jadvali): `products.csv` → `name;barcode;unit_code;mxik_code;vat_rate;price;category;is_marked`; `opening_stock.csv` → `barcode;qty;unit_cost;expiry_date`; `opening_debts.csv` → `name;phone;amount;direction;date`.
+**Javob**: CSV fayl (`Content-Disposition: attachment`), UTF-8, `;` ajratgich — ustunlar `kind`ga qarab (`11-malumotlar-modeli.md` §10 jadvali): `products.csv` → `name;name_ru;barcode;unit_code;mxik_code;vat_rate;price;category;is_marked` (`03` US-M04-04 bilan mos); `opening_stock.csv` → `barcode;qty;unit_cost;expiry_date`; `opening_debts.csv` → `name;phone;amount;direction;date`.
 
 ### `POST /import-jobs`
 
@@ -294,14 +316,15 @@ Uchta `kind`: `products` (US-M04-04), `opening_stock` (US-M04-04), `opening_debt
 **Ruxsat**: `catalog.manage` (`kind=products`) / `stock.opening.manage` (`kind=opening_stock`, `kind=opening_debts`).
 **So'rov**: `multipart/form-data`: `kind` (enum), `file` (CSV/XLSX, max 10 MB, max 20 000 qator — standart, sozlanadi, qaror #54).
 **Javob**: `201 {id, kind, status:"uploaded", total_rows:0}`.
-**Xatolar**: `422 IMPORT_FILE_INVALID` (format/kodlash xato), `413 FILE_TOO_LARGE`.
+**Xatolar**: `422 IMPORT_FILE_INVALID` (format/kodlash xato), `413 FILE_TOO_LARGE` (`params`: `max_bytes` — fayl yoki so'rov tanasi; `max_rows` — qator chegarasi; `max_unpacked_bytes` / `max_compression_ratio` — XLSX ochilgandagi hajm).
+**Zararli fayldan himoya**: so'rov tanasi routingdan oldin cheklanadi (import yuklashi — fayl chegarasi + multipart zaxirasi, boshqa so'rovlar — 1 MB; `Content-Length` va oqim baytlari bo'yicha). XLSX openpyxl'dan oldin zip katalogi bo'yicha tekshiriladi: ochilgan hajm ≤ 50 MB, siqish nisbati ≤ 100:1; faqat dastlabki 64 ustun o'qiladi; bo'sh qatorlar ham `2 × max_rows + 100` qattiq chegaraga sanaladi (bitta katakchasi `XFD1048576` da turgan kichik fayl tez rad etiladi).
 **Idempotentlik**: `Idempotency-Key` majburiy.
 
 ### `POST /import-jobs/{id}/validate`
 
 **Maqsad**: asinxron ish — har qatorni sxema + biznes qoida bo'yicha tekshiradi (masalan `products` — shtrix-kod takrori, MXIK format; `opening_stock` — shtrix-kod katalogda topildimi; `opening_debts` — `direction` qiymati `receivable`/`payable`), natijani `import_jobs.errors` JSONB'ga (qator, maydon, xato kodi) yozadi, `status="validated"` (yoki hamma qator xato bo'lsa `status="failed"`).
 **Ruxsat**: `POST /import-jobs` dagi bilan bir xil.
-**Javob**: `202 {job_id, status:"validating"}` → poll `GET /import-jobs/{id}` → `{status:"validated", total_rows, ok_rows, error_rows}`.
+**Javob**: `202 {job_id, status:"validating"}` → poll `GET /import-jobs/{id}` → `{status:"validated", total_rows, ok_rows, error_rows}`. Ish allaqachon `validating` holatida bo'lsa — `409 DOC_INVALID_STATE`. `products`: `is_marked=true` qator markirovka guruhi `general` oladi (shablonda guruh ustuni yo'q); katalogda yo'q kategoriya nomlari commit'da yaratiladi.
 
 ### `GET /import-jobs/{id}`
 
@@ -316,7 +339,7 @@ Uchta `kind`: `products` (US-M04-04), `opening_stock` (US-M04-04), `opening_debt
 
 ### `POST /import-jobs/{id}/commit`
 
-**Maqsad**: faqat **xatosiz** qatorlarni (yoki foydalanuvchi "xatolarsiz davom et" deb tasdiqlagan qismni) bitta tranzaksiyada hujjatlarga aylantirish: `products` → yangi `products`+`product_barcodes`; `opening_stock` → bitta `stock-openings` hujjati (§7 bilan bir xil posting, `13-provodka-qoidalari.md` §2.21); `opening_debts` → bitta `debt-openings` hujjati (`18-api-kassa.md` §12.4 — faqat `import_jobs.kind=opening_debts` shu yerda hosil bo'ladi).
+**Maqsad**: faqat **xatosiz** qatorlarni (yoki foydalanuvchi "xatolarsiz davom et" deb tasdiqlagan qismni) bitta tranzaksiyada hujjatlarga aylantirish: `products` → yangi `products`+`product_barcodes`, boshlang'ich narxlar bitta `price_changes` hujjati sifatida o'tkaziladi (`result = {created_doc_ids:[shu hujjat], created_product_count}`); `opening_stock` → bitta `stock-openings` hujjati (§7 bilan bir xil posting, `13-provodka-qoidalari.md` §2.21); `opening_debts` → bitta `debt-openings` hujjati (`18-api-kassa.md` §12.4 — faqat `import_jobs.kind=opening_debts` shu yerda hosil bo'ladi).
 **Ruxsat**: `validate`dagi bilan bir xil.
 **So'rov**: `{skip_error_rows: bool}` (standart `true`).
 **Javob**: `202 {job_id, status:"committing"}` → poll `GET /import-jobs/{id}` → `{status:"committed", result:{created_doc_ids:[...]}}`.

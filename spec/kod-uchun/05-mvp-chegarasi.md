@@ -225,7 +225,7 @@ Faqat tashqi javob kutayotgan bandlar (raqamlar barqaror):
 - **7.** Tashqi javob kerak: CRPT Turon — oldindan onlayn tekshiruv majburiyligi, `label` formati, hisobdan chiqarish metodi, SaaS integrator kaliti — interim: `MARKING_PRECHECK=warn`, `MarkingPort` stub — 26 #40 (OQ-025).
 - **8.** Tashqi javob kerak: foydalanish shartlari (oferta) va AI'ga chegaradan tashqari uzatish roziligi matni — interim: `terms_versions`, `ai_cross_border_enabled=false` rozilikgacha — 26 #127 (OQ-042).
 - **9.** Tashqi javob kerak: E-IMZO prod kalitlari (API-KEY, VPN-kalit, E-IMZO-SERVER) narxi va muddati — interim: dev/test TestCA, prod jadvalida ~1 oy bufer — 26 #118 (OQ-028).
-- **10.** Tashqi javob kerak: virtual kassa reyestri uchun karta-ekvayring va UzQR integratsiyasi qaysi bosqichda majburiy (VMQ-943 2-ilova 6-band, VMQ-393) — interim: mustaqil terminal + statik UzQR (qaror #64) — 26 #170.
+- **10.** Tashqi javob kerak: virtual kassa reyestri uchun karta-ekvayring va UzQR integratsiyasi qaysi bosqichda majburiy (VMQ-943 2-ilova 6-band, VMQ-393) — interim: terminalsiz karta (rekvizitsiz, mustaqil terminal) + statik UzQR (qaror #64) — 26 #170.
 
 ## Manbalar
 

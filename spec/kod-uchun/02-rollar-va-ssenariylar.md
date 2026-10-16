@@ -119,7 +119,7 @@ Veb-kassa (PWA, planshet/PK/Android Chrome; asosiy va yagona ish quroli) — bir
 
 **Kundalik**
 1. Smena boshida boshlang'ich naqd summani kiritib, smenani ochadi (**M01**).
-2. Mijozga tovar sotadi: skanerlash → to'lov (naqd/karta/yagona QR (UzQR, bank)/Payme/Click/Uzum) → bosma chek (**M01**). Mustaqil terminalda karta to'lovida terminal chekidan karta turini (shaxsiy/korporativ/ijtimoiy) belgilaydi; ijtimoiy kartada karta niqobi va RRN ni kiritadi (qaror #64). Statik UzQR to'lovini mijoz telefonidagi tasdiqni ko'rib qo'lda tasdiqlaydi. Printer ishlamasa yoki xaridor so'rasa — elektron chek (QR/Telegram) zahira sifatida.
+2. Mijozga tovar sotadi: skanerlash → to'lov (naqd/karta/yagona QR (UzQR, bank)/Payme/Click/Uzum) → bosma chek (**M01**). Integratsiyalangan terminalda karta rekvizitlari terminal natijasidan avtomatik olinadi; terminal bog'lanmagan kassada karta to'lovi "terminalsiz karta (rekvizitsiz)" — faqat summa kiritiladi, ilovaga hech qanday karta ma'lumoti (turi, raqami, RRN) yozilmaydi (qaror #64, #71). Statik UzQR to'lovini mijoz telefonidagi tasdiqni ko'rib qo'lda tasdiqlaydi. Printer ishlamasa yoki xaridor so'rasa — elektron chek (QR/Telegram) zahira sifatida.
 3. Markirovkalangan tovar sotganda kod skanerlanadi va fiskal chek ichida OFD orqali Asl belgisiga ketadi; online bo'lsa kod oldindan tekshiriladi — muvaffaqiyatsiz bo'lsa ogohlantirish chiqadi (standart `MARKING_PRECHECK=warn`), dublikat yoki avval sotilgan kod rad etiladi (qaror #62) (**M01**).
 4. Mijoz tovarni qaytarganda, asl chek bo'yicha qaytarish amalga oshiradi; limitdan oshsa Menejerdan tasdiq so'raydi (**M02**).
 5. Kichik chegirma (limit ichida) berishi mumkin; kattaroq chegirma uchun Menejer PIN kodi kerak (**M03**).

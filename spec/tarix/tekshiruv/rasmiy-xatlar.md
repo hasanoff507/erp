@@ -16,6 +16,7 @@
 > 2. Hujjatlarni ko'rib chiqish bosqichlari (muvofiqlik sertifikati, Kiberxavfsizlik markazi xulosasi, fiskal operator integratsiyasi) uchun alohida-alohida qancha vaqt ketadi?
 > 3. my.soliq.uz orqali korxona tomonidan avtomatik tuzilgan soliq hisobotlarini (QQS, aylanma va boshqalar) dasturiy ravishda (API orqali) olish imkoniyati bormi? Agar bo'lsa, qaysi hujjatga/portalga murojaat qilishimiz kerak?
 > 4. E-IMZO integratsiyasi uchun rasmiy dasturchi texnik hujjati (API tavsifi) mavjudmi, yoki faqat qo'llanma darajasida ma'lumot beriladimi?
+> 5. Kassa dasturiga integratsiya qilinmagan alohida bank terminali orqali qabul qilingan karta to'lovida fiskal chekda faqat to'lov shakli «bank kartalari» ko'rsatilsa (karta turi, niqoblangan raqam va RRN kassir tomonidan kiritilmasa) — bu VMQ-943 va 2026-10-22 dan amal qiladigan chek rekvizitlari talablariga mos keladimi? Ijtimoiy kartalar uchun alohida talab bormi? (26 #178)
 >
 > Javobingizni email orqali kutib qolamiz. Hamkorlikka tayyormiz.
 >
@@ -166,6 +167,7 @@
 > 3. Xizmat ko'rsatish darajasi (SLA) qanday — API mavjudligi foizi, nosozlik holatida qo'llab-quvvatlash javob vaqti?
 > 4. Bizning o'z reyestr arizamiz tasdiqlanganidan keyin, sizning xizmatingizdan boshqa (o'z fiskal modulimizga) o'tish uchun qanday shartlar (bildirishnoma muddati, shartnoma bekor qilish tartibi) bor?
 > 5. Zaxira mablag' talabi (BHM asosida) va yillik texnik xizmat (1 BHM) to'lovi uchinchi tomon integrator orqali ulangan do'konlarga ham tegishlimi?
+> 6. Integratsiyalanmagan bank terminali bilan qabul qilingan karta to'lovi uchun chekni faqat «bank kartalari» to'lov shakli bilan (karta turi, niqob va RRN'siz) yuborsak, sizning fiskal modulingiz/OFD buni qabul qiladimi yoki bu maydonlar majburiymi? (26 #178)
 >
 > Javobingizni kutib qolamiz. Hamkorlikka tayyormiz.
 >

@@ -249,7 +249,7 @@ CREATE TABLE platform.turnover_tax_rates (
 
 -- Karta BIN qoidalari (qaror #71) — global ma'lumotnoma (RLS istisnosi); erp_app — faqat SELECT, yozish — platforma
 -- admin yo'li. Integratsiyalangan terminal natijasida card_type bo'lmasa, terminal bergan BIN (PAN'ning birinchi
--- 6–8 raqami) shu jadvaldan eng uzun prefiks bo'yicha qidiriladi; topilmasa — kassir bitta bosishda tanlaydi.
+-- 6–8 raqami) shu jadvaldan eng uzun prefiks bo'yicha qidiriladi; topilmasa — card_type='unknown' (card_type_source='bin_table'); kassir karta turini tanlamaydi.
 -- To'liq PAN hech qachon saqlanmaydi: BIN faqat qidiruv paytida ishlatiladi, to'lov qatoriga card_mask (4+4) yoziladi.
 CREATE TABLE platform.card_bin_rules (
   id          UUID PRIMARY KEY DEFAULT app.uuidv7(),
@@ -394,9 +394,9 @@ CREATE TABLE app.tenants (
   -- (standart 'none')}, marking_precheck ('off'|'warn'|'block', standart 'warn', qaror #62), bank_account (20 raqam),
   -- bank_mfo — tenantning yagona bank hisobi (qaror #49), payment_providers.{click|payme|uzum}.autofiscal_off_confirmed_at
   -- (ISO vaqt — provayder avtofiskalizatsiyasi o'chirilgani tasdig'i, 20 #40d), card_manual_fallback ('allow'|
-  -- 'manager_approval'|'forbid' — karta rekvizitlarini qo'lda kiritish siyosati, qaror #71; kalit yo'q bo'lsa: faol
-  -- card_terminals bog'langan kassada 'manager_approval', boshqa kassada 'allow'; siyosat faqat faol terminal bog'langan
-  -- kassada qo'llanadi — terminalsiz kassada manual_reason='standalone_terminal' har doim ruxsat). Baholash usuli BU YERDA EMAS — valuation_method_history
+  -- 'manager_approval'|'forbid' — faol card_terminals bog'langan kassada karta to'lovini terminalsiz (rekvizitsiz)
+  -- qabul qilish siyosati, qaror #71; kalit yo'q bo'lsa 'manager_approval'; terminal bog'lanmagan kassada qo'llanmaydi —
+  -- u yerda karta = faqat summa, manual_reason='standalone_terminal', har doim ruxsat). Baholash usuli BU YERDA EMAS — valuation_method_history
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   version       INT NOT NULL DEFAULT 1
@@ -1129,7 +1129,7 @@ CREATE TABLE app.card_terminal_transactions (
   card_mask               TEXT NULL CHECK (card_mask IS NULL OR card_mask ~ '^[0-9]{4}[*]+[0-9]{4}$'), -- normallashtirilgan 4+4
   card_scheme             TEXT NULL CHECK (card_scheme IN ('uzcard','humo','visa','mastercard','unionpay','mir','other')),
   card_type               TEXT NULL CHECK (card_type IN ('personal','corporate','social','unknown')),
-  card_type_source        TEXT NULL CHECK (card_type_source IN ('terminal','bin_table','cashier')),
+  card_type_source        TEXT NULL CHECK (card_type_source IN ('terminal','bin_table')),
   entry_mode              TEXT NULL CHECK (entry_mode IN ('chip','contactless','magstripe','fallback')), -- kartani o'qish usuli
   tid                     TEXT NULL,
   mid                     TEXT NULL,
@@ -1138,7 +1138,10 @@ CREATE TABLE app.card_terminal_transactions (
   decline_message         TEXT NULL,
   resolved_by             TEXT NULL CHECK (resolved_by IN ('auto','status_query','manager')),
                           -- auto — terminal javobi; status_query — get_status/get_last_transaction;
-                          -- manager — unknown'ni terminal chekiga qarab menejer qo'lda yopdi (card.manual_entry.approve)
+                          -- manager — unknown'ni menejer terminal chekiga qarab yopdi (card.manual_entry.approve):
+                          -- faqat "o'tdi / o'tmadi" tasdig'i, hech qanday karta rekviziti kiritilmaydi — approved'da
+                          -- rrn/card_mask/approval_code/card_type NULL qoladi, to'lov qatori card_entry_mode='manual',
+                          -- manual_reason='unknown_result' (rekvizitsiz), tranzaksiya hujjatga doc_type/doc_id orqali bog'lanadi
   resolved_by_user_id     UUID NULL REFERENCES app.users(id),
   terminal_response       JSONB NOT NULL DEFAULT '{}',    -- adapterning sanitizatsiyalangan xom javobi (PAN/track yo'q)
   slip_text               TEXT NULL,                      -- terminal cheki matni (ixtiyoriy)
@@ -1155,8 +1158,12 @@ CREATE TABLE app.card_terminal_transactions (
   CHECK (kind <> 'void' OR original_transaction_id IS NOT NULL),  -- void doim asl purchase'ga bog'liq
   CHECK (kind <> 'purchase' OR original_transaction_id IS NULL),
   CHECK (kind = 'purchase' OR status <> 'voided'),
-  -- tasdiqlangan purchase/refund: RRN va niqob majburiy (fiskal chek rekviziti, qaror #64)
-  CHECK (status NOT IN ('approved','voided') OR kind = 'void' OR (rrn IS NOT NULL AND card_mask IS NOT NULL AND approved_amount IS NOT NULL)),
+  -- tasdiqlangan purchase/refund: terminal natijasida RRN va niqob majburiy (fiskal chek rekviziti, qaror #64);
+  -- menejer yopgan unknown (resolved_by='manager') — rekvizitsiz
+  CHECK (status NOT IN ('approved','voided') OR kind = 'void' OR (approved_amount IS NOT NULL
+         AND (resolved_by = 'manager' OR (rrn IS NOT NULL AND card_mask IS NOT NULL)))),
+  CHECK (resolved_by IS DISTINCT FROM 'manager' OR (rrn IS NULL AND card_mask IS NULL AND approval_code IS NULL
+         AND card_type IS NULL)),
   CHECK ((card_type IS NULL) = (card_type_source IS NULL)),
   CHECK (status IN ('pending','unknown') OR resolved_at IS NOT NULL),
   CHECK (resolved_by IS DISTINCT FROM 'manager' OR resolved_by_user_id IS NOT NULL),
@@ -1180,19 +1187,20 @@ CREATE TABLE app.sale_payments (
   method         TEXT NOT NULL CHECK (method IN ('cash','card','uzqr','click','payme','uzum','debt')),
   amount         NUMERIC(18,2) NOT NULL CHECK (amount > 0),
   provider_tx_id TEXT NULL,
-  terminal_ref   TEXT NULL, -- mustaqil terminal operatsiyasi / statik UzQR to'lov raqami (ixtiyoriy)
-  card_type      TEXT NULL CHECK (card_type IN ('personal','corporate','social','unknown')), -- chek rekviziti (VMQ-943 1-ilova 7-band)
-  card_mask      TEXT NULL CHECK (card_mask IS NULL OR card_mask ~ '^[0-9]{4}[*]+[0-9]{4}$'), -- birinchi va oxirgi 4 raqam
-  rrn            TEXT NULL, -- terminal tranzaksiyasining noyob raqami (RRN)
+  terminal_ref   TEXT NULL, -- statik UzQR to'lov raqami (ixtiyoriy) / integrated kartada server card_result.tid'dan to'ldiradi
+  card_type      TEXT NULL CHECK (card_type IN ('personal','corporate','social','unknown')), -- chek rekviziti (VMQ-943 1-ilova 7-band), faqat integrated
+  card_mask      TEXT NULL CHECK (card_mask IS NULL OR card_mask ~ '^[0-9]{4}[*]+[0-9]{4}$'), -- birinchi va oxirgi 4 raqam, faqat integrated
+  rrn            TEXT NULL, -- terminal tranzaksiyasining noyob raqami (RRN), faqat integrated
   qr_type        TEXT NULL CHECK (qr_type IN ('static','dynamic')),
   due_date       DATE NULL, -- method='debt': va'da sanasi → debt_moves.due_date manbasi
   checkout_ref   UUID NULL REFERENCES app.payment_checkouts(checkout_ref),
-  -- karta kiritish usuli (qaror #71): integrated — terminal natijasi avtomatik; manual — kassir terminal chekidan (#64)
+  -- karta kiritish usuli (qaror #64, #71): integrated — rekvizitlar faqat terminal natijasidan avtomatik;
+  -- manual — karta terminalsiz (ilovadan tashqarida) qabul qilingan: faqat summa + manual_reason, hech qanday karta rekviziti yo'q
   card_entry_mode  TEXT NULL CHECK (card_entry_mode IN ('integrated','manual')),
   card_terminal_transaction_id UUID NULL REFERENCES app.card_terminal_transactions(id),
   approval_code    TEXT NULL CHECK (approval_code IS NULL OR approval_code ~ '^[0-9A-Za-z]{1,12}$'),
   card_scheme      TEXT NULL CHECK (card_scheme IN ('uzcard','humo','visa','mastercard','unionpay','mir','other')),
-  card_type_source TEXT NULL CHECK (card_type_source IN ('terminal','bin_table','cashier')),
+  card_type_source TEXT NULL CHECK (card_type_source IN ('terminal','bin_table')),
   manual_reason    TEXT NULL CHECK (manual_reason IN ('terminal_offline','terminal_error','unknown_result','standalone_terminal')),
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
   CHECK (method = 'debt' OR due_date IS NULL),
@@ -1201,20 +1209,18 @@ CREATE TABLE app.sale_payments (
   CHECK (method <> 'uzqr' OR qr_type IS NOT NULL),
   CHECK (method <> 'uzqr' OR qr_type = 'static' OR provider_tx_id IS NOT NULL),
   CHECK (qr_type IS NULL OR method = 'uzqr'),
-  -- karta: card_type majburiy (qaror #64); ijtimoiy kartada niqob va RRN ham majburiy
-  CHECK ((method = 'card') = (card_type IS NOT NULL)),
-  CHECK (card_type IS DISTINCT FROM 'social' OR (card_mask IS NOT NULL AND rrn IS NOT NULL)),
-  CHECK (method = 'card' OR (card_mask IS NULL AND rrn IS NULL)),
-  -- qaror #71: karta qatorida kiritish usuli majburiy; integrated — tranzaksiya, RRN, niqob majburiy, sabab yo'q;
-  -- manual — tranzaksiyasiz, sabab majburiy, card_type kassir tanlaydi (#64 qoidalari o'zgarmaydi)
+  CHECK (method <> 'card' OR terminal_ref IS NULL OR card_entry_mode = 'integrated'), -- terminalsiz kartada raqam kiritilmaydi
+  -- karta (qaror #64, #71): kiritish usuli majburiy; integrated — tranzaksiya, RRN, niqob, karta turi (terminal yoki
+  -- BIN jadvali; topilmasa 'unknown') majburiy, sabab yo'q; manual — tranzaksiyasiz, sabab majburiy, barcha karta
+  -- rekvizitlari NULL (ilovada karta ma'lumoti qo'lda kiritilmaydi)
   CHECK ((method = 'card') = (card_entry_mode IS NOT NULL)),
-  CHECK ((method = 'card') = (card_type_source IS NOT NULL)),
+  CHECK ((card_type IS NULL) = (card_type_source IS NULL)),
   CHECK (card_entry_mode IS DISTINCT FROM 'integrated' OR (card_terminal_transaction_id IS NOT NULL
-         AND rrn IS NOT NULL AND card_mask IS NOT NULL AND manual_reason IS NULL)),
-  CHECK (card_entry_mode IS DISTINCT FROM 'manual' OR (card_terminal_transaction_id IS NULL
-         AND manual_reason IS NOT NULL AND card_type_source = 'cashier')),
-  CHECK (method = 'card' OR (approval_code IS NULL AND card_scheme IS NULL AND manual_reason IS NULL
-         AND card_terminal_transaction_id IS NULL))
+         AND rrn IS NOT NULL AND card_mask IS NOT NULL AND card_type IS NOT NULL AND manual_reason IS NULL)),
+  CHECK (card_entry_mode IS DISTINCT FROM 'manual' OR (card_terminal_transaction_id IS NULL AND manual_reason IS NOT NULL
+         AND card_type IS NULL AND card_mask IS NULL AND rrn IS NULL AND approval_code IS NULL AND card_scheme IS NULL)),
+  CHECK (method = 'card' OR (card_type IS NULL AND card_mask IS NULL AND rrn IS NULL AND approval_code IS NULL
+         AND card_scheme IS NULL AND manual_reason IS NULL AND card_terminal_transaction_id IS NULL))
 );
 CREATE INDEX idx_sale_payments_sale ON app.sale_payments (sale_id);
 -- bitta tasdiqlangan terminal tranzaksiyasi — bitta to'lov qatori
@@ -1238,7 +1244,8 @@ CREATE TABLE app.returns (
                    -- standart — asl to'lov usuli; qarzli sotuvda avval sotuvning ochiq qarzi kamayadi (debt_adjustment
                    -- qismi, chek yo'q), qolgani pul bilan (13 §2.5). Click/Payme/Uzum qaytarish — provayder kabinetida qo'lda
   -- refund_method='card' rekvizitlari (qaror #71): integrated — shu terminalda refund (settlement'gacha void) natijasi;
-  -- manual — terminalda mustaqil qaytarilgan / terminal ishlamaydi (card_manual_fallback siyosati bo'yicha)
+  -- manual — karta qaytarish terminalsiz (ilovadan tashqarida) amalga oshirilgan: faqat summa + manual_reason, karta
+  -- rekvizitlari NULL (faol terminal bog'langan kassada card_manual_fallback siyosati bo'yicha)
   card_entry_mode  TEXT NULL CHECK (card_entry_mode IN ('integrated','manual')),
   card_terminal_transaction_id UUID NULL REFERENCES app.card_terminal_transactions(id),
   card_type        TEXT NULL CHECK (card_type IN ('personal','corporate','social','unknown')),
@@ -1267,7 +1274,8 @@ CREATE TABLE app.returns (
   CHECK ((refund_method = 'card') = (card_entry_mode IS NOT NULL)),
   CHECK (card_entry_mode IS DISTINCT FROM 'integrated' OR (card_terminal_transaction_id IS NOT NULL
          AND rrn IS NOT NULL AND card_mask IS NOT NULL AND manual_reason IS NULL)),
-  CHECK (card_entry_mode IS DISTINCT FROM 'manual' OR (card_terminal_transaction_id IS NULL AND manual_reason IS NOT NULL)),
+  CHECK (card_entry_mode IS DISTINCT FROM 'manual' OR (card_terminal_transaction_id IS NULL AND manual_reason IS NOT NULL
+         AND card_type IS NULL AND card_mask IS NULL AND rrn IS NULL AND approval_code IS NULL AND card_scheme IS NULL)),
   CHECK (refund_method = 'card' OR (card_type IS NULL AND card_mask IS NULL AND rrn IS NULL AND approval_code IS NULL
          AND card_scheme IS NULL AND manual_reason IS NULL AND card_terminal_transaction_id IS NULL))
 );
@@ -1699,7 +1707,7 @@ CREATE TABLE app.debt_payments (
   card_terminal_transaction_id UUID NULL REFERENCES app.card_terminal_transactions(id),
   approval_code    TEXT NULL CHECK (approval_code IS NULL OR approval_code ~ '^[0-9A-Za-z]{1,12}$'),
   card_scheme      TEXT NULL CHECK (card_scheme IN ('uzcard','humo','visa','mastercard','unionpay','mir','other')),
-  card_type_source TEXT NULL CHECK (card_type_source IN ('terminal','bin_table','cashier')),
+  card_type_source TEXT NULL CHECK (card_type_source IN ('terminal','bin_table')),
   manual_reason    TEXT NULL CHECK (manual_reason IN ('terminal_offline','terminal_error','unknown_result','standalone_terminal')),
   promise_date    DATE NULL, -- qoldiq uchun yangi va'da sanasi (qarz daftari ko'rinishi oxirgisini oladi)
   receipt_seq     INT NULL CHECK (receipt_seq IS NULL OR receipt_seq > 0),
@@ -1725,17 +1733,16 @@ CREATE TABLE app.debt_payments (
   CHECK (method <> 'uzqr' OR qr_type IS NOT NULL),
   CHECK (method <> 'uzqr' OR qr_type = 'static' OR provider_tx_id IS NOT NULL),
   CHECK (qr_type IS NULL OR method = 'uzqr'),
-  CHECK ((method = 'card') = (card_type IS NOT NULL)),
-  CHECK (card_type IS DISTINCT FROM 'social' OR (card_mask IS NOT NULL AND rrn IS NOT NULL)),
-  CHECK (method = 'card' OR (card_mask IS NULL AND rrn IS NULL)),
+  -- karta — sale_payments bilan bir xil qoida (qaror #64, #71): manual — rekvizitsiz
+  CHECK (method <> 'card' OR terminal_ref IS NULL OR card_entry_mode = 'integrated'),
   CHECK ((method = 'card') = (card_entry_mode IS NOT NULL)),
-  CHECK ((method = 'card') = (card_type_source IS NOT NULL)),
+  CHECK ((card_type IS NULL) = (card_type_source IS NULL)),
   CHECK (card_entry_mode IS DISTINCT FROM 'integrated' OR (card_terminal_transaction_id IS NOT NULL
-         AND rrn IS NOT NULL AND card_mask IS NOT NULL AND manual_reason IS NULL)),
-  CHECK (card_entry_mode IS DISTINCT FROM 'manual' OR (card_terminal_transaction_id IS NULL
-         AND manual_reason IS NOT NULL AND card_type_source = 'cashier')),
-  CHECK (method = 'card' OR (approval_code IS NULL AND card_scheme IS NULL AND manual_reason IS NULL
-         AND card_terminal_transaction_id IS NULL)),
+         AND rrn IS NOT NULL AND card_mask IS NOT NULL AND card_type IS NOT NULL AND manual_reason IS NULL)),
+  CHECK (card_entry_mode IS DISTINCT FROM 'manual' OR (card_terminal_transaction_id IS NULL AND manual_reason IS NOT NULL
+         AND card_type IS NULL AND card_mask IS NULL AND rrn IS NULL AND approval_code IS NULL AND card_scheme IS NULL)),
+  CHECK (method = 'card' OR (card_type IS NULL AND card_mask IS NULL AND rrn IS NULL AND approval_code IS NULL
+         AND card_scheme IS NULL AND manual_reason IS NULL AND card_terminal_transaction_id IS NULL)),
   CHECK (unallocated_amount <= amount)
 );
 CREATE UNIQUE INDEX uq_debt_payments_card_tx ON app.debt_payments (card_terminal_transaction_id)

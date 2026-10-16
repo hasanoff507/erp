@@ -76,7 +76,7 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
             Elektron chek (QR, Telegram)
           </button>
         </div>
-        <div style="font-size: 12px; color: #6B7686;">Qayta chop etilgan chekda «NUSXA / КОПИЯ» belgisi bo'ladi, har chop etish auditga yoziladi.</div>
+        <div style="font-size: 12px; color: #6B7686;">Qayta chop etilgan chekda «NUSXA / КОПИЯ» belgisi bo'ladi, har chop etish auditga yoziladi. Karta rekvizitlari (niqob, RRN, karta turi) faqat integratsiyalangan terminal to'lovida chiqadi; terminalsiz kartada — faqat to'lov shakli va summa.</div>
       </div>
       <div style="flex-grow: 1; min-height: 0; display: flex; gap: 14px;">
         <div style="flex: 1 1 0; min-width: 0; background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 16px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 6px 20px rgba(15,27,45,.05); padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;">
@@ -191,7 +191,7 @@ class Component extends DCLogic {
     const qr = pattern.split("").map(ch => ({ c: ch === "1" ? "#0F1B2D" : "#FFFFFF" }));
     const facts = [
       { label: "Fiskal holat", value: "Fiskal belgi olindi", bg: "#E5F5EC", fg: "#1F6B3E" },
-      { label: "To'lov shakli", value: "Karta · terminal · shaxsiy", bg: "#E8F0FC", fg: "#1F4FA8" },
+      { label: "To'lov shakli", value: "Karta · integratsiyalangan", bg: "#E8F0FC", fg: "#1F4FA8" },
       { label: "Chek berish", value: "Bosma chek", bg: "#F4F6F8", fg: "#3D4A5C" },
       { label: "Qaytim", value: "0 so'm", bg: "#F4F6F8", fg: "#3D4A5C" }
     ];

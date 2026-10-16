@@ -85,18 +85,10 @@ a{color:#0E7C66}a:hover{color:#0A5E4D}
               </li>
             </sc-for>
           </ol>
-          <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.7fr); gap: 8px;">
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
             <div style="padding: 8px 12px; background: #FFFFFF; border: 1px dashed #DCE1E7; border-radius: 12px;"><div style="font-size: 12px; color: #6B7686;">Karta (niqob)</div><div style="font-size: 13px; font-weight: 700; color: #5B6675; white-space: nowrap;">terminaldan keladi</div></div>
             <div style="padding: 8px 12px; background: #FFFFFF; border: 1px dashed #DCE1E7; border-radius: 12px;"><div style="font-size: 12px; color: #6B7686;">RRN / tasdiq kodi</div><div style="font-size: 13px; font-weight: 700; color: #5B6675; white-space: nowrap;">terminaldan keladi</div></div>
-            <div style="padding: 8px 12px; background: #FFFFFF; border: 1px dashed #DCE1E7; border-radius: 12px; display: flex; flex-direction: column; gap: 4px;">
-              <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px;"><span style="font-size: 12px; color: #6B7686;">Karta turi</span><span style="font-size: 13px; font-weight: 700; color: #5B6675; white-space: nowrap;">terminaldan keladi</span></div>
-              <span id="ct-fallback" style="font-size: 12px; color: #5B6675;">terminal/BIN bermasa — bir bosishda tanlang:</span>
-              <div role="radiogroup" aria-labelledby="ct-fallback" style="display: flex; align-items: center; gap: 6px;">
-                <sc-for list="{{cardTypes}}" as="ct" hint-placeholder-count="3">
-                  <button type="button" role="radio" aria-checked="false" disabled="disabled" style="flex: 1 1 auto; height: 48px; min-width: 48px; padding: 0 6px; border: 1px solid #E7EAEE; border-radius: 8px; background: #F8FAFB; color: #5B6675; font: inherit; font-size: 12px; font-weight: 700; white-space: nowrap;">{{ct.label}}</button>
-                </sc-for>
-              </div>
-            </div>
+            <div style="padding: 8px 12px; background: #FFFFFF; border: 1px dashed #DCE1E7; border-radius: 12px;"><div style="font-size: 12px; color: #6B7686;">Karta turi</div><div style="font-size: 13px; font-weight: 700; color: #5B6675; white-space: nowrap;">terminal / BIN jadvalidan</div></div>
           </div>
           <div style="display: flex; gap: 12px; align-items: center;">
             <button type="button" style="height: 48px; padding: 0 16px; border: 1px solid #F3CFCB; border-radius: 12px; background: #FFFFFF; color: #C8372D; font: inherit; font-size: 14px; font-weight: 700; white-space: nowrap;">Terminalda bekor qilish</button>
@@ -213,7 +205,6 @@ class Component extends DCLogic {
       ["3", "Bank javobi", "tasdiq yoki rad", "next"],
       ["4", "Fiskal chek", "avtomatik chiqadi", "next"]
     ].map(([n, title, sub, st]) => ({ n, title, sub, ...sty(st) }));
-    const cardTypes = ["Shaxsiy", "Korporativ", "Ijtimoiy"].map(label => ({ label }));
     const S = {
       ok: ["#E5F5EC", "#1F6B3E", "M5 12.5l4.5 4.5L19 7"],
       bad: ["#FBEAE8", "#A82B22", "M6 6l12 12M18 6L6 18"],
@@ -234,10 +225,10 @@ class Component extends DCLogic {
       st("ok", "Tasdiqlandi", "card-approved", "Tasdiq kodi 482913 · 8600 **** **** 1234", "RRN 629014372815 · Uzcard · Shaxsiy", "Fiskal chek…", "pill"),
       st("bad", "Rad etildi", "CARD_DECLINED", "Bank: «Mablag' yetarli emas» (51)", "Urinish yakunlandi · yangi urinish mumkin", "Qayta yuborish", "brand"),
       st("unk", "Natija noma'lum", "CARD_OUTCOME_UNKNOWN", "Holat avtomatik so'ralmoqda…", "Yangi urinish bloklangan · avto-takror yo'q", "Menejer tasdig'i bilan yopish", "sec"),
-      st("off", "Terminal ulanmagan", "CARD_TERMINAL_UNREACHABLE", "Do'kon agenti terminalga ulana olmadi", "Siyosat: menejer tasdig'i bilan", "Qo'lda kiritish (menejer tasdig'i)", "sec"),
+      st("off", "Terminal ulanmagan", "CARD_TERMINAL_UNREACHABLE", "Do'kon agenti terminalga ulana olmadi", "Karta ma'lumoti so'ralmaydi · faqat summa", "Karta terminalsiz (rekvizitsiz) — menejer tasdig'i", "sec"),
       st("rcpt", "To'landi, chek kutilmoqda", "receipt-pending", "To'lov qabul qilingan, chek kutilmoqda", "Savat saqlanadi · bekor qilinsa — avto void", "Chekni qayta yuborish", "sec")
     ];
-    return { methods, lines, ghost, steps, cardTypes, states };
+    return { methods, lines, ghost, steps, states };
   }
 }
 </script>

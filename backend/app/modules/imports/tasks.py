@@ -12,6 +12,7 @@ from uuid import UUID
 
 from app.core.config import Settings, get_settings
 from app.core.db.session import Database, TenantContextError
+from app.core.permissions import BranchScope
 from app.modules.imports.wiring import ImportService, build_import_service
 
 
@@ -47,9 +48,12 @@ async def import_jobs_commit(
     job_id: str,
     user_id: str,
     skip_error_rows: bool = True,
+    branch_ids: list[str] | None = None,
 ) -> dict[str, Any]:
+    """``branch_ids`` — the committing actor's branch scope (``[]`` = every branch)."""
     tid = _uuid(tenant_id, "tenant_id")
+    scope = BranchScope(allowed=tuple(_uuid(b, "branch_id") for b in branch_ids or ()), current=None)
     result: dict[str, Any] = await _service(ctx).run_commit(
-        tid, _uuid(job_id, "job_id"), _uuid(user_id, "user_id"), skip_error_rows
+        tid, _uuid(job_id, "job_id"), _uuid(user_id, "user_id"), skip_error_rows, scope
     )
     return result

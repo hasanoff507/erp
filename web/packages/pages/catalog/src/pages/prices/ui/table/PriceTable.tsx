@@ -27,7 +27,7 @@ import {
   productSelected,
   rowStateOf,
   type ApprovalLimit,
-  type ProductOut,
+  type PriceProduct,
   type RowState,
 } from "../../model/index.ts";
 
@@ -61,7 +61,7 @@ export function PriceTable({ editable, approvalLimit }: { editable: boolean; app
   ]);
   const changeOf = new Map(changes.map((c) => [c.product.id, c]));
 
-  const columns: DataTableColumn<ProductOut>[] = [
+  const columns: DataTableColumn<PriceProduct>[] = [
     {
       id: "name",
       header: t("prices.columns.product"),
@@ -80,7 +80,13 @@ export function PriceTable({ editable, approvalLimit }: { editable: boolean; app
       header: t("prices.columns.cost"),
       numeric: true,
       width: "110px",
-      cell: () => <span className="font-normal text-muted-foreground">{t("common.notAvailable")}</span>,
+      // `current_cost` (4 dp) of the selected branch's warehouse — shown in whole so'm like the price (08 §8).
+      cell: (p) =>
+        p.current_cost ? (
+          formatMoney(p.current_cost, { withCurrency: false })
+        ) : (
+          <span className="font-normal text-muted-foreground">{t("common.notAvailable")}</span>
+        ),
     },
     {
       id: "current",
@@ -113,7 +119,15 @@ export function PriceTable({ editable, approvalLimit }: { editable: boolean; app
       header: t("prices.columns.markup"),
       numeric: true,
       width: "90px",
-      cell: () => <span className="font-normal text-muted-foreground">{t("common.notAvailable")}</span>,
+      // `markup_pct` = (net price − cost) / cost × 100; below cost (negative) is highlighted.
+      cell: (p) =>
+        p.markup_pct ? (
+          <span className={p.markup_pct.startsWith("-") ? "text-destructive-strong" : undefined}>
+            {formatPercent(p.markup_pct)}
+          </span>
+        ) : (
+          <span className="font-normal text-muted-foreground">{t("common.notAvailable")}</span>
+        ),
     },
     {
       id: "new",

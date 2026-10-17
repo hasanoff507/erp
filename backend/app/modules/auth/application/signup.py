@@ -144,7 +144,7 @@ class SignupService:
         branch_id = await self._prov.ensure_default_branch(
             s, t.tenant_id, DEFAULT_BRANCH_NAME, DEFAULT_SETTLEMENT, t.business_type
         )
-        # go_live_date is set later in onboarding: the signup month (Tashkent)
+        # go_live_date = signup day (insert_tenant); tax settings start at the signup month (Tashkent)
         valid_from = t.signup_date.replace(day=1)
         await self._store.insert_branch_tax_setting(s, t, branch_id, valid_from, DEFAULT_SETTLEMENT)
         await self._prov.ensure_default_cash_register(s, t.tenant_id, branch_id)

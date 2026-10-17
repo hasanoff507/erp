@@ -51,6 +51,19 @@ class ProductListItem(ProductOut):
             "(19 §1, §4); null when the product has no price yet"
         )
     )
+    current_cost: str | None = Field(
+        description=(
+            "Unit cost (4 dp) in the branch's warehouse: AVECO avg_cost / FIFO "
+            "Σqty_left×unit_cost/Σqty_left, "
+            "fallback last purchase cost (13 §2.11); null when unknown (BO-05 «Tannarx»)"
+        )
+    )
+    markup_pct: str | None = Field(
+        description=(
+            "(net price − cost) / cost × 100, 2 dp; net price excludes VAT for a VAT payer "
+            "(tenant_tax_regimes today); null without price or cost (BO-05 «Ustama %»)"
+        )
+    )
 
 
 class ProductPage(BaseModel):

@@ -180,7 +180,8 @@ test("US-M04-04 download template → upload → error rows → fix & re-upload 
   ).toBeVisible();
   // Only `products` in Bosqich 1: the other kinds are shown as the next phase.
   await expect(page.getByText("Boshlang'ich qoldiq")).toBeVisible();
-  await expect(page.getByText("Keyingi bosqich", { exact: true })).toHaveCount(2);
+  await expect(page.getByText("Keyingi bosqich", { exact: true })).toHaveCount(1);
+  await expect(page.getByText("Onboarding", { exact: true })).toHaveCount(1);
 
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Shablonni yuklab olish" }).click();

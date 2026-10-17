@@ -22,6 +22,7 @@ import {
   $step,
   PRE_SIGNUP_STEPS,
   pageMounted,
+  type OpeningStockImportSlotProps,
   type ProductImportSlotProps,
 } from "../../model/index.ts";
 import { AccountStep } from "../account-step/AccountStep.tsx";
@@ -37,6 +38,8 @@ export interface OnboardingPageProps {
   productImport?: ComponentType<ProductImportSlotProps>;
   /** ③a «Qo'lda» → catalog product form route (owned by the catalog package). */
   manualProductHref?: string | null;
+  /** ③b Excel/CSV opening stock (catalog flow `kind="opening_stock"`, injected by the shell). */
+  openingStockImport?: ComponentType<OpeningStockImportSlotProps>;
   /** «Yakunlash» → BO-02. */
   dashboardPath?: string;
 }
@@ -46,6 +49,7 @@ const SELF = "/onboarding";
 function OnboardingPage({
   productImport,
   manualProductHref = null,
+  openingStockImport,
   dashboardPath = "/app/dashboard",
 }: OnboardingPageProps) {
   const { t } = useTranslation("onboarding");
@@ -98,7 +102,11 @@ function OnboardingPage({
           {step === "account" ? <AccountStep /> : null}
           {step === "store" ? <StoreStep /> : null}
           {step === "products" ? (
-            <ProductsStep productImport={productImport} manualProductHref={manualProductHref} />
+            <ProductsStep
+              productImport={productImport}
+              manualProductHref={manualProductHref}
+              openingStockImport={openingStockImport}
+            />
           ) : null}
           {step === "debts" ? <DebtsStep /> : null}
           {step === "ofd" ? <OfdStep /> : null}

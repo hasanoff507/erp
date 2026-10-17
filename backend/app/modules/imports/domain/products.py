@@ -24,7 +24,7 @@ TEMPLATE_COLUMNS: Final[tuple[str, ...]] = (
     "is_marked",
 )
 REQUIRED_COLUMNS: Final = frozenset({"name", "unit_code", "vat_rate"})
-SUPPORTED_KINDS: Final = frozenset({"products"})
+SUPPORTED_KINDS: Final = frozenset({"products", "opening_stock"})  # opening_debts — Bosqich 4
 ALL_KINDS: Final = frozenset({"products", "opening_stock", "opening_debts"})
 
 _MXIK_RE: Final = re.compile(r"^[0-9]{17}$")

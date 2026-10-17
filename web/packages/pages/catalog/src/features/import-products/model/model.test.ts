@@ -126,9 +126,41 @@ describe("product import flow (19 §6, US-M04-04)", () => {
       createdProductCount: 2,
       skippedRows: 1,
       createdDocIds: ["doc-1"],
+      lineCount: 0,
     });
     expect(calls).toContain("commit:job-1");
     expect(done).toHaveLength(1);
+  });
+
+  it("kind=opening_stock (BO-21 ③b): the job is created with that kind, the result carries line_count", async () => {
+    const { api, calls } = fakeApi([
+      job({ kind: "opening_stock", status: "validated", total_rows: 2, ok_rows: 2 }),
+      job({
+        kind: "opening_stock",
+        status: "committed",
+        total_rows: 2,
+        ok_rows: 2,
+        result: { created_doc_ids: ["so-1"], line_count: 2 },
+      }),
+    ]);
+    const model = createImportFlow(deps(api), "opening_stock");
+    const scope = fork();
+    const stock = new File(["barcode;qty;unit_cost\n4780000000017;10;9800\n"], "qoldiq.csv");
+
+    await allSettled(model.fileSelected, { scope, params: stock });
+    await allSettled(model.startRequested, { scope });
+    expect(calls[0]).toBe("create:opening_stock:qoldiq.csv");
+    expect(scope.getState(model.$phase)).toBe("review");
+
+    await allSettled(model.commitRequested, { scope });
+    expect(scope.getState(model.$result)).toMatchObject({
+      createdProductCount: 0,
+      createdDocIds: ["so-1"],
+      lineCount: 2,
+      skippedRows: 0,
+    });
+    await allSettled(model.templateRequested, { scope });
+    expect(calls).toContain("template");
   });
 
   it("all rows invalid → `invalid` phase, commit is not sent; restart returns to the file step", async () => {

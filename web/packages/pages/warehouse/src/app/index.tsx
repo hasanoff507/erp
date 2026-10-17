@@ -1,9 +1,26 @@
 /**
  * @pages/warehouse — Qoldiq, kirim, ko'chirish, inventarizatsiya (M04–M07).
- * Package router (24 §1). Placeholder in Bosqich 0: no screens yet, the shell shows "Tez orada"
- * for the sidebar routes owned by this package: BO-03 /app/warehouse/stock, BO-04 /app/purchases (07-ekran-tafsilotlari.md).
- * Each screen will live in src/pages/<screen>/{model/{events,stores,effects,connections,types,lib},ui}.
+ * Package router (24 §1): route objects relative to the back-office root `/app`.
+ *
+ * - BO-03 `/app/warehouse/stock` — qoldiq, ko'chirishlar, inventarizatsiyalar, hisobdan chiqarish.
+ * - BO-04 `/app/purchases` — xaridnomalar, kirimlar, qaytarish, yetkazib beruvchilar.
  */
 import type { RouteObject } from "react-router-dom";
 
-export const routes: RouteObject[] = [];
+import type { RouteHandle } from "@shared/models";
+
+import { Purchases } from "#/pages/purchases/ui/page/Page.tsx";
+import { Stock } from "#/pages/stock/ui/page/Page.tsx";
+
+export const routes: RouteObject[] = [
+  {
+    path: Stock.route,
+    element: <Stock.Page />,
+    handle: { titleKey: Stock.titleKey } satisfies RouteHandle,
+  },
+  {
+    path: Purchases.route,
+    element: <Purchases.Page />,
+    handle: { titleKey: Purchases.titleKey } satisfies RouteHandle,
+  },
+];

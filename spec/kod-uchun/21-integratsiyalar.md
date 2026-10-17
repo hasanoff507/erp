@@ -192,7 +192,8 @@ class EInvoicePort(Protocol):
     async def get_status(self, operator_doc_id: str) -> EInvoiceStatus: ...
     async def get_risk_flag(self, operator_doc_id: str) -> RiskFlag: ...   # green|red|unknown; Didox: scoring, Faktura.uz: unknown
     async def send_power_of_attorney(self, poa_id: UUID, signed_payload: Pkcs7Signature) -> PoaResult: ...   # 6-bo'lim; powers_of_attorney dan o'qiydi
-    async def send_ettn(self, ettn_id: UUID, signature: Pkcs7Signature) -> ETtnResult: ...   # 3-bo'lim
+    async def send_ettn(self, ettn_id: UUID, payload: Mapping[str, Any], signature: Pkcs7Signature | None = None) -> ETtnResult: ...   # 3-bo'lim; B2 Fake — imzosiz darhol registered
+    async def lookup_company(self, stir: str) -> CompanyInfo | None: ...   # 19 §9 lookup-by-stir (Faktura.uz CheckCompanyExist)
 ```
 
 **Ma'lumot moslashtirish**: `einvoices(tenant_id, direction, operator, operator_doc_id, factura_type, related_einvoice_id, counterparty_id, related_doc, status, risk_flag, signed_at, payload)`; `factura_type` — `standard`/`additional`/`corrected`/…, `risk_flag` CHECK `('green','red','unknown')`, standart `'unknown'`. Qizil yoki `unknown` faktura → kiruvchi QQS `vat_moves`ga **to'lovgacha yozilmaydi** (append-only registr, qaror #5). BO-07/BO-10'dagi "kutilayotgan QQS krediti" `risk_flag IN ('red','unknown')` va to'lanmagan qoldiqdan hisoblanadi (US-M07-03/US-M10-03). Yetkazib beruvchiga qaytarishda QQS kamaytirish — yetkazib beruvchining **qo'shimcha (salbiy) EHF**i qabul qilingan davrda (`factura_type='additional'`, `related_einvoice_id` — asl EHF; SK 257, 269; VM 489 40–42-band).
@@ -257,7 +258,7 @@ sequenceDiagram
 
 **Maqsad va modullar**: tovar tashilganda elektron yuk xati — M06 (filiallar/omborlar orasidagi ko'chirish) va M07 (kirim). **Ichki ko'chirishda ham majburiy** — "Ombordan omborga" rejimi (VM 249 31-ilova, VM 168 tahriri, 13-band): jo'natuvchi bir vaqtda yuk oluvchi, EHF chiqarilmaydi; istisno — qo'lda yoki jamoat transportida tashish (24-band). Asos: VM 249 31-ilova, VM 673 (muddatlar). Qaror #63.
 
-**Yo'nalish va trigger**: (a) **kiruvchi** — sotuv bilan bir vaqtda jo'natishda e-TTN e-faktura bilan **birlashtirilgan** (12, 33-band): kirimda alohida e-TTN emas, EHF payload'idan o'qiladi; (b) **chiquvchi (ichki)** — ko'chirish hujjati `post` qilinganda `ettn_documents(transport_type='warehouse_to_warehouse', status=draft)` yoziladi, jo'natuvchi Omborchi E-IMZO bilan imzolaydi → `outbox_jobs(kind=ettn_send)`; qabul qiluvchi filial tasdiqlaydi. `transfers.transport_mode='on_foot_or_public'` bo'lsa e-TTN talab qilinmaydi (standart `vehicle`).
+**Yo'nalish va trigger**: (a) **kiruvchi** — sotuv bilan bir vaqtda jo'natishda e-TTN e-faktura bilan **birlashtirilgan** (12, 33-band): kirimda alohida e-TTN emas, EHF payload'idan o'qiladi; (b) **chiquvchi (ichki)** — ko'chirish hujjati `post` qilinganda `ettn_documents(transport_type='warehouse_to_warehouse', status='pending_signature')` yoziladi (`12-db-sxema.md` CHECK, `19-api-ombor.md` §13), jo'natuvchi Omborchi E-IMZO bilan imzolaydi → `outbox_jobs(kind=ettn_send)`; qabul qiluvchi filial tasdiqlaydi. `transfers.transport_mode='on_foot_or_public'` bo'lsa e-TTN talab qilinmaydi (standart `vehicle`).
 
 **API holati**: kanal — faqat EDO operatori: Didox — "ТТН (новый)"; Faktura.uz — ommaviy hujjat turlari ro'yxatida aniq tur yo'q (Xat 4 bilan aniqlanadi). Alohida mustaqil e-TTN API yo'q.
 

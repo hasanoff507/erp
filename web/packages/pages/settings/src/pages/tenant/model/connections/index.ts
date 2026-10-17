@@ -5,12 +5,30 @@ import { toApiError } from "@shared/api";
 import {
   createConsentFx,
   createTaxRegimeFx,
+  fetchRecostSummaryFx,
   fetchSettingsFx,
   fetchTermsFx,
+  fetchValuationFx,
   updateSettingsFx,
+  updateValuationFx,
 } from "../effects/index.ts";
-import { pageMounted, settingsReloadRequested } from "../events/index.ts";
-import { $lastConsent, $settings, $settingsError, $terms, $termsError } from "../stores/index.ts";
+import {
+  pageMounted,
+  recostSummaryOpened,
+  settingsReloadRequested,
+  valuationOpened,
+} from "../events/index.ts";
+import {
+  $lastConsent,
+  $recostSummary,
+  $recostSummaryError,
+  $settings,
+  $settingsError,
+  $terms,
+  $termsError,
+  $valuation,
+  $valuationError,
+} from "../stores/index.ts";
 
 sample({ clock: [pageMounted, settingsReloadRequested], target: fetchSettingsFx });
 sample({ clock: pageMounted, target: fetchTermsFx });
@@ -44,3 +62,25 @@ sample({
   filter: (error) => toApiError(error).details.some((d) => d.field.endsWith("terms_version")),
   target: fetchTermsFx,
 });
+
+// --- zaxira baholash usuli (19 §17) ------------------------------------------------------------------
+sample({ clock: valuationOpened, target: fetchValuationFx });
+$valuation.on(fetchValuationFx.doneData, (_, v) => v);
+$valuationError.on(fetchValuationFx.failData, (_, e) => e).reset(fetchValuationFx.done);
+// PATCH answers `{current_method, pending_change}` (19 §17) — keep `effective_from` when it is absent.
+$valuation.on(updateValuationFx.doneData, (current, updated) => ({
+  ...updated,
+  effective_from: updated.effective_from ?? current?.effective_from ?? null,
+}));
+// Refused (already changed this year) — show what the server has now.
+sample({
+  clock: updateValuationFx.failData,
+  filter: (e) => e.code === "VALUATION_METHOD_CHANGE_NOT_ALLOWED",
+  fn: () => undefined,
+  target: fetchValuationFx,
+});
+
+// --- «Qayta hisoblash navbati» holat qatori (qaror #56c) ---------------------------------------------
+sample({ clock: recostSummaryOpened, target: fetchRecostSummaryFx });
+$recostSummary.on(fetchRecostSummaryFx.doneData, (_, s) => s);
+$recostSummaryError.on(fetchRecostSummaryFx.failData, (_, e) => e).reset(fetchRecostSummaryFx.done);

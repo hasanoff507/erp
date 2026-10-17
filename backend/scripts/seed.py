@@ -80,7 +80,8 @@ async def seed_global(engine: AsyncEngine) -> None:
 
 
 _INSERT_TENANT = text(
-    "INSERT INTO app.tenants (id, name, phone, legal_form) VALUES (:id, :name, :phone, :legal_form) "
+    "INSERT INTO app.tenants (id, name, phone, legal_form, go_live_date) "
+    "VALUES (:id, :name, :phone, :legal_form, CURRENT_DATE) "
     "ON CONFLICT (id) DO NOTHING"
 )
 

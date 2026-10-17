@@ -12,9 +12,11 @@
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@shared/api": "workspace:*",
     "@shared/i18n": "workspace:*",
     "@shared/lib": "workspace:*",
     "@shared/models": "workspace:*",
@@ -38,6 +40,7 @@
     "eslint": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

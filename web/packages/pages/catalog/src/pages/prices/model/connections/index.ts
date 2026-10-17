@@ -66,7 +66,10 @@ sample({
 });
 $products
   .on(listProductsFx.doneData, (_, res) => res.items)
-  .on(saveNameRuFx.doneData, (list, updated) => list.map((p) => (p.id === updated.id ? updated : p)));
+  // PATCH answers ProductOut (no current_price / current_cost / markup_pct): merge into the list row.
+  .on(saveNameRuFx.doneData, (list, updated) =>
+    list.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)),
+  );
 $total.on(listProductsFx.doneData, (_, res) => res.total);
 $listStatus
   .on(listProductsFx, () => "loading")

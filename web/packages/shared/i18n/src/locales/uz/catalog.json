@@ -15,7 +15,8 @@
       },
       "opening_stock": {
         "title": "Boshlang'ich qoldiq",
-        "description": "Ombor qoldig'i — keyingi bosqichda (Ombor bo'limida)"
+        "description": "Ombor qoldig'i — Excel/CSV orqali, onboarding ③b qadamida",
+        "where": "Onboarding"
       },
       "opening_debts": {
         "title": "Boshlang'ich qarzlar",
@@ -69,7 +70,16 @@
       "again": "Yana fayl yuklash",
       "toProducts": "Tovarlar ro'yxatiga o'tish"
     },
-    "back": "Tovarlarga qaytish"
+    "back": "Tovarlarga qaytish",
+    "openingStock": {
+      "hint": "unit_cost — bitta birlik tannarxi (QQS to'lovchida QQSsiz), qty — miqdor, expiry_date — yaroqlilik muddati YYYY-MM-DD (ixtiyoriy). Tovar shtrix-kod bo'yicha topiladi.",
+      "committing": "Boshlang'ich qoldiq kiritilmoqda…",
+      "allOk_one": "Barcha qatorlar to'g'ri: {{count}} ta qator boshlang'ich qoldiqqa kiritiladi.",
+      "allOk_other": "Barcha qatorlar to'g'ri: {{count}} ta qator boshlang'ich qoldiqqa kiritiladi.",
+      "confirmBody": "{{ok}} ta qator boshlang'ich qoldiqqa kiritiladi. {{errors}} ta xatoli qator kiritilmaydi — ularni keyin alohida faylda yuklashingiz mumkin.",
+      "doneTitle_one": "Boshlang'ich qoldiq kiritildi: {{count}} ta qator",
+      "doneTitle_other": "Boshlang'ich qoldiq kiritildi: {{count}} ta qator"
+    }
   },
   "server": {
     "client": {
@@ -161,8 +171,8 @@
       "body": "«{{name}}» kassa katalogida ko'rinmaydi, eski hujjatlarda saqlanadi. Keyin arxivdan tiklash mumkin."
     },
     "vat": {
-      "12": "12% (standart)",
       "0": "0%",
+      "12": "12% (standart)",
       "exempt": "QQSdan ozod (imtiyoz kodi)",
       "exemptShort": "Imtiyoz"
     },
@@ -286,7 +296,7 @@
       "product": "Tovar",
       "cost": "Tannarx",
       "current": "Joriy narx",
-      "markup": "Ustama",
+      "markup": "Ustama %",
       "new": "Yangi narx",
       "delta": "O'zgarish",
       "state": "Holat"

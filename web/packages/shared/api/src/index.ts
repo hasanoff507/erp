@@ -7,13 +7,30 @@
  * `pnpm api:fetch` (running backend) or `pnpm api:gen` (committed schema).
  */
 import * as access from "./generated/access/access.ts";
+import * as accounting from "./generated/accounting/accounting.ts";
 import * as auth from "./generated/auth/auth.ts";
 import * as branches from "./generated/branches/branches.ts";
+import * as debts from "./generated/debts/debts.ts";
 import * as health from "./generated/health/health.ts";
 import * as inventory from "./generated/inventory/inventory.ts";
 import * as pricing from "./generated/pricing/pricing.ts";
+import * as purchasing from "./generated/purchasing/purchasing.ts";
+import * as stockCounts from "./generated/stock-counts/stock-counts.ts";
+import * as transfers from "./generated/transfers/transfers.ts";
 
-export const api = { access, auth, branches, health, inventory, pricing } as const;
+export const api = {
+  access,
+  accounting,
+  auth,
+  branches,
+  debts,
+  health,
+  inventory,
+  pricing,
+  purchasing,
+  stockCounts,
+  transfers,
+} as const;
 
 export { apiRequest, http } from "./_base/instance.ts";
 export {

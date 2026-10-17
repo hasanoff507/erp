@@ -7,6 +7,7 @@ reads/writes to the current tenant, ``tenant_id`` is still written explicitly.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from datetime import date
 from typing import Any
 from uuid import UUID
 
@@ -193,6 +194,19 @@ class SqlCatalogRepository:
             )
         )
         return {str(row[0]): row[1] for row in rows}
+
+    async def vat_payer(self, s: AsyncSession, on: date) -> bool:
+        """``tenant_tax_regimes`` in force on ``on``; no row → VAT payer (the general regime)."""
+        regime = (
+            await s.execute(
+                text(
+                    "SELECT regime FROM app.tenant_tax_regimes WHERE valid_from <= :d "
+                    "ORDER BY valid_from DESC LIMIT 1"
+                ),
+                {"d": on},
+            )
+        ).scalar()
+        return regime != "turnover"
 
     # --- products ---------------------------------------------------------------------------------
     async def get_product(self, s: AsyncSession, product_id: UUID, *, lock: bool = False) -> Product | None:

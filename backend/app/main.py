@@ -22,6 +22,8 @@ from app.core.middleware import RequestContextMiddleware
 from app.core.telemetry import install_telemetry, observe_engine
 from app.modules.access.api import roles as access_roles_api
 from app.modules.access.wiring import build_access_module
+from app.modules.accounting.api import ledger as accounting_ledger_api
+from app.modules.accounting.wiring import build_accounting_module
 from app.modules.auth.api import admin_users as auth_admin_api
 from app.modules.auth.api import bff as auth_bff_api
 from app.modules.auth.api import oauth as auth_oauth_api
@@ -35,10 +37,21 @@ from app.modules.branches.api import tenant as tenant_api
 from app.modules.branches.wiring import build_branches_module
 from app.modules.catalog.api import router as catalog_api
 from app.modules.catalog.wiring import build_catalog_module
+from app.modules.debts.api import counterparties as debts_counterparties_api
+from app.modules.debts.wiring import build_debts_module
 from app.modules.imports.api import router as imports_api
 from app.modules.imports.wiring import build_imports_module
+from app.modules.inventory.api import stock as inventory_stock_api
+from app.modules.inventory.api import stock_counts as inventory_stock_counts_api
+from app.modules.inventory.api import transfers as inventory_transfers_api
+from app.modules.inventory.api import write_offs as inventory_write_offs_api
+from app.modules.inventory.wiring import build_inventory_module
 from app.modules.pricing.api import router as pricing_api
 from app.modules.pricing.wiring import build_pricing_module
+from app.modules.purchasing.api import goods_receipts as purchasing_goods_receipts_api
+from app.modules.purchasing.api import purchase_orders as purchasing_purchase_orders_api
+from app.modules.purchasing.api import supplier_returns as purchasing_supplier_returns_api
+from app.modules.purchasing.wiring import build_purchasing_module
 
 
 async def _token_tenant(request: Request) -> UUID | None:
@@ -73,6 +86,11 @@ def create_app(
         app.state.catalog = build_catalog_module(settings, db, lambda: app.state.redis)
         app.state.pricing = build_pricing_module(db)
         app.state.imports = build_imports_module(settings, db)
+        # Bosqich 2 modules (inventory/stock-counts/transfers, purchasing, debts, accounting)
+        app.state.accounting = build_accounting_module(settings, db)
+        app.state.inventory = build_inventory_module(settings, db)
+        app.state.debts = build_debts_module(settings, db)
+        app.state.purchasing = build_purchasing_module(settings, db)
         app.state.readiness = ReadinessProbe(
             gating={"postgres": postgres_check(db, alembic_head()), "redis": redis_check(redis)},
         )
@@ -136,6 +154,14 @@ def create_app(
     for module_router in (
         access_roles_api.router, devices_api.router, branches_api.router, cash_registers_api.router,
         tenant_api.router, catalog_api.router, pricing_api.router, imports_api.router,
+    ):  # fmt: skip
+        app.include_router(module_router, prefix=settings.api_prefix)
+    # Bosqich 2 routers
+    for module_router in (
+        inventory_stock_api.router, inventory_transfers_api.router, inventory_stock_counts_api.router,
+        inventory_write_offs_api.router, purchasing_purchase_orders_api.router,
+        purchasing_goods_receipts_api.router, purchasing_supplier_returns_api.router,
+        debts_counterparties_api.router, accounting_ledger_api.router,
     ):  # fmt: skip
         app.include_router(module_router, prefix=settings.api_prefix)
     return app

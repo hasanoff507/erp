@@ -28,5 +28,7 @@ export interface SettingsOut {
   ai_training_consent: boolean;
   ai_cross_border_enabled: boolean;
   card_manual_fallback: SettingsOutCardManualFallback;
+  /** QT-M06-05: a sent transfer is overdue after this many hours */
+  transfer_overdue_hours: number;
   fiscal_policy: FiscalPolicyOut;
 }

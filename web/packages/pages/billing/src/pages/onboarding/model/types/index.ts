@@ -85,3 +85,17 @@ export interface ProductImportSlotProps {
   embedded?: boolean;
   onDone?: (result: ProductImportResult) => void;
 }
+
+/** ③b `openingStockMethod` (07): Excel/CSV import (`kind=opening_stock`) or manual lines (19 §16). */
+export type OpeningStockMethod = "import" | "manual";
+
+/** ③b Excel/CSV commit result (19 §6 `result.line_count`). */
+export interface OpeningStockImportResult {
+  lineCount: number;
+}
+
+/** Slot for ③b Excel/CSV: the catalog import flow with `kind="opening_stock"`, injected by the shell. */
+export interface OpeningStockImportSlotProps {
+  embedded?: boolean;
+  onDone?: (result: OpeningStockImportResult) => void;
+}

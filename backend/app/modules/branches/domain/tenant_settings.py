@@ -29,6 +29,7 @@ WRITABLE_KEYS: Final = frozenset(
         "ai_training_consent",
         "fiscal_policy",
         "card_manual_fallback",
+        "transfer_overdue_hours",
     }
 )
 
@@ -45,6 +46,7 @@ _DEFAULTS: Final[dict[str, Any]] = {
     "ai_training_consent": False,
     "ai_cross_border_enabled": False,  # qaror #61
     "card_manual_fallback": "manager_approval",  # qaror #71
+    "transfer_overdue_hours": 48,  # QT-M06-05 "kechikkan" ko'chirish chegarasi, 1..720 soat
 }
 _FISCAL_POLICY_DEFAULTS: Final[dict[str, str]] = {
     "debt_receipt_split": "single",

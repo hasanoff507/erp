@@ -6,8 +6,9 @@
  * - `createPublicRoutes(slots)`: top-level routes outside the protected layouts —
  *   BO-21 `/onboarding` (①② public, ③–⑥ with the new session), UX-INSTALL `/install` (public),
  *   `/recover` and `/invite` (linked from the AS login page). Each page is a lazy chunk.
- *   `slots.productImport` is the catalog's import flow for ③a, injected by the shell because page
- *   packages never import each other (24 §1).
+ *   `slots.productImport` is the catalog's import flow for ③a and `slots.openingStockImport` the same
+ *   flow with `kind="opening_stock"` for ③b, injected by the shell because page packages never import
+ *   each other (24 §1).
  * - UX-INSTALL helper for the shell: `startInstallPromptCapture` (call once at start). The iOS rule
  *   (`isIosNotInstalled`, `IOS_INSTALL_PATH`) lives in `@shared/lib/platform`; re-exported here for
  *   compatibility.
@@ -18,7 +19,10 @@ import type { RouteObject } from "react-router-dom";
 import type { RouteHandle } from "@shared/models";
 
 import type { OnboardingPageProps } from "#/pages/onboarding/ui/page/Page.tsx";
-import type { ProductImportSlotProps } from "#/pages/onboarding/model/types/index.ts";
+import type {
+  OpeningStockImportSlotProps,
+  ProductImportSlotProps,
+} from "#/pages/onboarding/model/types/index.ts";
 
 export const routes: RouteObject[] = [];
 
@@ -27,6 +31,8 @@ export interface PublicRouteSlots {
   productImport?: ComponentType<ProductImportSlotProps>;
   /** ③a «Qo'lda» — catalog product form route. */
   manualProductHref?: string | null;
+  /** ③b Excel/CSV — the catalog import flow with `kind="opening_stock"` (embedded). */
+  openingStockImport?: ComponentType<OpeningStockImportSlotProps>;
   /** «Yakunlash» → BO-02 (default /app/dashboard). */
   dashboardPath?: string;
   /** Shown while a lazy page chunk loads. */
@@ -37,6 +43,7 @@ export function createPublicRoutes(slots: PublicRouteSlots = {}): RouteObject[] 
   const onboardingProps: OnboardingPageProps = {
     productImport: slots.productImport,
     manualProductHref: slots.manualProductHref ?? null,
+    openingStockImport: slots.openingStockImport,
     dashboardPath: slots.dashboardPath ?? "/app/dashboard",
   };
   const fallback = slots.fallback ?? null;
@@ -80,7 +87,12 @@ export function createPublicRoutes(slots: PublicRouteSlots = {}): RouteObject[] 
   ];
 }
 
-export type { ProductImportResult, ProductImportSlotProps } from "#/pages/onboarding/model/types/index.ts";
+export type {
+  OpeningStockImportResult,
+  OpeningStockImportSlotProps,
+  ProductImportResult,
+  ProductImportSlotProps,
+} from "#/pages/onboarding/model/types/index.ts";
 export { startInstallPromptCapture } from "#/features/install-guide/model/index.ts";
 export {
   CLOUD_PRINT_ANCHOR,

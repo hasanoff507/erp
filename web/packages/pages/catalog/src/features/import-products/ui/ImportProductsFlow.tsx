@@ -8,6 +8,9 @@
  * Self-contained: owns its model instance (factory), so it can be embedded in the onboarding wizard
  * (`embedded` hides the kind picker and the screen-level title) and in the catalog import screen.
  * Requires `catalog.manage` (the server checks; the caller decides whether to render it).
+ *
+ * `kind="opening_stock"` (BO-21 ③b, 19 §6, permission `stock.opening.manage`): the same flow with the
+ * `barcode;qty;unit_cost;expiry_date` template; the commit posts one stock-opening document.
  */
 import {
   CircleCheck,
@@ -32,14 +35,18 @@ import { createImportFlow, type ImportFlowModel } from "../model/factory/index.t
 import {
   ENABLED_IMPORT_KINDS,
   IMPORT_KINDS,
+  TEMPLATE_COLUMNS,
+  type FlowImportKind,
   type ImportFlowDeps,
   type ImportProductsResult,
 } from "../model/types/index.ts";
 import { ErrorRowsTable } from "./ErrorRowsTable.tsx";
 
 export interface ImportProductsFlowProps {
-  /** Inside another screen (BO-21 ③a): no kind picker, compact header. */
+  /** Inside another screen (BO-21 ③a/③b): no kind picker, compact header. */
   embedded?: boolean;
+  /** What the file holds (19 §6): `products` (default) or `opening_stock` (BO-21 ③b). */
+  kind?: FlowImportKind;
   /** Called once when the commit finished (products created). */
   onDone?: (result: ImportProductsResult) => void;
   /** Shown as a secondary action next to the result ("Tovarlar ro'yxati" on the catalog screen). */
@@ -51,12 +58,13 @@ export interface ImportProductsFlowProps {
 
 export function ImportProductsFlow({
   embedded = false,
+  kind = "products",
   onDone,
   doneAction,
   deps,
   className,
 }: ImportProductsFlowProps) {
-  const [model] = useState(() => createImportFlow(deps ?? importFlowDeps));
+  const [model] = useState(() => createImportFlow(deps ?? importFlowDeps, kind));
   const onDoneRef = useRef(onDone);
 
   useEffect(() => {
@@ -89,6 +97,7 @@ function FlowBody({
 }) {
   const { t } = useTranslation("catalog");
   const online = useUnit($isOnline);
+  const kind: FlowImportKind = model.kind === "opening_stock" ? "opening_stock" : "products";
   const [phase, flowError, templateLoading, requestTemplate] = useUnit([
     model.$phase,
     model.$flowError,
@@ -105,11 +114,12 @@ function FlowBody({
           <div className="min-w-0 flex-1">
             <h2 className="text-h2">{t("import.template.title")}</h2>
             <p className="text-small text-foreground-secondary">{t("import.template.hint")}</p>
+            {kind === "opening_stock" ? (
+              <p className="text-small text-foreground-secondary">{t("import.openingStock.hint")}</p>
+            ) : null}
             <p className="mt-1 text-[12px] text-muted-foreground">
               {t("import.template.columns")}{" "}
-              <code className="font-semibold text-foreground-secondary">
-                name;name_ru;barcode;unit_code;mxik_code;vat_rate;price;category;is_marked
-              </code>
+              <code className="font-semibold text-foreground-secondary">{TEMPLATE_COLUMNS[kind]}</code>
             </p>
           </div>
           <Button
@@ -166,7 +176,11 @@ function KindPicker() {
             >
               <span className="flex items-center justify-between gap-2 text-[14px] font-bold">
                 {t(`import.kind.${kind}.title`)}
-                {enabled ? null : <StatusChip tone="neutral">{t("common.nextPhase")}</StatusChip>}
+                {enabled ? null : (
+                  <StatusChip tone="neutral">
+                    {kind === "opening_stock" ? t("import.kind.opening_stock.where") : t("common.nextPhase")}
+                  </StatusChip>
+                )}
               </span>
               <span className="text-small text-foreground-secondary">
                 {t(`import.kind.${kind}.description`)}
@@ -214,7 +228,7 @@ function ProgressStep({ model }: { model: ImportFlowModel }) {
   const [phase, step, file] = useUnit([model.$phase, model.$processingStep, model.$file]);
   const text =
     phase === "committing"
-      ? t("import.progress.committing")
+      ? t(model.kind === "opening_stock" ? "import.openingStock.committing" : "import.progress.committing")
       : step === "uploading"
         ? t("import.progress.uploading")
         : t("import.progress.validating");
@@ -246,6 +260,7 @@ function ReviewStep({ model, online }: { model: ImportFlowModel; online: boolean
   if (!job) return null;
 
   const invalid = phase === "invalid";
+  const opening = model.kind === "opening_stock";
   const okRows = job.ok_rows;
   const errorRows = job.error_rows;
 
@@ -279,7 +294,7 @@ function ReviewStep({ model, online }: { model: ImportFlowModel; online: boolean
         </Banner>
       ) : (
         <Banner tone="success" icon={CircleCheck}>
-          {t("import.review.allOk", { count: okRows })}
+          {t(opening ? "import.openingStock.allOk" : "import.review.allOk", { count: okRows })}
         </Banner>
       )}
 
@@ -309,7 +324,10 @@ function ReviewStep({ model, online }: { model: ImportFlowModel; online: boolean
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
         title={t("import.review.confirmTitle")}
-        description={t("import.review.confirmBody", { ok: okRows, errors: errorRows })}
+        description={t(opening ? "import.openingStock.confirmBody" : "import.review.confirmBody", {
+          ok: okRows,
+          errors: errorRows,
+        })}
         confirmLabel={t("import.review.confirmAction")}
         onConfirm={() => {
           setConfirmOpen(false);
@@ -360,13 +378,17 @@ function DoneStep({
       <span className="flex h-12 w-12 items-center justify-center rounded-full bg-success-soft text-success-strong">
         <Icon as={CircleCheck} size="lg" />
       </span>
-      <p className="text-h2">{t("import.done.title", { count: result.createdProductCount })}</p>
+      <p className="text-h2">
+        {model.kind === "opening_stock"
+          ? t("import.openingStock.doneTitle", { count: result.lineCount })
+          : t("import.done.title", { count: result.createdProductCount })}
+      </p>
       {result.skippedRows > 0 ? (
         <p className="text-small text-foreground-secondary">
           {t("import.done.skipped", { count: result.skippedRows })}
         </p>
       ) : null}
-      {result.createdDocIds.length > 0 ? (
+      {result.createdDocIds.length > 0 && model.kind === "products" ? (
         <p className="text-small text-foreground-secondary">{t("import.done.prices")}</p>
       ) : null}
       <div className="mt-2 flex flex-wrap justify-center gap-2">

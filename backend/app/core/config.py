@@ -167,6 +167,18 @@ class Settings(BaseSettings):
     # uploaded files (attachments.s3_key) until the S3 StoragePort lands (23 §7 "Fayl ombori")
     file_storage_dir: str = "./var/files"
 
+    # --- Bosqich 2 settings: purchasing/debts slice ---
+    # e-invoice operator (21 §2, EInvoicePort): "fake" — local/test/staging only (27 Bosqich 2), refused in
+    # prod; "faktura_uz" — real adapter in Bosqich 5 (until then it answers EINVOICE_PROVIDER_UNAVAILABLE)
+    einvoice_provider: Literal["fake", "faktura_uz"] = "faktura_uz"
+
+    @model_validator(mode="after")
+    def _guard_einvoice_fake(self) -> Self:
+        """27 Bosqich 2: the fake operator registers e-TTN instantly — never where documents are real."""
+        if self.environment == "prod" and self.einvoice_provider == "fake":
+            raise ValueError("prod'da ERP_EINVOICE_PROVIDER=fake ruxsat etilmaydi (27 Bosqich 2)")
+        return self
+
     log_level: str = "INFO"
     log_json: bool = True
     cors_origins: list[str] = Field(default_factory=list)

@@ -159,7 +159,7 @@
     "imported": "{{count}} ta tovar qo'shildi",
     "openingStock": {
       "title": "Boshlang'ich qoldiq",
-      "text": "Excel/CSV yoki qo'lda — keyinroq Omborda kiritiladi (tez orada).",
+      "text": "Ombordagi mavjud tovarlar miqdori va tannarxi — Excel/CSV fayldan yoki qo'lda. Keyinroq Ombor bo'limida ham kiritish mumkin.",
       "badge": "ixtiyoriy"
     }
   },
@@ -301,5 +301,45 @@
   "iosBanner": {
     "text": "iPhone/iPad'da ilovani Home ekranga o'rnating — aks holda ma'lumotlar o'chib ketishi mumkin.",
     "action": "Qanday o'rnatiladi"
+  },
+  "openingStock": {
+    "methodLabel": "Boshlang'ich qoldiqni kiritish usuli",
+    "methods": {
+      "import": {
+        "title": "Excel/CSV fayl",
+        "text": "Shtrix-kod, miqdor, tannarx, yaroqlilik muddati"
+      },
+      "manual": {
+        "title": "Qo'lda",
+        "text": "Tovarni tanlab, miqdor va tannarxni kiriting"
+      }
+    },
+    "saved": "Bu bosqichda boshlang'ich qoldiqqa {{count}} ta qator kiritildi",
+    "manual": {
+      "warehouse": "Ombor: {{name}}",
+      "search": "Tovar qidirish",
+      "searchHint": "Nom yoki shtrix-kod, kamida 2 belgi",
+      "searchPlaceholder": "Masalan: sut yoki 4780…",
+      "results": "Topilgan tovarlar",
+      "noResults": "Tovar topilmadi — avval uni ③a da qo'shing",
+      "tableLabel": "Boshlang'ich qoldiq qatorlari",
+      "columns": {
+        "product": "Tovar",
+        "qty": "Miqdor",
+        "unitCost": "Tannarx (bir birlik)",
+        "expiry": "Yaroqlilik muddati",
+        "remove": "O'chirish"
+      },
+      "qtyFor": "Miqdor — {{name}}",
+      "costFor": "Tannarx — {{name}}",
+      "expiryFor": "Yaroqlilik muddati — {{name}}",
+      "removeFor": "Qatorni o'chirish — {{name}}",
+      "empty": "Tovarni qidirib, qatorga qo'shing.",
+      "costHint": "Tannarx QQS to'lovchida QQSsiz kiritiladi.",
+      "save": "Qoldiqni saqlash ({{count}})",
+      "posted": "{{number}} hujjati o'tkazildi: {{count}} ta qator, jami {{amount}}",
+      "again": "Yana kiritish",
+      "replacedDraft": "Qatorlar o'zgartirildi — yangi qoralama bilan almashtirildi"
+    }
   }
 }

@@ -16,12 +16,19 @@ from sqlalchemy import text
 
 from app.core.db.session import Database, unscoped_transaction
 from app.core.queue import JobQueue
+from app.workers.jobs.einvoice import einvoice_ettn_sweep_fanout
+from app.workers.jobs.inventory import inventory_daily_fanout, inventory_recost_sweep_fanout
 from app.workers.jobs.system import purge_idempotency_keys_fanout, purge_login_attempts
 
 # SAQ cron runs in UTC; Asia/Tashkent is UTC+5 all year (no DST)
 CRON_JOBS: list[CronJob[Any]] = [
     CronJob(purge_login_attempts, cron="15 22 * * *"),  # 03:15 Tashkent (23 §4)
     CronJob(purge_idempotency_keys_fanout, cron="30 22 * * *"),  # 03:30 Tashkent, tenant fan-out (23 §4)
+    # Bosqich 2 inventory: valuation switch + expiry_soon/low_stock events (00:20 Tashkent), recost sweeper
+    CronJob(inventory_daily_fanout, cron="20 19 * * *"),
+    CronJob(inventory_recost_sweep_fanout, cron="*/15 * * * *"),
+    # e-TTN outbox: retries (backoff ≥ 1 min), lost enqueues, dead workers
+    CronJob(einvoice_ettn_sweep_fanout, cron="* * * * *"),
 ]
 
 _ACTIVE_TENANTS = text("SELECT app.list_active_tenant_ids()")

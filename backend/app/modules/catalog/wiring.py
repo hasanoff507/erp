@@ -20,6 +20,7 @@ from app.modules.catalog.application.ports import CatalogRepository, MxikCatalog
 from app.modules.catalog.application.products import ProductService
 from app.modules.catalog.infrastructure.mxik import FakeMxikAdapter, RedisMxikCache, TasnifMxikAdapter
 from app.modules.catalog.infrastructure.repositories import SqlCatalogRepository
+from app.modules.inventory.wiring import product_cost_reader
 from app.modules.pricing.wiring import current_price_reader
 
 __all__ = ["CatalogModule", "build_catalog_module", "build_mxik_port", "catalog_repository"]
@@ -56,7 +57,7 @@ def build_catalog_module(
         max_attempts=settings.mxik_max_attempts,
     )
     return CatalogModule(
-        products=ProductService(db.session_factory, repo, current_price_reader()),
+        products=ProductService(db.session_factory, repo, current_price_reader(), product_cost_reader()),
         categories=CategoryService(db.session_factory, repo),
         mxik=mxik,
     )

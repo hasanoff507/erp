@@ -89,7 +89,7 @@
 
 **Vazifalar:**
 - [ ] Posting xizmati: hujjat → `stock_moves`, `stock_lots`, `ledger_entries`, `vat_moves` bitta tranzaksiyada; teskari hujjat (`13-provodka-qoidalari.md` §2)
-- [ ] M07 kirim (naqd va nasiyaga), yetkazib beruvchilar
+- [ ] M07 kirim (darhol bank to'lovi bilan va nasiyaga; kassadan naqd to'lov — Bosqich 4 `supplier_payments`), yetkazib beruvchilar
 - [ ] M04 qoldiq, FIFO/AVECO (US-M04-05), qayta hisoblash ishi
 - [ ] M06 ko'chirish, M05 inventarizatsiya (US-M05-01…03) — `expected` formulasi `count_lines.counted_at` bilan (qaror #53); ortiqcha `Kt 9390`, kamomad 5910/4730 (26 #35); ombor hisobi `warehouses.inventory_account` (2910/2920); offline `transfer.*` / `stock_count.line_recorded` — Bosqich 3 sync bilan
 - [ ] Ko'chirish `post` — `ettn_documents` qoralamasi ("Ombordan omborga", `transfers.transport_mode`) yaratiladi (qaror #63); `FakeEInvoiceAdapter` e-TTN ni darhol `registered` qiladi (staging/test); real yuborish va E-IMZO — Bosqich 5

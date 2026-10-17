@@ -6,7 +6,18 @@ import { ApiError } from "@shared/api";
 import {
   $aiTerms,
   $lastConsent,
+  $recostSummary,
   $settings,
+  $valuation,
+  $valuationError,
+  canRequestValuationChange,
+  fetchRecostSummaryFx,
+  fetchValuationFx,
+  nextYearStart,
+  otherMethod,
+  recostSummaryOpened,
+  updateValuationFx,
+  valuationOpened,
   TENANT_FIELD_TAB,
   TENANT_TABS,
   buildPatch,
@@ -44,6 +55,7 @@ const settings = (patch: Partial<TenantSettings> = {}): TenantSettings => ({
     ai_training_consent: false,
     ai_cross_border_enabled: false,
     card_manual_fallback: "manager_approval",
+    transfer_overdue_hours: 48,
     fiscal_policy: { debt_receipt_split: "single", credit_sale_receipt: "none" },
   },
   tax_regime: { current: "vat", history: [] },
@@ -227,5 +239,87 @@ describe("BO-14 errors across tabs (WEB-03)", () => {
     expect(firstErrorField(["bankMfo", "name"])).toBe("name");
     expect(tabsWithErrors([])).toEqual([]);
     expect(firstErrorField(["nope"])).toBeNull();
+  });
+});
+
+describe("BO-14 zaxira baholash usuli (19 §17, US-M04-05)", () => {
+  const current = {
+    current_method: "aveco" as const,
+    effective_from: "2026-01-01",
+    pending_change: null,
+  };
+
+  it("loads the current method when the card opens", async () => {
+    const scope = fork({ handlers: [[fetchValuationFx, vi.fn(() => Promise.resolve(current))]] });
+    await allSettled(valuationOpened, { scope });
+    expect(scope.getState($valuation)).toEqual(current);
+    expect(canRequestValuationChange(scope.getState($valuation))).toBe(true);
+  });
+
+  it("a change inside the year is scheduled from 1 January (pending_change); effective_from is kept", async () => {
+    const patch = vi.fn((method: "aveco" | "fifo") =>
+      Promise.resolve({
+        current_method: "aveco" as const,
+        effective_from: null,
+        pending_change: { method, effective_from: "2027-01-01" },
+      }),
+    );
+    const scope = fork({ values: [[$valuation, current]], handlers: [[updateValuationFx, patch]] });
+    await allSettled(updateValuationFx, { scope, params: "fifo" });
+    expect(patch).toHaveBeenCalledWith("fifo");
+    expect(scope.getState($valuation)).toEqual({
+      current_method: "aveco",
+      effective_from: "2026-01-01",
+      pending_change: { method: "fifo", effective_from: "2027-01-01" },
+    });
+    expect(canRequestValuationChange(scope.getState($valuation))).toBe(false);
+  });
+
+  it("409 VALUATION_METHOD_CHANGE_NOT_ALLOWED reloads what the server has", async () => {
+    const fetch = vi.fn(() =>
+      Promise.resolve({
+        ...current,
+        pending_change: { method: "fifo" as const, effective_from: "2027-01-01" },
+      }),
+    );
+    const scope = fork({
+      values: [[$valuation, current]],
+      handlers: [
+        [
+          updateValuationFx,
+          vi.fn(() =>
+            Promise.reject(
+              new ApiError({
+                status: 409,
+                code: "VALUATION_METHOD_CHANGE_NOT_ALLOWED",
+                messageKey: "errors.valuation_method_change_not_allowed",
+              }),
+            ),
+          ),
+        ],
+        [fetchValuationFx, fetch],
+      ],
+    });
+    await allSettled(updateValuationFx, { scope, params: "fifo" }).catch(() => undefined);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(scope.getState($valuation)?.pending_change?.method).toBe("fifo");
+    expect(scope.getState($valuationError)).toBeNull();
+  });
+
+  it("recost status line counts open and failed jobs (qaror #56c)", async () => {
+    const scope = fork({
+      handlers: [
+        [fetchRecostSummaryFx, vi.fn(() => Promise.resolve({ pending: 2, failed: 1, more: false }))],
+      ],
+    });
+    await allSettled(recostSummaryOpened, { scope });
+    expect(scope.getState($recostSummary)).toEqual({ pending: 2, failed: 1, more: false });
+  });
+
+  it("lib: next year start, the other method", () => {
+    expect(nextYearStart(new Date("2026-10-17T12:00:00"))).toBe("2027-01-01");
+    expect(otherMethod("aveco")).toBe("fifo");
+    expect(otherMethod("fifo")).toBe("aveco");
+    expect(canRequestValuationChange(null)).toBe(false);
   });
 });

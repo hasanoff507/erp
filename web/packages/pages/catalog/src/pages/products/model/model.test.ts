@@ -49,7 +49,7 @@ function product(patch: Partial<ProductOut> = {}): ProductOut {
 }
 
 const page = (items: ProductOut[]): ProductPage => ({
-  items: items.map((p) => ({ ...p, current_price: null })),
+  items: items.map((p) => ({ ...p, current_price: null, current_cost: null, markup_pct: null })),
   total: items.length,
   page: 1,
   size: 25,

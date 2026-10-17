@@ -14,7 +14,7 @@ CREATE TABLE app.tenants (
   accepted_terms_ip      INET NULL,
   settings      JSONB NOT NULL DEFAULT '{}', -- TenantSettings kalitlari (11-malumotlar-modeli.md §2):
   -- ai_training_consent, ai_cross_border_enabled (standart false — rozilik berilmaguncha AI'ga chegaradan tashqari
-  -- uzatish yo'q), negative_stock_policy (allow/forbid), weight_barcode_templates[] (standart 22=WEIGHT, 21=AMOUNT),
+  -- uzatish yo'q), negative_stock_policy (allow/block), transfer_overdue_hours (48), stock_valuation (ichki: qo'llangan baholash usuli), weight_barcode_templates[] (standart 22=WEIGHT, 21=AMOUNT),
   -- low_stock_check_enabled, expiry_warning_days (standart 7), vat_diff_tolerance_amount (standart "1000.00", qaror #50),
   -- supplier_overpay_policy ('warn'|'block', standart 'warn', qaror #47), discount_posting ('gross_9050'|'net', standart
   -- 'gross_9050'), owner_withdrawal_account ('4890'|'8720', standart legal_form'dan), payment_org_commission_account

@@ -659,6 +659,10 @@ Umumiy mexanizm — chegirma (limitdan yuqori), qaytarish (limitdan yuqori/chek 
 | `credit_limit` | Money\|null | yo'q | `null` = limitsiz |
 | `standing_discount_pct` | decimal\|null | yo'q | — |
 | `notify_consent` | boolean | yo'q | — |
+| `is_supplier` | boolean | yo'q | standart `false` |
+| `is_customer` | boolean | yo'q | standart `!is_supplier`; faqat mijoz yozuvida `phone` majburiy |
+| `vat_payer` | boolean | yo'q | — |
+| `note` | string\|null | yo'q | — |
 
 **Javob**: `201 {id, version: 1, ...}`. `notify_consent_at` — hosila, `notify_consent=true` bo'lganda server vaqtni yozadi (tanadan qabul qilinmaydi).
 **Idempotentlik**: `Idempotency-Key` majburiy.
@@ -667,13 +671,13 @@ Umumiy mexanizm — chegirma (limitdan yuqori), qaytarish (limitdan yuqori/chek 
 
 **Maqsad**: qidiruv ism/telefon bo'yicha (`pg_trgm`).
 **Ruxsat**: `sales.create` yoki `debts.create` yoki `stock.view` yoki `purchases.create` (biri yetarli; `GET /{id}` ham shu).
-**So'rov**: `?search=&kind=&page=&size=`.
-**Javob**: `{items:[{id, name, phone, is_customer, is_supplier, receivable_balance, credit_limit, version}], total, page, size}` — **page pagination**.
+**So'rov**: `?search=&kind=&is_supplier=&is_customer=&archived=&page=&size=`.
+**Javob**: `{items:[{id, name, phone, is_customer, is_supplier, receivable_balance, payable_balance, credit_limit, version}], total, page, size}` — **page pagination**.
 
 ### 11.4 `GET /api/v1/counterparties/{id}` / `PATCH /api/v1/counterparties/{id}`
 
 `PATCH` — `version` tanada majburiy, `409 VERSION_CONFLICT` mos kelmasa.
-**Ruxsat**: `GET /{id}` — §11.3 bilan bir xil; `PATCH` — `debts.limit.manage` yoki `purchases.create` (`is_supplier=true` kontragent; kredit limiti/doimiy chegirma — faqat `debts.limit.manage`).
+**Ruxsat**: `GET /{id}` — §11.3 bilan bir xil; `PATCH` — `debts.limit.manage` yoki `purchases.create` (`is_supplier=true` kontragent; kredit limiti/doimiy chegirma — faqat `debts.limit.manage`). `POST /{id}/archive` · `POST /{id}/unarchive` — `debts.limit.manage` yoki `debts.create`; `purchases.create` — faqat `is_supplier=true` kontragent (aks holda `403 PERMISSION_DENIED`).
 
 ---
 

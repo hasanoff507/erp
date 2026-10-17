@@ -60,6 +60,7 @@ class ErrorCode(StrEnum):
     LOT_NOT_FOUND = "LOT_NOT_FOUND"
     STOCK_NEGATIVE = "STOCK_NEGATIVE"
     LOT_ALREADY_CONSUMED = "LOT_ALREADY_CONSUMED"
+    TRANSFER_COST_PENDING = "TRANSFER_COST_PENDING"
     BARCODE_NOT_IN_CATALOG = "BARCODE_NOT_IN_CATALOG"
     VALUATION_METHOD_CHANGE_NOT_ALLOWED = "VALUATION_METHOD_CHANGE_NOT_ALLOWED"
     WAREHOUSE_ACCOUNT_LOCKED = "WAREHOUSE_ACCOUNT_LOCKED"
@@ -276,6 +277,7 @@ ERROR_SPECS: Final[dict[ErrorCode, ErrorSpec]] = {
     ErrorCode.LOT_NOT_FOUND: ErrorSpec("Ombor/qoldiq", 404, "errors.lot_not_found"),
     ErrorCode.STOCK_NEGATIVE: ErrorSpec("Ombor/qoldiq", 200, "warnings.stock_negative"),
     ErrorCode.LOT_ALREADY_CONSUMED: ErrorSpec("Ombor/qoldiq", 409, "errors.lot_already_consumed"),
+    ErrorCode.TRANSFER_COST_PENDING: ErrorSpec("Ombor/qoldiq", 409, "errors.transfer_cost_pending"),
     ErrorCode.BARCODE_NOT_IN_CATALOG: ErrorSpec("Ombor/qoldiq", 422, "errors.barcode_not_in_catalog"),
     ErrorCode.VALUATION_METHOD_CHANGE_NOT_ALLOWED: ErrorSpec("Ombor/qoldiq", 409, "errors.valuation_method_change_not_allowed"),
     ErrorCode.WAREHOUSE_ACCOUNT_LOCKED: ErrorSpec("Ombor/qoldiq", 409, "errors.warehouse_account_locked"),

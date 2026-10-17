@@ -33,13 +33,14 @@ async def test_get_settings_defaults(client: httpx.AsyncClient, app_db: Database
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["name"] == "Mega Market" and body["legal_form"] == "llc" and body["version"] == 1
-    assert body["go_live_date"] is None and body["accepted_terms_version"] is None
+    # go_live_date is written when the tenant is created (13 §2.21: openings dated go_live_date − 1)
+    assert body["go_live_date"] is not None and body["accepted_terms_version"] is None
     assert body["settings"] == {
         "bank_account": None, "bank_mfo": None, "supplier_overpay_policy": "warn",
         "vat_diff_tolerance_amount": "1000.00", "marking_precheck": "warn", "discount_posting": "gross_9050",
         "owner_withdrawal_account": "4890", "payment_org_commission_account": "9430",
         "turnover_tax_account": "9430", "negative_stock_policy": "allow", "ai_training_consent": False,
-        "ai_cross_border_enabled": False, "card_manual_fallback": "manager_approval",
+        "ai_cross_border_enabled": False, "card_manual_fallback": "manager_approval", "transfer_overdue_hours": 48,
         "fiscal_policy": {"debt_receipt_split": "single", "credit_sale_receipt": "none"},
     }  # fmt: skip
     assert body["tax_regime"] == {"current": None, "history": []}

@@ -1,8 +1,8 @@
 """Composition of the imports module (23 §1 ``wiring.py``).
 
-``import_jobs`` spans modules (products → catalog + pricing; later
-opening_stock → inventory, opening_debts → debts), so it lives in its own
-module and reaches the others only through their ``wiring``.
+``import_jobs`` spans modules (products → catalog + pricing; opening_stock →
+inventory; later opening_debts → debts), so it lives in its own module and
+reaches the others only through their ``wiring``.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from app.modules.imports.application.service import ImportLimits, ImportService
 from app.modules.imports.infrastructure.queue import SaqEnqueuer
 from app.modules.imports.infrastructure.repositories import SqlImportJobRepository
 from app.modules.imports.infrastructure.storage import FilesystemStorage
+from app.modules.inventory.wiring import opening_import_port
 from app.modules.pricing.wiring import price_change_service
 
 __all__ = ["ImportService", "build_import_service"]
@@ -36,6 +37,7 @@ def build_import_service(
         catalog_repository(),
         price_change_service(session_factory),
         ImportLimits(max_bytes=settings.import_max_bytes, max_rows=settings.import_max_rows),
+        opening_import_port(session_factory, settings),
     )
 
 

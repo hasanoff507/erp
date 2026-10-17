@@ -56,6 +56,19 @@ describe("i18n resources — 08 §11", () => {
     );
   });
 
+  it("opening-stock import counts use Russian plural forms (1 строка, 3 строки, 37 строк)", async () => {
+    const i18n = initI18n("ru");
+    await i18n.changeLanguage("ru");
+    const t = i18n.getFixedT("ru", "catalog");
+    expect(t("import.openingStock.doneTitle", { count: 1 })).toBe("Начальные остатки внесены: 1 строка");
+    expect(t("import.openingStock.doneTitle", { count: 3 })).toBe("Начальные остатки внесены: 3 строки");
+    expect(t("import.openingStock.doneTitle", { count: 37 })).toBe("Начальные остатки внесены: 37 строк");
+    expect(t("import.openingStock.allOk", { count: 1 })).toContain("1 строка будет внесена");
+    expect(t("import.openingStock.allOk", { count: 3 })).toContain("3 строки будут внесены");
+    expect(t("import.openingStock.allOk", { count: 37 })).toContain("37 строк будет внесено");
+    await i18n.changeLanguage("uz");
+  });
+
   it.each(["uz", "ru"] as const)("%s has no empty or whitespace-only values", (lang) => {
     const empty = Object.entries(resources[lang] as Record<string, Tree>).flatMap(([ns, tree]) =>
       leaves(tree, `${ns}:`)

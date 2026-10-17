@@ -26,14 +26,14 @@
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | [Bosqich 0](#bosqich-0-poydevor-va-tashqi-ishlar) | 61 | 0 | 0 | 13 | 0 | 74 | 19 | 11 | 0 | 17 | 1 | 10 | 16 |
 | [Bosqich 1](#bosqich-1-royxatdan-otish-va-katalog) | 143 | 0 | 0 | 0 | 0 | 143 | 11 | 3 | 13 | 61 | 8 | 26 | 21 |
-| [Bosqich 2](#bosqich-2-ombor-va-hujjat-otkazish-yadrosi) | 4 | 22 | 111 | 0 | 0 | 137 | 11 | 2 | 14 | 47 | 8 | 25 | 30 |
-| [Bosqich 3](#bosqich-3-veb-kassa) | 7 | 17 | 173 | 0 | 0 | 197 | 18 | 6 | 16 | 37 | 18 | 22 | 80 |
-| [Bosqich 4](#bosqich-4-qarz-daftari-xarajatlar-hisobotlar-telegram) | 1 | 17 | 148 | 0 | 0 | 166 | 11 | 6 | 23 | 49 | 15 | 17 | 45 |
-| [Bosqich 5](#bosqich-5-fiskal-va-e-faktura) | 0 | 8 | 118 | 1 | 0 | 127 | 14 | 8 | 7 | 51 | 15 | 11 | 21 |
+| [Bosqich 2](#bosqich-2-ombor-va-hujjat-otkazish-yadrosi) | 134 | 0 | 0 | 0 | 0 | 134 | 11 | 2 | 14 | 47 | 5 | 25 | 30 |
+| [Bosqich 3](#bosqich-3-veb-kassa) | 9 | 16 | 175 | 0 | 0 | 200 | 18 | 6 | 16 | 37 | 21 | 22 | 80 |
+| [Bosqich 4](#bosqich-4-qarz-daftari-xarajatlar-hisobotlar-telegram) | 4 | 15 | 147 | 0 | 0 | 166 | 11 | 6 | 23 | 49 | 15 | 17 | 45 |
+| [Bosqich 5](#bosqich-5-fiskal-va-e-faktura) | 8 | 4 | 114 | 1 | 0 | 127 | 14 | 8 | 7 | 51 | 15 | 11 | 21 |
 | [Bosqich 6](#bosqich-6-tolov-ai-pilot) | 4 | 11 | 128 | 2 | 0 | 145 | 14 | 4 | 12 | 45 | 15 | 14 | 41 |
 | [Bosqich 7](#bosqich-7-1c-integratsiyasi) | 0 | 0 | 131 | 0 | 0 | 131 | 12 | 5 | 18 | 49 | 4 | 15 | 28 |
 | [MVP'dan keyin](#mvpdan-keyin) | 1 | 2 | 0 | 0 | 21 | 24 | 11 | 0 | 4 | 6 | 1 | 2 | 0 |
-| **Jami** | **221** | **77** | **809** | **16** | **21** | **1144** | **121** | **45** | **107** | **362** | **85** | **142** | **282** |
+| **Jami** | **364** | **48** | **695** | **16** | **21** | **1144** | **121** | **45** | **107** | **362** | **85** | **142** | **282** |
 
 Manba qamrovi: 105 US (30) → 105 tasi bosqich ro'yxatlarida; 362 endpoint katalog qatori (17: 4, 14: 48, 18: 47, 19: 91, 20: 107, 33: 65); 42 ekran (07, UX-INSTALL bilan); 142 jadval (12); 282 QT (31). Biriktirilmagan: yo'q.
 
@@ -74,6 +74,18 @@ Bosqich 1 + B0 bo'shliqlari 3 ta Opus tekshiruvchidan (xavfsizlik, spec, veb —
 | — | Qurilmani bekor qilish (`branches/infrastructure/devices.py`) so'nggi foydalanuvchilarning PIN'ini global tiklaydi (SEC-01 ga o'xshash ko'p-tenant masalasi) | 3 | PIN login va qurilma bog'lash — B3; tenant-lokal PIN talqini bilan birga |
 | — | Taklifni qayta yuborish amali yo'q (ikki tenant bir telefonni taklif qilsa, oxirgi kod amal qiladi) | 1+ | UX takomillashtirish — asoschi ustuvorligi bo'yicha |
 
+## Bosqich 2 tekshiruvi: keyingi bosqichlarga o'tkazilgan topilmalar
+
+Bosqich 2 3 ta Opus tekshiruvchidan (buxgalteriya to'g'riligi — 17, xavfsizlik/RLS/parallellik — 10, veb 07/08 — 22 topilma; qabul agenti WEB-23 ni qo'shdi) va Opus qabul agentlaridan o'tdi: 50 topilmadan 45 tasi qabul qilindi va tuzatildi (kod va/yoki spec), 3 tasi rad etildi (ACC-11, ACC-14, WEB-14 — spec aniqlashtirildi), quyidagilar — keyingi bosqichga (ACC-07, ACC-09, WEB-10 backend qismi).
+
+| Topilma | Tafsilot | Bosqich | Sabab |
+|---|---|---|---|
+| ACC-07 | Kirim qatori summasi 4 kasrli birlik narxdan qayta hisoblanadi — katta miqdorda EHF qator summasi/QQS tiyingacha mos kelmasligi mumkin | 5 | `from-einvoice` bilan qator `net_amount`/`vat_amount` asosiy qilib qabul qilinadi |
+| ACC-09 | `moved_at = posted_at`, `entry_date = doc_date`: o'tgan sanali kirim davr oxiridagi qoldiq hisobotida ko'rinmaydi | 5 | davr yopish tayyorligi: GL `inv_acct` ↔ Σ `stock_balances.value` tekshiruvi va `doc_date` bo'yicha qoldiq hisoboti |
+| WEB-10 | Qoldiq qatorlari uchun mahsulot kartalari alohida so'raladi (veb qismida cheklov va navbat qo'yildi) | 4 | `/stock-balances` ga birlik/kategoriya/shtrix-kod/markirovka maydonlari — `GET /reports/stock` bilan |
+| — | BO-03 «Barchasi» (konsolidatsiya), eksport | 4 | `/reports/stock`, eksport ishlari — M12 |
+| — | e-TTN imzolash, qo'lda ro'yxatga olish, qabul tomonda tasdiqlash | 5 | E-IMZO va real operator (19 §20) |
+
 ## Asoschi qarorlari
 
 | Band | Qaror mavzusi | Holat | Kodga ta'siri |
@@ -82,6 +94,13 @@ Bosqich 1 + B0 bo'shliqlari 3 ta Opus tekshiruvchidan (xavfsizlik, spec, veb —
 | Agent porti | Do'kon agenti lokal API porti — ruxsat ro'yxati, standart `47110` | ✅ qabul qilingan | CSP `connect-src` deploy konfiguratsiyasidagi port ro'yxatidan generatsiya qilinadi (24 §CSP, 21 §16). Hozir kodda bitta port: `web/apps/shell/csp.ts` (`agentPort = 47110`, test `csp.test.ts`), `shared/lib/src/runtime-config`; ro'yxatga kengaytirish — agent bilan (B5) |
 | braces audit | `pnpm audit` dagi `braces` topilmasini e'tiborsiz qoldirish | ✅ qabul qilingan | `web/pnpm-workspace.yaml` (audit ignore, sababi izohda: build-vaqt zanjiri, foydalanuvchi kiritmasi yo'q); tailwindcss/micromatch `braces`dan voz kechganda olib tashlanadi |
 | Noto subset | Manrope'da yo'q gliflar uchun self-hosted Noto Sans subset zaxirasi | ✅ qabul qilingan | bajarildi — G-02 (`08` §2, 26 #141) |
+| B2 QQS krediti | E-fakturasiz qo'lda kiritilgan kirimda QQS krediti post paytida ochiladi (SK 266 — kredit ro'yxatdan o'tgan EHF bilan) | ⛔ kutilmoqda | hozir: einvoice_id yo'q kirim yashil kabi; ehtiyotkor variant — `unknown` kabi kechiktirish (`purchasing/domain/receipts.py`, B5 `from-einvoice` bilan qayta ko'rish) |
+| B2 qizil faktura | Qizil/`unknown` fakturada 6010 to'liq (QQS bilan), 4410 `vat_credit='deferred'`, faqat `vat_moves` to'lovgacha kechiktiriladi | ✅ qabul qilingan (13 §2.8 tuzatildi) | `purchasing/domain/receipts.py`; B4 to'lov / B5 `green` faqat `vat_moves` yozadi |
+| B2 naqd kirim | `paid_immediately=true` faqat bank (`Kt 5110`); kassadan naqd — B4 `supplier_payments` | ✅ qabul qilingan (27, 13 §2.8) | kassa smenasi (B3) kerak |
+| B2 orqa sana | Back-office hujjatlarida `moved_at = posted_at` — o'tgan sanali kirim recost qo'zg'atmaydi, usul o'tkazilgan kundagi bo'yicha | ⛔ tasdiqlash kerak | 13 §3.1/§3.3; davr yopish tekshiruvi — B5 (ACC-09) |
+| B2 12 oy qaytarish | Asl kirimdan 12 oy o'tgan qaytarish rad etiladi (`reverse_sale_required`) — teskari realizatsiya alohida oqim | ⛔ tasdiqlash kerak | `purchasing/application/supplier_returns.py` |
+| B2 ko'chirish muddati | `settings.transfer_overdue_hours` standart 48 soat (QT-M06-05 «tenant sozlamasi» kaliti spec'da yo'q edi) | ⛔ tasdiqlash kerak | `branches/domain/tenant_settings.py`; 11/20 ga qo'shildi |
+| B2 go_live_date | `tenants.go_live_date` = ro'yxatdan o'tgan kun (boshlang'ich qoldiq `go_live_date − 1`) | ⛔ tasdiqlash kerak | `auth/infrastructure/signup_repository.py`; ilgari hech qayerda yozilmas edi |
 | Karta `unknown` | Noma'lum karta natijasini menejer rekvizitsiz yopadi | ✅ qabul qilingan | menejer faqat tasdiqlaydi, hech narsa yozmaydi (`resolved_by='manager'`), rekvizitlar NULL (qaror #71, 21 §9.2) — B3 vazifasi |
 
 ## Tashqi bog'liqliklar (26 Jadval B)
@@ -239,7 +258,7 @@ Holat: ✅ 61 · 🟡 0 · ⬜ 0 · ⛔ 13 · ⏭ 0 · jami 74
 | B0-QT-RLS-04 | ✅ | QT-RLS-04 (integration) — Berilgan oddiy tenant foydalanuvchisi (Egasi) tokeni, qachonki GET /platform/tenants (faqat platform_admins uchun) so'raladi, unda 403; Berilga… | 31; 27 (aniq havola) | test: `backend/tests/integration/test_rls.py` :: `test_qt_rls_04_no_platform_bypass_for_the_app_role` |
 | B0-QT-RLS-05 | ✅ | QT-RLS-05 (integration) — Berilgan platform.units/platform.plans/platform.addons kabi tenant_idsiz global jadval, qachonki oddiy erp_app roli bilan INSERT/UPDATE qilinsa… | 31; 27 (aniq havola) | test: `backend/tests/integration/test_rls.py` :: `test_qt_rls_05_app_role_cannot_write_global_tables` |
 | B0-QT-RLS-06 | ✅ | QT-RLS-06 (integration) — Berilgan Tenant B'da product_id=PB1 va price="9999.00" mavjud, Tenant A qurilmasi hali hech qachon bu ID bilan ishlamagan, qachonki Tenant A qu… | 31; 27 (aniq havola) | test: `backend/tests/integration/test_rls.py` :: `test_qt_rls_06_other_tenant_catalog_and_prices_are_invisible` |
-| B0-QT-RLS-07 | ✅ | QT-RLS-07 (integration) — Berilgan Tenant B qurilmasi /sync/push orqali counterparty.created voqeasini yuborgan (counterparty_id=CB1, Tenant B kontekstida qabul qilingan… | 31; 27 (aniq havola) | test: `backend/tests/integration/test_rls.py` :: `test_qt_rls_07_search_does_not_leak_other_tenant_counterparty` |
+| B0-QT-RLS-07 | ✅ | QT-RLS-07 (integration) — Berilgan Tenant B qurilmasi /sync/push orqali counterparty.created voqeasini yuborgan (counterparty_id=CB1, Tenant B kontekstida qabul qilingan… | 31; 27 (aniq havola) | test: `backend/tests/integration/test_counterparties.py` :: `test_qt_rls_07_counterparties_are_tenant_isolated` |
 | B0-QT-RLS-08 | ✅ | QT-RLS-08 (integration) — Berilgan bitta DB ulanishi (connection pool) ichida scheduler ketma-ket ikki tenant (Tenant A, keyin Tenant B) uchun job navbatga qo'yadi, biri… | 31; 27 (aniq havola) | test: `backend/tests/integration/test_rls.py` :: `test_qt_rls_08_context_does_not_survive_on_a_pooled_connection` |
 | B0-QT-OAUTH-01 | ✅ | QT-OAUTH-01 (integration) — Berilgan /oauth/authorize so'rovida code_challenge_method=plain, qachonki so'rov yuborilsa, unda rad etiladi (faqat S256 qabul qilinadi). | 31; 27 (aniq havola) | test: `backend/tests/integration/test_oauth.py` :: `test_qt_oauth_01_plain_code_challenge_is_rejected` |
 | B0-QT-OAUTH-02 | ✅ | QT-OAUTH-02 (integration) — Berilgan to'g'ri code_challenge bilan olingan code, qachonki POST /oauth/tokenga noto'g'ri code_verifier bilan almashtirilsa, unda rad etilad… | 31; 27 (aniq havola) | test: `backend/tests/integration/test_oauth.py` :: `test_qt_oauth_02_code_verifier_and_single_use` |
@@ -306,7 +325,7 @@ Holat: ✅ 143 · 🟡 0 · ⬜ 0 · ⛔ 0 · ⏭ 0 · jami 143
 | B1-EP-14#11 | ✅ | POST /auth/otp/request | 14 §20; 27 B1: Telegram OTP real (`/auth/otp/*`) | kod: `backend/app/modules/auth/api/signup.py`; test: `backend/tests/integration/test_otp_flow.py`, `backend/tests/integration/test_signup_flow.py`, `backend/tests/support/auth_signup.py` |
 | B1-EP-14#12 | ✅ | POST /auth/otp/verify | 14 §20; 27 B1: Telegram OTP real (`/auth/otp/*`) | kod: `backend/app/modules/auth/api/signup.py`; test: `backend/tests/integration/test_admin_users_invite.py`, `backend/tests/integration/test_credentials_flow.py`, `backend/tests/integration/test_otp_flow.py` |
 | B1-EP-14#13 | ✅ | POST /auth/credentials | 14 §20; 27 B1: taklif/tiklash kodi bilan kredensial o'rnatish (US-M13-04/06, 14 §4.2) | kod: `backend/app/modules/auth/api/signup.py`; test: `backend/tests/integration/test_credentials_flow.py`, `web/apps/shell/e2e/credentials.spec.ts` |
-| B1-EP-14#14 | ✅ | GET /auth/terms | 14 §20; 27 B1: Foydalanish shartlari aksepti | kod: `backend/app/modules/billing/api/terms.py`; test: `backend/tests/integration/test_terms_current.py`, `web/apps/shell/e2e/login.spec.ts`, `web/apps/shell/e2e/signup.spec.ts` |
+| B1-EP-14#14 | ✅ | GET /auth/terms | 14 §20; 27 B1: Foydalanish shartlari aksepti | kod: `backend/app/modules/billing/api/terms.py`; test: `backend/tests/integration/test_terms_current.py`, `web/apps/shell/e2e/login.spec.ts`, `web/apps/shell/e2e/opening-stock.spec.ts` |
 | B1-EP-14#15 | ✅ | GET /auth/google/start | 14 §20; 27 B1: Google bilan kirish (§2.2) | kod: `backend/app/modules/auth/api/signup.py`; test: `backend/tests/integration/test_google_login.py`, `backend/tests/unit/test_login_page.py`, `backend/tests/unit/test_otp_units.py` |
 | B1-EP-14#16 | ✅ | GET /auth/google/callback | 14 §20; 27 B1: Google bilan kirish (§2.2) | kod: `backend/app/modules/auth/api/signup.py`; test: `backend/tests/integration/test_google_login.py` |
 | B1-EP-14§18.2#1 | ✅ | GET /admin/users — Xodimlar ro'yxati | 14 §18.2; 30 (US API) | kod: `backend/app/modules/auth/api/admin_users.py`; test: `backend/tests/integration/test_admin_users_invite.py`, `backend/tests/integration/test_admin_users_update.py`, `backend/tests/support/admin_users.py` |
@@ -321,26 +340,26 @@ Holat: ✅ 143 · 🟡 0 · ⬜ 0 · ⛔ 0 · ⏭ 0 · jami 143
 | B1-EP-14§18.2#10 | ✅ | GET /admin/users — Sessiya/qurilmalarni bekor qilish | 14 §18.2; 30 (US API) | kod: `backend/app/modules/auth/api/admin_users.py`; test: `backend/tests/integration/test_admin_users_invite.py`, `backend/tests/integration/test_admin_users_update.py`, `backend/tests/support/admin_users.py` |
 | B1-EP-14§18.2#11 | ✅ | POST /admin/users/{id}/sessions/{session_id}/revoke — Bitta sessiyani bekor qilish | 14 §18.2; 30 (US API) | kod: `backend/app/modules/auth/api/admin_users.py`; test: `backend/tests/integration/test_admin_users_sessions.py`, `backend/tests/integration/test_admin_users_update.py`, `web/apps/shell/e2e/staff.spec.ts` |
 | B1-EP-18#16 | ✅ | POST /api/v1/price-changes/{id}/post → approval-requests bog'lanishi | 18 §10; 30 (US API) | kod: `backend/app/modules/pricing/api/router.py`; test: `backend/tests/integration/test_pricing_price_changes.py`, `backend/tests/support/catalog.py`, `web/apps/shell/e2e/prices.spec.ts` |
-| B1-EP-19#1 | ✅ | GET /products | 19 §1; 30 (resurs) | kod: `backend/app/modules/catalog/api/router.py`; test: `backend/tests/integration/test_catalog_products.py`, `backend/tests/integration/test_import_jobs.py`, `backend/tests/integration/test_pricing_current_price.py` |
-| B1-EP-19#2 | ✅ | POST /products | 19 §1; 30 (resurs) | kod: `backend/app/modules/catalog/api/router.py`; test: `backend/tests/integration/test_catalog_products.py`, `backend/tests/integration/test_import_jobs.py`, `backend/tests/integration/test_pricing_current_price.py` |
+| B1-EP-19#1 | ✅ | GET /products | 19 §1; 30 (resurs) | kod: `backend/app/modules/catalog/api/router.py`; test: `backend/tests/integration/test_catalog_products.py`, `backend/tests/integration/test_import_jobs.py`, `backend/tests/integration/test_inventory_product_costs.py` |
+| B1-EP-19#2 | ✅ | POST /products | 19 §1; 30 (resurs) | kod: `backend/app/modules/catalog/api/router.py`; test: `backend/tests/integration/test_catalog_products.py`, `backend/tests/integration/test_import_jobs.py`, `backend/tests/integration/test_inventory_product_costs.py` |
 | B1-EP-19#3 | ✅ | GET /products/{id} · PATCH /products/{id} | 19 §1; 30 (resurs) | kod: `backend/app/modules/catalog/api/router.py`; test: `backend/tests/integration/test_catalog_products.py`, `backend/tests/integration/test_pricing_current_price.py`, `web/apps/shell/e2e/catalog.spec.ts` |
-| B1-EP-19#4 | ✅ | POST /products/{id}/archive · POST /products/{id}/unarchive | 19 §1; 30 (resurs) | kod: `backend/app/modules/catalog/api/router.py`; test: `backend/tests/integration/test_catalog_products.py`, `backend/tests/integration/test_pricing_price_changes.py` |
+| B1-EP-19#4 | ✅ | POST /products/{id}/archive · POST /products/{id}/unarchive | 19 §1; 30 (resurs) | kod: `backend/app/modules/catalog/api/router.py`; test: `backend/tests/integration/test_catalog_products.py`, `backend/tests/integration/test_pricing_price_changes.py`, `backend/tests/integration/test_purchase_orders.py` |
 | B1-EP-19#5 | ✅ | Shtrix-kodlar — GET/POST /products/{id}/barcodes · DELETE /products/{id}/barcodes/{barcod… | 19 §1; 30 (resurs) | kod: `backend/app/modules/catalog/api/router.py`; test: `backend/tests/integration/test_catalog_products.py`, `web/apps/shell/e2e/catalog.spec.ts` |
 | B1-EP-19#6 | ✅ | POST /products/{id}/barcodes/internal-generate | 19 §1; 30 (US API) | kod: `backend/app/modules/catalog/api/router.py`; test: `backend/tests/integration/test_catalog_products.py`, `web/apps/shell/e2e/catalog.spec.ts` |
 | B1-EP-19#7 | ✅ | GET /product-categories | 19 §2; katalog (M09) — 27 B1 | kod: `backend/app/modules/catalog/api/router.py`; test: `backend/tests/integration/test_catalog_products.py`, `web/apps/shell/e2e/catalog.spec.ts`, `web/apps/shell/e2e/permissions.spec.ts` |
 | B1-EP-19#8 | ✅ | POST /product-categories | 19 §2; katalog (M09) — 27 B1 | kod: `backend/app/modules/catalog/api/router.py`; test: `backend/tests/integration/test_catalog_products.py`, `web/apps/shell/e2e/catalog.spec.ts`, `web/apps/shell/e2e/permissions.spec.ts` |
 | B1-EP-19#9 | ✅ | PATCH /product-categories/{id} | 19 §2; katalog (M09) — 27 B1 | kod: `backend/app/modules/catalog/api/router.py`; test: `backend/tests/integration/test_catalog_products.py` |
 | B1-EP-19#10 | ✅ | POST /product-categories/{id}/archive | 19 §2; katalog (M09) — 27 B1 | kod: `backend/app/modules/catalog/api/router.py`; test: `backend/tests/integration/test_catalog_products.py` |
-| B1-EP-19#11 | ✅ | GET /units | 19 §3; birliklar — katalog, 27 B1 | kod: `backend/app/modules/catalog/api/router.py`; test: `backend/tests/integration/test_catalog_products.py`, `web/apps/shell/e2e/catalog.spec.ts`, `web/apps/shell/e2e/prices.spec.ts` |
+| B1-EP-19#11 | ✅ | GET /units | 19 §3; birliklar — katalog, 27 B1 | kod: `backend/app/modules/catalog/api/router.py`; test: `backend/tests/integration/test_catalog_products.py`, `web/apps/shell/e2e/catalog.spec.ts`, `web/apps/shell/e2e/prices-cost.spec.ts` |
 | B1-EP-19#12 | ✅ | GET /products/{id}/prices | 19 §4; 30 (US API) | kod: `backend/app/modules/pricing/api/router.py`; test: `backend/tests/integration/test_catalog_products.py`, `backend/tests/integration/test_import_jobs.py`, `backend/tests/integration/test_pricing_current_price.py` |
 | B1-EP-19#13 | ✅ | POST /price-changes | 19 §4; 30 (US API) | kod: `backend/app/modules/pricing/api/router.py`; test: `backend/tests/integration/test_pricing_price_changes.py`, `backend/tests/support/catalog.py`, `web/apps/shell/e2e/prices.spec.ts` |
 | B1-EP-19#14 | ✅ | POST /price-changes/{id}/post | 19 §4; 30 (US API) | kod: `backend/app/modules/pricing/api/router.py`; test: `backend/tests/integration/test_pricing_price_changes.py`, `backend/tests/support/catalog.py`, `web/apps/shell/e2e/prices.spec.ts` |
-| B1-EP-19#20 | ✅ | GET /import-jobs/templates/{kind} | 19 §6; 30 (resurs) | kod: `backend/app/modules/imports/api/router.py`; test: `web/apps/shell/e2e/product-import.spec.ts` |
-| B1-EP-19#21 | ✅ | POST /import-jobs | 19 §6; 30 (US API) | kod: `backend/app/modules/imports/api/router.py`; test: `backend/tests/integration/test_import_jobs.py`, `backend/tests/unit/test_body_limit.py`, `web/apps/shell/e2e/product-import.spec.ts` |
-| B1-EP-19#22 | ✅ | POST /import-jobs/{id}/validate | 19 §6; 30 (resurs) | kod: `backend/app/modules/imports/api/router.py`; test: `backend/tests/integration/test_import_jobs.py` |
-| B1-EP-19#23 | ✅ | GET /import-jobs/{id} | 19 §6; 30 (resurs) | kod: `backend/app/modules/imports/api/router.py`; test: `web/apps/shell/e2e/product-import.spec.ts` |
-| B1-EP-19#24 | ✅ | GET /import-jobs/{id}/errors | 19 §6; 30 (resurs) | kod: `backend/app/modules/imports/api/router.py`; test: `backend/tests/integration/test_import_jobs.py` |
-| B1-EP-19#25 | ✅ | POST /import-jobs/{id}/commit | 19 §6; 30 (resurs) | kod: `backend/app/modules/imports/api/router.py`; test: `backend/tests/integration/test_import_jobs.py` |
+| B1-EP-19#20 | ✅ | GET /import-jobs/templates/{kind} | 19 §6; 30 (resurs) | kod: `backend/app/modules/imports/api/router.py`; test: `web/apps/shell/e2e/opening-stock.spec.ts`, `web/apps/shell/e2e/product-import.spec.ts` |
+| B1-EP-19#21 | ✅ | POST /import-jobs | 19 §6; 30 (US API) | kod: `backend/app/modules/imports/api/router.py`; test: `backend/tests/integration/test_import_jobs.py`, `backend/tests/integration/test_stock_openings.py`, `backend/tests/unit/test_body_limit.py` |
+| B1-EP-19#22 | ✅ | POST /import-jobs/{id}/validate | 19 §6; 30 (resurs) | kod: `backend/app/modules/imports/api/router.py`; test: `backend/tests/integration/test_import_jobs.py`, `backend/tests/integration/test_stock_openings.py`, `web/apps/shell/e2e/opening-stock.spec.ts` |
+| B1-EP-19#23 | ✅ | GET /import-jobs/{id} | 19 §6; 30 (resurs) | kod: `backend/app/modules/imports/api/router.py`; test: `backend/tests/integration/test_stock_openings.py`, `web/apps/shell/e2e/opening-stock.spec.ts`, `web/apps/shell/e2e/product-import.spec.ts` |
+| B1-EP-19#24 | ✅ | GET /import-jobs/{id}/errors | 19 §6; 30 (resurs) | kod: `backend/app/modules/imports/api/router.py`; test: `backend/tests/integration/test_import_jobs.py`, `backend/tests/integration/test_stock_openings.py` |
+| B1-EP-19#25 | ✅ | POST /import-jobs/{id}/commit | 19 §6; 30 (resurs) | kod: `backend/app/modules/imports/api/router.py`; test: `backend/tests/integration/test_import_jobs.py`, `backend/tests/integration/test_stock_openings.py`, `web/apps/shell/e2e/opening-stock.spec.ts` |
 | B1-EP-20#24 | ✅ | GET /roles — Rollar ro'yxati | 20 indeks; 30 (resurs) | kod: `backend/app/modules/access/api/roles.py`; test: `backend/tests/integration/test_access_roles.py`, `web/apps/shell/e2e/staff.spec.ts`, `web/packages/pages/settings/src/pages/users/model/model.test.ts` |
 | B1-EP-20#25 | ✅ | POST /roles — Yangi (maxsus) rol yaratish | 20 indeks; 30 (resurs) | kod: `backend/app/modules/access/api/roles.py`; test: `backend/tests/integration/test_access_roles.py`, `web/apps/shell/e2e/staff.spec.ts`, `web/packages/pages/settings/src/pages/users/model/model.test.ts` |
 | B1-EP-20#26 | ✅ | PATCH /roles/{id} — Rol nomini tahrirlash | 20 indeks; 30 (resurs) | kod: `backend/app/modules/access/api/roles.py`; test: `backend/tests/integration/test_access_roles.py` |
@@ -353,13 +372,13 @@ Holat: ✅ 143 · 🟡 0 · ⬜ 0 · ⛔ 0 · ⏭ 0 · jami 143
 | B1-EP-20#33 | ✅ | PATCH /branches/{id} — Filialni tahrirlash | 20 indeks; 30 (resurs) | kod: `backend/app/modules/branches/api/branches.py`; test: `backend/tests/integration/test_branches_api.py` |
 | B1-EP-20#34 | ✅ | GET /branches/{id}/tax-settings — Aholi punkti toifasi tarixi | 20 indeks; 30 (US API) | kod: `backend/app/modules/branches/api/branches.py`; test: `backend/tests/integration/test_branches_api.py` |
 | B1-EP-20#35 | ✅ | POST /branches/{id}/tax-settings — Yangi toifa qiymati qo'shish | 20 indeks; 30 (US API) | kod: `backend/app/modules/branches/api/branches.py`; test: `backend/tests/integration/test_branches_api.py` |
-| B1-EP-20#37 | ✅ | GET /warehouses — Omborlar ro'yxati | 20 indeks; US-M14-03 (30 §2b) | kod: `backend/app/modules/branches/api/branches.py`; test: `backend/tests/integration/test_branches_api.py`, `web/apps/shell/e2e/branches.spec.ts` |
+| B1-EP-20#37 | ✅ | GET /warehouses — Omborlar ro'yxati | 20 indeks; US-M14-03 (30 §2b) | kod: `backend/app/modules/branches/api/branches.py`; test: `backend/tests/integration/test_branches_api.py`, `web/apps/shell/e2e/branches.spec.ts`, `web/apps/shell/e2e/journal.spec.ts` |
 | B1-EP-20#37a | ✅ | PATCH /warehouses/{id} — Ombor nomi va tovar hisobini (2910/2920) o'zgartirish | 20 indeks; US-M14-03 (30 §2b) | kod: `backend/app/modules/branches/api/branches.py`; test: `backend/tests/integration/test_branches_api.py` |
 | B1-EP-20#38 | ✅ | GET /cash-registers — Kassalar ro'yxati | 20 indeks; 30 (katalog raqami) | kod: `backend/app/modules/branches/api/cash_registers.py`; test: `backend/tests/integration/test_branches_api.py`, `web/apps/shell/e2e/branches.spec.ts` |
 | B1-EP-20#39 | ✅ | POST /cash-registers — Yangi kassa qo'shish | 20 indeks; 30 (katalog raqami) | kod: `backend/app/modules/branches/api/cash_registers.py`; test: `backend/tests/integration/test_branches_api.py`, `web/apps/shell/e2e/branches.spec.ts` |
 | B1-EP-20#40 | ✅ | PATCH /cash-registers/{id} — Kassani tahrirlash | 20 indeks; 30 (katalog raqami) | kod: `backend/app/modules/branches/api/cash_registers.py`; test: `backend/tests/integration/test_branches_api.py` |
-| B1-EP-20#40a | ✅ | GET /tenant/settings — Do'kon sozlamalari + integratsiya holati | 20 indeks; 27 B1: do'kon sozlamalari (BO-14, BO-21) | kod: `backend/app/modules/branches/api/tenant.py`; test: `backend/tests/integration/test_tenant_settings_api.py`, `web/apps/shell/e2e/store-settings.spec.ts` |
-| B1-EP-20#40b | ✅ | PATCH /tenant/settings — Do'kon nomi, yuridik shakli, bank hisobi va tenant siyosatlari | 20 indeks; 27 B1: do'kon sozlamalari (`tenants.legal_form`) | kod: `backend/app/modules/branches/api/tenant.py`; test: `backend/tests/integration/test_tenant_settings_api.py`, `web/apps/shell/e2e/store-settings.spec.ts` |
+| B1-EP-20#40a | ✅ | GET /tenant/settings — Do'kon sozlamalari + integratsiya holati | 20 indeks; 27 B1: do'kon sozlamalari (BO-14, BO-21) | kod: `backend/app/modules/branches/api/tenant.py`; test: `backend/tests/integration/test_tenant_settings_api.py`, `web/apps/shell/e2e/store-settings.spec.ts`, `web/apps/shell/e2e/valuation.spec.ts` |
+| B1-EP-20#40b | ✅ | PATCH /tenant/settings — Do'kon nomi, yuridik shakli, bank hisobi va tenant siyosatlari | 20 indeks; 27 B1: do'kon sozlamalari (`tenants.legal_form`) | kod: `backend/app/modules/branches/api/tenant.py`; test: `backend/tests/integration/test_tenant_settings_api.py`, `web/apps/shell/e2e/store-settings.spec.ts`, `web/apps/shell/e2e/valuation.spec.ts` |
 | B1-EP-20#40c | ✅ | POST /tenant/tax-regimes — Soliq rejimini o'zgartirish (keyingi oydan) | 20 indeks; do'kon sozlamalari BO-14 — 27 B1 | kod: `backend/app/modules/branches/api/tenant.py`; test: `backend/tests/integration/test_tenant_settings_api.py`, `web/apps/shell/e2e/store-settings.spec.ts` |
 | B1-EP-20#40h | ✅ | POST /tenant/consents — AI chegaradan tashqari uzatish roziligini qabul qilish/qaytarib o… | 20 indeks; 30 (US API) | kod: `backend/app/modules/branches/api/tenant.py`; test: `backend/tests/integration/test_tenant_settings_api.py`, `web/apps/shell/e2e/store-settings.spec.ts`, `web/packages/pages/settings/src/pages/tenant/model/model.test.ts` |
 | B1-EP-20#40i | ✅ | POST /cash-registers/{id}/archive — Kassani arxivlash | 20 indeks; 30 (resurs) | kod: `backend/app/modules/branches/api/cash_registers.py`; test: `backend/tests/integration/test_branches_api.py` |
@@ -385,12 +404,12 @@ Holat: ✅ 143 · 🟡 0 · ⬜ 0 · ⛔ 0 · ⏭ 0 · jami 143
 | B1-TBL-auth.user_credentials | ✅ | `auth.user_credentials` (revizion 0003) | 12; 30 (US jadvallari) | DDL 0003; kod va test: `backend/tests/integration/test_admin_users_invite.py`, `backend/tests/integration/test_admin_users_update.py` |
 | B1-TBL-auth.otp_challenges | ✅ | `auth.otp_challenges` (revizion 0003) | 12; 30 (US jadvallari) | DDL 0003; kod va test: `backend/tests/integration/test_admin_users_credentials.py`, `backend/tests/integration/test_admin_users_invite.py` |
 | B1-TBL-auth.sessions | ✅ | `auth.sessions` (revizion 0003) | 12; 30 (US jadvallari) | DDL 0003; kod va test: `backend/tests/integration/test_admin_users_sessions.py`, `backend/tests/integration/test_admin_users_update.py` |
-| B1-TBL-app.tenants | ✅ | `app.tenants` (revizion 0002) | 12; 27 vazifa matni | DDL 0002; kod va test: `backend/tests/integration/test_migrations.py`, `backend/tests/integration/test_rls.py` |
+| B1-TBL-app.tenants | ✅ | `app.tenants` (revizion 0002) | 12; 27 vazifa matni | DDL 0002; kod va test: `backend/tests/integration/test_inventory_valuation.py`, `backend/tests/integration/test_migrations.py` |
 | B1-TBL-app.users | ✅ | `app.users` (revizion 0002) | 12; 30 (US jadvallari) | DDL 0002; kod va test: `backend/tests/integration/test_admin_users_invite.py`, `backend/tests/integration/test_otp_flow.py` |
 | B1-TBL-app.user_identities | ✅ | `app.user_identities` (revizion 0003) | 12; 27 vazifa matni | DDL 0003; kod va test: `backend/tests/integration/test_google_login.py` |
 | B1-TBL-app.branches | ✅ | `app.branches` (revizion 0002) | 12; 27 vazifa matni | DDL 0002; kod va test: `backend/tests/integration/test_branches_api.py`, `backend/tests/integration/test_pricing_current_price.py` |
 | B1-TBL-app.branch_tax_settings | ✅ | `app.branch_tax_settings` (revizion 0002) | 12; 30 (US jadvallari) | DDL 0002; kod va test: `backend/tests/integration/test_signup_flow.py` |
-| B1-TBL-app.warehouses | ✅ | `app.warehouses` (revizion 0002) | 12; 30 (US jadvallari) | DDL 0002; kod va test: `backend/tests/integration/test_catalog_products.py`, `backend/tests/integration/test_seed_and_worker.py` |
+| B1-TBL-app.warehouses | ✅ | `app.warehouses` (revizion 0002) | 12; 30 (US jadvallari) | DDL 0002; kod va test: `backend/tests/integration/test_catalog_products.py`, `backend/tests/integration/test_goods_receipts.py` |
 | B1-TBL-app.cash_registers | ✅ | `app.cash_registers` (revizion 0002) | 12; 30 (US jadvallari) | DDL 0002; kod va test: `backend/tests/integration/test_admin_users_sessions.py`, `backend/tests/integration/test_signup_flow.py` |
 | B1-TBL-app.memberships | ✅ | `app.memberships` (revizion 0002) | 12; 30 (US jadvallari) | DDL 0002; kod va test: `backend/tests/integration/test_admin_users_invite.py`, `backend/tests/integration/test_admin_users_update.py` |
 | B1-TBL-app.roles | ✅ | `app.roles` (revizion 0002) | 12; 30 (US jadvallari) | DDL 0002; kod va test: `backend/tests/integration/test_admin_users_update.py`, `backend/tests/integration/test_seed_and_worker.py` |
@@ -438,185 +457,182 @@ Holat: ✅ 143 · 🟡 0 · ⬜ 0 · ⛔ 0 · ⏭ 0 · jami 143
 
 **Maqsad (27):** Hujjat postingi (kirim, ko'chirish, inventarizatsiya, hisobdan chiqarish) to'g'ri qoldiq va provodka hosil qiladi.
 
-Holat: ✅ 4 · 🟡 22 · ⬜ 111 · ⛔ 0 · ⏭ 0 · jami 137
+Holat: ✅ 134 · 🟡 0 · ⬜ 0 · ⛔ 0 · ⏭ 0 · jami 134
 
 ### Bosqich 2 — Vazifalar (27)
 
 | ID | Holat | Band | Manba | Dalil |
 |---|---|---|---|---|
-| B2-T01 | ⬜ | Posting xizmati: hujjat → `stock_moves`, `stock_lots`, `ledger_entries`, `vat_moves` bitta tranzaksiyada; teskari hujjat (`13-provodka-qoidalari.md` §2) | 27 |  |
-| B2-T02 | ⬜ | M07 kirim (naqd va nasiyaga), yetkazib beruvchilar | 27 |  |
-| B2-T03 | ⬜ | M04 qoldiq, FIFO/AVECO (US-M04-05), qayta hisoblash ishi | 27 |  |
-| B2-T04 | ⬜ | M06 ko'chirish, M05 inventarizatsiya (US-M05-01…03) — `expected` formulasi `count_lines.counted_at` bilan (qaror #53); ortiqcha `Kt 9390`, kamomad 5910/4730 (26 #35); ombor hisobi `warehouses.inventory_account` (2910/2920); offline `transfer.*` / `stock_count…` | 27 |  |
-| B2-T05 | ⬜ | Ko'chirish `post` — `ettn_documents` qoralamasi ("Ombordan omborga", `transfers.transport_mode`) yaratiladi (qaror #63); `FakeEInvoiceAdapter` e-TTN ni darhol `registered` qiladi (staging/test); real yuborish va E-IMZO — Bosqich 5 | 27 |  |
-| B2-T06 | ⬜ | US-M07-05 yetkazib beruvchiga qaytarish | 27 |  |
-| B2-T07 | ⬜ | US-M04-06 hisobdan chiqarish + yaroqlilik muddati maydoni; faqat online (qaror #54) | 27 |  |
-| B2-T08 | ⬜ | `stock_openings` importi/kiritish (US-M04-04 qoldiq qismi, `Dt inv_acct / Kt 0000`; kontr-hisob `0000` — 26 #36) | 27 |  |
-| B2-T09 | ⬜ | `stock_lots.blocked_qty` (qaytgan muddati o'tgan tovar, `13` §2.5); AVECO `avg_costs.total_value`, manfiy qoldiq `pending` tannarxi, FIFO↔AVECO almashtirish (`13` §3) | 27 |  |
-| B2-T10 | ⬜ | Bildirishnoma voqealari `outbox_jobs(kind='telegram')` ga yoziladi (yuborish — Bosqich 4) | 27 |  |
-| B2-T11 | ⬜ | BO-03 "Ko'chirishlar" tabi (US-M06-03) | 27 |  |
+| B2-T01 | ✅ | Posting xizmati: hujjat → `stock_moves`, `stock_lots`, `ledger_entries`, `vat_moves` bitta tranzaksiyada; teskari hujjat (`13-provodka-qoidalari.md` §2) | 27 | posting toolkit: `accounting/application/posting.py` (`LedgerPoster`: hisob rejasi/Dt≠Kt/summa tekshiruvi, `vat_moves`, storno — Dt/Kt almashadi, QQS manfiy, `reversal_of_id`, ochiq davr sanasi; `PERIOD_CLOSED`), `inventory/application/stock.py` (`StockService.lock` — `stock_balances` qatorlari tartibli `FOR UPDATE`, `receive`/`issue`/`reverse_*`, cost-line analitika shartnomasi), `debts/application/register.py`; har hujjat bitta `tenant_transaction`da; test: `tests/unit/test_accounting_entries.py`, `test_accounting_ledger.py` (storno, PERIOD_CLOSED), `test_inventory_concurrency.py`, `test_debt_register.py` |
+| B2-T02 | ✅ | M07 kirim (darhol bank to'lovi bilan va nasiyaga; kassadan naqd to'lov — Bosqich 4 `supplier_payments`), yetkazib beruvchilar | 27 | `purchasing/` (goods receipts: nasiya `Kt 6010` + `debt_moves`, darhol bank `Kt 5110`, tekin `Kt 8530`, QQS/aylanma rejimi, qizil/`unknown` faktura — 4410 `vat_credit='deferred'`, avans `Kt 4310`), `debts/` (kontragentlar CRUD, STIR qidiruv, qarz balansi); test: `test_goods_receipts.py` (QT-M04-01, QT-M07-02/03/04/07/08/09, §2.6a/§2.7/§2.8/§2.16/§4.3), `test_counterparties.py`, `test_purchase_orders.py`, `tests/unit/test_purchasing_posting.py`. Kassadan naqd to'lov — B4 (`supplier_payments`) |
+| B2-T03 | ✅ | M04 qoldiq, FIFO/AVECO (US-M04-05), qayta hisoblash ishi | 27 | `inventory/domain/costing.py` (FIFO lot qiymati, AVECO `total_value`), `application/stock.py`, `application/recost.py` (`recost_jobs`, SAQ `inventory_recost` + 15 daqiqalik sweep, `/recost-jobs` API), qoldiq API (`/stock-balances|lots|moves`); test: `test_inventory_costing.py` (QT-M04-05/06/09/10), `test_recost_jobs.py` (QT-M04-11, yopilgan davr tuzatishi), `tests/unit/test_costing.py`, `test_inventory_stock_api.py` (QT-PERM-08/09) |
+| B2-T04 | ✅ | M06 ko'chirish, M05 inventarizatsiya (US-M05-01…03) — `expected` formulasi `count_lines.counted_at` bilan (qaror #53); ortiqcha `Kt 9390`, kamomad 5910/4730 (26 #35); ombor hisobi `warehouses.inventory_account` (2910/2920); offline `transfer.*` / `stock_count…` | 27 | `inventory/application/transfers.py` (2970 jo'natish/qabul, kamomad 5910, `TRANSFER_COST_PENDING`), `stock_counts.py` (X-02 `expected`, 4730/5910, ortiqcha 9390 `last_purchase_cost`da), `warehouses.inventory_account`; test: `test_transfers.py` (QT-M06-01…03/05/06), `test_stock_counts.py` (QT-M05-01…04/06/07). Offline `transfer.*`/`stock_count.line_recorded` — voqea nomlari va payload validatorlari `inventory/domain/*`da, `/sync/push` — B3 |
+| B2-T05 | ✅ | Ko'chirish `post` — `ettn_documents` qoralamasi ("Ombordan omborga", `transfers.transport_mode`) yaratiladi (qaror #63); `FakeEInvoiceAdapter` e-TTN ni darhol `registered` qiladi (staging/test); real yuborish va E-IMZO — Bosqich 5 | 27 | `ettn_documents` qoralamasi (`pending_signature`, `warehouse_to_warehouse`) transfer `post`ida; `ERP_EINVOICE_PROVIDER=fake` — `outbox_jobs(kind='ettn_send')` → `integrations/einvoice/application/ettn_outbox.py` (`FakeEInvoiceAdapter` → `registered`, `transfers.ettn_ref`, backoff 1 daq×2 cap 1 soat, 24 urinish, qulf tartibi transfer → outbox → ettn); test: `test_transfers.py::test_qt_m06_07_*`, `::test_qt_m06_08_*`, `test_ettn_outbox.py`, `tests/unit/test_ettn_lock_order.py`. Real operator va E-IMZO — B5 |
+| B2-T06 | ✅ | US-M07-05 yetkazib beruvchiga qaytarish | 27 | `purchasing/application/supplier_returns.py` (13 §2.20: `Dt 6010 / Kt inv_acct`, AVECO 3a/3b, 2-qator QQS — qo'shimcha e-faktura bilan B5; 12 oy → `reverse_sale_required`); test: `test_supplier_returns.py::test_qt_m07_06_*` va 3a/3b raqamli testlari |
+| B2-T07 | ✅ | US-M04-06 hisobdan chiqarish + yaroqlilik muddati maydoni; faqat online (qaror #54) | 27 | `inventory/application/write_offs.py` (13 §2.12: 9430/4730/9410, sovg'a QQS `Dt 9430 / Kt 6410` bozor qiymatidan + `vat_moves`, limit → `approval_requests` 202 + `over_limit_action`; partiya `expiry_date`), faqat online REST (sync voqeasi yo'q); test: `test_write_offs.py::test_qt_m04_08_*` va §2.12 matritsasi |
+| B2-T08 | ✅ | `stock_openings` importi/kiritish (US-M04-04 qoldiq qismi, `Dt inv_acct / Kt 0000`; kontr-hisob `0000` — 26 #36) | 27 | `inventory/application/openings.py` (`Dt inv_acct / Kt 0000`, `entry_date = go_live_date − 1`, QQSsiz), `imports` `kind=opening_stock` (filial doirasi tekshiruvi); `go_live_date` ro'yxatdan o'tishda yoziladi; test: `test_stock_openings.py::test_qt_m04_04_*`, `test_import_jobs.py` |
+| B2-T09 | ✅ | `stock_lots.blocked_qty` (qaytgan muddati o'tgan tovar, `13` §2.5); AVECO `avg_costs.total_value`, manfiy qoldiq `pending` tannarxi, FIFO↔AVECO almashtirish (`13` §3) | 27 | `stock_lots.blocked_qty` (`block`, `from_blocked`, bekor qilishda tiklanadi), AVECO `total_value` (eski qiymat − COGS, kirimni bekor qilish himoyasi), pending tannarx keyingi kirimda qoplanadi + recost, FIFO↔AVECO bir martalik almashtirish (`valuation.py`); test: `test_inventory_costing.py`, `test_inventory_valuation.py`, `test_write_offs.py`, `test_recost_jobs.py` |
+| B2-T10 | ✅ | Bildirishnoma voqealari `outbox_jobs(kind='telegram')` ga yoziladi (yuborish — Bosqich 4) | 27 | `notifications/application/outbox.py` (`outbox_jobs(kind='telegram')`, dedupe kaliti) — `expiry_soon`, `low_stock` (kunlik cron), `over_limit_action` (hisobdan chiqarish limiti); yuboruvchi worker yo'q (B4); test: `test_inventory_notifications.py::test_qt_m04_07_*`, `::test_qt_m04_02_*`, `test_write_offs.py` (202 yo'li) |
+| B2-T11 | ✅ | BO-03 "Ko'chirishlar" tabi (US-M06-03) | 27 | `web/packages/pages/warehouse` BO-03 «Ko'chirishlar» tabi (holat, kechikkan, e-TTN ustuni, post/jo'natish/qabul/bekor) + «Qoldiq» ostidagi qisqa blok; `transfer_overdue_hours` sozlamasi; test: `features/transfers/model/*.test.ts`, `e2e/warehouse-transfers.spec.ts`, `test_transfers.py::test_qt_m06_05_*` |
 
 ### Bosqich 2 — Tayyor ta'rifi (27)
 
 | ID | Holat | Band | Manba | Dalil |
 |---|---|---|---|---|
-| B2-DoD-01 | ⬜ | `13` §2.6–§2.12, §2.20, §2.21, §3 (FIFO/AVECO), X-02 misollari avtomatik testlarda | 27 Tayyor ta'rifi |  |
-| B2-DoD-02 | ⬜ | posting o'zgarsa raqamli testlar yangilangan. | 27 Tayyor ta'rifi |  |
+| B2-DoD-01 | ✅ | `13` §2.6–§2.12, §2.20, §2.21, §3 (FIFO/AVECO), X-02 misollari avtomatik testlarda | 27 Tayyor ta'rifi | raqamli testlar: §2.6 `test_qt_m07_03_*` (1 000 000,00 + 120 000,00), §2.6a/§2.7/§2.8/§2.16/§4.3 (`test_goods_receipts.py`), §2.9–§2.10 `test_qt_m06_01/02/03_*`, §2.11 `test_qt_m05_03_*`/`test_qt_m05_06_*` (16 000,00), §2.12 `test_qt_m04_08_*` + matritsa, §2.20 `test_supplier_returns.py` (3a/3b), §2.21 `test_qt_m04_04_*`, §3 `test_qt_m04_05_*` (980 000,00 / 270 000,00), `test_qt_m04_06_*` (8 333,3333 / 1 000 000,00 / 250 000,00), `test_qt_m04_09/10/11_*`, almashtirish `test_inventory_valuation.py`, X-02 `test_qt_m05_07_*`, `tests/unit/test_costing.py::test_x02_expected_count_qty` |
+| B2-DoD-02 | ✅ | posting o'zgarsa raqamli testlar yangilangan. | 27 Tayyor ta'rifi | tekshiruv tuzatishlari (ACC-01/02/03/04/06/15, ACC-08) bilan raqamli testlar yangilandi: `test_inventory_costing.py` (AVECO kirim bekor qilish, FIFO partiya qoldig'i 33,34), `test_purchasing_posting.py` (qizil faktura 1 120 000,00), `test_transfers.py` (`TRANSFER_COST_PENDING`), `test_stock_counts.py` (bekor qilingan kirim partiyasi — 16 000,00) |
 
 ### Bosqich 2 — Hikoyalar (27 → 30)
 
 | ID | Holat | Band | Manba | Dalil |
 |---|---|---|---|---|
-| B2-US-M04-01 | ⬜ | US-M04-01 — Kirimda balans avto yangilanish | 27 Hikoyalar; 30 (Must) |  |
-| B2-US-M04-05 | ⬜ | US-M04-05 — Tannarx usulini (FIFO/AVECO) tanlash | 27 Hikoyalar; 30 (Must) |  |
-| B2-US-M04-06 | ⬜ | US-M04-06 — Yaroqlilik muddati ogohlantirish + hisobdan chiqarish | 27 Hikoyalar; 30 (Should) |  |
-| B2-US-M05-01 | ⬜ | US-M05-01 — Sanash varag'i / haqiqiy son kiritish | 27 Hikoyalar; 30 (Must) |  |
-| B2-US-M05-02 | ⬜ | US-M05-02 — Farqni (ortiqcha/kamomad) tasdiqlash | 27 Hikoyalar; 30 (Must) |  |
-| B2-US-M05-03 | ⬜ | US-M05-03 — Kamomad/ortiqchani buxgalteriya yozuviga aks ettirish | 27 Hikoyalar; 30 (Must) |  |
-| B2-US-M06-01 | ⬜ | US-M06-01 — Ko'chirish hujjatini yaratish (yuborish) | 27 Hikoyalar; 30 (Must) |  |
-| B2-US-M06-02 | ⬜ | US-M06-02 — Kelgan tovarni tasdiqlab qabul qilish | 27 Hikoyalar; 30 (Must) |  |
-| B2-US-M06-03 | ⬜ | US-M06-03 — Ko'chirishlar tarixi va bajarilish vaqti | 27 Hikoyalar; 30 (Should) |  |
-| B2-US-M07-01 | ⬜ | US-M07-01 — Yetkazib beruvchiga xaridnoma yaratish | 27 Hikoyalar; 30 (Must) |  |
-| B2-US-M07-02 | ⬜ | US-M07-02 — Kelgan tovarni xaridnoma bilan solishtirib qabul qilish | 27 Hikoyalar; 30 (Must) |  |
-| B2-US-M07-05 | ⬜ | US-M07-05 — Yetkazib beruvchiga tovar qaytarish | 27 Hikoyalar; 30 (Should) |  |
-| B2-US-M11-01 | ⬜ | US-M11-01 — Har bir sotuv/xariddan avtomatik provodka | 27 Hikoyalar; 30 (Must) |  |
-| B2-US-M04-04 | ⬜ | US-M04-04 — Boshlang'ich katalog/qoldiq kiritish (qo'lda/import/AI-03) | 27 Hikoyalar; 30 (Must) |  |
+| B2-US-M04-01 | ✅ | US-M04-01 — Kirimda balans avto yangilanish | 27 Hikoyalar; 30 (Must) | `test_goods_receipts.py::test_qt_m04_01_*`, `test_inventory_costing.py::test_qt_m04_01_*`, `test_recost_jobs.py::test_qt_m04_11_*`; BO-03 — `e2e/warehouse-stock.spec.ts` |
+| B2-US-M04-05 | ✅ | US-M04-05 — Tannarx usulini (FIFO/AVECO) tanlash | 27 Hikoyalar; 30 (Must) | `test_qt_m04_05/06/09/10_*`, `test_inventory_valuation.py` (PATCH qoidalari, almashtirish); BO-14 — `e2e/valuation.spec.ts` |
+| B2-US-M04-06 | ✅ | US-M04-06 — Yaroqlilik muddati ogohlantirish + hisobdan chiqarish | 27 Hikoyalar; 30 (Should) | `test_inventory_notifications.py::test_qt_m04_07_*`, `test_write_offs.py::test_qt_m04_08_*`; BO-03 muddati yaqin partiyalar — `e2e/warehouse-stock.spec.ts` |
+| B2-US-M05-01 | ✅ | US-M05-01 — Sanash varag'i / haqiqiy son kiritish | 27 Hikoyalar; 30 (Must) | `test_stock_counts.py::test_qt_m05_01_*`; BO-03 back-office sanash — `e2e/warehouse-counts.spec.ts` (POS-10 skaneri — B3) |
+| B2-US-M05-02 | ✅ | US-M05-02 — Farqni (ortiqcha/kamomad) tasdiqlash | 27 Hikoyalar; 30 (Must) | `test_stock_counts.py::test_qt_m05_02_*`, `::test_qt_m05_07_*`; `e2e/warehouse-counts.spec.ts` |
+| B2-US-M05-03 | ✅ | US-M05-03 — Kamomad/ortiqchani buxgalteriya yozuviga aks ettirish | 27 Hikoyalar; 30 (Must) | `test_stock_counts.py::test_qt_m05_03_*`, `::test_qt_m05_04_*`, `::test_qt_m05_06_*` |
+| B2-US-M06-01 | ✅ | US-M06-01 — Ko'chirish hujjatini yaratish (yuborish) | 27 Hikoyalar; 30 (Must) | `test_transfers.py::test_qt_m06_01_*`, `::test_qt_m06_06_*`, `::test_qt_m06_07_*`, `::test_qt_m06_08_*`; `e2e/warehouse-transfers.spec.ts` |
+| B2-US-M06-02 | ✅ | US-M06-02 — Kelgan tovarni tasdiqlab qabul qilish | 27 Hikoyalar; 30 (Must) | `test_transfers.py::test_qt_m06_02_*`, `::test_qt_m06_03_*`; `e2e/warehouse-transfers.spec.ts` |
+| B2-US-M06-03 | ✅ | US-M06-03 — Ko'chirishlar tarixi va bajarilish vaqti | 27 Hikoyalar; 30 (Should) | `test_transfers.py::test_qt_m06_05_*` (`is_overdue`, `transfer_overdue_hours`); BO-03 «Ko'chirishlar» — `e2e/warehouse-transfers.spec.ts` |
+| B2-US-M07-01 | ✅ | US-M07-01 — Yetkazib beruvchiga xaridnoma yaratish | 27 Hikoyalar; 30 (Must) | `test_purchase_orders.py::test_qt_m07_01_*`; BO-04 — `e2e/purchases.spec.ts` |
+| B2-US-M07-02 | ✅ | US-M07-02 — Kelgan tovarni xaridnoma bilan solishtirib qabul qilish | 27 Hikoyalar; 30 (Must) | `test_goods_receipts.py::test_qt_m07_02_*`, `::test_qt_m07_07_*`, `::test_qt_m07_08_*`; `e2e/purchases.spec.ts` |
+| B2-US-M07-05 | ✅ | US-M07-05 — Yetkazib beruvchiga tovar qaytarish | 27 Hikoyalar; 30 (Should) | `test_supplier_returns.py::test_qt_m07_06_*`; `e2e/purchases.spec.ts` |
+| B2-US-M11-01 | ✅ | US-M11-01 — Har bir sotuv/xariddan avtomatik provodka | 27 Hikoyalar; 30 (Must) | xarid qismi: kirim/qaytarish/ko'chirish/inventarizatsiya/hisobdan chiqarish/boshlang'ich qoldiq — avtomatik ikki tomonlama provodka; `test_accounting_ledger.py::test_qt_m11_01_*`, BO-08 `e2e/journal.spec.ts`. Sotuv qismi (2.1–2.4) — B3 |
+| B2-US-M04-04 | ✅ | US-M04-04 — Boshlang'ich katalog/qoldiq kiritish (qo'lda/import/AI-03) | 27 Hikoyalar; 30 (Must) | qoldiq qismi: `test_stock_openings.py::test_qt_m04_04_*`, `test_import_jobs.py` (`opening_stock`); BO-21 ③b — `e2e/opening-stock.spec.ts` |
 
 ### Bosqich 2 — Endpointlar (14/17/18/19/20/33)
 
 | ID | Holat | Band | Manba | Dalil |
 |---|---|---|---|---|
-| B2-EP-18#17 | ⬜ | POST /api/v1/counterparties / GET / GET /{id} / PATCH /{id} | 18 §11.2–11.4; kontragentlar CRUD — 27 B2 (yetkazib beruvchilar); mijoz qismi — B4 |  |
-| B2-EP-19#26 | ⬜ | GET /stock-balances | 19 §7; qoldiq registri — 27 B2 (US-M04-01); `low_stock` filtri — B4 |  |
-| B2-EP-19#27 | ⬜ | GET /stock-lots | 19 §7; ombor registrlari — 27 B2 |  |
-| B2-EP-19#28 | ⬜ | GET /stock-moves | 19 §7; ombor registrlari — 27 B2 |  |
-| B2-EP-19#29 | ⬜ | POST /goods-receipts | 19 §8; 30 (US API) |  |
-| B2-EP-19#31 | ⬜ | GET /goods-receipts · GET /goods-receipts/{id} · PATCH /goods-receipts/{id} | 19 §8; 30 (US API) |  |
-| B2-EP-19#32 | ⬜ | POST /goods-receipts/{id}/post | 19 §8; 30 (US API) |  |
-| B2-EP-19#33 | ⬜ | POST /goods-receipts/{id}/cancel | 19 §8; 30 (resurs) |  |
-| B2-EP-19#39 | ⬜ | GET /counterparties?is_supplier=true&search=&archived=&cursor=&limit= | 19 §9; 27 B2: yetkazib beruvchilar (M07) |  |
-| B2-EP-19#40 | ⬜ | POST /counterparties (is_supplier=true) | 19 §9; 27 B2: yetkazib beruvchilar (M07) |  |
-| B2-EP-19#41 | ⬜ | GET/PATCH /counterparties/{id} | 19 §9; 27 B2: yetkazib beruvchilar (M07) |  |
-| B2-EP-19#42 | ⬜ | POST /counterparties/{id}/archive | 19 §9; 27 B2: yetkazib beruvchilar (M07) |  |
-| B2-EP-19#43 | ⬜ | GET /counterparties/{id}/debt-balance | 19 §9; 27 B2: yetkazib beruvchilar (M07) |  |
-| B2-EP-19#44 | ⬜ | POST /counterparties/lookup-by-stir | 19 §9; 27 B2: yetkazib beruvchilar (STIR qidiruv) |  |
-| B2-EP-19#45 | ⬜ | POST /purchase-orders | 19 §10; 30 (US API) |  |
-| B2-EP-19#46 | ⬜ | POST /purchase-orders/{id}/send | 19 §10; 30 (US API) |  |
-| B2-EP-19#47 | ⬜ | GET /purchase-orders · GET /purchase-orders/{id} | 19 §10; 30 (US API) |  |
-| B2-EP-19#48 | ⬜ | PATCH /purchase-orders/{id} | 19 §10; 30 (resurs) |  |
-| B2-EP-19#49 | ⬜ | POST /purchase-orders/{id}/cancel | 19 §10; 30 (resurs) |  |
-| B2-EP-19#52 | ⬜ | POST /supplier-returns | 19 §12; 30 (US API) |  |
-| B2-EP-19#53 | ⬜ | POST /supplier-returns/{id}/post | 19 §12; 30 (US API) |  |
-| B2-EP-19#54 | ⬜ | POST /supplier-returns/{id}/cancel | 19 §12; 30 (resurs) |  |
-| B2-EP-19#55 | ⬜ | POST /transfers | 19 §13; 30 (US API) |  |
-| B2-EP-19#56 | ⬜ | POST /transfers/{id}/post | 19 §13; 30 (US API) |  |
-| B2-EP-19#57 | ⬜ | POST /transfers/{id}/send | 19 §13; 30 (resurs) |  |
-| B2-EP-19#58 | ⬜ | POST /transfers/{id}/receive | 19 §13; 30 (US API) |  |
-| B2-EP-19#59 | ⬜ | GET /transfers · GET /transfers/{id} | 19 §13; 30 (US API) |  |
-| B2-EP-19#60 | ⬜ | POST /transfers/{id}/cancel | 19 §13; 30 (resurs) |  |
-| B2-EP-19#61 | ⬜ | POST /stock-counts | 19 §14; 30 (US API) |  |
-| B2-EP-19#62 | ⬜ | POST /stock-counts/{id}/lines (skaner kiritish) | 19 §14; 30 (US API) |  |
-| B2-EP-19#63 | ⬜ | PATCH /stock-counts/{id}/lines/{line_id} | 19 §14; 30 (resurs) |  |
-| B2-EP-19#64 | ⬜ | POST /stock-counts/{id}/submit-for-review | 19 §14; 30 (US API) |  |
-| B2-EP-19#65 | ⬜ | POST /stock-counts/{id}/post | 19 §14; 30 (US API) |  |
-| B2-EP-19#66 | ⬜ | POST /stock-counts/{id}/cancel | 19 §14; 30 (resurs) |  |
-| B2-EP-19#67 | ⬜ | GET /stock-counts · GET /stock-counts/{id} | 19 §14; 30 (US API) |  |
-| B2-EP-19#68 | ⬜ | POST /write-offs | 19 §15; 30 (US API) |  |
-| B2-EP-19#69 | ⬜ | POST /write-offs/{id}/post | 19 §15; 30 (US API) |  |
-| B2-EP-19#70 | ⬜ | POST /write-offs/{id}/cancel | 19 §15; 30 (resurs) |  |
-| B2-EP-19#71 | ⬜ | POST /stock-openings | 19 §16; 27 B2: `stock_openings` (US-M04-04 qoldiq qismi) |  |
-| B2-EP-19#72 | ⬜ | POST /stock-openings/{id}/post | 19 §16; 27 B2: `stock_openings` |  |
-| B2-EP-19#73 | ⬜ | POST /stock-openings/{id}/cancel | 19 §16; 27 B2: `stock_openings` |  |
-| B2-EP-19#74 | ⬜ | GET /valuation-settings | 19 §17; 30 (US API) |  |
-| B2-EP-19#75 | ⬜ | PATCH /valuation-settings | 19 §17; 30 (US API) |  |
-| B2-EP-19#78 | ⬜ | GET /recost-jobs | 19 §18; 27 B2: qayta hisoblash ishi |  |
-| B2-EP-19#79 | ⬜ | GET /recost-jobs/{id} | 19 §18; 27 B2: qayta hisoblash ishi |  |
-| B2-EP-19#80 | ⬜ | POST /recost-jobs/{id}/retry | 19 §18; 27 B2: qayta hisoblash ishi |  |
-| B2-EP-20#9 | ⬜ | GET /ledger-entries — Buxgalteriya jurnali | 20 indeks; 30 (US API) |  |
+| B2-EP-18#17 | ✅ | POST /api/v1/counterparties / GET / GET /{id} / PATCH /{id} | 18 §11.2–11.4; kontragentlar CRUD — 27 B2 (yetkazib beruvchilar); mijoz qismi — B4 | kod: `backend/app/modules/debts/api/counterparties.py`; test: `backend/tests/integration/test_counterparties.py`, `backend/tests/integration/test_purchase_orders.py`, `backend/tests/support/purchasing.py` |
+| B2-EP-19#26 | ✅ | GET /stock-balances | 19 §7; qoldiq registri — 27 B2 (US-M04-01); `low_stock` filtri — B4 | kod: `backend/app/modules/inventory/api/stock.py`; test: `backend/tests/integration/test_inventory_stock_api.py`, `web/apps/shell/e2e/warehouse-stock.spec.ts`, `web/apps/shell/e2e/warehouse-transfers.spec.ts` |
+| B2-EP-19#27 | ✅ | GET /stock-lots | 19 §7; ombor registrlari — 27 B2 | kod: `backend/app/modules/inventory/api/stock.py`; test: `backend/tests/integration/test_inventory_stock_api.py`, `web/apps/shell/e2e/warehouse-stock.spec.ts` |
+| B2-EP-19#28 | ✅ | GET /stock-moves | 19 §7; ombor registrlari — 27 B2 | kod: `backend/app/modules/inventory/api/stock.py`; test: `backend/tests/integration/test_inventory_stock_api.py` |
+| B2-EP-19#29 | ✅ | POST /goods-receipts | 19 §8; 30 (US API) | kod: `backend/app/modules/purchasing/api/goods_receipts.py`; test: `backend/tests/support/purchasing.py`, `web/apps/shell/e2e/purchases.spec.ts` |
+| B2-EP-19#31 | ✅ | GET /goods-receipts · GET /goods-receipts/{id} · PATCH /goods-receipts/{id} | 19 §8; 30 (US API) | kod: `backend/app/modules/purchasing/api/goods_receipts.py`; test: `backend/tests/support/purchasing.py`, `web/apps/shell/e2e/purchases.spec.ts` |
+| B2-EP-19#32 | ✅ | POST /goods-receipts/{id}/post | 19 §8; 30 (US API) | kod: `backend/app/modules/purchasing/api/goods_receipts.py`; test: `backend/tests/support/purchasing.py` |
+| B2-EP-19#33 | ✅ | POST /goods-receipts/{id}/cancel | 19 §8; 30 (resurs) | kod: `backend/app/modules/purchasing/api/goods_receipts.py`; test: `test_goods_receipts.py` (bekor qilish storno, `LOT_ALREADY_CONSUMED`, PO qayta ochiladi) |
+| B2-EP-19#39 | ✅ | GET /counterparties?is_supplier=true&search=&archived=&page=&size= | 19 §9; 27 B2: yetkazib beruvchilar (M07) | kod: `backend/app/modules/debts/api/counterparties.py`; test: `backend/tests/integration/test_counterparties.py`, `backend/tests/integration/test_purchase_orders.py`, `backend/tests/support/purchasing.py` |
+| B2-EP-19#40 | ✅ | POST /counterparties (is_supplier=true) | 19 §9; 27 B2: yetkazib beruvchilar (M07) | kod: `backend/app/modules/debts/api/counterparties.py`; test: `backend/tests/integration/test_counterparties.py`, `backend/tests/integration/test_purchase_orders.py`, `backend/tests/support/purchasing.py` |
+| B2-EP-19#41 | ✅ | GET/PATCH /counterparties/{id} | 19 §9; 27 B2: yetkazib beruvchilar (M07) | kod: `backend/app/modules/debts/api/counterparties.py`; test: `backend/tests/integration/test_counterparties.py` |
+| B2-EP-19#42 | ✅ | POST /counterparties/{id}/archive · POST /counterparties/{id}/unarchive | 19 §9; 27 B2: yetkazib beruvchilar (M07) | kod: `backend/app/modules/debts/api/counterparties.py`; test: `backend/tests/integration/test_counterparties.py`, `backend/tests/integration/test_purchase_orders.py` |
+| B2-EP-19#43 | ✅ | GET /counterparties/{id}/debt-balance | 19 §9; 27 B2: yetkazib beruvchilar (M07) | kod: `backend/app/modules/debts/api/counterparties.py`; test: `backend/tests/integration/test_counterparties.py` |
+| B2-EP-19#44 | ✅ | POST /counterparties/lookup-by-stir | 19 §9; 27 B2: yetkazib beruvchilar (STIR qidiruv) | kod: `backend/app/modules/debts/api/counterparties.py`; test: `backend/tests/integration/test_counterparties.py` |
+| B2-EP-19#45 | ✅ | POST /purchase-orders | 19 §10; 30 (US API) | kod: `backend/app/modules/purchasing/api/purchase_orders.py`; test: `backend/tests/integration/test_goods_receipts.py`, `backend/tests/integration/test_purchase_orders.py`, `backend/tests/support/purchasing.py` |
+| B2-EP-19#46 | ✅ | POST /purchase-orders/{id}/send | 19 §10; 30 (US API) | kod: `backend/app/modules/purchasing/api/purchase_orders.py`; test: `backend/tests/integration/test_goods_receipts.py`, `backend/tests/integration/test_purchase_orders.py` |
+| B2-EP-19#47 | ✅ | GET /purchase-orders · GET /purchase-orders/{id} | 19 §10; 30 (US API) | kod: `backend/app/modules/purchasing/api/purchase_orders.py`; test: `backend/tests/integration/test_goods_receipts.py`, `backend/tests/integration/test_purchase_orders.py`, `backend/tests/support/purchasing.py` |
+| B2-EP-19#48 | ✅ | PATCH /purchase-orders/{id} | 19 §10; 30 (resurs) | kod: `backend/app/modules/purchasing/api/purchase_orders.py`; test: `backend/tests/integration/test_goods_receipts.py`, `backend/tests/integration/test_purchase_orders.py` |
+| B2-EP-19#49 | ✅ | POST /purchase-orders/{id}/cancel | 19 §10; 30 (resurs) | kod: `backend/app/modules/purchasing/api/purchase_orders.py`; test: `backend/tests/integration/test_goods_receipts.py`, `backend/tests/integration/test_purchase_orders.py` |
+| B2-EP-19#52 | ✅ | POST /supplier-returns | 19 §12; 30 (US API) | kod: `backend/app/modules/purchasing/api/supplier_returns.py`; test: `backend/tests/integration/test_goods_receipts.py`, `backend/tests/support/purchasing.py`, `web/apps/shell/e2e/purchases.spec.ts` |
+| B2-EP-19#53 | ✅ | POST /supplier-returns/{id}/post | 19 §12; 30 (US API) | kod: `backend/app/modules/purchasing/api/supplier_returns.py`; test: `backend/tests/support/purchasing.py` |
+| B2-EP-19#54 | ✅ | POST /supplier-returns/{id}/cancel | 19 §12; 30 (resurs) | kod: `backend/app/modules/purchasing/api/supplier_returns.py`; test: `backend/tests/integration/test_goods_receipts.py` |
+| B2-EP-19#55 | ✅ | POST /transfers | 19 §13; 30 (US API) | kod: `backend/app/modules/inventory/api/transfers.py`; test: `backend/tests/support/inventory_docs.py`, `web/apps/shell/e2e/warehouse-transfers.spec.ts` |
+| B2-EP-19#56 | ✅ | POST /transfers/{id}/post | 19 §13; 30 (US API) | kod: `backend/app/modules/inventory/api/transfers.py`; test: `test_transfers.py` (`act(..., 'post')` — QT-M06-07/08) |
+| B2-EP-19#57 | ✅ | POST /transfers/{id}/send | 19 §13; 30 (resurs) | kod: `backend/app/modules/inventory/api/transfers.py`; test: `test_transfers.py` (`act(..., 'send')` — QT-M06-01, `ETTN_REQUIRED`) |
+| B2-EP-19#58 | ✅ | POST /transfers/{id}/receive | 19 §13; 30 (US API) | kod: `backend/app/modules/inventory/api/transfers.py`; test: `test_transfers.py` (`act(..., 'receive')` — QT-M06-02/03, `TRANSFER_COST_PENDING`) |
+| B2-EP-19#59 | ✅ | GET /transfers · GET /transfers/{id} | 19 §13; 30 (US API) | kod: `backend/app/modules/inventory/api/transfers.py`; test: `backend/tests/integration/test_ettn_outbox.py`, `backend/tests/support/inventory_docs.py`, `web/apps/shell/e2e/warehouse-transfers.spec.ts` |
+| B2-EP-19#60 | ✅ | POST /transfers/{id}/cancel | 19 §13; 30 (resurs) | kod: `backend/app/modules/inventory/api/transfers.py`; test: `test_transfers.py` (har holatdan bekor qilish, `ETTN_CANCEL_IN_OPERATOR`) |
+| B2-EP-19#61 | ✅ | POST /stock-counts | 19 §14; 30 (US API) | kod: `backend/app/modules/inventory/api/stock_counts.py`; test: `backend/tests/support/inventory_docs.py`, `web/apps/shell/e2e/warehouse-counts.spec.ts` |
+| B2-EP-19#62 | ✅ | POST /stock-counts/{id}/lines (skaner kiritish) | 19 §14; 30 (US API) | kod: `backend/app/modules/inventory/api/stock_counts.py`; test: `test_stock_counts.py` (QT-M05-01, `BARCODE_NOT_IN_CATALOG`) |
+| B2-EP-19#63 | ✅ | PATCH /stock-counts/{id}/lines/{line_id} | 19 §14; 30 (resurs) | kod: `backend/app/modules/inventory/api/stock_counts.py`; test: `test_stock_counts.py` |
+| B2-EP-19#64 | ✅ | POST /stock-counts/{id}/submit-for-review | 19 §14; 30 (US API) | kod: `backend/app/modules/inventory/api/stock_counts.py`; test: `test_stock_counts.py` (QT-M05-04) |
+| B2-EP-19#65 | ✅ | POST /stock-counts/{id}/post | 19 §14; 30 (US API) | kod: `backend/app/modules/inventory/api/stock_counts.py`; test: `test_stock_counts.py` (QT-M05-02/03/06/07, `COUNT_LINES_INCOMPLETE`) |
+| B2-EP-19#66 | ✅ | POST /stock-counts/{id}/cancel | 19 §14; 30 (resurs) | kod: `backend/app/modules/inventory/api/stock_counts.py`; test: `test_stock_counts.py` (aralash qatorli storno) |
+| B2-EP-19#67 | ✅ | GET /stock-counts · GET /stock-counts/{id} | 19 §14; 30 (US API) | kod: `backend/app/modules/inventory/api/stock_counts.py`; test: `backend/tests/support/inventory_docs.py`, `web/apps/shell/e2e/warehouse-counts.spec.ts` |
+| B2-EP-19#68 | ✅ | POST /write-offs | 19 §15; 30 (US API) | kod: `backend/app/modules/inventory/api/write_offs.py`; test: `backend/tests/support/inventory_docs.py`, `web/apps/shell/e2e/warehouse-stock.spec.ts` |
+| B2-EP-19#69 | ✅ | POST /write-offs/{id}/post | 19 §15; 30 (US API) | kod: `backend/app/modules/inventory/api/write_offs.py`; test: `test_write_offs.py` (QT-M04-08, 202 tasdiq yo'li) |
+| B2-EP-19#70 | ✅ | POST /write-offs/{id}/cancel | 19 §15; 30 (resurs) | kod: `backend/app/modules/inventory/api/write_offs.py`; test: `test_write_offs.py` (storno + QQS manfiy, `expired_return` bloklangan qoldiq tiklanadi) |
+| B2-EP-19#71 | ✅ | POST /stock-openings · GET /stock-openings · GET /stock-openings/{id} | 19 §16; 27 B2: `stock_openings` (US-M04-04 qoldiq qismi) | kod: `backend/app/modules/inventory/api/stock.py`; test: `backend/tests/integration/test_accounting_ledger.py`, `backend/tests/integration/test_stock_openings.py`, `web/apps/shell/e2e/opening-stock.spec.ts` |
+| B2-EP-19#72 | ✅ | POST /stock-openings/{id}/post | 19 §16; 27 B2: `stock_openings` | kod: `backend/app/modules/inventory/api/stock.py`; test: `backend/tests/integration/test_accounting_ledger.py`, `backend/tests/integration/test_stock_openings.py`, `web/apps/shell/e2e/opening-stock.spec.ts` |
+| B2-EP-19#73 | ✅ | POST /stock-openings/{id}/cancel | 19 §16; 27 B2: `stock_openings` | kod: `backend/app/modules/inventory/api/stock.py`; test: `backend/tests/integration/test_stock_openings.py` |
+| B2-EP-19#74 | ✅ | GET /valuation-settings | 19 §17; 30 (US API) | kod: `backend/app/modules/inventory/api/stock.py`; test: `backend/tests/integration/test_inventory_valuation.py`, `web/apps/shell/e2e/valuation.spec.ts` |
+| B2-EP-19#75 | ✅ | PATCH /valuation-settings | 19 §17; 30 (US API) | kod: `backend/app/modules/inventory/api/stock.py`; test: `backend/tests/integration/test_inventory_valuation.py`, `web/apps/shell/e2e/valuation.spec.ts` |
+| B2-EP-19#78 | ✅ | GET /recost-jobs | 19 §18; 27 B2: qayta hisoblash ishi | kod: `backend/app/modules/inventory/api/stock.py`; test: `backend/tests/integration/test_recost_jobs.py`, `backend/tests/integration/test_stock_openings.py`, `web/apps/shell/e2e/journal.spec.ts` |
+| B2-EP-19#79 | ✅ | GET /recost-jobs/{id} | 19 §18; 27 B2: qayta hisoblash ishi | kod: `backend/app/modules/inventory/api/stock.py`; test: `backend/tests/integration/test_recost_jobs.py` |
+| B2-EP-19#80 | ✅ | POST /recost-jobs/{id}/retry | 19 §18; 27 B2: qayta hisoblash ishi | kod: `backend/app/modules/inventory/api/stock.py`; test: `backend/tests/integration/test_recost_jobs.py` |
+| B2-EP-20#9 | ✅ | GET /ledger-entries — Buxgalteriya jurnali | 20 indeks; 30 (US API) | kod: `backend/app/modules/accounting/api/ledger.py`; test: `backend/tests/integration/test_accounting_ledger.py`, `backend/tests/integration/test_inventory_stock_api.py`, `web/apps/shell/e2e/journal.spec.ts` |
 
 ### Bosqich 2 — Ekranlar (06/07)
 
 | ID | Holat | Band | Manba | Dalil |
 |---|---|---|---|---|
-| B2-SCR-BO-03 | ⬜ | BO-03 — Ombor qoldig'i (+ Ko'chirishlar tab) | 07; 27/30 |  |
-| B2-SCR-BO-04 | ⬜ | BO-04 — Xaridnoma yaratish, yetkazib beruvchiga to'lov/qaytarish | 07; 27/30 |  |
-| B2-SCR-BO-08 | ⬜ | BO-08 — Buxgalteriya jurnali, provodkalar | 07; 27/30 |  |
-| B2-SCR-BO-14 | ⬜ | BO-14 — Tenant/do'kon sozlamalari | 07; 27/30 |  |
-| B2-SCR-BO-21 | ⬜ | BO-21 — Ro'yxatdan o'tish va birinchi sozlash (onboarding wizard) | 07; 27/30 |  |
-| B2-SCR-POS-08 | ⬜ | POS-08 — Yetkazib beruvchidan tovar qabul qilish (kirim) | 07; 27/30 |  |
-| B2-SCR-POS-09 | ⬜ | POS-09 — Omborlar orasida tovar ko'chirish | 07; 27/30 |  |
-| B2-SCR-POS-10 | ⬜ | POS-10 — Inventarizatsiya (jismoniy sanash) | 07; 27/30 |  |
+| B2-SCR-BO-03 | ✅ | BO-03 — Ombor qoldig'i (+ Ko'chirishlar tab) | 07; 27/30 | B2 qismi: `pages/warehouse/src/pages/stock` — «Qoldiq» (KPI, kam qoldiq/muddat banneri, jadval, ko'chirishlar qisqa bloki), «Ko'chirishlar», «Inventarizatsiyalar», hisobdan chiqarish dialogi (online); test: model testlari, `e2e/warehouse-stock|transfers|counts.spec.ts`. «Barchasi» konsolidatsiya va eksport — B4; e-TTN imzolash — B5; POS-10 — B3 |
+| B2-SCR-BO-04 | ✅ | BO-04 — Xaridnoma yaratish, yetkazib beruvchiga to'lov/qaytarish | 07; 27/30 | B2 qismi: `pages/warehouse/src/pages/purchases` — xaridnomalar, kirimlar (PO'dan, farq sababi, o'tkazish), qaytarish, yetkazib beruvchilar (STIR qidiruv, qarz balansi); test: model testlari, `e2e/purchases.spec.ts`. To'lov / «Men qarzdorman» — B4, e-ishonchnoma — B5, AI-03 — B6 |
+| B2-SCR-BO-08 | ✅ | BO-08 — Buxgalteriya jurnali, provodkalar | 07; 27/30 | B2 qismi: `pages/finance/src/pages/journal` — provodkalar jurnali (filtrlar, Dt=Kt oboroti), «Qayta hisoblash navbati» (qayta urinish); test: `journal/model/model.test.ts`, `e2e/journal.spec.ts`. Davr yopish, tuzatuvchi yozuv, eksport, hisob qoldiqlari — B4/B5 |
+| B2-SCR-BO-14 | ✅ | BO-14 — Tenant/do'kon sozlamalari | 07; 27/30 | B2 qismi: `pages/settings` tenant — baholash usuli (FIFO/AVECO, keyingi yildan, tasdiq dialogi), recost holat qatori; test: tenant model testlari, `e2e/valuation.spec.ts` |
+| B2-SCR-BO-21 | ✅ | BO-21 — Ro'yxatdan o'tish va birinchi sozlash (onboarding wizard) | 07; 27/30 | B2 qismi: ③b «Boshlang'ich qoldiq» — Excel/CSV import (`opening_stock`) va qo'lda kiritish (`pages/billing/src/features/opening-stock`); test: `opening-stock/model/model.test.ts`, `e2e/opening-stock.spec.ts` |
 
 ### Bosqich 2 — Jadvallar / migratsiyalar (12)
 
 | ID | Holat | Band | Manba | Dalil |
 |---|---|---|---|---|
-| B2-TBL-app.valuation_method_history | ✅ | `app.valuation_method_history` (revizion 0005) | 12; 30 (US jadvallari) | DDL 0005; kod va test: `backend/tests/integration/test_signup_flow.py` |
-| B2-TBL-app.counterparties | 🟡 | `app.counterparties` (revizion 0006) | 12; 27 B2: yetkazib beruvchilar (M07); mijozlar — B4 | DDL 0006 bor; modul kodi/testi yo'q |
-| B2-TBL-app.purchase_orders | 🟡 | `app.purchase_orders` (revizion 0013) | 12; 30 (US jadvallari) | DDL 0013 bor; modul kodi/testi yo'q |
-| B2-TBL-app.po_lines | 🟡 | `app.po_lines` (revizion 0013) | 12; 30 (US jadvallari) | DDL 0013 bor; modul kodi/testi yo'q |
-| B2-TBL-app.goods_receipts | 🟡 | `app.goods_receipts` (revizion 0013) | 12; 30 (US jadvallari) | DDL 0013 bor; modul kodi/testi yo'q |
-| B2-TBL-app.receipt_lines | 🟡 | `app.receipt_lines` (revizion 0013) | 12; 30 (US jadvallari) | DDL 0013 bor; modul kodi/testi yo'q |
-| B2-TBL-app.supplier_returns | 🟡 | `app.supplier_returns` (revizion 0015) | 12; 30 (US jadvallari) | DDL 0015 bor; modul kodi/testi yo'q |
-| B2-TBL-app.supplier_return_lines | 🟡 | `app.supplier_return_lines` (revizion 0015) | 12; 30 (US jadvallari) | DDL 0015 bor; modul kodi/testi yo'q |
-| B2-TBL-app.transfers | 🟡 | `app.transfers` (revizion 0014) | 12; 27 vazifa matni | DDL 0014 bor; modul kodi/testi yo'q |
-| B2-TBL-app.transfer_lines | 🟡 | `app.transfer_lines` (revizion 0014) | 12; 30 (US jadvallari) | DDL 0014 bor; modul kodi/testi yo'q |
-| B2-TBL-app.stock_counts | 🟡 | `app.stock_counts` (revizion 0014) | 12; 30 (US jadvallari) | DDL 0014 bor; modul kodi/testi yo'q |
-| B2-TBL-app.count_lines | 🟡 | `app.count_lines` (revizion 0014) | 12; 27 vazifa matni | DDL 0014 bor; modul kodi/testi yo'q |
-| B2-TBL-app.write_offs | 🟡 | `app.write_offs` (revizion 0014) | 12; 30 (US jadvallari) | DDL 0014 bor; modul kodi/testi yo'q |
-| B2-TBL-app.write_off_lines | 🟡 | `app.write_off_lines` (revizion 0014) | 12; 30 (US jadvallari) | DDL 0014 bor; modul kodi/testi yo'q |
-| B2-TBL-app.stock_openings | 🟡 | `app.stock_openings` (revizion 0014) | 12; 27 B2: `stock_openings` | DDL 0014 bor; modul kodi/testi yo'q |
-| B2-TBL-app.opening_lines | 🟡 | `app.opening_lines` (revizion 0014) | 12; 27 B2: `stock_openings` | DDL 0014 bor; modul kodi/testi yo'q |
-| B2-TBL-app.stock_moves | ✅ | `app.stock_moves` (revizion 0015) | 12; 27 vazifa matni | DDL 0015; kod va test: `backend/tests/support/branches.py` |
-| B2-TBL-app.stock_lots | 🟡 | `app.stock_lots` (revizion 0015) | 12; 27 vazifa matni | DDL 0015 bor; modul kodi/testi yo'q |
-| B2-TBL-app.avg_costs | 🟡 | `app.avg_costs` (revizion 0015) | 12; 27 vazifa matni | DDL 0015 bor; modul kodi/testi yo'q |
+| B2-TBL-app.valuation_method_history | ✅ | `app.valuation_method_history` (revizion 0005) | 12; 30 (US jadvallari) | DDL 0005; kod va test: `backend/tests/integration/test_inventory_valuation.py`, `backend/tests/integration/test_signup_flow.py` |
+| B2-TBL-app.counterparties | ✅ | `app.counterparties` (revizion 0006) | 12; 27 B2: yetkazib beruvchilar (M07); mijozlar — B4 | DDL 0006; kod va test: `backend/tests/integration/test_debt_register.py`, `backend/tests/integration/test_rls.py` |
+| B2-TBL-app.purchase_orders | ✅ | `app.purchase_orders` (revizion 0013) | 12; 30 (US jadvallari) | DDL 0013; kod va test: `backend/tests/integration/test_purchase_orders.py` |
+| B2-TBL-app.po_lines | ✅ | `app.po_lines` (revizion 0013) | 12; 30 (US jadvallari) | DDL 0013; kod: `purchasing/infrastructure/repositories.py`; test (API orqali): `test_purchase_orders.py` (qatorlarni almashtirish, `received_lines`) |
+| B2-TBL-app.goods_receipts | ✅ | `app.goods_receipts` (revizion 0013) | 12; 30 (US jadvallari) | DDL 0013; kod va test: `backend/tests/integration/test_goods_receipts.py`, `backend/tests/integration/test_purchase_orders.py` |
+| B2-TBL-app.receipt_lines | ✅ | `app.receipt_lines` (revizion 0013) | 12; 30 (US jadvallari) | DDL 0013; kod va test: `backend/tests/support/purchasing.py` |
+| B2-TBL-app.supplier_returns | ✅ | `app.supplier_returns` (revizion 0015) | 12; 30 (US jadvallari) | DDL 0015; kod va test: `backend/tests/integration/test_supplier_returns.py` |
+| B2-TBL-app.supplier_return_lines | ✅ | `app.supplier_return_lines` (revizion 0015) | 12; 30 (US jadvallari) | DDL 0015; kod: `purchasing/infrastructure/receipts_sql.py`; test (API orqali): `test_supplier_returns.py` (QQS ulushi, qoldiq qaytarilishi) |
+| B2-TBL-app.transfers | ✅ | `app.transfers` (revizion 0014) | 12; 27 vazifa matni | DDL 0014; kod va test: `backend/tests/integration/test_ettn_outbox.py`, `backend/tests/integration/test_transfers.py` |
+| B2-TBL-app.transfer_lines | ✅ | `app.transfer_lines` (revizion 0014) | 12; 30 (US jadvallari) | DDL 0014; kod: `inventory/infrastructure/transfers_sql.py` (`lot_allocations`, `unit_cost`); test (API orqali): `test_transfers.py` |
+| B2-TBL-app.stock_counts | ✅ | `app.stock_counts` (revizion 0014) | 12; 30 (US jadvallari) | DDL 0014; kod va test: `backend/tests/integration/test_stock_counts.py` |
+| B2-TBL-app.count_lines | ✅ | `app.count_lines` (revizion 0014) | 12; 27 vazifa matni | DDL 0014; kod va test: `backend/tests/integration/test_stock_counts.py` |
+| B2-TBL-app.write_offs | ✅ | `app.write_offs` (revizion 0014) | 12; 30 (US jadvallari) | DDL 0014; kod va test: `backend/tests/integration/test_write_offs.py` |
+| B2-TBL-app.write_off_lines | ✅ | `app.write_off_lines` (revizion 0014) | 12; 30 (US jadvallari) | DDL 0014; kod va test: `backend/tests/integration/test_write_offs.py` |
+| B2-TBL-app.stock_openings | ✅ | `app.stock_openings` (revizion 0014) | 12; 27 B2: `stock_openings` | DDL 0014; kod va test: `backend/tests/integration/test_import_jobs.py`, `backend/tests/integration/test_stock_openings.py` |
+| B2-TBL-app.opening_lines | ✅ | `app.opening_lines` (revizion 0014) | 12; 27 B2: `stock_openings` | DDL 0014; kod: `inventory/infrastructure/docs_sql.py`; test (API orqali): `test_stock_openings.py`, `test_import_jobs.py` |
+| B2-TBL-app.stock_moves | ✅ | `app.stock_moves` (revizion 0015) | 12; 27 vazifa matni | DDL 0015; kod va test: `backend/tests/integration/test_recost_jobs.py`, `backend/tests/integration/test_supplier_returns.py` |
+| B2-TBL-app.stock_lots | ✅ | `app.stock_lots` (revizion 0015) | 12; 27 vazifa matni | DDL 0015; kod va test: `backend/tests/support/inventory.py` |
+| B2-TBL-app.avg_costs | ✅ | `app.avg_costs` (revizion 0015) | 12; 27 vazifa matni | DDL 0015; kod va test: `backend/tests/support/inventory.py` |
 | B2-TBL-app.stock_balances | ✅ | `app.stock_balances` (revizion 0015) | 12; 30 (US jadvallari) | DDL 0015; kod va test: `backend/tests/integration/test_catalog_products.py`, `backend/tests/support/branches.py` |
-| B2-TBL-app.ledger_entries | 🟡 | `app.ledger_entries` (revizion 0015) | 12; 27 vazifa matni | DDL 0015 bor; modul kodi/testi yo'q |
-| B2-TBL-app.vat_moves | 🟡 | `app.vat_moves` (revizion 0015) | 12; 27 vazifa matni | DDL 0015 bor; modul kodi/testi yo'q |
-| B2-TBL-app.ettn_documents | 🟡 | `app.ettn_documents` (revizion 0020) | 12; 27 vazifa matni | DDL 0020 bor; modul kodi/testi yo'q |
-| B2-TBL-app.outbox_jobs | 🟡 | `app.outbox_jobs` (revizion 0022) | 12; 27 vazifa matni | DDL 0022 bor; ilova kodi bor, test yo'q |
-| B2-TBL-app.recost_jobs | 🟡 | `app.recost_jobs` (revizion 0022) | 12; 27 B2: qayta hisoblash ishi | DDL 0022 bor; modul kodi/testi yo'q |
+| B2-TBL-app.ledger_entries | ✅ | `app.ledger_entries` (revizion 0015) | 12; 27 vazifa matni | DDL 0015; kod va test: `backend/tests/integration/test_goods_receipts.py`, `backend/tests/integration/test_inventory_valuation.py` |
+| B2-TBL-app.vat_moves | ✅ | `app.vat_moves` (revizion 0015) | 12; 27 vazifa matni | DDL 0015; kod va test: `backend/tests/integration/test_accounting_ledger.py`, `backend/tests/integration/test_goods_receipts.py` |
+| B2-TBL-app.ettn_documents | ✅ | `app.ettn_documents` (revizion 0020) | 12; 27 vazifa matni | DDL 0020; kod va test: `backend/tests/integration/test_ettn_outbox.py`, `backend/tests/integration/test_transfers.py` |
+| B2-TBL-app.outbox_jobs | ✅ | `app.outbox_jobs` (revizion 0022) | 12; 27 vazifa matni | DDL 0022; kod va test: `backend/tests/integration/test_ettn_outbox.py`, `backend/tests/integration/test_inventory_notifications.py` |
+| B2-TBL-app.recost_jobs | ✅ | `app.recost_jobs` (revizion 0022) | 12; 27 B2: qayta hisoblash ishi | DDL 0022; kod va test: `backend/tests/integration/test_goods_receipts.py`, `backend/tests/integration/test_recost_jobs.py` |
 
 ### Bosqich 2 — Qabul testlari (31)
 
 | ID | Holat | Band | Manba | Dalil |
 |---|---|---|---|---|
-| B2-QT-PERM-08 | ✅ | QT-PERM-08 (integration) — Berilgan Kassir faqat "Chilonzor filiali"ga bog'langan (memberships.branch_ids=['Chilonzor']), qachonki X-Branch-Idda boshqa filial ID'si bila… | 31; 31 §1.7 — filial doirasi `stock-balances` (B2) | test: `backend/tests/integration/test_rs_dependencies.py` |
-| B2-QT-PERM-09 | ⬜ | QT-PERM-09 (integration) — Berilgan Egasi (memberships.branch_ids=[], bo'sh massiv = barcha filiallar), qachonki istalgan filial ID'si bilan so'rov yuborsa, unda hech qa… | 31; 31 §1.7 — filial doirasi `stock-balances` (B2) |  |
-| B2-QT-M04-01 | ⬜ | QT-M04-01 (happy) — Berilgan xaridnoma bo'yicha tovar qabul qilingan, qachonki qabul hujjati post qilinsa, unda stock_balances.qty avtomatik oshadi, yangi stock_lots qat… | 31; 31 US (US-M04-01) |  |
-| B2-QT-M04-04 | ⬜ | QT-M04-04 (happy) — Berilgan yangi tenant (go_live_date belgilangan), qachonki Egasi "Boshlang'ich qoldiq" (stock-openings) kiritsa, unda stock_lots/stock_balances boshl… | 31; boshlang'ich qoldiq (`stock-openings`) — 27 B2 |  |
-| B2-QT-M04-05 | ⬜ | QT-M04-05 (happy — FIFO) — Berilgan 2 kirim: 100 dona × "8000.0000" so'm, so'ng 50 dona × "9000.0000" so'm, qachonki 120 dona sotilsa, unda FIFO bo'yicha COGS = 100×8000… | 31; 31 US (US-M04-05) |  |
-| B2-QT-M04-06 | ⬜ | QT-M04-06 (happy — AVECO) — Berilgan xuddi shu 2 kirim, tenant usuli AVECO, qachonki 120 dona sotilsa, unda kirim 2'dan keyin avg_cost = "8333.3333"; COGS = 120 × 8333.3… | 31; 31 US (US-M04-05) |  |
-| B2-QT-M04-07 | ⬜ | QT-M04-07 (happy) — Berilgan partiyada yaroqlilik muddatiga 7 kun qolgan, qachonki kunlik tekshiruv ishga tushsa, unda Egasi/Menejerga ro'yxat (tovar, partiya, qoldiq, m… | 31; 31 US (US-M04-06) |  |
-| B2-QT-M04-08 | ⬜ | QT-M04-08 (negative) — Berilgan tovar muddati o'tgan, qachonki Omborchi "Hisobdan chiqarish" hujjatini sabab bilan yaratsa, unda stock_moves(qty=-N), ledger_entries: Dt… | 31; 31 US (US-M04-06) |  |
-| B2-QT-M04-09 | ⬜ | QT-M04-09 (unit — qaytarish tannarxi (FIFO)) — Berilgan QT-M04-05'dagi sotuv (lot_allocations: 100×"8000.0000" + 20×"9000.0000"), qachonki mijoz shu chekdagi 5 donani qa… | 31; 31 US (US-M04-05) |  |
-| B2-QT-M04-10 | ⬜ | QT-M04-10 (unit — qaytarish tannarxi (AVECO)) — Berilgan QT-M04-06'dagi holat (avg_cost="8333.3333" sotuv paytida), keyinroq yangi kirim bilan avg_cost o'zgargan, qachon… | 31; 31 US (US-M04-05) |  |
-| B2-QT-M04-11 | ⬜ | QT-M04-11 (negative (manfiy qoldiq, offline)) — Berilgan ikki qurilma bir-biridan bexabar offline rejimda oxirgi ma'lum qoldiqdagi bitta donani sotadi (stock_balances.qt… | 31; 31 US (US-M04-01) |  |
-| B2-QT-M05-01 | ⬜ | QT-M05-01 (happy) — Berilgan inventarizatsiya boshlangan (stock-counts), qachonki Omborchi har tovar bo'yicha haqiqiy sonni kiritsa, unda tizim haqiqiy son bilan tizimda… | 31; 31 US (US-M05-01) |  |
-| B2-QT-M05-02 | ⬜ | QT-M05-02 (happy) — Berilgan farq ro'yxati tayyor — "Coca-Cola 1.5L" bo'yicha kamomad 3 dona, qachonki Menejer/Egasi tasdiqlasa (POST /stock-counts/{id}/post), unda stoc… | 31; 31 US (US-M05-02) |  |
-| B2-QT-M05-03 | ⬜ | QT-M05-03 (happy) — Berilgan inventarizatsiya tasdiqlangan (kamomad 3 dona), qachonki buxgalteriya yozuvi yaratilsa, unda tannarx bo'yicha Dt 4730 / Kt 2910 (stock_count… | 31; 31 US (US-M05-03) |  |
-| B2-QT-M05-04 | ⬜ | QT-M05-04 (negative) — Berilgan inventarizatsiya hali submit qilinmagan (submit-for-review bosqichida), qachonki post chaqirilsa, unda rad etiladi — holat mashinasi ketm… | 31; 31 US (US-M05-03) |  |
-| B2-QT-M05-06 | ⬜ | QT-M05-06 (happy (ortiqcha)) — Berilgan inventarizatsiyada "Coca-Cola 1.5L" bo'yicha 2 dona ortiqcha, oxirgi kirim narxi (last_purchase_cost) "8000.0000", qachonki post… | 31; 31 US (US-M05-03) |  |
-| B2-QT-M05-07 | ⬜ | QT-M05-07 (unit (expected formulasi)) — Berilgan stock_counts.started_at=T0, count_lines.snapshot_qty=10, T1 da 2 dona sotildi, qachonki qator T2 (> T1) da counted=8 bil… | 31; 31 US (US-M05-02) |  |
-| B2-QT-M06-01 | ⬜ | QT-M06-01 (happy) — Berilgan "Asosiy ombor"dan boshqa filialga 10 dona yuborilmoqda, qachonki POST /transfers/{id}/send chaqirilsa, unda ledger_entries: Dt 2970/Kt 2910… | 31; 31 US (US-M06-01) |  |
-| B2-QT-M06-02 | ⬜ | QT-M06-02 (happy) — Berilgan tovar manzilga yetib kelgan, qachonki qabul qiluvchi POST /transfers/{id}/receive bilan tasdiqlasa, unda ledger_entries: Dt 2910/Kt 2970, qa… | 31; 31 US (US-M06-02) |  |
-| B2-QT-M06-03 | ⬜ | QT-M06-03 (negative) — Berilgan jo'natilgan 10 dona, qabulda haqiqiy 8 dona kelgan, qachonki qabul qiluvchi 8 dona bilan tasdiqlasa, unda farq (2 dona) Dt 5910/Kt 2970 s… | 31; 31 US (US-M06-02) |  |
-| B2-QT-M06-05 | ⬜ | QT-M06-05 (negative) — Berilgan ko'chirish uzoq vaqt "yo'lda" holatida (tenant sozlamasidagi muddatdan ortiq), qachonki Menejer ro'yxatni ochsa, unda shu ko'chirish "kec… | 31; 31 US (US-M06-03) |  |
-| B2-QT-M06-06 | ⬜ | QT-M06-06 (negative (markirovka, offline)) — Berilgan "Hayot suvi 1.5L" (markirovkalangan) boshqa filialga offline ko'chirilmoqda — bu M02'dagi qaytarish siyosatidan far… | 31; 31 US (US-M06-01) |  |
-| B2-QT-M06-07 | ⬜ | QT-M06-07 (happy (e-TTN)) — Berilgan ko'chirish transport_mode='vehicle', vehicle_plate to'ldirilgan, qachonki POST /transfers/{id}/post bajarilsa, unda ettn_documents(t… | 31; 31 US (US-M06-01) |  |
-| B2-QT-M06-08 | ⬜ | QT-M06-08 (happy (e-TTN istisnosi)) — Berilgan ko'chirish transport_mode='on_foot_or_public', qachonki post va send bajarilsa, unda ettn_documents yaratilmaydi va jo'nat… | 31; 31 US (US-M06-01) |  |
-| B2-QT-M07-01 | ⬜ | QT-M07-01 (happy) — Berilgan kam qolgan tovar aniqlangan, qachonki Menejer POST /purchase-orders orqali xaridnoma yaratsa, unda hujjat draftda yaratiladi; POST /purchase… | 31; 31 US (US-M07-01) |  |
-| B2-QT-M07-02 | ⬜ | QT-M07-02 (happy) — Berilgan xaridnomada 50 dona buyurtma qilingan, qachonki Omborchi POST /goods-receipts orqali haqiqiy 48 dona kiritsa, unda farq (2 dona kam) belgila… | 31; 31 US (US-M07-02) |  |
-| B2-QT-M07-06 | ⬜ | QT-M07-06 (happy) — Berilgan tovar muddati o'tgan, shu yetkazib beruvchidan kirim qilingan, qachonki Omborchi "Yetkazib beruvchiga qaytarish" hujjatini yaratsa, unda omb… | 31; 31 US (US-M07-05) |  |
-| B2-QT-M07-07 | ⬜ | QT-M07-07 (negative) — Berilgan xaridnoma allaqachon status="cancelled", qachonki shu xaridnomaga POST /goods-receipts yaratishga urinilsa, unda 409 PURCHASE_ORDER_CLOSE… | 31; 31 US (US-M07-02) |  |
-| B2-QT-M07-08 | ⬜ | QT-M07-08 (negative (bonus tovar)) — Berilgan yetkazib beruvchi "10+1 tekin" bonus bergan, qachonki qabul qilinsa, unda bonus miqdori kirim qatoriga qo'shiladi, partiya… | 31; 31 US (US-M07-02) |  |
-| B2-QT-M11-01 | ⬜ | QT-M11-01 (happy) — Berilgan sotuv yakunlangan, qachonki tizim buxgalteriya modulini ishga tushirsa, unda kassa/hisob-kitob/tovar-moddiy zaxira/QQS/daromad hisoblari bo'… | 31; 31 US (US-M11-01) |  |
+| B2-QT-PERM-08 | ✅ | QT-PERM-08 (integration) — Berilgan Kassir faqat "Chilonzor filiali"ga bog'langan (memberships.branch_ids=['Chilonzor']), qachonki X-Branch-Idda boshqa filial ID'si bila… | 31; 31 §1.7 — filial doirasi `stock-balances` (B2) | test: `backend/tests/integration/test_inventory_stock_api.py` :: `test_qt_perm_08_restricted_user_other_branch_is_denied` |
+| B2-QT-PERM-09 | ✅ | QT-PERM-09 (integration) — Berilgan Egasi (memberships.branch_ids=[], bo'sh massiv = barcha filiallar), qachonki istalgan filial ID'si bilan so'rov yuborsa, unda hech qa… | 31; 31 §1.7 — filial doirasi `stock-balances` (B2) | test: `backend/tests/integration/test_inventory_stock_api.py` :: `test_qt_perm_09_unrestricted_owner_never_denied` |
+| B2-QT-M04-01 | ✅ | QT-M04-01 (happy) — Berilgan xaridnoma bo'yicha tovar qabul qilingan, qachonki qabul hujjati post qilinsa, unda stock_balances.qty avtomatik oshadi, yangi stock_lots qat… | 31; 31 US (US-M04-01) | test: `backend/tests/integration/test_goods_receipts.py` :: `test_qt_m04_01_post_raises_balance_and_creates_lot` |
+| B2-QT-M04-04 | ✅ | QT-M04-04 (happy) — Berilgan yangi tenant (go_live_date belgilangan), qachonki Egasi "Boshlang'ich qoldiq" (stock-openings) kiritsa, unda stock_lots/stock_balances boshl… | 31; boshlang'ich qoldiq (`stock-openings`) — 27 B2 | test: `backend/tests/integration/test_stock_openings.py` :: `test_qt_m04_04_opening_posts_lots_balances_and_dt_inv_kt_0000` |
+| B2-QT-M04-05 | ✅ | QT-M04-05 (happy — FIFO) — Berilgan 2 kirim: 100 dona × "8000.0000" so'm, so'ng 50 dona × "9000.0000" so'm, qachonki 120 dona sotilsa, unda FIFO bo'yicha COGS = 100×8000… | 31; 31 US (US-M04-05) | test: `backend/tests/integration/test_inventory_costing.py` :: `test_qt_m04_05_fifo_cogs` |
+| B2-QT-M04-06 | ✅ | QT-M04-06 (happy — AVECO) — Berilgan xuddi shu 2 kirim, tenant usuli AVECO, qachonki 120 dona sotilsa, unda kirim 2'dan keyin avg_cost = "8333.3333"; COGS = 120 × 8333.3… | 31; 31 US (US-M04-05) | test: `backend/tests/integration/test_inventory_costing.py` :: `test_qt_m04_06_aveco_cogs` |
+| B2-QT-M04-07 | ✅ | QT-M04-07 (happy) — Berilgan partiyada yaroqlilik muddatiga 7 kun qolgan, qachonki kunlik tekshiruv ishga tushsa, unda Egasi/Menejerga ro'yxat (tovar, partiya, qoldiq, m… | 31; 31 US (US-M04-06) | test: `backend/tests/integration/test_inventory_notifications.py` :: `test_qt_m04_07_expiry_soon_events` |
+| B2-QT-M04-08 | ✅ | QT-M04-08 (negative) — Berilgan tovar muddati o'tgan, qachonki Omborchi "Hisobdan chiqarish" hujjatini sabab bilan yaratsa, unda stock_moves(qty=-N), ledger_entries: Dt… | 31; 31 US (US-M04-06) | test: `backend/tests/integration/test_write_offs.py` :: `test_qt_m04_08_expired_lot_write_off_books_dt_9430_kt_2910` |
+| B2-QT-M04-09 | ✅ | QT-M04-09 (unit — qaytarish tannarxi (FIFO)) — Berilgan QT-M04-05'dagi sotuv (lot_allocations: 100×"8000.0000" + 20×"9000.0000"), qachonki mijoz shu chekdagi 5 donani qa… | 31; 31 US (US-M04-05) | test: `backend/tests/integration/test_inventory_costing.py` :: `test_qt_m04_09_fifo_return_goes_back_to_original_lots_in_reverse_order` |
+| B2-QT-M04-10 | ✅ | QT-M04-10 (unit — qaytarish tannarxi (AVECO)) — Berilgan QT-M04-06'dagi holat (avg_cost="8333.3333" sotuv paytida), keyinroq yangi kirim bilan avg_cost o'zgargan, qachon… | 31; 31 US (US-M04-05) | test: `backend/tests/integration/test_inventory_costing.py` :: `test_qt_m04_10_aveco_return_at_original_unit_cost` |
+| B2-QT-M04-11 | ✅ | QT-M04-11 (negative (manfiy qoldiq, offline)) — Berilgan ikki qurilma bir-biridan bexabar offline rejimda oxirgi ma'lum qoldiqdagi bitta donani sotadi (stock_balances.qt… | 31; 31 US (US-M04-01) | test: `backend/tests/integration/test_recost_jobs.py` :: `test_qt_m04_11_negative_stock_pending_then_recost` |
+| B2-QT-M05-01 | ✅ | QT-M05-01 (happy) — Berilgan inventarizatsiya boshlangan (stock-counts), qachonki Omborchi har tovar bo'yicha haqiqiy sonni kiritsa, unda tizim haqiqiy son bilan tizimda… | 31; 31 US (US-M05-01) | test: `backend/tests/integration/test_stock_counts.py` :: `test_qt_m05_01_count_shows_the_difference_before_posting` |
+| B2-QT-M05-02 | ✅ | QT-M05-02 (happy) — Berilgan farq ro'yxati tayyor — "Coca-Cola 1.5L" bo'yicha kamomad 3 dona, qachonki Menejer/Egasi tasdiqlasa (POST /stock-counts/{id}/post), unda stoc… | 31; 31 US (US-M05-02) | test: `backend/tests/integration/test_stock_counts.py` :: `test_qt_m05_02_03_shortage_with_responsible_posts_dt_4730` |
+| B2-QT-M05-03 | ✅ | QT-M05-03 (happy) — Berilgan inventarizatsiya tasdiqlangan (kamomad 3 dona), qachonki buxgalteriya yozuvi yaratilsa, unda tannarx bo'yicha Dt 4730 / Kt 2910 (stock_count… | 31; 31 US (US-M05-03) | test: `backend/tests/integration/test_stock_counts.py` :: `test_qt_m05_03_shortage_without_responsible_posts_dt_5910_and_aveco_cost` |
+| B2-QT-M05-04 | ✅ | QT-M05-04 (negative) — Berilgan inventarizatsiya hali submit qilinmagan (submit-for-review bosqichida), qachonki post chaqirilsa, unda rad etiladi — holat mashinasi ketm… | 31; 31 US (US-M05-03) | test: `backend/tests/integration/test_stock_counts.py` :: `test_qt_m05_04_post_before_submit_for_review_is_refused` |
+| B2-QT-M05-06 | ✅ | QT-M05-06 (happy (ortiqcha)) — Berilgan inventarizatsiyada "Coca-Cola 1.5L" bo'yicha 2 dona ortiqcha, oxirgi kirim narxi (last_purchase_cost) "8000.0000", qachonki post… | 31; 31 US (US-M05-03) | test: `backend/tests/integration/test_stock_counts.py` :: `test_qt_m05_06_surplus_posts_dt_2910_kt_9390_at_last_purchase_cost` |
+| B2-QT-M05-07 | ✅ | QT-M05-07 (unit (expected formulasi)) — Berilgan stock_counts.started_at=T0, count_lines.snapshot_qty=10, T1 da 2 dona sotildi, qachonki qator T2 (> T1) da counted=8 bil… | 31; 31 US (US-M05-02) | test: `backend/tests/integration/test_stock_counts.py` :: `test_qt_m05_07_expected_follows_each_line_counted_at` |
+| B2-QT-M06-01 | ✅ | QT-M06-01 (happy) — Berilgan "Asosiy ombor"dan boshqa filialga 10 dona yuborilmoqda, qachonki POST /transfers/{id}/send chaqirilsa, unda ledger_entries: Dt 2970/Kt 2910… | 31; 31 US (US-M06-01) | test: `backend/tests/integration/test_transfers.py` :: `test_qt_m06_01_send_books_dt_2970_kt_2910_and_takes_stock_from_the_sender` |
+| B2-QT-M06-02 | ✅ | QT-M06-02 (happy) — Berilgan tovar manzilga yetib kelgan, qachonki qabul qiluvchi POST /transfers/{id}/receive bilan tasdiqlasa, unda ledger_entries: Dt 2910/Kt 2970, qa… | 31; 31 US (US-M06-02) | test: `backend/tests/integration/test_transfers.py` :: `test_qt_m06_02_receive_books_dt_inv_to_kt_2970_and_keeps_the_lot_cost` |
+| B2-QT-M06-03 | ✅ | QT-M06-03 (negative) — Berilgan jo'natilgan 10 dona, qabulda haqiqiy 8 dona kelgan, qachonki qabul qiluvchi 8 dona bilan tasdiqlasa, unda farq (2 dona) Dt 5910/Kt 2970 s… | 31; 31 US (US-M06-02) | test: `backend/tests/integration/test_transfers.py` :: `test_qt_m06_03_shortage_on_receive_books_dt_5910_kt_2970` |
+| B2-QT-M06-05 | ✅ | QT-M06-05 (negative) — Berilgan ko'chirish uzoq vaqt "yo'lda" holatida (tenant sozlamasidagi muddatdan ortiq), qachonki Menejer ro'yxatni ochsa, unda shu ko'chirish "kec… | 31; 31 US (US-M06-03) | test: `backend/tests/integration/test_transfers.py` :: `test_qt_m06_05_sent_transfer_is_overdue_after_the_tenant_setting` |
+| B2-QT-M06-06 | ✅ | QT-M06-06 (negative (markirovka, offline)) — Berilgan "Hayot suvi 1.5L" (markirovkalangan) boshqa filialga offline ko'chirilmoqda — bu M02'dagi qaytarish siyosatidan far… | 31; 31 US (US-M06-01) | test: `backend/tests/integration/test_transfers.py` :: `test_qt_m06_06_marked_product_transfer_is_allowed_without_crpt` |
+| B2-QT-M06-07 | ✅ | QT-M06-07 (happy (e-TTN)) — Berilgan ko'chirish transport_mode='vehicle', vehicle_plate to'ldirilgan, qachonki POST /transfers/{id}/post bajarilsa, unda ettn_documents(t… | 31; 31 US (US-M06-01) | test: `backend/tests/integration/test_transfers.py` :: `test_qt_m06_07_vehicle_transfer_needs_a_registered_ettn` |
+| B2-QT-M06-08 | ✅ | QT-M06-08 (happy (e-TTN istisnosi)) — Berilgan ko'chirish transport_mode='on_foot_or_public', qachonki post va send bajarilsa, unda ettn_documents yaratilmaydi va jo'nat… | 31; 31 US (US-M06-01) | test: `backend/tests/integration/test_transfers.py` :: `test_qt_m06_08_on_foot_needs_no_ettn_and_vehicle_needs_a_plate` |
+| B2-QT-M07-01 | ✅ | QT-M07-01 (happy) — Berilgan kam qolgan tovar aniqlangan, qachonki Menejer POST /purchase-orders orqali xaridnoma yaratsa, unda hujjat draftda yaratiladi; POST /purchase… | 31; 31 US (US-M07-01) | test: `backend/tests/integration/test_purchase_orders.py` :: `test_qt_m07_01_purchase_order_draft_then_sent` |
+| B2-QT-M07-02 | ✅ | QT-M07-02 (happy) — Berilgan xaridnomada 50 dona buyurtma qilingan, qachonki Omborchi POST /goods-receipts orqali haqiqiy 48 dona kiritsa, unda farq (2 dona kam) belgila… | 31; 31 US (US-M07-02) | test: `backend/tests/integration/test_goods_receipts.py` :: `test_qt_m07_02_po_receipt_with_discrepancy` |
+| B2-QT-M07-06 | ✅ | QT-M07-06 (happy) — Berilgan tovar muddati o'tgan, shu yetkazib beruvchidan kirim qilingan, qachonki Omborchi "Yetkazib beruvchiga qaytarish" hujjatini yaratsa, unda omb… | 31; 31 US (US-M07-05) | test: `backend/tests/integration/test_supplier_returns.py` :: `test_qt_m07_06_expired_goods_returned_fifo` |
+| B2-QT-M07-07 | ✅ | QT-M07-07 (negative) — Berilgan xaridnoma allaqachon status="cancelled", qachonki shu xaridnomaga POST /goods-receipts yaratishga urinilsa, unda 409 PURCHASE_ORDER_CLOSE… | 31; 31 US (US-M07-02) | test: `backend/tests/integration/test_goods_receipts.py` :: `test_qt_m07_07_closed_or_cancelled_po_rejects_receipts` |
+| B2-QT-M07-08 | ✅ | QT-M07-08 (negative (bonus tovar)) — Berilgan yetkazib beruvchi "10+1 tekin" bonus bergan, qachonki qabul qilinsa, unda bonus miqdori kirim qatoriga qo'shiladi, partiya… | 31; 31 US (US-M07-02) | test: `backend/tests/integration/test_goods_receipts.py` :: `test_qt_m07_08_bonus_units_share_the_invoice` |
+| B2-QT-M11-01 | ✅ | QT-M11-01 (happy) — Berilgan sotuv yakunlangan, qachonki tizim buxgalteriya modulini ishga tushirsa, unda kassa/hisob-kitob/tovar-moddiy zaxira/QQS/daromad hisoblari bo'… | 31; 31 US (US-M11-01) | test: `backend/tests/integration/test_accounting_ledger.py` :: `test_qt_m11_01_posting_writes_double_entry_rows_and_vat` |
 
 ## Bosqich 3: veb-kassa
 
 **Maqsad (27):** Do'kon internet bor-yo'qligidan qat'i nazar kassada sotish, qaytarish, chegirma va smena yopish ishini to'liq bajara oladi.
 
-Holat: ✅ 7 · 🟡 17 · ⬜ 173 · ⛔ 0 · ⏭ 0 · jami 197
+Holat: ✅ 9 · 🟡 16 · ⬜ 175 · ⛔ 0 · ⏭ 0 · jami 200
 
 ### Bosqich 3 — Vazifalar (27)
 
@@ -703,7 +719,7 @@ Holat: ✅ 7 · 🟡 17 · ⬜ 173 · ⛔ 0 · ⏭ 0 · jami 197
 | B3-EP-18#44 | ⬜ | GET /api/v1/card-terminals / POST /api/v1/card-terminals | 18 §16a.5; 27 vazifa matni |  |
 | B3-EP-18#45 | ⬜ | PATCH /api/v1/card-terminals/{id} | 18 §16a.5; 30 (US API) |  |
 | B3-EP-18#46 | ⬜ | POST /api/v1/card-terminal-settlements | 18 §16a.6; 30 (US API) |  |
-| B3-EP-19#76 | ⬜ | GET/PATCH /stock-settings | 19 §17; tarozi shtrix-kod formati (US-M09-06, B3), kam qoldiq chegarasi — B4 |  |
+| B3-EP-19#76 | ✅ | GET/PATCH /stock-settings | 19 §17; tarozi shtrix-kod formati (US-M09-06, B3), kam qoldiq chegarasi — B4 | kod: `backend/app/modules/inventory/api/stock.py`; test: `backend/tests/integration/test_inventory_valuation.py`, `web/apps/shell/e2e/valuation.spec.ts` |
 | B3-EP-20#1 | ⬜ | GET /reports/vat-summary — Ichki QQS/aylanma hisob-kitobi (davr bo'yicha) | 20 indeks; 30 (US API) |  |
 | B3-EP-20#2 | ⬜ | GET /vat-moves — QQS registri (vat_moves) ro'yxati | 20 indeks; 30 (US API) |  |
 | B3-EP-20#29a | ✅ | GET /devices — Tenant qurilmalari ro'yxati (BO-11 «Qurilmalar» tabi) | 20 indeks; 27 vazifa matni | kod: `backend/app/modules/branches/api/devices.py`; test: `backend/tests/integration/test_admin_users_invite.py`, `backend/tests/integration/test_admin_users_sessions.py`, `backend/tests/integration/test_devices_api.py` |
@@ -720,6 +736,9 @@ Holat: ✅ 7 · 🟡 17 · ⬜ 173 · ⛔ 0 · ⏭ 0 · jami 197
 | ID | Holat | Band | Manba | Dalil |
 |---|---|---|---|---|
 | B3-SCR-POS-01 | ⬜ | POS-01 — Kassaga kirish / Smena ochish | 07; 27/30; ko'chirildi B1 → B3: 27 B3: M01 kassa, smena ochish va POS-01 (iOS ko'rsatmasi bilan) — Bosqich 3 da quriladi; B1 ulushi (US-M13-06 tiklash) `/recover` sahifasida, BO-01 qatorida |  |
+| B3-SCR-POS-08 | ⬜ | POS-08 — Yetkazib beruvchidan tovar qabul qilish (kirim) | 07; 27/30; ko'chirildi B2 → B3: veb-kassa (POS) ekrani — 27 B3 (M01 kassa va POS qobig'i); B2 da faqat backend kontrakti: `/goods-receipts` (19 §8, online) |  |
+| B3-SCR-POS-09 | ⬜ | POS-09 — Omborlar orasida tovar ko'chirish | 07; 27/30; ko'chirildi B2 → B3: veb-kassa (POS) ekrani — 27 B3; B2 da backend `/transfers` va offline voqea nomlari (`transfer.sent`/`transfer.received`, sync — B3) |  |
+| B3-SCR-POS-10 | ⬜ | POS-10 — Inventarizatsiya (jismoniy sanash) | 07; 27/30; ko'chirildi B2 → B3: veb-kassa (POS) skaneri — 27 B3 (`stock_count.line_recorded` sync bilan); B2 da `/stock-counts` va BO-03 back-office sanash |  |
 | B3-SCR-BO-07 | ⬜ | BO-07 — QQS ichki hisob-kitobi | 07; 27/30 |  |
 | B3-SCR-BO-09 | ⬜ | BO-09 — Hisobotlar markazi | 07; 27/30 |  |
 | B3-SCR-BO-11 | ⬜ | BO-11 — Foydalanuvchilar, huquqlar va sessiyalar | 07; 27/30 |  |
@@ -745,7 +764,7 @@ Holat: ✅ 7 · 🟡 17 · ⬜ 173 · ⛔ 0 · ⏭ 0 · jami 197
 | B3-TBL-platform.card_bin_rules | 🟡 | `platform.card_bin_rules` (revizion 0007) | 12; 27 vazifa matni | DDL 0007 bor; ilova kodi bor, test yo'q |
 | B3-TBL-auth.authorization_codes | 🟡 | `auth.authorization_codes` (revizion 0003) | 12; 27 vazifa matni | DDL 0003 bor; ilova kodi bor, test yo'q |
 | B3-TBL-auth.refresh_tokens | ✅ | `auth.refresh_tokens` (revizion 0003) | 12; 27 vazifa matni | DDL 0003; kod va test: `backend/tests/integration/test_admin_users_sessions.py`, `backend/tests/integration/test_auth_gate_fixes.py` |
-| B3-TBL-app.approval_requests | ✅ | `app.approval_requests` (revizion 0010) | 12; 27 vazifa matni | DDL 0010; kod va test: `backend/tests/integration/test_pricing_price_changes.py` |
+| B3-TBL-app.approval_requests | ✅ | `app.approval_requests` (revizion 0010) | 12; 27 vazifa matni | DDL 0010; kod va test: `backend/tests/integration/test_pricing_price_changes.py`, `backend/tests/integration/test_write_offs.py` |
 | B3-TBL-app.doc_approvals | 🟡 | `app.doc_approvals` (revizion 0010) | 12; 27 vazifa matni | DDL 0010 bor; modul kodi/testi yo'q |
 | B3-TBL-app.payment_checkouts | 🟡 | `app.payment_checkouts` (revizion 0010) | 12; 30 (US jadvallari) | DDL 0010 bor; modul kodi/testi yo'q |
 | B3-TBL-app.card_terminals | 🟡 | `app.card_terminals` (revizion 0010) | 12; 27 vazifa matni | DDL 0010 bor; modul kodi/testi yo'q |
@@ -762,7 +781,7 @@ Holat: ✅ 7 · 🟡 17 · ⬜ 173 · ⛔ 0 · ⏭ 0 · jami 197
 | B3-TBL-app.cash_moves | 🟡 | `app.cash_moves` (revizion 0015) | 12; 30 (US jadvallari) | DDL 0015 bor; modul kodi/testi yo'q |
 | B3-TBL-app.fiscal_receipts | 🟡 | `app.fiscal_receipts` (revizion 0020) | 12; 30 (US jadvallari) | DDL 0020 bor; modul kodi/testi yo'q |
 | B3-TBL-app.sync_receipts | 🟡 | `app.sync_receipts` (revizion 0022) | 12; 30 (US jadvallari) | DDL 0022 bor; modul kodi/testi yo'q |
-| B3-TBL-app.sync_exceptions | 🟡 | `app.sync_exceptions` (revizion 0022) | 12; 27 vazifa matni | DDL 0022 bor; modul kodi/testi yo'q |
+| B3-TBL-app.sync_exceptions | ✅ | `app.sync_exceptions` (revizion 0022) | 12; 27 vazifa matni | DDL 0022; kod va test: `backend/tests/integration/test_recost_jobs.py`, `backend/tests/integration/test_transfers.py` |
 | B3-TBL-app.idempotency_keys | ✅ | `app.idempotency_keys` (revizion 0022) | 12; 30 (US jadvallari) | DDL 0022; kod va test: `backend/tests/integration/test_health_and_idempotency.py`, `backend/tests/integration/test_purge_idempotency.py` |
 
 ### Bosqich 3 — Qabul testlari (31)
@@ -854,7 +873,7 @@ Holat: ✅ 7 · 🟡 17 · ⬜ 173 · ⛔ 0 · ⏭ 0 · jami 197
 
 **Maqsad (27):** Do'kon qog'oz qarz daftarini va xarajat qaydlarini to'liq elektron qiladi, egasi kunlik hisobotni Telegram'da oladi.
 
-Holat: ✅ 1 · 🟡 17 · ⬜ 148 · ⛔ 0 · ⏭ 0 · jami 166
+Holat: ✅ 4 · 🟡 15 · ⬜ 147 · ⛔ 0 · ⏭ 0 · jami 166
 
 ### Bosqich 4 — Vazifalar (27)
 
@@ -993,7 +1012,7 @@ Holat: ✅ 1 · 🟡 17 · ⬜ 148 · ⛔ 0 · ⏭ 0 · jami 166
 | B4-TBL-app.debt_openings | 🟡 | `app.debt_openings` (revizion 0017) | 12; 30 (US jadvallari) | DDL 0017 bor; modul kodi/testi yo'q |
 | B4-TBL-app.debt_payment_allocations | 🟡 | `app.debt_payment_allocations` (revizion 0017) | 12; 30 (US jadvallari) | DDL 0017 bor; modul kodi/testi yo'q |
 | B4-TBL-app.debt_writeoffs | 🟡 | `app.debt_writeoffs` (revizion 0017) | 12; 27 vazifa matni | DDL 0017 bor; modul kodi/testi yo'q |
-| B4-TBL-app.supplier_payments | 🟡 | `app.supplier_payments` (revizion 0017) | 12; 27 vazifa matni | DDL 0017 bor; modul kodi/testi yo'q |
+| B4-TBL-app.supplier_payments | 🟡 | `app.supplier_payments` (revizion 0017) | 12; 27 vazifa matni; ko'chirildi B2 → B4: yetkazib beruvchiga to'lov (US-M07-04, 19 §11) — 27 B4; B2 vazifa matnida faqat «kassadan naqd to'lov — Bosqich 4» deb tilga olingan | DDL 0017 bor; modul kodi/testi yo'q |
 | B4-TBL-app.supplier_payment_allocations | 🟡 | `app.supplier_payment_allocations` (revizion 0017) | 12; 30 (US jadvallari) | DDL 0017 bor; modul kodi/testi yo'q |
 | B4-TBL-app.recurring_expenses | 🟡 | `app.recurring_expenses` (revizion 0018) | 12; 30 (US jadvallari) | DDL 0018 bor; modul kodi/testi yo'q |
 | B4-TBL-app.attachments | ✅ | `app.attachments` (revizion 0018) | 12; 30 (US jadvallari) | DDL 0018; kod va test: `backend/tests/integration/test_import_jobs.py` |
@@ -1001,8 +1020,8 @@ Holat: ✅ 1 · 🟡 17 · ⬜ 148 · ⛔ 0 · ⏭ 0 · jami 166
 | B4-TBL-app.bank_statement_imports | 🟡 | `app.bank_statement_imports` (revizion 0018) | 12; 27 B4: bank ko'chirmasi importi | DDL 0018 bor; modul kodi/testi yo'q |
 | B4-TBL-app.bank_settlements | 🟡 | `app.bank_settlements` (revizion 0018) | 12; 27 vazifa matni | DDL 0018 bor; modul kodi/testi yo'q |
 | B4-TBL-app.tax_settlements | 🟡 | `app.tax_settlements` (revizion 0018) | 12; 27 B4: `tax_settlements` | DDL 0018 bor; modul kodi/testi yo'q |
-| B4-TBL-app.debt_moves | 🟡 | `app.debt_moves` (revizion 0015) | 12; 30 (US jadvallari) | DDL 0015 bor; modul kodi/testi yo'q |
-| B4-TBL-app.debt_balances | 🟡 | `app.debt_balances` (revizion 0015) | 12; 30 (US jadvallari) | DDL 0015 bor; modul kodi/testi yo'q |
+| B4-TBL-app.debt_moves | ✅ | `app.debt_moves` (revizion 0015) | 12; 30 (US jadvallari) | DDL 0015; kod va test: `backend/tests/integration/test_debt_register.py`, `backend/tests/integration/test_goods_receipts.py` |
+| B4-TBL-app.debt_balances | ✅ | `app.debt_balances` (revizion 0015) | 12; 30 (US jadvallari) | DDL 0015; kod va test: `backend/tests/integration/test_debt_register.py`, `backend/tests/integration/test_goods_receipts.py` |
 | B4-TBL-app.telegram_links | 🟡 | `app.telegram_links` (revizion 0023) | 12; 30 (US jadvallari) | DDL 0023 bor; modul kodi/testi yo'q |
 | B4-TBL-app.notification_settings | 🟡 | `app.notification_settings` (revizion 0023) | 12; 30 (US jadvallari) | DDL 0023 bor; modul kodi/testi yo'q |
 | B4-TBL-app.notifications_log | 🟡 | `app.notifications_log` (revizion 0023) | 12; 30 (US jadvallari) | DDL 0023 bor; modul kodi/testi yo'q |
@@ -1012,7 +1031,7 @@ Holat: ✅ 1 · 🟡 17 · ⬜ 148 · ⛔ 0 · ⏭ 0 · jami 166
 | ID | Holat | Band | Manba | Dalil |
 |---|---|---|---|---|
 | B4-QT-M03-03 | ⬜ | QT-M03-03 (happy) — Berilgan tanlangan davrda chegirmalar berilgan, qachonki Egasi hisobotni ochsa, unda berilgan chegirmalar summasi va shu sabab kamaygan margin ko'rsa… | 31; 31 US (US-M03-03) |  |
-| B4-QT-M04-02 | ⬜ | QT-M04-02 (happy) — Berilgan tovar qoldig'i min_stockdan past, qachonki tizim kunlik tekshiruvni bajarsa, unda Menejerga M18 orqali ogohlantirish ketadi. | 31; 31 US (US-M04-02) |  |
+| B4-QT-M04-02 | ✅ | QT-M04-02 (happy) — Berilgan tovar qoldig'i min_stockdan past, qachonki tizim kunlik tekshiruvni bajarsa, unda Menejerga M18 orqali ogohlantirish ketadi. | 31; 31 US (US-M04-02) | test: `backend/tests/integration/test_inventory_notifications.py` :: `test_qt_m04_02_low_stock_event` |
 | B4-QT-M04-03 | ⬜ | QT-M04-03 (happy) — Berilgan 2 filial mavjud, qachonki konsolidatsiyalangan hisobot ochilsa, unda har bir filial alohida va jami qoldiq ko'rsatiladi. | 31; 31 US (US-M04-03) |  |
 | B4-QT-M07-05 | ⬜ | QT-M07-05 (happy) — Berilgan yetkazib beruvchiga kreditorlik "1120000.00" ochiq, qachonki Buxgalter "1120000.00" to'lov qilsa, unda ledger_entries: Dt 6010/Kt 5110="1120… | 31; 31 US (US-M07-04) |  |
 | B4-QT-M08-01 | ⬜ | QT-M08-01 (happy) — Berilgan mijoz joriy qarzi "0.00", kredit limiti "500000.00", qachonki "300000.00"lik sotuv "nasiya" bilan yakunlansa, unda debt_moves(direction='rec… | 31; 27 (aniq havola) |  |
@@ -1061,7 +1080,7 @@ Holat: ✅ 1 · 🟡 17 · ⬜ 148 · ⛔ 0 · ⏭ 0 · jami 166
 
 **Maqsad (27):** Har bir sotuv fiskal talablarga mos chek chiqaradi, markirovkalangan tovar tekshiriladi, e-faktura oqimi (kiruvchi va chiquvchi) ishlaydi.
 
-Holat: ✅ 0 · 🟡 8 · ⬜ 118 · ⛔ 1 · ⏭ 0 · jami 127
+Holat: ✅ 8 · 🟡 4 · ⬜ 114 · ⛔ 1 · ⏭ 0 · jami 127
 
 ### Bosqich 5 — Vazifalar (27)
 
@@ -1124,7 +1143,7 @@ Holat: ✅ 0 · 🟡 8 · ⬜ 118 · ⛔ 1 · ⏭ 0 · jami 127
 | B5-EP-19#36 | ⬜ | POST /powers-of-attorney/{id}/sign-challenge | 19 §8a; 27 (resurs) |  |
 | B5-EP-19#37 | ⬜ | POST /powers-of-attorney/{id}/submit-signed | 19 §8a; 27 (resurs) |  |
 | B5-EP-19#38 | ⬜ | POST /powers-of-attorney/{id}/cancel | 19 §8a; 27 (resurs) |  |
-| B5-EP-19#77 | ⬜ | GET /stock-settings/plu-export | 19 §17; 27 B5: MVP'da PLU CSV eksport |  |
+| B5-EP-19#77 | ✅ | GET /stock-settings/plu-export | 19 §17; 27 B5: MVP'da PLU CSV eksport | kod: `backend/app/modules/inventory/api/stock.py`; test: `backend/tests/integration/test_inventory_valuation.py`, `web/apps/shell/e2e/valuation.spec.ts` |
 | B5-EP-19#81 | ⬜ | GET /einvoices?direction=in&status=&risk_flag=&cursor=&limit= | 19 §19; 27 vazifa matni |  |
 | B5-EP-19#82 | ⬜ | GET /einvoices/{id} | 19 §19; 27 (resurs) |  |
 | B5-EP-19#83 | ⬜ | PATCH /einvoices/{id}/risk-flag | 19 §19; 27 (resurs) |  |
@@ -1187,13 +1206,13 @@ Holat: ✅ 0 · 🟡 8 · ⬜ 118 · ⛔ 1 · ⏭ 0 · jami 127
 
 | ID | Holat | Band | Manba | Dalil |
 |---|---|---|---|---|
-| B5-TBL-platform.marking_product_groups | 🟡 | `platform.marking_product_groups` (revizion 0004) | 12; 27 B5: markirovka (qaror #63) | DDL 0004 bor; ilova kodi bor, test yo'q |
+| B5-TBL-platform.marking_product_groups | ✅ | `platform.marking_product_groups` (revizion 0004) | 12; 27 B5: markirovka (qaror #63) | DDL 0004; kod va test: `backend/tests/integration/test_transfers.py` |
 | B5-TBL-app.ledger_adjustments | 🟡 | `app.ledger_adjustments` (revizion 0016) | 12; 27 vazifa matni | DDL 0016 bor; modul kodi/testi yo'q |
-| B5-TBL-app.marking_codes | 🟡 | `app.marking_codes` (revizion 0020) | 12; 30 (US jadvallari) | DDL 0020 bor; modul kodi/testi yo'q |
-| B5-TBL-app.einvoices | 🟡 | `app.einvoices` (revizion 0020) | 12; 27 B5: e-faktura (B2 dagi `factura_type` — faqat ustun) | DDL 0020 bor; modul kodi/testi yo'q |
-| B5-TBL-app.powers_of_attorney | 🟡 | `app.powers_of_attorney` (revizion 0020) | 12; 27 vazifa matni | DDL 0020 bor; modul kodi/testi yo'q |
+| B5-TBL-app.marking_codes | ✅ | `app.marking_codes` (revizion 0020) | 12; 30 (US jadvallari) | DDL 0020; kod va test: `backend/tests/integration/test_goods_receipts.py` |
+| B5-TBL-app.einvoices | ✅ | `app.einvoices` (revizion 0020) | 12; 27 B5: e-faktura (B2 dagi `factura_type` — faqat ustun) | DDL 0020; kod va test: `backend/tests/integration/test_goods_receipts.py` |
+| B5-TBL-app.powers_of_attorney | 🟡 | `app.powers_of_attorney` (revizion 0020) | 12; 27 vazifa matni | DDL 0020 bor; ilova kodi bor, test yo'q |
 | B5-TBL-app.tenant_secrets | 🟡 | `app.tenant_secrets` (revizion 0022) | 12; 27 vazifa matni; ko'chirildi B0 → B5: yozish yo'li — integratsiya kalitlari `20` #40d/#40e (Faktura.uz, CRPT, UzQR — 27 B5); B0 da DDL va envelope shifrlash (`core/secrets.py`), B1 da BO-14 faqat holatini o'qiydi | DDL 0022 bor; ilova kodi bor, test yo'q |
-| B5-TBL-app.period_closings | 🟡 | `app.period_closings` (revizion 0024) | 12; 30 (US jadvallari) | DDL 0024 bor; modul kodi/testi yo'q |
+| B5-TBL-app.period_closings | ✅ | `app.period_closings` (revizion 0024) | 12; 30 (US jadvallari) | DDL 0024; kod va test: `backend/tests/support/inventory.py` |
 | B5-TBL-app.onec_agents | ⬜ | `app.onec_agents` (revizion 0028) | 12; 12 §6.1 — 0028 store_agent (27 B5) | DDL migratsiyasi (0028) hali yo'q |
 | B5-TBL-app.onec_agent_tasks | ⬜ | `app.onec_agent_tasks` (revizion 0028) | 12; 12 §6.1 — 0028 store_agent (27 B5) | DDL migratsiyasi (0028) hali yo'q |
 | B5-TBL-app.onec_task_results | ⬜ | `app.onec_task_results` (revizion 0028) | 12; 12 §6.1 — 0028 store_agent (27 B5) | DDL migratsiyasi (0028) hali yo'q |
@@ -1212,9 +1231,9 @@ Holat: ✅ 0 · 🟡 8 · ⬜ 118 · ⛔ 1 · ⏭ 0 · jami 127
 | B5-QT-M01-20 | ⬜ | QT-M01-20 (negative (MARKING_PRECHECK=block)) — Berilgan tenant marking_precheck='block', online, stub kodni yaroqsiz deb qaytaradi, qachonki sotuv yaratilsa, unda 409 M… | 31; 27 (aniq havola) |  |
 | B5-QT-M01-21 | ⬜ | QT-M01-21 (happy (fiskal javob maydonlari)) — Berilgan ERP_FISCAL_PROVIDER=fake (FM emulyatori), qachonki 2 qatorli (1 markirovkali) naqd sotuv fiskallashtirilsa, unda f… | 31; 27 (aniq havola) |  |
 | B5-QT-M01-23 | ⬜ | QT-M01-23 (happy (lokal ko'prik fiskal natijasi)) — Berilgan ERP_FISCAL_PROVIDER=multikassa_local (soxta FM), chek qurilma FM'ida imzolangan, qachonki sale.created fisca… | 31; 27 (aniq havola) |  |
-| B5-QT-M07-03 | ⬜ | QT-M07-03 (happy) — Berilgan faktura "1120000.00" so'm (QQS bilan, nasiyaga), qachonki POST /goods-receipts/{id}/post bajarilsa, unda ledger_entries: Dt 2910/Kt 6010="10… | 31; 31 US (US-M07-03) |  |
-| B5-QT-M07-04 | ⬜ | QT-M07-04 (negative) — Berilgan faktura "qizil" (yuqori xavfli) deb belgilangan, qachonki qabul post qilinsa, unda Dt 4410 (kiritiladigan QQS) yozuvi to'lovgacha yozilma… | 31; 31 US (US-M07-03) |  |
-| B5-QT-M07-09 | ⬜ | QT-M07-09 (negative (xavf darajasi noma'lum)) — Berilgan kiruvchi faktura uchun operator xavf darajasini qaytarmagan (einvoices.risk_flag='unknown', standart), qachonki… | 31; 31 US (US-M07-03) |  |
+| B5-QT-M07-03 | ✅ | QT-M07-03 (happy) — Berilgan faktura "1120000.00" so'm (QQS bilan, nasiyaga), qachonki POST /goods-receipts/{id}/post bajarilsa, unda ledger_entries: Dt 2910/Kt 6010="10… | 31; 31 US (US-M07-03) | test: `backend/tests/integration/test_goods_receipts.py` :: `test_qt_m07_03_vat_ledger_vat_moves_and_payable` |
+| B5-QT-M07-04 | ✅ | QT-M07-04 (negative) — Berilgan faktura "qizil" (yuqori xavfli) deb belgilangan, qachonki qabul post qilinsa, unda Dt 4410 (kiritiladigan QQS) yozuvi to'lovgacha yozilma… | 31; 31 US (US-M07-03) | test: `backend/tests/integration/test_goods_receipts.py` :: `test_qt_m07_04_09_risky_einvoice_defers_input_vat` |
+| B5-QT-M07-09 | ✅ | QT-M07-09 (negative (xavf darajasi noma'lum)) — Berilgan kiruvchi faktura uchun operator xavf darajasini qaytarmagan (einvoices.risk_flag='unknown', standart), qachonki… | 31; 31 US (US-M07-03) | test: `backend/tests/integration/test_goods_receipts.py` |
 | B5-QT-M10-04 | ⬜ | QT-M10-04 (happy) — Berilgan faktura "qizil" deb belgilangan, qachonki Buxgalter QQS hisobotini tayyorlasa, unda bu faktura alohida ko'rsatiladi, krediti "hali tasdiqlan… | 31; 31 US (US-M10-03) |  |
 | B5-QT-M11-02 | ⬜ | QT-M11-02 (happy) — Berilgan oy yakunlanmoqda, barcha recost_jobs tugagan, qachonki Buxgalter "oy yopish"ni boshlasa, unda period_closings yozuvi yaratiladi, balans/P&L… | 31; 31 US (US-M11-02) |  |
 | B5-QT-M11-03 | ⬜ | QT-M11-03 (negative) — Berilgan oy allaqachon yopilgan (period_closings mavjud), qachonki shu davrga tegishli yangi ledger_entries yozishga (yoki recost_job) urinilsa, u… | 31; 31 US (US-M11-02) |  |

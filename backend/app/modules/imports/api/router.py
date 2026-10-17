@@ -1,7 +1,8 @@
 """``/import-jobs`` (19 §6, US-M04-04). OpenAPI tag ``inventory`` (17 §11: M04).
 
-Bosqich 1: ``kind=products`` (permission ``catalog.manage``); ``opening_stock`` /
-``opening_debts`` (``stock.opening.manage``) are refused with ``VALIDATION_ERROR``.
+``kind=products`` needs ``catalog.manage``; ``opening_stock`` needs ``stock.opening.manage``
+(19 §6) — checked per kind (job endpoints: the job's kind). ``opening_debts`` (Bosqich 4) is refused
+with ``VALIDATION_ERROR``.
 """
 
 from __future__ import annotations
@@ -12,17 +13,32 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, UploadFile
 from pydantic import BaseModel, ConfigDict
 
-from app.core.auth.dependencies import require_subscription_ok
+from app.core.auth.dependencies import auth_gateway, require_subscription_ok
 from app.core.auth.principal import Principal
 from app.core.error_codes import ErrorCode
 from app.core.errors import AppError
-from app.core.permissions import PermissionGrant, require_permission
-from app.modules.imports.application.service import ImportService, check_kind
+from app.core.permissions import BranchScope, current_branch_scope
+from app.modules.imports.application.service import ImportService, check_kind, kind_permission
 
 router = APIRouter(prefix="/import-jobs", tags=["inventory"])
 
 Actor = Annotated[Principal, Depends(require_subscription_ok)]
-CanImport = Annotated[PermissionGrant, Depends(require_permission("catalog.manage"))]
+Scope = Annotated[BranchScope, Depends(current_branch_scope)]
+
+
+async def require_kind_permission(request: Request, actor: Principal, kind: str) -> None:
+    """The import permission of ``kind`` (19 §6), same rules as ``require_permission``."""
+    code = kind_permission(kind)
+    if not actor.has_scope(code.split(".", 1)[0]):
+        raise AppError(ErrorCode.PERMISSION_DENIED, params={"permission": code})
+    if not await auth_gateway(request).permission_limits(actor, code):
+        raise AppError(ErrorCode.PERMISSION_DENIED, params={"permission": code})
+
+
+async def _job_permission(request: Request, actor: Principal, job_id: UUID) -> None:
+    await require_kind_permission(request, actor, await import_service(request).kind_of(actor, job_id))
+
+
 _CHUNK = 1024 * 1024
 
 
@@ -88,7 +104,9 @@ def _ip(request: Request) -> str | None:
     response_class=Response,
     responses={200: {"content": {"text/csv": {}}}},
 )
-async def get_template(kind: str, actor: Actor, _: CanImport) -> Response:
+async def get_template(request: Request, kind: str, actor: Actor) -> Response:
+    check_kind(kind)
+    await require_kind_permission(request, actor, kind)
     body = ImportService.template(kind)
     return Response(
         content=body.encode("utf-8-sig"),
@@ -113,14 +131,15 @@ async def create_import_job(
     request: Request,
     response: Response,
     actor: Actor,
-    _: CanImport,
+    scope: Scope,
     kind: Annotated[str, Form()],
     file: Annotated[UploadFile, File()],
 ) -> dict[str, Any]:
     check_kind(kind)
+    await require_kind_permission(request, actor, kind)
     service = import_service(request)
     content = await _read_limited(file, service.max_bytes)
-    job = await service.upload(actor, kind, file.filename, file.content_type, content, _ip(request))
+    job = await service.upload(actor, scope, kind, file.filename, file.content_type, content, _ip(request))
     response.headers["Location"] = f"{request.url.path}/{job['id']}"
     return job
 
@@ -132,13 +151,15 @@ async def create_import_job(
     status_code=202,
 )
 async def validate_import_job(
-    request: Request, job_id: UUID, actor: Actor, _: CanImport, body: EmptyBody | None = None
+    request: Request, job_id: UUID, actor: Actor, scope: Scope, body: EmptyBody | None = None
 ) -> dict[str, Any]:
-    return await import_service(request).request_validate(actor, job_id, _ip(request))
+    await _job_permission(request, actor, job_id)
+    return await import_service(request).request_validate(actor, scope, job_id, _ip(request))
 
 
 @router.get("/{job_id}", operation_id="inventory_get_import_job", response_model=ImportJobOut)
-async def get_import_job(request: Request, job_id: UUID, actor: Actor, _: CanImport) -> dict[str, Any]:
+async def get_import_job(request: Request, job_id: UUID, actor: Actor) -> dict[str, Any]:
+    await _job_permission(request, actor, job_id)
     return await import_service(request).get(actor, job_id)
 
 
@@ -149,10 +170,10 @@ async def list_import_job_errors(
     request: Request,
     job_id: UUID,
     actor: Actor,
-    _: CanImport,
     cursor: Annotated[str | None, Query(max_length=64)] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> dict[str, Any]:
+    await _job_permission(request, actor, job_id)
     return await import_service(request).errors(actor, job_id, cursor, limit)
 
 
@@ -163,7 +184,8 @@ async def list_import_job_errors(
     status_code=202,
 )
 async def commit_import_job(
-    request: Request, job_id: UUID, actor: Actor, _: CanImport, body: CommitRequest | None = None
+    request: Request, job_id: UUID, actor: Actor, scope: Scope, body: CommitRequest | None = None
 ) -> dict[str, Any]:
+    await _job_permission(request, actor, job_id)
     skip = body.skip_error_rows if body else True
-    return await import_service(request).request_commit(actor, job_id, skip, _ip(request))
+    return await import_service(request).request_commit(actor, scope, job_id, skip, _ip(request))

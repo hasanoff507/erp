@@ -1,6 +1,13 @@
 import { createEvent } from "effector";
 
-import type { AccountData, ProductsMethod, SignupMethod, StepId, StoreData } from "../types/index.ts";
+import type {
+  AccountData,
+  OpeningStockMethod,
+  ProductsMethod,
+  SignupMethod,
+  StepId,
+  StoreData,
+} from "../types/index.ts";
 
 /** `?method=google` after the Google callback (14 §2.2); otherwise the phone path. */
 export const pageMounted = createEvent<{ method: SignupMethod }>();
@@ -32,6 +39,10 @@ export const productsMethodSelected = createEvent<ProductsMethod | null>();
 /** The embedded import flow committed: `created_product_count`. */
 export const productsImported = createEvent<number>();
 export const connectNowToggled = createEvent<boolean>();
+/** ③b method buttons (`null` — closed). */
+export const openingStockMethodSelected = createEvent<OpeningStockMethod | null>();
+/** ③b lines posted as opening stock (import `line_count` or a manual document's `line_count`). */
+export const openingStockSaved = createEvent<number>();
 /** «Yakunlash» on ⑥ → BO-02. */
 export const finishClicked = createEvent();
 

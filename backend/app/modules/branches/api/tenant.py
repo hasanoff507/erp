@@ -7,7 +7,7 @@ from datetime import date, datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel, ConfigDict, StringConstraints, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
 from app.core.error_codes import ErrorCode
 from app.core.errors import AppError
@@ -40,6 +40,7 @@ CommissionAccount = Literal["9430", "9410"]
 TurnoverTaxAccount = Literal["9430", "9820"]
 NegativeStockPolicy = Literal["allow", "block"]
 CardManualFallback = Literal["allow", "manager_approval", "forbid"]
+TransferOverdueHours = Annotated[int, Field(ge=1, le=720, strict=True)]
 DebtReceiptSplit = Literal["single", "per_sale"]
 CreditSaleReceipt = Literal["none", "credit_type"]
 
@@ -55,6 +56,7 @@ _NON_NULLABLE = (
     "ai_training_consent",
     "fiscal_policy",
     "card_manual_fallback",
+    "transfer_overdue_hours",
 )
 
 
@@ -91,6 +93,7 @@ class SettingsPatchIn(BaseModel):
     ai_training_consent: bool | None = None
     fiscal_policy: FiscalPolicyIn | None = None
     card_manual_fallback: CardManualFallback | None = None
+    transfer_overdue_hours: TransferOverdueHours | None = None
 
     _check = field_validator(*_NON_NULLABLE, mode="before")(_not_null)
 
@@ -142,6 +145,9 @@ class SettingsOut(BaseModel):
     ai_training_consent: bool
     ai_cross_border_enabled: bool
     card_manual_fallback: CardManualFallback
+    transfer_overdue_hours: int = Field(
+        description="QT-M06-05: a sent transfer is overdue after this many hours"
+    )
     fiscal_policy: FiscalPolicyOut
 
 

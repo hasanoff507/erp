@@ -11,6 +11,8 @@ import {
   $completed,
   $finished,
   $method,
+  $openingStockLines,
+  $openingStockMethod,
   $otp,
   $resendAvailableAt,
   $resendIn,
@@ -24,6 +26,8 @@ import {
   formatCountdown,
   loadTermsFx,
   nextClicked,
+  openingStockMethodSelected,
+  openingStockSaved,
   otpCodeSubmitted,
   otpRequested,
   pageMounted,
@@ -296,5 +300,23 @@ describe("BO-21 lib", () => {
   it("formats the resend countdown", () => {
     expect(formatCountdown(65)).toBe("1:05");
     expect(formatCountdown(0)).toBe("0:00");
+  });
+});
+
+describe("BO-21 ③b opening stock (optional)", () => {
+  it("method choice and posted lines add up; «Davom» on ③ does not wait for it", async () => {
+    const scope = fork({ values: [[$step, "products"]] });
+    await allSettled(openingStockMethodSelected, { scope, params: "manual" });
+    expect(scope.getState($openingStockMethod)).toBe("manual");
+    await allSettled(openingStockSaved, { scope, params: 3 });
+    await allSettled(openingStockSaved, { scope, params: 2 });
+    expect(scope.getState($openingStockLines)).toBe(5);
+    await allSettled(openingStockMethodSelected, { scope, params: null });
+    expect(scope.getState($openingStockMethod)).toBeNull();
+
+    const fresh = fork({ values: [[$step, "products"]], handlers: [[trackFx, () => undefined]] });
+    await allSettled(nextClicked, { scope: fresh });
+    expect(fresh.getState($step)).toBe("debts");
+    expect(fresh.getState($openingStockLines)).toBeNull();
   });
 });

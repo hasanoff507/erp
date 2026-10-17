@@ -12,7 +12,29 @@ import type {
   ImportJobAccepted,
   ImportJobCreated,
   ImportJobOut,
-  ListImportJobErrorsParams
+  ListImportJobErrorsParams,
+  ListRecostJobsParams,
+  ListStockBalancesParams,
+  ListStockLotsParams,
+  ListStockMovesParams,
+  ListStockOpeningsParams,
+  ListWriteOffsParams,
+  OpeningCancel,
+  OpeningCreate,
+  OpeningOut,
+  OpeningPage,
+  RecostJobDetail,
+  RecostJobOut,
+  RecostJobPage,
+  StockBalancePage,
+  StockLotPage,
+  StockMovePage,
+  ValuationSettingsOut,
+  ValuationSettingsPatch,
+  WriteOffCancel,
+  WriteOffCreate,
+  WriteOffOut,
+  WriteOffPage
 } from '@shared/models/generated';
 
 import { apiRequest } from '../../_base/instance.ts';
@@ -100,9 +122,252 @@ export const commitImportJob = (
     },
       options);
     }
+  /**
+ * @summary List Stock Balances
+ */
+export const listStockBalances = (
+    params?: ListStockBalancesParams,
+ options?: SecondParameter<typeof apiRequest<StockBalancePage>>,) => {
+      return apiRequest<StockBalancePage>(
+      {url: `/api/v1/stock-balances`, method: 'GET',
+        params
+    },
+      options);
+    }
+  /**
+ * @summary List Stock Lots
+ */
+export const listStockLots = (
+    params?: ListStockLotsParams,
+ options?: SecondParameter<typeof apiRequest<StockLotPage>>,) => {
+      return apiRequest<StockLotPage>(
+      {url: `/api/v1/stock-lots`, method: 'GET',
+        params
+    },
+      options);
+    }
+  /**
+ * @summary List Stock Moves
+ */
+export const listStockMoves = (
+    params?: ListStockMovesParams,
+ options?: SecondParameter<typeof apiRequest<StockMovePage>>,) => {
+      return apiRequest<StockMovePage>(
+      {url: `/api/v1/stock-moves`, method: 'GET',
+        params
+    },
+      options);
+    }
+  /**
+ * @summary Get Valuation Settings
+ */
+export const getValuationSettings = (
+
+ options?: SecondParameter<typeof apiRequest<ValuationSettingsOut>>,) => {
+      return apiRequest<ValuationSettingsOut>(
+      {url: `/api/v1/valuation-settings`, method: 'GET'
+    },
+      options);
+    }
+  /**
+ * @summary Update Valuation Settings
+ */
+export const updateValuationSettings = (
+    valuationSettingsPatch: ValuationSettingsPatch,
+ options?: SecondParameter<typeof apiRequest<ValuationSettingsOut>>,) => {
+      return apiRequest<ValuationSettingsOut>(
+      {url: `/api/v1/valuation-settings`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: valuationSettingsPatch
+    },
+      options);
+    }
+  /**
+ * @summary List Recost Jobs
+ */
+export const listRecostJobs = (
+    params?: ListRecostJobsParams,
+ options?: SecondParameter<typeof apiRequest<RecostJobPage>>,) => {
+      return apiRequest<RecostJobPage>(
+      {url: `/api/v1/recost-jobs`, method: 'GET',
+        params
+    },
+      options);
+    }
+  /**
+ * @summary Get Recost Job
+ */
+export const getRecostJob = (
+    jobId: string,
+ options?: SecondParameter<typeof apiRequest<RecostJobDetail>>,) => {
+      return apiRequest<RecostJobDetail>(
+      {url: `/api/v1/recost-jobs/${jobId}`, method: 'GET'
+    },
+      options);
+    }
+  /**
+ * @summary Retry Recost Job
+ */
+export const retryRecostJob = (
+    jobId: string,
+    emptyBodyNull?: EmptyBody | null,
+ options?: SecondParameter<typeof apiRequest<RecostJobOut>>,) => {
+      return apiRequest<RecostJobOut>(
+      {url: `/api/v1/recost-jobs/${jobId}/retry`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: emptyBodyNull
+    },
+      options);
+    }
+  /**
+ * @summary Create Stock Opening
+ */
+export const createStockOpening = (
+    openingCreate: OpeningCreate,
+ options?: SecondParameter<typeof apiRequest<OpeningOut>>,) => {
+      return apiRequest<OpeningOut>(
+      {url: `/api/v1/stock-openings`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: openingCreate
+    },
+      options);
+    }
+  /**
+ * @summary List Stock Openings
+ */
+export const listStockOpenings = (
+    params?: ListStockOpeningsParams,
+ options?: SecondParameter<typeof apiRequest<OpeningPage>>,) => {
+      return apiRequest<OpeningPage>(
+      {url: `/api/v1/stock-openings`, method: 'GET',
+        params
+    },
+      options);
+    }
+  /**
+ * @summary Get Stock Opening
+ */
+export const getStockOpening = (
+    docId: string,
+ options?: SecondParameter<typeof apiRequest<OpeningOut>>,) => {
+      return apiRequest<OpeningOut>(
+      {url: `/api/v1/stock-openings/${docId}`, method: 'GET'
+    },
+      options);
+    }
+  /**
+ * @summary Post Stock Opening
+ */
+export const postStockOpening = (
+    docId: string,
+    emptyBodyNull?: EmptyBody | null,
+ options?: SecondParameter<typeof apiRequest<OpeningOut>>,) => {
+      return apiRequest<OpeningOut>(
+      {url: `/api/v1/stock-openings/${docId}/post`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: emptyBodyNull
+    },
+      options);
+    }
+  /**
+ * @summary Cancel Stock Opening
+ */
+export const cancelStockOpening = (
+    docId: string,
+    openingCancel: OpeningCancel,
+ options?: SecondParameter<typeof apiRequest<OpeningOut>>,) => {
+      return apiRequest<OpeningOut>(
+      {url: `/api/v1/stock-openings/${docId}/cancel`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: openingCancel
+    },
+      options);
+    }
+  /**
+ * @summary Create Write Off
+ */
+export const createWriteOff = (
+    writeOffCreate: WriteOffCreate,
+ options?: SecondParameter<typeof apiRequest<WriteOffOut>>,) => {
+      return apiRequest<WriteOffOut>(
+      {url: `/api/v1/write-offs`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: writeOffCreate
+    },
+      options);
+    }
+  /**
+ * @summary List Write Offs
+ */
+export const listWriteOffs = (
+    params?: ListWriteOffsParams,
+ options?: SecondParameter<typeof apiRequest<WriteOffPage>>,) => {
+      return apiRequest<WriteOffPage>(
+      {url: `/api/v1/write-offs`, method: 'GET',
+        params
+    },
+      options);
+    }
+  /**
+ * @summary Get Write Off
+ */
+export const getWriteOff = (
+    docId: string,
+ options?: SecondParameter<typeof apiRequest<WriteOffOut>>,) => {
+      return apiRequest<WriteOffOut>(
+      {url: `/api/v1/write-offs/${docId}`, method: 'GET'
+    },
+      options);
+    }
+  /**
+ * @summary Post Write Off
+ */
+export const postWriteOff = (
+    docId: string,
+    emptyBodyNull?: EmptyBody | null,
+ options?: SecondParameter<typeof apiRequest<WriteOffOut>>,) => {
+      return apiRequest<WriteOffOut>(
+      {url: `/api/v1/write-offs/${docId}/post`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: emptyBodyNull
+    },
+      options);
+    }
+  /**
+ * @summary Cancel Write Off
+ */
+export const cancelWriteOff = (
+    docId: string,
+    writeOffCancel: WriteOffCancel,
+ options?: SecondParameter<typeof apiRequest<WriteOffOut>>,) => {
+      return apiRequest<WriteOffOut>(
+      {url: `/api/v1/write-offs/${docId}/cancel`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: writeOffCancel
+    },
+      options);
+    }
   export type GetImportTemplateResult = NonNullable<Awaited<ReturnType<typeof getImportTemplate>>>
 export type CreateImportJobResult = NonNullable<Awaited<ReturnType<typeof createImportJob>>>
 export type ValidateImportJobResult = NonNullable<Awaited<ReturnType<typeof validateImportJob>>>
 export type GetImportJobResult = NonNullable<Awaited<ReturnType<typeof getImportJob>>>
 export type ListImportJobErrorsResult = NonNullable<Awaited<ReturnType<typeof listImportJobErrors>>>
 export type CommitImportJobResult = NonNullable<Awaited<ReturnType<typeof commitImportJob>>>
+export type ListStockBalancesResult = NonNullable<Awaited<ReturnType<typeof listStockBalances>>>
+export type ListStockLotsResult = NonNullable<Awaited<ReturnType<typeof listStockLots>>>
+export type ListStockMovesResult = NonNullable<Awaited<ReturnType<typeof listStockMoves>>>
+export type GetValuationSettingsResult = NonNullable<Awaited<ReturnType<typeof getValuationSettings>>>
+export type UpdateValuationSettingsResult = NonNullable<Awaited<ReturnType<typeof updateValuationSettings>>>
+export type ListRecostJobsResult = NonNullable<Awaited<ReturnType<typeof listRecostJobs>>>
+export type GetRecostJobResult = NonNullable<Awaited<ReturnType<typeof getRecostJob>>>
+export type RetryRecostJobResult = NonNullable<Awaited<ReturnType<typeof retryRecostJob>>>
+export type CreateStockOpeningResult = NonNullable<Awaited<ReturnType<typeof createStockOpening>>>
+export type ListStockOpeningsResult = NonNullable<Awaited<ReturnType<typeof listStockOpenings>>>
+export type GetStockOpeningResult = NonNullable<Awaited<ReturnType<typeof getStockOpening>>>
+export type PostStockOpeningResult = NonNullable<Awaited<ReturnType<typeof postStockOpening>>>
+export type CancelStockOpeningResult = NonNullable<Awaited<ReturnType<typeof cancelStockOpening>>>
+export type CreateWriteOffResult = NonNullable<Awaited<ReturnType<typeof createWriteOff>>>
+export type ListWriteOffsResult = NonNullable<Awaited<ReturnType<typeof listWriteOffs>>>
+export type GetWriteOffResult = NonNullable<Awaited<ReturnType<typeof getWriteOff>>>
+export type PostWriteOffResult = NonNullable<Awaited<ReturnType<typeof postWriteOff>>>
+export type CancelWriteOffResult = NonNullable<Awaited<ReturnType<typeof cancelWriteOff>>>

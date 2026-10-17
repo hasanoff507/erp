@@ -6,7 +6,10 @@ import type {
   ImportJobOut,
 } from "@shared/models";
 
-/** Import kinds of 19 §6. Bosqich 1 builds `products` only (opening_stock — Bosqich 2, opening_debts — Bosqich 4). */
+/**
+ * Import kinds of 19 §6. The catalog screen imports `products`; `opening_stock` (Bosqich 2) is embedded
+ * by BO-21 ③b (`<ImportProductsFlow kind="opening_stock" embedded />`), `opening_debts` — Bosqich 4.
+ */
 export type ImportKind = "products" | "opening_stock" | "opening_debts";
 
 export const IMPORT_KINDS: readonly ImportKind[] = ["products", "opening_stock", "opening_debts"];
@@ -35,9 +38,20 @@ export interface ImportProductsResult {
   createdProductCount: number;
   /** Error rows skipped by the commit (`skip_error_rows=true`). */
   skippedRows: number;
-  /** Initial price-change document(s) created from the `price` column. */
+  /** Initial price-change document(s) created from the `price` column; the stock-opening document (opening_stock). */
   createdDocIds: string[];
+  /** `opening_stock`: lines of the posted stock-opening document (`result.line_count`). */
+  lineCount: number;
 }
+
+/** Kinds the embeddable flow supports today. */
+export type FlowImportKind = Extract<ImportKind, "products" | "opening_stock">;
+
+/** Template columns of `GET /import-jobs/templates/{kind}` (19 §6), shown next to the download button. */
+export const TEMPLATE_COLUMNS: Readonly<Record<FlowImportKind, string>> = {
+  products: "name;name_ru;barcode;unit_code;mxik_code;vat_rate;price;category;is_marked",
+  opening_stock: "barcode;qty;unit_cost;expiry_date",
+};
 
 /** The generated `inventory` functions the flow uses — injectable for unit tests. */
 export interface ImportApi {

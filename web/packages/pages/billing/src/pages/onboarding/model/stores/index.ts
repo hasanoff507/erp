@@ -6,6 +6,7 @@ import type { SignupOut, TermsVersionOut } from "@shared/models";
 import { currentVersion, secondsLeft } from "../lib/index.ts";
 import type {
   AccountData,
+  OpeningStockMethod,
   OtpChallenge,
   ProductsMethod,
   SignupFailure,
@@ -43,3 +44,6 @@ export const $signupFailure = createStore<SignupFailure | null>(null);
 export const $productsMethod = createStore<ProductsMethod | null>(null);
 export const $importedCount = createStore<number | null>(null);
 export const $connectNow = createStore(false);
+export const $openingStockMethod = createStore<OpeningStockMethod | null>(null);
+/** Opening-stock lines posted during this wizard (several documents add up); `null` — none yet. */
+export const $openingStockLines = createStore<number | null>(null);

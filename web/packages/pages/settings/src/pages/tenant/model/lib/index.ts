@@ -1,9 +1,15 @@
 import { dayjs } from "@shared/lib/date";
 import { toDecimal } from "@shared/lib/money";
-import type { SettingsPatchIn, TenantSettingsPatchIn } from "@shared/models";
+import type { SettingsPatchIn, TenantSettingsPatchIn, ValuationSettingsOut } from "@shared/models";
 
 import { TENANT_TABS } from "../types/index.ts";
-import type { TenantFormValues, TenantSettings, TenantTab, TermsVersion } from "../types/index.ts";
+import type {
+  TenantFormValues,
+  TenantSettings,
+  TenantTab,
+  TermsVersion,
+  ValuationMethod,
+} from "../types/index.ts";
 
 export function toFormValues(s: TenantSettings): TenantFormValues {
   return {
@@ -149,4 +155,21 @@ export function firstErrorField(fields: Iterable<string>): keyof TenantFormValue
     .filter((f) => set.has(f))
     .sort((a, b) => TENANT_TABS.indexOf(TENANT_FIELD_TAB[a]) - TENANT_TABS.indexOf(TENANT_FIELD_TAB[b]));
   return sorted[0] ?? null;
+}
+
+/** Valuation changes inside a year with stock moves take effect on 1 January of next year (19 §17). */
+export function nextYearStart(today: Date = new Date()): string {
+  return dayjs(today).add(1, "year").startOf("year").format("YYYY-MM-DD");
+}
+
+export function otherMethod(method: ValuationMethod): ValuationMethod {
+  return method === "aveco" ? "fifo" : "aveco";
+}
+
+/**
+ * The method may be changed once a year (19 §17): with a scheduled `pending_change` a different
+ * request is refused (409 VALUATION_METHOD_CHANGE_NOT_ALLOWED) — the action is not offered.
+ */
+export function canRequestValuationChange(v: Pick<ValuationSettingsOut, "pending_change"> | null): boolean {
+  return v !== null && v.pending_change === null;
 }

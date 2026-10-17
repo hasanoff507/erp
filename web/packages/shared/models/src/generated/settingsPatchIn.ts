@@ -31,4 +31,5 @@ export interface SettingsPatchIn {
   ai_training_consent?: boolean | null;
   fiscal_policy?: FiscalPolicyIn | null;
   card_manual_fallback?: SettingsPatchInCardManualFallback;
+  transfer_overdue_hours?: number | null;
 }

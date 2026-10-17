@@ -49,7 +49,9 @@ import {
   type TenantTab,
 } from "../../model/index.ts";
 import { AiConsentCard } from "../AiConsentCard.tsx";
+import { RecostStatusLine } from "../RecostStatusLine.tsx";
 import { TaxRegimeCard } from "../TaxRegimeCard.tsx";
+import { ValuationCard } from "../ValuationCard.tsx";
 import { SegmentField, SelectField, SwitchField } from "../fields.tsx";
 
 const digits = (max: number, exact?: number) =>
@@ -105,8 +107,9 @@ function isTab(value: string | null): value is TenantTab {
 /**
  * BO-14 — Tenant/do'kon sozlamalari, Bosqich 1 part (07, route /app/settings/tenant, `settings.tenant`
  * — owner only): name, legal form, bank details, the tenant policies of 20 #40b, tax regime (#40c),
- * AI cross-border consent (#40h). Integrations, costing method, scales, store agent, receipt template and
- * sync exceptions are later stages and shown as disabled sections.
+ * AI cross-border consent (#40h). Bosqich 2: «Zaxira baholash usuli» (19 §17, `valuation.settings.manage`)
+ * and the «Qayta hisoblash navbati» status line (qaror #56c, → BO-08). Integrations, scales, store agent,
+ * receipt template and sync exceptions are later stages and shown as disabled sections.
  */
 function TenantPage() {
   const { t } = useTranslation("settings");
@@ -437,7 +440,7 @@ function TenantForm({
               />
             </div>
           </Card>
-          <NextStageCard title={t("tenant.costing.title")} description={t("tenant.costing.description")} />
+          <ValuationCard />
         </TabsContent>
 
         <TabsContent value="integrations" className="mt-3.5 flex flex-col gap-3.5">
@@ -536,6 +539,7 @@ function TenantForm({
             title={t("tenant.syncExceptions.title")}
             description={t("tenant.syncExceptions.description")}
           />
+          <RecostStatusLine />
         </TabsContent>
       </Tabs>
       {dirty ? (

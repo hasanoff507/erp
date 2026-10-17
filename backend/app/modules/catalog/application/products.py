@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 from uuid import UUID
 
@@ -23,8 +23,15 @@ from app.core.db.session import tenant_transaction
 from app.core.error_codes import ErrorCode
 from app.core.errors import AppError, ErrorDetail
 from app.core.idempotency import stage_response
+from app.core.money import HUNDRED, price_str
 from app.core.permissions import BranchScope
-from app.modules.catalog.application.ports import CatalogRepository, CurrentPricesPort, ProductFilter
+from app.modules.accounting.domain.calendar import business_today as tashkent_today
+from app.modules.catalog.application.ports import (
+    CatalogRepository,
+    CurrentCostsPort,
+    CurrentPricesPort,
+    ProductFilter,
+)
 from app.modules.catalog.application.presenters import barcode_json, product_json
 from app.modules.catalog.domain.barcodes import (
     INTERNAL_SEQ_MAX,
@@ -77,6 +84,26 @@ def _price(value: Decimal | None) -> str | None:
     return None if value is None else str(value)
 
 
+def markup_pct(
+    price: Decimal | None, cost: Decimal | None, vat_rate: Decimal | None, vat_payer: bool
+) -> str | None:
+    """BO-05 «Ustama %» = (net selling price − cost) / cost × 100, 2 dp (ROUND_HALF_UP).
+
+    For a VAT payer the net price excludes the VAT included in the retail price
+    (``price × 100 / (100 + rate)``, 13 §2); for a turnover-tax payer it is the full price.
+    ``None`` when the price or the cost is missing or zero.
+    """
+    if price is None or cost is None or price <= 0 or cost <= 0:
+        return None
+    rate = vat_rate if vat_payer and vat_rate is not None else Decimal(0)
+    net = price * HUNDRED / (HUNDRED + rate)
+    return _pct((net - cost) / cost * HUNDRED)
+
+
+def _pct(value: Decimal) -> str:
+    return format(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP), "f")
+
+
 def _audit_view(values: Mapping[str, Any]) -> dict[str, Any]:
     return {k: (str(v) if isinstance(v, Decimal | UUID) else v) for k, v in values.items()}
 
@@ -87,24 +114,39 @@ class ProductService:
         session_factory: async_sessionmaker[AsyncSession],
         repo: CatalogRepository,
         prices: CurrentPricesPort | None = None,
+        costs: CurrentCostsPort | None = None,
     ) -> None:
         self._sf = session_factory
         self._repo = repo
         self._prices = prices
+        self._costs = costs
 
     # --- reads ------------------------------------------------------------------------------------
     async def list_page(
         self, actor: Principal, flt: ProductFilter, page: int, size: int, scope: BranchScope
     ) -> Page:
-        """19 §1: each item carries ``current_price`` (branch → global, 19 §4), batched per page."""
+        """19 §1: each item carries ``current_price`` (branch → global, 19 §4), ``current_cost`` (the
+        branch warehouse's unit cost, inventory) and ``markup_pct`` (BO-05) — batched per page."""
         async with self._sf() as s, tenant_transaction(s, actor.tenant_id, user_id=actor.user_id):
             items, total = await self._repo.list_products(s, flt, (page - 1) * size, size)
+            ids = [p.id for p in items]
             prices: Mapping[UUID, Decimal] = (
-                await self._prices(s, [p.id for p in items], scope) if self._prices and items else {}
+                await self._prices(s, ids, scope) if self._prices and items else {}
             )
-        return Page(
-            [product_json(p) | {"current_price": _price(prices.get(p.id))} for p in items], total, page, size
-        )
+            costs: Mapping[UUID, Decimal] = await self._costs(s, ids, scope) if self._costs and items else {}
+            vat_payer = await self._repo.vat_payer(s, tashkent_today()) if items else True
+        out = []
+        for p in items:
+            cost = costs.get(p.id)
+            out.append(
+                product_json(p)
+                | {
+                    "current_price": _price(prices.get(p.id)),
+                    "current_cost": None if cost is None else price_str(cost),
+                    "markup_pct": markup_pct(prices.get(p.id), cost, p.vat_rate, vat_payer),
+                }
+            )
+        return Page(out, total, page, size)
 
     async def get(self, actor: Principal, product_id: UUID) -> dict[str, Any]:
         async with self._sf() as s, tenant_transaction(s, actor.tenant_id, user_id=actor.user_id):

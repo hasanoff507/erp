@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 from typing import Any, Protocol
 from uuid import UUID
@@ -32,6 +33,7 @@ class CatalogRepository(Protocol):
     async def list_units(self, s: AsyncSession) -> list[Unit]: ...
     async def unit_codes(self, s: AsyncSession) -> set[str]: ...
     async def marking_group_exists(self, s: AsyncSession, code: str) -> bool: ...
+    async def vat_payer(self, s: AsyncSession, on: date) -> bool: ...
 
     # --- categories -------------------------------------------------------------------------------
     async def get_category(
@@ -101,6 +103,15 @@ class CurrentPricesPort(Protocol):
 
     Products without an effective price are absent from the result.
     """
+
+    async def __call__(
+        self, s: AsyncSession, product_ids: Sequence[UUID], scope: BranchScope
+    ) -> Mapping[UUID, Decimal]: ...
+
+
+class CurrentCostsPort(Protocol):
+    """Inventory: unit cost per product in the request branch's warehouse (19 §1 ``current_cost``), one
+    query; products without a known cost are absent."""
 
     async def __call__(
         self, s: AsyncSession, product_ids: Sequence[UUID], scope: BranchScope

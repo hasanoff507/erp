@@ -8,6 +8,7 @@ import {
   $drafts,
   $history,
   $prices,
+  $products,
   $saveResult,
   $selectedId,
   approvalLimitOf,
@@ -20,6 +21,7 @@ import {
   pageChanged,
   pageMounted,
   rowStateOf,
+  saveNameRuFx,
   savePricesFx,
   saveRequested,
   scopeChanged,
@@ -50,8 +52,13 @@ function product(id: string, name: string): ProductOut {
 
 const page: ProductPage = {
   items: [
-    { ...product("p1", "Sut 1 l"), current_price: "12000.0000" },
-    { ...product("p2", "Choy 100 g"), current_price: null },
+    {
+      ...product("p1", "Sut 1 l"),
+      current_price: "12000.0000",
+      current_cost: "9800.5000",
+      markup_pct: "8.93",
+    },
+    { ...product("p2", "Choy 100 g"), current_price: null, current_cost: null, markup_pct: null },
   ],
   total: 2,
   page: 1,
@@ -59,7 +66,9 @@ const page: ProductPage = {
 };
 
 const page2: ProductPage = {
-  items: [{ ...product("p3", "Non"), current_price: "5000.0000" }],
+  items: [
+    { ...product("p3", "Non"), current_price: "5000.0000", current_cost: "5200.0000", markup_pct: "-13.85" },
+  ],
   total: 21,
   page: 2,
   size: 20,
@@ -100,6 +109,14 @@ function scope(saveStatus = "posted") {
       ],
       [loadHistoryFx, () => ({ items: [], next_cursor: null })],
       [
+        saveNameRuFx,
+        ({ product: p, nameRu }: { product: ProductOut; nameRu: string }) => ({
+          ...product(p.id, p.name),
+          name_ru: nameRu,
+          version: p.version + 1,
+        }),
+      ],
+      [
         savePricesFx,
         (params: SavePricesParams) => {
           saved.push(params);
@@ -118,6 +135,24 @@ describe("BO-05 prices model (US-M09-01/02)", () => {
     expect(s.getState($prices).p1?.current).toBe("13500.0000");
     expect(s.getState($selectedId)).toBe("p1");
     expect(s.getState($history)).toEqual([]);
+  });
+
+  it("rows carry «Tannarx» / «Ustama %» (current_cost, markup_pct); a nameRu save keeps them (WEB-15)", async () => {
+    const { s } = scope();
+    await allSettled(pageMounted, { scope: s });
+    const [p1, p2] = s.getState($products);
+    expect(p1).toMatchObject({ current_cost: "9800.5000", markup_pct: "8.93" });
+    expect(p2).toMatchObject({ current_cost: null, markup_pct: null });
+
+    if (!p1) throw new Error("no row");
+    await allSettled(saveNameRuFx, { scope: s, params: { product: p1, nameRu: "Молоко 1 л" } });
+    expect(s.getState($products)[0]).toMatchObject({
+      name_ru: "Молоко 1 л",
+      version: 2,
+      current_price: "12000.0000",
+      current_cost: "9800.5000",
+      markup_pct: "8.93",
+    });
   });
 
   it("only changed rows become lines; save sends one document and clears the drafts", async () => {

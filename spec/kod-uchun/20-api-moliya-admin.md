@@ -318,8 +318,8 @@
 |---|---|
 | Maqsad | Buxgalteriya jurnali (`ledger_entries`) — hisob rejasi bo'yicha filtr (`13-provodka-qoidalari.md` §1) |
 | Ruxsat | `accounting.post` |
-| So'rov | Cursor; filtr `?account_dt=&account_kt=&entry_date__gte=&entry_date__lte=&branch_id=&doc_type=` (filtr maydonlari ustun nomi bilan bir xil: `entry_date__*`, `branch_id`) |
-| Javob | `{items: [{id, entry_date, account_dt, account_kt, amount, branch_id, doc_type, doc_id, analytics, reversal_of_id}], next_cursor}` |
+| So'rov | Cursor; filtr `?account_dt=&account_kt=&entry_date__gte=&entry_date__lte=&branch_id=&doc_type=&doc_id=` (filtr maydonlari ustun nomi bilan bir xil: `entry_date__*`, `branch_id`); filial cheklangan foydalanuvchi faqat o'z filiallari qatorlarini ko'radi (`branch_id` boshqa filial — `403 BRANCH_SCOPE_DENIED`) |
+| Javob | `{items: [{id, entry_date, account_dt, account_kt, amount, branch_id, doc_type, doc_id, doc_number, analytics, reversal_of_id}], next_cursor}` (`doc_number` — hujjat raqami, bo'lmasa `null`) |
 | Xatolar | `VALIDATION_ERROR` |
 | Idempotency-Key | Kerak emas |
 | Offline | Faqat ko'rish (kesh) |
@@ -823,7 +823,7 @@
 |---|---|---|
 | `name` | do'kon nomi | `tenants.name` (interfeys tili — `users.locale`, tenant sozlamasi emas) |
 | `legal_form` | `"llc"\|"jsc"\|"private_enterprise"\|"sole_proprietor"` | `tenants.legal_form` |
-| `go_live_date` | sana, faqat o'qish (onboarding yozadi) | `tenants.go_live_date` |
+| `go_live_date` | sana, faqat o'qish (ro'yxatdan o'tishda yoziladi — ro'yxatdan o'tgan kun, Toshkent) | `tenants.go_live_date` |
 | `accepted_terms_version`, `accepted_terms_at` | faqat o'qish (ro'yxatdan o'tishda aksept, `14-autentifikatsiya-oauth2.md`) | `tenants` |
 | `settings.bank_account`, `settings.bank_mfo` | tenantning **yagona** bank hisobi (20 raqam) va MFO — MVP'da bitta hisob, `cash_moves.bank_account_id` doim `NULL` (qaror #49); ko'chirma importi (55g) shu hisob bilan solishtiradi | `tenants.settings` |
 | `settings.supplier_overpay_policy` | `"warn"\|"block"`, standart `"warn"` — `warn`: ortiqcha to'lov avans 4310 (`SUPPLIER_OVERPAY_ADVANCE`), `block`: `422 SUPPLIER_OVERPAY_BLOCKED` (qaror #47, `19-api-ombor.md` §11) | `tenants.settings` |
@@ -834,6 +834,7 @@
 | `settings.payment_org_commission_account` | `"9430"\|"9410"`, standart `"9430"` — faqat `click`/`payme`/`uzum` to'lov tashkiloti komissiyasi (55e); `card`/`uzqr` komissiyasi — doim `9430` | `tenants.settings` |
 | `settings.card_manual_fallback` | `"allow"\|"manager_approval"\|"forbid"`, standart `"manager_approval"` — karta rekvizitlarini qo'lda kiritish siyosati (qaror #71, BO-12) | `tenants.settings` |
 | `settings.negative_stock_policy` | `"allow"\|"block"`, standart `"allow"` — manfiy qoldiqqa chiqim siyosati (`block` — `NEGATIVE_STOCK_NOT_ALLOWED`, `19-api-ombor.md`) | `tenants.settings` |
+| `settings.transfer_overdue_hours` | `int` 1..720, standart `48` — `GET /transfers` `is_overdue` chegarasi (QT-M06-05) | `tenants.settings` |
 | `settings.ai_training_consent` | bool — anonimlashtirilgan ma'lumotdan AI'ni yaxshilashda foydalanishga rozilik | `tenants.settings` |
 | `settings.turnover_tax_account` | `"9430"\|"9820"`, standart `"9430"` — aylanma solig'i xarajati (8c) | `tenants.settings` |
 | `settings.fiscal_policy` | `{debt_receipt_split: "single"\|"per_sale" (standart "single", qaror #45), credit_sale_receipt: "none"\|"credit_type" (standart "none")}` | `tenants.settings` |
@@ -858,7 +859,7 @@
 |---|---|
 | Maqsad | Do'kon nomi (`tenants.name`), yuridik shakli, bank hisobi va tenant siyosatlarini (`tenants.settings`) yangilash; soliq rejimi — 40c, integratsiya kalitlari — 40d, AI roziligi — 40h orqali |
 | Ruxsat | `settings.tenant`; tanada faqat `settings.vat_diff_tolerance_amount` bo'lsa — `tax.compare.review` ham yetarli (Buxgalter, qaror #50) |
-| So'rov | `{name?, legal_form?, settings?: {bank_account?, bank_mfo?, supplier_overpay_policy?, vat_diff_tolerance_amount?, marking_precheck?, discount_posting?, owner_withdrawal_account?, payment_org_commission_account?, turnover_tax_account?, negative_stock_policy?, card_manual_fallback?, ai_training_consent?, fiscal_policy?: {debt_receipt_split?, credit_sale_receipt?}}, version: int (majburiy)}` — qisman yangilash (merge); `ai_cross_border_enabled`, `go_live_date`, `accepted_terms_*` qabul qilinmaydi |
+| So'rov | `{name?, legal_form?, settings?: {bank_account?, bank_mfo?, supplier_overpay_policy?, vat_diff_tolerance_amount?, marking_precheck?, discount_posting?, owner_withdrawal_account?, payment_org_commission_account?, turnover_tax_account?, negative_stock_policy?, transfer_overdue_hours?, card_manual_fallback?, ai_training_consent?, fiscal_policy?: {debt_receipt_split?, credit_sale_receipt?}}, version: int (majburiy)}` — qisman yangilash (merge); `ai_cross_border_enabled`, `go_live_date`, `accepted_terms_*` qabul qilinmaydi |
 | Javob | `200 TenantSettings` |
 | Xatolar | `VALIDATION_ERROR` (enum tashqarisidagi qiymat, `vat_diff_tolerance_amount < 0`, `bank_account` 20 raqam emas, `bank_mfo` 5 raqam emas, `ai_cross_border_enabled`/`go_live_date`/`accepted_terms_*` tanada), `VERSION_CONFLICT` (`params.current_version`) |
 | Idempotency-Key | Majburiy |

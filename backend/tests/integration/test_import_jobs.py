@@ -65,11 +65,14 @@ async def test_template_and_kinds(env: Env) -> None:
     assert r.headers["content-type"].startswith("text/csv")
     assert r.headers["content-disposition"] == 'attachment; filename="products.csv"'
     assert r.content.decode("utf-8-sig").strip() == HEADER
-    for kind in ("opening_stock", "opening_debts"):  # Bosqich 2 / Bosqich 4
+    for kind in ("opening_debts",):  # Bosqich 4 (opening_stock — Bosqich 2, test_stock_openings.py)
         refused = await env.client.get(f"{API}/templates/{kind}", headers=shop.h(key=None))
         assert refused.status_code == 422
         assert refused.json()["error"]["details"][0]["message_key"] == "validation.import_kind_not_supported"
         assert (await upload(env, shop, csv_file(), kind=kind)).status_code == 422
+    opening = await env.client.get(f"{API}/templates/opening_stock", headers=shop.h(key=None))
+    assert opening.status_code == 200
+    assert opening.content.decode("utf-8-sig").strip() == "barcode;qty;unit_cost;expiry_date"
     assert (await upload(env, shop, csv_file(), kind="nonsense")).status_code == 422
     denied = await env.client.get(f"{API}/templates/products", headers=shop.h("cashier", key=None))
     assert denied.status_code == 403
@@ -281,3 +284,45 @@ async def test_qt_nfr_signup_01_catalog_import_500_products_xlsx(env: Env) -> No
             )
         ).one()
     assert tuple(counts) == (500, 500, 500, 10)
+
+
+async def test_opening_stock_import_needs_the_default_branch_in_scope(env: Env) -> None:
+    """SEC-02: the ``opening_stock`` import posts into the default branch's warehouse — a user restricted
+    to another branch is refused (upload / validate / commit → 403), and so is the commit job itself."""
+    from app.modules.accounting.wiring import business_today
+    from app.modules.imports.tasks import import_jobs_commit
+    from tests.support.inventory import add_branch, add_user, set_go_live
+
+    shop = await env.shop("Import scope")
+    await set_go_live(env, shop, business_today().replace(day=1))
+    await create_product(env.client, shop, "Pepsi 1L", barcode="4870000000024")
+    branch_b, _ = await add_branch(env, shop, "B2")
+    await add_user(env, shop, "accountant_b", SystemRole.ACCOUNTANT, (branch_b,))
+    content = b"barcode;qty;unit_cost;expiry_date\r\n4870000000024;5;1000;\r\n"
+    refused = await upload(env, shop, content, "opening.csv", kind="opening_stock", role="accountant_b")
+    assert refused.status_code == 403 and err(refused) == "BRANCH_SCOPE_DENIED"
+    job_id = (await upload(env, shop, content, "opening.csv", kind="opening_stock")).json()["id"]
+    denied = await env.client.post(f"{API}/{job_id}/validate", headers=shop.h("accountant_b"))
+    assert denied.status_code == 403 and err(denied) == "BRANCH_SCOPE_DENIED"
+    await env.client.post(f"{API}/{job_id}/validate", headers=shop.h())
+    await env.drain()
+    assert (await job(env, shop, job_id))["status"] == "validated"
+    denied = await env.client.post(f"{API}/{job_id}/commit", json={}, headers=shop.h("accountant_b"))
+    assert denied.status_code == 403 and err(denied) == "BRANCH_SCOPE_DENIED"
+    await env.drain()
+    assert (await job(env, shop, job_id))["status"] == "validated"
+    # the worker re-checks the committing actor's scope (a job enqueued with a restricted scope)
+    async with env.db.session_factory() as s, tenant_transaction(s, shop.tenant_id):
+        await s.execute(
+            text("UPDATE app.import_jobs SET status = 'committing' WHERE id = :id"), {"id": job_id}
+        )
+    result = await import_jobs_commit(
+        {"db": env.db, "settings": env.settings}, tenant_id=str(shop.tenant_id), job_id=job_id,
+        user_id=str(shop.user_ids["accountant_b"]), branch_ids=[str(branch_b)],
+    )  # fmt: skip
+    assert result == {"status": "failed", "code": "BRANCH_SCOPE_DENIED"}
+    state = await job(env, shop, job_id)
+    assert state["status"] == "failed" and state["result"] == {}
+    async with env.db.session_factory() as s, tenant_transaction(s, shop.tenant_id):
+        count = (await s.execute(text("SELECT count(*) FROM app.stock_openings"))).scalar()
+    assert count == 0

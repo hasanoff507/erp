@@ -14,6 +14,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import DBAPIError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.context import current_request_id
@@ -161,8 +162,30 @@ async def _http_handler(_: Request, exc: Exception) -> JSONResponse:
     return error_response(code, status, headers=exc.headers)
 
 
+_NUMERIC_OUT_OF_RANGE = "22003"  # PostgreSQL numeric_value_out_of_range
+
+
+def _sqlstate(exc: DBAPIError) -> str | None:
+    orig = exc.orig
+    state = getattr(orig, "sqlstate", None) or getattr(orig, "pgcode", None)
+    return str(state) if state else None
+
+
+async def _db_error_handler(_: Request, exc: Exception) -> JSONResponse:
+    """A value too large for its NUMERIC column (e.g. qty × cost) is bad input, not a 500 (SEC-05)."""
+    assert isinstance(exc, DBAPIError)
+    if _sqlstate(exc) == _NUMERIC_OUT_OF_RANGE:
+        return error_response(
+            ErrorCode.VALIDATION_ERROR,
+            422,
+            details=[ErrorDetail(field="", message_key="validation.numeric_out_of_range")],
+        )
+    raise exc  # anything else stays an INTERNAL_ERROR (RequestContextMiddleware logs it)
+
+
 def install_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(AppError, _app_error_handler)
+    app.add_exception_handler(DBAPIError, _db_error_handler)
     app.add_exception_handler(RequestValidationError, _validation_handler)
     app.add_exception_handler(StarletteHTTPException, _http_handler)
     # unhandled exceptions become INTERNAL_ERROR in RequestContextMiddleware

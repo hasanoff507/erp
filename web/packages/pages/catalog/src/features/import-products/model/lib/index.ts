@@ -46,6 +46,7 @@ export function resultFromJob(job: ImportJobOut): ImportProductsResult {
     createdProductCount: asCount(job.result.created_product_count),
     skippedRows: job.error_rows,
     createdDocIds: asIds(job.result.created_doc_ids),
+    lineCount: asCount(job.result.line_count),
   };
 }
 

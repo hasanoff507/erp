@@ -151,8 +151,8 @@ test("save changed policies, schedule a tax regime and give the AI cross-border 
   expect(regimes[0]).toMatchObject({ regime: "turnover" });
   expect(String(regimes[0]?.valid_from)).toMatch(/^\d{4}-\d{2}-01$/);
   await expect(main.getByText(/Rejalashtirilgan: Aylanma solig'i/)).toBeVisible();
-  // Costing method is a later stage: shown, not editable.
-  await expect(main.getByText("Zaxira baholash usuli (AVECO / FIFO)")).toBeVisible();
+  // Costing method (Bosqich 2, its own spec valuation.spec.ts): the card is on this tab.
+  await expect(main.getByRole("heading", { name: "Zaxira baholash usuli" })).toBeVisible();
 
   // --- AI cross-border consent (owner only, POST /tenant/consents) -----------------------------------
   await main.getByRole("tab", { name: "Xavfsizlik" }).click();

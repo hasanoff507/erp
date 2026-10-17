@@ -25,8 +25,9 @@ _CURRENT_TERMS = text(
 )
 _INSERT_TENANT = text(
     "INSERT INTO app.tenants (id, name, activity_type, phone, legal_form, accepted_terms_version, "
-    "accepted_terms_at, accepted_terms_ip, settings) VALUES (:id, :name, :activity_type, :phone, "
-    ":legal_form, :terms, now(), CAST(:ip AS inet), CAST(:settings AS jsonb))"
+    "accepted_terms_at, accepted_terms_ip, settings, go_live_date) "
+    "VALUES (:id, :name, :activity_type, :phone, :legal_form, :terms, now(), CAST(:ip AS inet), "
+    "CAST(:settings AS jsonb), :go_live_date)"
 )
 _INSERT_USER = text(
     "INSERT INTO app.users (id, phone, name) VALUES (:id, :phone, :name) ON CONFLICT (phone) DO NOTHING "
@@ -77,6 +78,8 @@ class SignupRepository:
                 "id": t.tenant_id, "name": t.store_name, "activity_type": t.business_type, "phone": t.phone,
                 "legal_form": t.legal_form, "terms": t.terms_version, "ip": t.ip,
                 "settings": json.dumps(settings),
+                # 13 §2.21/§5.5: openings are dated go_live_date − 1; the tenant starts on its signup day
+                "go_live_date": t.signup_date,
             },
         )  # fmt: skip
 

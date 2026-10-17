@@ -569,6 +569,55 @@ MANUAL: dict[str, tuple[str, str]] = {
     "B1-TBL-app.import_jobs": (DONE, "DDL 0022; kod `imports/infrastructure/repositories.py`; test `test_import_jobs.py::test_us_m04_04_csv_upload_validate_commit`, `::test_all_rows_invalid_fails_and_job_requires_tenant`"),
     "B1-TBL-app.doc_sequences": (DONE, "DDL 0019; kod `core/doc_numbers.py` (`app.next_doc_number`, birinchi hujjatda yaratiladi — 12 §5.2, 14 §20); test `test_pricing_price_changes.py::test_qt_m09_01_*` (`C-01-2026-000001` → `…000002`), `test_import_jobs.py::test_us_m04_04_*`"),
     "B1-SCR-UX-INSTALL": (DONE, "B1-T03 ga qarang; analitika `install_guide_viewed`/`pwa_installed`, PWA precache `apps/shell/vite.config.ts`; test: `e2e/install.spec.ts`"),
+    # ---- Bosqich 2 (2026-10-17/18; 3 Opus tekshiruvchi → qabul agenti → tuzatishlar)
+    "B2-T01": (DONE, "posting toolkit: `accounting/application/posting.py` (`LedgerPoster`: hisob rejasi/Dt≠Kt/summa tekshiruvi, `vat_moves`, storno — Dt/Kt almashadi, QQS manfiy, `reversal_of_id`, ochiq davr sanasi; `PERIOD_CLOSED`), `inventory/application/stock.py` (`StockService.lock` — `stock_balances` qatorlari tartibli `FOR UPDATE`, `receive`/`issue`/`reverse_*`, cost-line analitika shartnomasi), `debts/application/register.py`; har hujjat bitta `tenant_transaction`da; test: `tests/unit/test_accounting_entries.py`, `test_accounting_ledger.py` (storno, PERIOD_CLOSED), `test_inventory_concurrency.py`, `test_debt_register.py`"),
+    "B2-T02": (DONE, "`purchasing/` (goods receipts: nasiya `Kt 6010` + `debt_moves`, darhol bank `Kt 5110`, tekin `Kt 8530`, QQS/aylanma rejimi, qizil/`unknown` faktura — 4410 `vat_credit='deferred'`, avans `Kt 4310`), `debts/` (kontragentlar CRUD, STIR qidiruv, qarz balansi); test: `test_goods_receipts.py` (QT-M04-01, QT-M07-02/03/04/07/08/09, §2.6a/§2.7/§2.8/§2.16/§4.3), `test_counterparties.py`, `test_purchase_orders.py`, `tests/unit/test_purchasing_posting.py`. Kassadan naqd to'lov — B4 (`supplier_payments`)"),
+    "B2-T03": (DONE, "`inventory/domain/costing.py` (FIFO lot qiymati, AVECO `total_value`), `application/stock.py`, `application/recost.py` (`recost_jobs`, SAQ `inventory_recost` + 15 daqiqalik sweep, `/recost-jobs` API), qoldiq API (`/stock-balances|lots|moves`); test: `test_inventory_costing.py` (QT-M04-05/06/09/10), `test_recost_jobs.py` (QT-M04-11, yopilgan davr tuzatishi), `tests/unit/test_costing.py`, `test_inventory_stock_api.py` (QT-PERM-08/09)"),
+    "B2-T04": (DONE, "`inventory/application/transfers.py` (2970 jo'natish/qabul, kamomad 5910, `TRANSFER_COST_PENDING`), `stock_counts.py` (X-02 `expected`, 4730/5910, ortiqcha 9390 `last_purchase_cost`da), `warehouses.inventory_account`; test: `test_transfers.py` (QT-M06-01…03/05/06), `test_stock_counts.py` (QT-M05-01…04/06/07). Offline `transfer.*`/`stock_count.line_recorded` — voqea nomlari va payload validatorlari `inventory/domain/*`da, `/sync/push` — B3"),
+    "B2-T05": (DONE, "`ettn_documents` qoralamasi (`pending_signature`, `warehouse_to_warehouse`) transfer `post`ida; `ERP_EINVOICE_PROVIDER=fake` — `outbox_jobs(kind='ettn_send')` → `integrations/einvoice/application/ettn_outbox.py` (`FakeEInvoiceAdapter` → `registered`, `transfers.ettn_ref`, backoff 1 daq×2 cap 1 soat, 24 urinish, qulf tartibi transfer → outbox → ettn); test: `test_transfers.py::test_qt_m06_07_*`, `::test_qt_m06_08_*`, `test_ettn_outbox.py`, `tests/unit/test_ettn_lock_order.py`. Real operator va E-IMZO — B5"),
+    "B2-T06": (DONE, "`purchasing/application/supplier_returns.py` (13 §2.20: `Dt 6010 / Kt inv_acct`, AVECO 3a/3b, 2-qator QQS — qo'shimcha e-faktura bilan B5; 12 oy → `reverse_sale_required`); test: `test_supplier_returns.py::test_qt_m07_06_*` va 3a/3b raqamli testlari"),
+    "B2-T07": (DONE, "`inventory/application/write_offs.py` (13 §2.12: 9430/4730/9410, sovg'a QQS `Dt 9430 / Kt 6410` bozor qiymatidan + `vat_moves`, limit → `approval_requests` 202 + `over_limit_action`; partiya `expiry_date`), faqat online REST (sync voqeasi yo'q); test: `test_write_offs.py::test_qt_m04_08_*` va §2.12 matritsasi"),
+    "B2-T08": (DONE, "`inventory/application/openings.py` (`Dt inv_acct / Kt 0000`, `entry_date = go_live_date − 1`, QQSsiz), `imports` `kind=opening_stock` (filial doirasi tekshiruvi); `go_live_date` ro'yxatdan o'tishda yoziladi; test: `test_stock_openings.py::test_qt_m04_04_*`, `test_import_jobs.py`"),
+    "B2-T09": (DONE, "`stock_lots.blocked_qty` (`block`, `from_blocked`, bekor qilishda tiklanadi), AVECO `total_value` (eski qiymat − COGS, kirimni bekor qilish himoyasi), pending tannarx keyingi kirimda qoplanadi + recost, FIFO↔AVECO bir martalik almashtirish (`valuation.py`); test: `test_inventory_costing.py`, `test_inventory_valuation.py`, `test_write_offs.py`, `test_recost_jobs.py`"),
+    "B2-T10": (DONE, "`notifications/application/outbox.py` (`outbox_jobs(kind='telegram')`, dedupe kaliti) — `expiry_soon`, `low_stock` (kunlik cron), `over_limit_action` (hisobdan chiqarish limiti); yuboruvchi worker yo'q (B4); test: `test_inventory_notifications.py::test_qt_m04_07_*`, `::test_qt_m04_02_*`, `test_write_offs.py` (202 yo'li)"),
+    "B2-T11": (DONE, "`web/packages/pages/warehouse` BO-03 «Ko'chirishlar» tabi (holat, kechikkan, e-TTN ustuni, post/jo'natish/qabul/bekor) + «Qoldiq» ostidagi qisqa blok; `transfer_overdue_hours` sozlamasi; test: `features/transfers/model/*.test.ts`, `e2e/warehouse-transfers.spec.ts`, `test_transfers.py::test_qt_m06_05_*`"),
+    "B2-DoD-01": (DONE, "raqamli testlar: §2.6 `test_qt_m07_03_*` (1 000 000,00 + 120 000,00), §2.6a/§2.7/§2.8/§2.16/§4.3 (`test_goods_receipts.py`), §2.9–§2.10 `test_qt_m06_01/02/03_*`, §2.11 `test_qt_m05_03_*`/`test_qt_m05_06_*` (16 000,00), §2.12 `test_qt_m04_08_*` + matritsa, §2.20 `test_supplier_returns.py` (3a/3b), §2.21 `test_qt_m04_04_*`, §3 `test_qt_m04_05_*` (980 000,00 / 270 000,00), `test_qt_m04_06_*` (8 333,3333 / 1 000 000,00 / 250 000,00), `test_qt_m04_09/10/11_*`, almashtirish `test_inventory_valuation.py`, X-02 `test_qt_m05_07_*`, `tests/unit/test_costing.py::test_x02_expected_count_qty`"),
+    "B2-DoD-02": (DONE, "tekshiruv tuzatishlari (ACC-01/02/03/04/06/15, ACC-08) bilan raqamli testlar yangilandi: `test_inventory_costing.py` (AVECO kirim bekor qilish, FIFO partiya qoldig'i 33,34), `test_purchasing_posting.py` (qizil faktura 1 120 000,00), `test_transfers.py` (`TRANSFER_COST_PENDING`), `test_stock_counts.py` (bekor qilingan kirim partiyasi — 16 000,00)"),
+    "B2-US-M04-01": (DONE, "`test_goods_receipts.py::test_qt_m04_01_*`, `test_inventory_costing.py::test_qt_m04_01_*`, `test_recost_jobs.py::test_qt_m04_11_*`; BO-03 — `e2e/warehouse-stock.spec.ts`"),
+    "B2-US-M04-05": (DONE, "`test_qt_m04_05/06/09/10_*`, `test_inventory_valuation.py` (PATCH qoidalari, almashtirish); BO-14 — `e2e/valuation.spec.ts`"),
+    "B2-US-M04-06": (DONE, "`test_inventory_notifications.py::test_qt_m04_07_*`, `test_write_offs.py::test_qt_m04_08_*`; BO-03 muddati yaqin partiyalar — `e2e/warehouse-stock.spec.ts`"),
+    "B2-US-M05-01": (DONE, "`test_stock_counts.py::test_qt_m05_01_*`; BO-03 back-office sanash — `e2e/warehouse-counts.spec.ts` (POS-10 skaneri — B3)"),
+    "B2-US-M05-02": (DONE, "`test_stock_counts.py::test_qt_m05_02_*`, `::test_qt_m05_07_*`; `e2e/warehouse-counts.spec.ts`"),
+    "B2-US-M05-03": (DONE, "`test_stock_counts.py::test_qt_m05_03_*`, `::test_qt_m05_04_*`, `::test_qt_m05_06_*`"),
+    "B2-US-M06-01": (DONE, "`test_transfers.py::test_qt_m06_01_*`, `::test_qt_m06_06_*`, `::test_qt_m06_07_*`, `::test_qt_m06_08_*`; `e2e/warehouse-transfers.spec.ts`"),
+    "B2-US-M06-02": (DONE, "`test_transfers.py::test_qt_m06_02_*`, `::test_qt_m06_03_*`; `e2e/warehouse-transfers.spec.ts`"),
+    "B2-US-M06-03": (DONE, "`test_transfers.py::test_qt_m06_05_*` (`is_overdue`, `transfer_overdue_hours`); BO-03 «Ko'chirishlar» — `e2e/warehouse-transfers.spec.ts`"),
+    "B2-US-M07-01": (DONE, "`test_purchase_orders.py::test_qt_m07_01_*`; BO-04 — `e2e/purchases.spec.ts`"),
+    "B2-US-M07-02": (DONE, "`test_goods_receipts.py::test_qt_m07_02_*`, `::test_qt_m07_07_*`, `::test_qt_m07_08_*`; `e2e/purchases.spec.ts`"),
+    "B2-US-M07-05": (DONE, "`test_supplier_returns.py::test_qt_m07_06_*`; `e2e/purchases.spec.ts`"),
+    "B2-US-M11-01": (DONE, "xarid qismi: kirim/qaytarish/ko'chirish/inventarizatsiya/hisobdan chiqarish/boshlang'ich qoldiq — avtomatik ikki tomonlama provodka; `test_accounting_ledger.py::test_qt_m11_01_*`, BO-08 `e2e/journal.spec.ts`. Sotuv qismi (2.1–2.4) — B3"),
+    "B2-US-M04-04": (DONE, "qoldiq qismi: `test_stock_openings.py::test_qt_m04_04_*`, `test_import_jobs.py` (`opening_stock`); BO-21 ③b — `e2e/opening-stock.spec.ts`"),
+    "B2-EP-19#33": (DONE, "kod: `backend/app/modules/purchasing/api/goods_receipts.py`; test: `test_goods_receipts.py` (bekor qilish storno, `LOT_ALREADY_CONSUMED`, PO qayta ochiladi)"),
+    "B2-EP-19#56": (DONE, "kod: `backend/app/modules/inventory/api/transfers.py`; test: `test_transfers.py` (`act(..., 'post')` — QT-M06-07/08)"),
+    "B2-EP-19#57": (DONE, "kod: `backend/app/modules/inventory/api/transfers.py`; test: `test_transfers.py` (`act(..., 'send')` — QT-M06-01, `ETTN_REQUIRED`)"),
+    "B2-EP-19#58": (DONE, "kod: `backend/app/modules/inventory/api/transfers.py`; test: `test_transfers.py` (`act(..., 'receive')` — QT-M06-02/03, `TRANSFER_COST_PENDING`)"),
+    "B2-EP-19#60": (DONE, "kod: `backend/app/modules/inventory/api/transfers.py`; test: `test_transfers.py` (har holatdan bekor qilish, `ETTN_CANCEL_IN_OPERATOR`)"),
+    "B2-EP-19#62": (DONE, "kod: `backend/app/modules/inventory/api/stock_counts.py`; test: `test_stock_counts.py` (QT-M05-01, `BARCODE_NOT_IN_CATALOG`)"),
+    "B2-EP-19#63": (DONE, "kod: `backend/app/modules/inventory/api/stock_counts.py`; test: `test_stock_counts.py`"),
+    "B2-EP-19#64": (DONE, "kod: `backend/app/modules/inventory/api/stock_counts.py`; test: `test_stock_counts.py` (QT-M05-04)"),
+    "B2-EP-19#65": (DONE, "kod: `backend/app/modules/inventory/api/stock_counts.py`; test: `test_stock_counts.py` (QT-M05-02/03/06/07, `COUNT_LINES_INCOMPLETE`)"),
+    "B2-EP-19#66": (DONE, "kod: `backend/app/modules/inventory/api/stock_counts.py`; test: `test_stock_counts.py` (aralash qatorli storno)"),
+    "B2-EP-19#69": (DONE, "kod: `backend/app/modules/inventory/api/write_offs.py`; test: `test_write_offs.py` (QT-M04-08, 202 tasdiq yo'li)"),
+    "B2-EP-19#70": (DONE, "kod: `backend/app/modules/inventory/api/write_offs.py`; test: `test_write_offs.py` (storno + QQS manfiy, `expired_return` bloklangan qoldiq tiklanadi)"),
+    "B2-TBL-app.po_lines": (DONE, "DDL 0013; kod: `purchasing/infrastructure/repositories.py`; test (API orqali): `test_purchase_orders.py` (qatorlarni almashtirish, `received_lines`)"),
+    "B2-TBL-app.supplier_return_lines": (DONE, "DDL 0015; kod: `purchasing/infrastructure/receipts_sql.py`; test (API orqali): `test_supplier_returns.py` (QQS ulushi, qoldiq qaytarilishi)"),
+    "B2-TBL-app.transfer_lines": (DONE, "DDL 0014; kod: `inventory/infrastructure/transfers_sql.py` (`lot_allocations`, `unit_cost`); test (API orqali): `test_transfers.py`"),
+    "B2-TBL-app.opening_lines": (DONE, "DDL 0014; kod: `inventory/infrastructure/docs_sql.py`; test (API orqali): `test_stock_openings.py`, `test_import_jobs.py`"),
+    "B2-SCR-BO-03": (DONE, "B2 qismi: `pages/warehouse/src/pages/stock` — «Qoldiq» (KPI, kam qoldiq/muddat banneri, jadval, ko'chirishlar qisqa bloki), «Ko'chirishlar», «Inventarizatsiyalar», hisobdan chiqarish dialogi (online); test: model testlari, `e2e/warehouse-stock|transfers|counts.spec.ts`. «Barchasi» konsolidatsiya va eksport — B4; e-TTN imzolash — B5; POS-10 — B3"),
+    "B2-SCR-BO-04": (DONE, "B2 qismi: `pages/warehouse/src/pages/purchases` — xaridnomalar, kirimlar (PO'dan, farq sababi, o'tkazish), qaytarish, yetkazib beruvchilar (STIR qidiruv, qarz balansi); test: model testlari, `e2e/purchases.spec.ts`. To'lov / «Men qarzdorman» — B4, e-ishonchnoma — B5, AI-03 — B6"),
+    "B2-SCR-BO-08": (DONE, "B2 qismi: `pages/finance/src/pages/journal` — provodkalar jurnali (filtrlar, Dt=Kt oboroti), «Qayta hisoblash navbati» (qayta urinish); test: `journal/model/model.test.ts`, `e2e/journal.spec.ts`. Davr yopish, tuzatuvchi yozuv, eksport, hisob qoldiqlari — B4/B5"),
+    "B2-SCR-BO-14": (DONE, "B2 qismi: `pages/settings` tenant — baholash usuli (FIFO/AVECO, keyingi yildan, tasdiq dialogi), recost holat qatori; test: tenant model testlari, `e2e/valuation.spec.ts`"),
+    "B2-SCR-BO-21": (DONE, "B2 qismi: ③b «Boshlang'ich qoldiq» — Excel/CSV import (`opening_stock`) va qo'lda kiritish (`pages/billing/src/features/opening-stock`); test: `opening-stock/model/model.test.ts`, `e2e/opening-stock.spec.ts`"),
 }
 
 # Endpoint → bosqich: matn bo'yicha topilmaganlar yoki spec matni noaniq bo'lganlar (manba ko'rsatilgan).
@@ -713,6 +762,10 @@ QT_STAGE_RULES: list[tuple[str, str, str]] = [
 STAGE_MOVE: dict[str, tuple[str, str]] = {
     "B0-TBL-app.license_tokens": ("6", "yozish/o'qish yo'li — `GET /auth/license` offline litsenziya tokeni (27 B6, 14 §17); B0 da faqat DDL"),
     "B0-TBL-app.tenant_secrets": ("5", "yozish yo'li — integratsiya kalitlari `20` #40d/#40e (Faktura.uz, CRPT, UzQR — 27 B5); B0 da DDL va envelope shifrlash (`core/secrets.py`), B1 da BO-14 faqat holatini o'qiydi"),
+    "B2-TBL-app.supplier_payments": ("4", "yetkazib beruvchiga to'lov (US-M07-04, 19 §11) — 27 B4; B2 vazifa matnida faqat «kassadan naqd to'lov — Bosqich 4» deb tilga olingan"),
+    "B2-SCR-POS-08": ("3", "veb-kassa (POS) ekrani — 27 B3 (M01 kassa va POS qobig'i); B2 da faqat backend kontrakti: `/goods-receipts` (19 §8, online)"),
+    "B2-SCR-POS-09": ("3", "veb-kassa (POS) ekrani — 27 B3; B2 da backend `/transfers` va offline voqea nomlari (`transfer.sent`/`transfer.received`, sync — B3)"),
+    "B2-SCR-POS-10": ("3", "veb-kassa (POS) skaneri — 27 B3 (`stock_count.line_recorded` sync bilan); B2 da `/stock-counts` va BO-03 back-office sanash"),
     "B1-SCR-POS-01": ("3", "27 B3: M01 kassa, smena ochish va POS-01 (iOS ko'rsatmasi bilan) — Bosqich 3 da quriladi; B1 ulushi (US-M13-06 tiklash) `/recover` sahifasida, BO-01 qatorida"),
 }
 
@@ -750,11 +803,27 @@ DEFERRED = [
     ("—", "Taklifni qayta yuborish amali yo'q (ikki tenant bir telefonni taklif qilsa, oxirgi kod amal qiladi)", "1+", "UX takomillashtirish — asoschi ustuvorligi bo'yicha"),
 ]
 
+# Bosqich 2 tekshiruvi (2026-10-18, Opus: buxgalteriya / xavfsizlik / veb → qabul agentlari): keyingi bosqichga.
+DEFERRED_B2 = [
+    ("ACC-07", "Kirim qatori summasi 4 kasrli birlik narxdan qayta hisoblanadi — katta miqdorda EHF qator summasi/QQS tiyingacha mos kelmasligi mumkin", "5", "`from-einvoice` bilan qator `net_amount`/`vat_amount` asosiy qilib qabul qilinadi"),
+    ("ACC-09", "`moved_at = posted_at`, `entry_date = doc_date`: o'tgan sanali kirim davr oxiridagi qoldiq hisobotida ko'rinmaydi", "5", "davr yopish tayyorligi: GL `inv_acct` ↔ Σ `stock_balances.value` tekshiruvi va `doc_date` bo'yicha qoldiq hisoboti"),
+    ("WEB-10", "Qoldiq qatorlari uchun mahsulot kartalari alohida so'raladi (veb qismida cheklov va navbat qo'yildi)", "4", "`/stock-balances` ga birlik/kategoriya/shtrix-kod/markirovka maydonlari — `GET /reports/stock` bilan"),
+    ("—", "BO-03 «Barchasi» (konsolidatsiya), eksport", "4", "`/reports/stock`, eksport ishlari — M12"),
+    ("—", "e-TTN imzolash, qo'lda ro'yxatga olish, qabul tomonda tasdiqlash", "5", "E-IMZO va real operator (19 §20)"),
+]
+
 FOUNDER = [
     ("26 #179", "Rol limitlarining standart qiymatlari (Menejer — `discount.give` %, `cash.withdraw`, `stock.writeoff`; Kassir — `debts.create`; Omborchi — `stock.writeoff`)", "⛔ kutilmoqda", "seed va provisioning'da `limit_value = NULL` (limitsiz); Egasi BO-11 da o'zi qo'yadi; qaror kelganda faqat `app/modules/access/domain/permissions.py` o'zgaradi (migratsiyasiz)"),
     ("Agent porti", "Do'kon agenti lokal API porti — ruxsat ro'yxati, standart `47110`", "✅ qabul qilingan", "CSP `connect-src` deploy konfiguratsiyasidagi port ro'yxatidan generatsiya qilinadi (24 §CSP, 21 §16). Hozir kodda bitta port: `web/apps/shell/csp.ts` (`agentPort = 47110`, test `csp.test.ts`), `shared/lib/src/runtime-config`; ro'yxatga kengaytirish — agent bilan (B5)"),
     ("braces audit", "`pnpm audit` dagi `braces` topilmasini e'tiborsiz qoldirish", "✅ qabul qilingan", "`web/pnpm-workspace.yaml` (audit ignore, sababi izohda: build-vaqt zanjiri, foydalanuvchi kiritmasi yo'q); tailwindcss/micromatch `braces`dan voz kechganda olib tashlanadi"),
     ("Noto subset", "Manrope'da yo'q gliflar uchun self-hosted Noto Sans subset zaxirasi", "✅ qabul qilingan", "bajarildi — G-02 (`08` §2, 26 #141)"),
+    ("B2 QQS krediti", "E-fakturasiz qo'lda kiritilgan kirimda QQS krediti post paytida ochiladi (SK 266 — kredit ro'yxatdan o'tgan EHF bilan)", "⛔ kutilmoqda", "hozir: einvoice_id yo'q kirim yashil kabi; ehtiyotkor variant — `unknown` kabi kechiktirish (`purchasing/domain/receipts.py`, B5 `from-einvoice` bilan qayta ko'rish)"),
+    ("B2 qizil faktura", "Qizil/`unknown` fakturada 6010 to'liq (QQS bilan), 4410 `vat_credit='deferred'`, faqat `vat_moves` to'lovgacha kechiktiriladi", "✅ qabul qilingan (13 §2.8 tuzatildi)", "`purchasing/domain/receipts.py`; B4 to'lov / B5 `green` faqat `vat_moves` yozadi"),
+    ("B2 naqd kirim", "`paid_immediately=true` faqat bank (`Kt 5110`); kassadan naqd — B4 `supplier_payments`", "✅ qabul qilingan (27, 13 §2.8)", "kassa smenasi (B3) kerak"),
+    ("B2 orqa sana", "Back-office hujjatlarida `moved_at = posted_at` — o'tgan sanali kirim recost qo'zg'atmaydi, usul o'tkazilgan kundagi bo'yicha", "⛔ tasdiqlash kerak", "13 §3.1/§3.3; davr yopish tekshiruvi — B5 (ACC-09)"),
+    ("B2 12 oy qaytarish", "Asl kirimdan 12 oy o'tgan qaytarish rad etiladi (`reverse_sale_required`) — teskari realizatsiya alohida oqim", "⛔ tasdiqlash kerak", "`purchasing/application/supplier_returns.py`"),
+    ("B2 ko'chirish muddati", "`settings.transfer_overdue_hours` standart 48 soat (QT-M06-05 «tenant sozlamasi» kaliti spec'da yo'q edi)", "⛔ tasdiqlash kerak", "`branches/domain/tenant_settings.py`; 11/20 ga qo'shildi"),
+    ("B2 go_live_date", "`tenants.go_live_date` = ro'yxatdan o'tgan kun (boshlang'ich qoldiq `go_live_date − 1`)", "⛔ tasdiqlash kerak", "`auth/infrastructure/signup_repository.py`; ilgari hech qayerda yozilmas edi"),
     ("Karta `unknown`", "Noma'lum karta natijasini menejer rekvizitsiz yopadi", "✅ qabul qilingan", "menejer faqat tasdiqlaydi, hech narsa yozmaydi (`resolved_by='manager'`), rekvizitlar NULL (qaror #71, 21 §9.2) — B3 vazifasi"),
 ]
 
@@ -1147,6 +1216,16 @@ def render(stages, items, unassigned, eps, tables, qts, matrix, screens, code) -
     w("| Topilma | Tafsilot | Bosqich | Sabab |")
     w("|---|---|---|---|")
     for d in DEFERRED:
+        w(f"| {d[0]} | {d[1]} | {d[2]} | {d[3]} |")
+    w("")
+
+    w("## Bosqich 2 tekshiruvi: keyingi bosqichlarga o'tkazilgan topilmalar")
+    w("")
+    w("Bosqich 2 3 ta Opus tekshiruvchidan (buxgalteriya to'g'riligi — 17, xavfsizlik/RLS/parallellik — 10, veb 07/08 — 22 topilma; qabul agenti WEB-23 ni qo'shdi) va Opus qabul agentlaridan o'tdi: 50 topilmadan 45 tasi qabul qilindi va tuzatildi (kod va/yoki spec), 3 tasi rad etildi (ACC-11, ACC-14, WEB-14 — spec aniqlashtirildi), quyidagilar — keyingi bosqichga (ACC-07, ACC-09, WEB-10 backend qismi).")
+    w("")
+    w("| Topilma | Tafsilot | Bosqich | Sabab |")
+    w("|---|---|---|---|")
+    for d in DEFERRED_B2:
         w(f"| {d[0]} | {d[1]} | {d[2]} | {d[3]} |")
     w("")
 

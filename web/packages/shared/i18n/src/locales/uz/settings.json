@@ -643,9 +643,32 @@
       "hint": "Rejim o'zgarishi keyingi oydan, zaxira usuli — keyingi hisobot yilidan kuchga kiradi.",
       "history": "Rejimlar tarixi"
     },
-    "costing": {
-      "title": "Zaxira baholash usuli (AVECO / FIFO)",
-      "description": "Usulni o'zgartirish keyingi bosqichda qo'shiladi; hozircha joriy usul amal qiladi."
+    "valuation": {
+      "title": "Zaxira baholash usuli",
+      "method": {
+        "aveco": "O'rtacha narx (AVECO)",
+        "fifo": "FIFO"
+      },
+      "since": "{{date}} dan amal qiladi",
+      "pending": "{{date}} dan: {{method}}",
+      "pendingHint": "Bu yil uchun o'zgarish qayd etilgan — usul yiliga bir marta o'zgartiriladi.",
+      "hint": "Zaxira usuli o'zgarishi keyingi hisobot yilidan kuchga kiradi.",
+      "readOnly": "Usulni Egasi yoki Buxgalter o'zgartiradi.",
+      "change": "Usulni o'zgartirish",
+      "dialogTitle": "Zaxira usuli {{method}} ga o'zgartirilsinmi?",
+      "dialogBody": "Bu o'zgarish faqat keyingi hisobot yili boshidan ({{date}}) kuchga kiradi. Joriy yil oxirigacha tannarx {{current}} bo'yicha hisoblanadi.",
+      "dialogNote": "Usul yiliga bir marta o'zgartiriladi. Joriy yilda hali ombor harakati bo'lmasa, server o'zgarishni darhol qo'llaydi.",
+      "confirm": "{{method}} ga o'zgartirish",
+      "savedPending": "Zaxira usuli {{date}} dan {{method}} ga o'zgaradi",
+      "savedNow": "Zaxira usuli o'zgartirildi: {{method}}"
+    },
+    "recostLine": {
+      "title": "Qayta hisoblash navbati",
+      "loading": "Navbat holati yuklanmoqda…",
+      "clear": "Navbatda ish yo'q — tannarx dolzarb",
+      "pending": "Navbatda {{count}} ta ish — tannarx qayta hisoblanmoqda",
+      "failed": "{{count}} ta ish xato bilan tugadi — Buxgalteriya jurnalida qayta urining",
+      "open": "Buxgalteriya jurnali"
     },
     "integrations": {
       "summary": "{{connected}} / {{total}} ulangan",

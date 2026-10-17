@@ -1,4 +1,4 @@
-import type { PriceChangeOut, PriceHistoryItem, ProductOut } from "@shared/models";
+import type { PriceChangeOut, PriceHistoryItem, ProductListItem, ProductOut } from "@shared/models";
 
 export interface PriceFilters {
   search: string;
@@ -17,6 +17,12 @@ export interface ProductPrice {
 }
 
 export type ListStatus = "idle" | "loading" | "error";
+
+/**
+ * A row of the «Chakana narxlar» table — the `GET /products` list item: the product plus
+ * `current_cost` (4 dp, «Tannarx») and `markup_pct` (2 dp, «Ustama %»), `null` when unknown (19 §1).
+ */
+export type PriceProduct = ProductListItem;
 
 /** Row state in the «Chakana narxlar» table (07 BO-05: o'zgarmagan / o'zgaradi / tasdiq kerak). */
 export type RowState = "unchanged" | "changed" | "approval" | "approvalMaybe" | "invalid";
@@ -64,4 +70,4 @@ export interface SavePricesParams {
 export const PRICES_PAGE_SIZE = 20;
 export const HISTORY_PAGE_SIZE = 20;
 
-export type { PriceChangeOut, PriceHistoryItem, ProductOut };
+export type { PriceChangeOut, PriceHistoryItem, ProductListItem, ProductOut };

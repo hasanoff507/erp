@@ -10,14 +10,14 @@ import {
   type PriceDraft,
   type PriceFilters,
   type PriceHistoryItem,
+  type PriceProduct,
   type PriceScope,
-  type ProductOut,
   type ProductPrice,
 } from "../types/index.ts";
 
 export const $filters = createStore<PriceFilters>({ search: "", categoryId: null });
 export const $page = createStore(1);
-export const $products = createStore<ProductOut[]>([]);
+export const $products = createStore<PriceProduct[]>([]);
 export const $total = createStore(0);
 export const $listStatus = createStore<ListStatus>("idle");
 export const $listError = createStore<ApiError | null>(null, { skipVoid: false });

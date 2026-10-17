@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Protocol
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.permissions import BranchScope
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +89,25 @@ class CatalogImportPort(Protocol):
     async def queue_labels(
         self, s: AsyncSession, tenant_id: UUID, product_ids: Sequence[UUID], reason: str
     ) -> None: ...
+
+
+class OpeningStockPort(Protocol):
+    """Inventory: the ``opening_stock`` import posts ONE ``stock_openings`` document (19 §6, 13 §2.21)."""
+
+    async def barcode_products(self, s: AsyncSession, barcodes: Sequence[str]) -> dict[str, UUID]: ...
+    async def check_scope(self, s: AsyncSession, scope: BranchScope) -> UUID | None:
+        """``403 BRANCH_SCOPE_DENIED`` unless ``scope`` covers the branch the opening is posted to."""
+        ...
+
+    async def post_opening(
+        self,
+        s: AsyncSession,
+        tenant_id: UUID,
+        user_id: UUID,
+        lines: Sequence[tuple[UUID, Decimal, Decimal, date | None]],
+        comment: str,
+        scope: BranchScope,
+    ) -> UUID: ...
 
 
 class InitialPricesPort(Protocol):

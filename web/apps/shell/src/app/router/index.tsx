@@ -10,7 +10,12 @@
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
 
 import { routes as aiAssistantRoutes } from "@pages/ai-assistant";
-import { routes as billingRoutes, createPublicRoutes, startInstallPromptCapture } from "@pages/billing";
+import {
+  routes as billingRoutes,
+  createPublicRoutes,
+  startInstallPromptCapture,
+  type OpeningStockImportSlotProps,
+} from "@pages/billing";
 import { ImportProductsFlow, routes as catalogRoutes } from "@pages/catalog";
 import { routes as debtsRoutes } from "@pages/debts";
 import { routes as financeRoutes } from "@pages/finance";
@@ -31,6 +36,11 @@ import {
 } from "../ui/status/index.tsx";
 
 import { DefaultRedirect, RootRedirect, RoutePermissionGuard } from "./guards.tsx";
+
+/** BO-21 ③b Excel/CSV: the catalog import flow for `kind=opening_stock` (19 §6). */
+function OpeningStockImport(props: OpeningStockImportSlotProps) {
+  return <ImportProductsFlow {...props} kind="opening_stock" />;
+}
 
 /** After login without `next`: `/` → the first permitted screen (DefaultRedirect). */
 export const DEFAULT_APP_PATH = "/";
@@ -65,10 +75,11 @@ export const appRoutes: RouteObject[] = [
         hydrateFallbackElement: <Splash />,
       },
       // BO-21 /onboarding, UX-INSTALL /install, /recover, /invite (@pages/billing) — outside the
-      // protected layouts; ③a gets the catalog import flow here (pages never import each other, 24 §1).
+      // protected layouts; ③a/③b get the catalog import flow here (pages never import each other, 24 §1).
       ...createPublicRoutes({
         productImport: ImportProductsFlow,
         manualProductHref: "/app/catalog/products/new",
+        openingStockImport: OpeningStockImport,
         dashboardPath: "/app/dashboard",
         fallback: <Splash />,
       }),

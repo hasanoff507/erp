@@ -13,6 +13,8 @@ import { interval } from "patronum";
 import { toE164 } from "@shared/lib/phone";
 import { $authStatus, sessionCheckRequested } from "@shared/state/session";
 
+import { postDraftFx as openingStockPostFx } from "#/features/opening-stock/model/index.ts";
+
 import {
   loadTermsFx,
   readClockFx,
@@ -31,6 +33,8 @@ import {
   finishClicked,
   methodSelected,
   nextClicked,
+  openingStockMethodSelected,
+  openingStockSaved,
   otpCodeSubmitted,
   otpRequested,
   pageMounted,
@@ -52,6 +56,8 @@ import {
   $importedCount,
   $method,
   $now,
+  $openingStockLines,
+  $openingStockMethod,
   $otp,
   $otpError,
   $productsMethod,
@@ -329,3 +335,9 @@ sample({
 sample({ clock: productsMethodSelected, target: $productsMethod });
 sample({ clock: productsImported, target: $importedCount });
 sample({ clock: connectNowToggled, target: $connectNow });
+
+// --- ③b opening stock (optional; «Davom» never waits for it) -------------------------------------
+sample({ clock: openingStockMethodSelected, target: $openingStockMethod });
+$openingStockLines.on(openingStockSaved, (total, lines) => (total ?? 0) + lines);
+// «Qo'lda»: a posted stock-opening document counts its lines.
+sample({ clock: openingStockPostFx.doneData, fn: (doc) => doc.line_count, target: openingStockSaved });

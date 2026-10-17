@@ -36,3 +36,15 @@ export interface TenantFormValues {
   supplierOverpayPolicy: "warn" | "block";
   aiTrainingConsent: boolean;
 }
+
+/** 19 §17 zaxira baholash usuli (enum lower-case, labels upper-case AVECO / FIFO — 07 `costingMethod`). */
+export type ValuationMethod = "aveco" | "fifo";
+export const VALUATION_METHODS: readonly ValuationMethod[] = ["aveco", "fifo"];
+
+/** Open (queued + running) and failed recost jobs; `more` — a list had a next page (show «N+»). */
+export interface RecostSummary {
+  pending: number;
+  failed: number;
+  more: boolean;
+}
+export const RECOST_SUMMARY_LIMIT = 100;

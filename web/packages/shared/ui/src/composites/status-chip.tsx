@@ -14,14 +14,24 @@ export interface StatusChipProps {
   icon?: LucideIcon;
   dot?: boolean;
   children: ReactNode;
+  /** `sm` (default) — 12 px caption; `md` — 13 px / 600 (POS status bar ladder / offline chips, 08 §7.2). */
+  size?: "sm" | "md";
   className?: string;
 }
 
-export function StatusChip({ tone = "neutral", icon, dot = false, children, className }: StatusChipProps) {
+export function StatusChip({
+  tone = "neutral",
+  icon,
+  dot = false,
+  size = "sm",
+  children,
+  className,
+}: StatusChipProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-caption",
+        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5",
+        size === "md" ? "text-[13px] font-semibold" : "text-caption",
         SOFT_TONE[tone],
         className,
       )}

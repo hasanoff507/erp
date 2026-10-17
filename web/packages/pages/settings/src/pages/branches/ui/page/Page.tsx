@@ -22,6 +22,7 @@ import { useOnline } from "#/shared/ui/hooks.ts";
 
 import {
   $branches,
+  $cashRegisters,
   $branchesError,
   $branchesLoaded,
   $selectedBranch,
@@ -32,6 +33,8 @@ import {
   type Branch,
 } from "../../model/index.ts";
 import { BranchSummary } from "../detail/BranchDetail.tsx";
+import { CardTerminalsCard } from "#/features/card-terminals/index.ts";
+
 import { CardPolicy } from "../detail/CardPolicy.tsx";
 import { CashRegisters } from "../detail/CashRegisters.tsx";
 import { TaxHistory } from "../detail/TaxHistory.tsx";
@@ -59,6 +62,7 @@ function BranchesPage() {
     branchesReloadRequested,
     pageMounted,
   ]);
+  const registers = useUnit($cashRegisters);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Branch | null>(null);
 
@@ -147,6 +151,12 @@ function BranchesPage() {
             <TaxHistory branch={selected} canEdit={canBranches} />
             <Warehouses canEdit={canBranches} />
             <CashRegisters branch={selected} canManage={canRegisters} />
+            {/* --- Bosqich 3 settings: card slice --- */}
+            <CardTerminalsCard
+              branchId={selected.id}
+              registers={registers.filter((r) => !r.archived_at)}
+              canManage={canRegisters}
+            />
             {canTenant ? <CardPolicy /> : null}
           </div>
         ) : null}

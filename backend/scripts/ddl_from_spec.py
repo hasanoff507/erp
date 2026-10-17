@@ -22,8 +22,8 @@ SPEC_FILE = Path(__file__).resolve().parents[2] / "spec" / "kod-uchun" / "12-db-
 
 # "## 0. Rollar", "### 2.5a Tasdiqlash", "### 4.5 `SECURITY DEFINER`" → "0", "2.5a", "4.5"
 _HEADING = re.compile(r"^#{2,4}\s+(\d+(?:\.\d+)?[a-z]?)\.?\s")
-# first line of a block: "-- 0015 registers", "-- 0027 boshida", "-- DBA bootstrap", "-- namuna: ..."
-_MARKER = re.compile(r"^--\s*(\d{4}[a-z]?\b|DBA bootstrap|namuna\b)")
+# first line of a block: "-- 0015 registers", "-- 0027a down", "-- DBA bootstrap", "-- namuna: ..."
+_MARKER = re.compile(r"^--\s*(\d{4}[a-z]?(?: down)?\b|DBA bootstrap|namuna\b)")
 
 
 @dataclass(frozen=True)

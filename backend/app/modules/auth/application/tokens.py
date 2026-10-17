@@ -68,6 +68,19 @@ class TokenPolicy:
     code_ttl_s: int
     session_idle_s: int
     session_absolute_s: int
+    # device-bound login (14 §7): sliding 14 d / absolute 180 d
+    device_idle_s: int = 14 * 86400
+    device_absolute_s: int = 180 * 86400
+
+    def idle_s(self, device_id: UUID | None) -> int:
+        return self.device_idle_s if device_id is not None else self.session_idle_s
+
+    def absolute_s(self, device_id: UUID | None) -> int:
+        return self.device_absolute_s if device_id is not None else self.session_absolute_s
+
+
+# client → the device kind it may bind a login to (14 §7.2); other clients never bind a device
+CLIENT_DEVICE_KINDS: Final = {"web-bff": "web", "android-pos": "android"}
 
 
 class SubscriptionLockedError(OAuth2Error):  # type: ignore[misc]
@@ -201,7 +214,7 @@ class TokenService:
         await self._repo.issue_code(
             code_hash=token_hash(code), client_id=client.id, user_id=user.user_id, tenant_id=user.tenant_id,
             code_challenge=code_challenge, redirect_uri=redirect_uri, scope=scope,
-            ttl_s=self._policy.code_ttl_s,
+            ttl_s=self._policy.code_ttl_s, device_id=user.device_id,
         )  # fmt: skip
 
     async def consume_code(self, code: str, client: OAuthClient) -> AuthorizationCode | None:
@@ -211,7 +224,7 @@ class TokenService:
             return None
         return AuthorizationCode(
             row.client_id, row.user_id, row.tenant_id, row.code_challenge, row.code_challenge_method,
-            row.redirect_uri, row.scope,
+            row.redirect_uri, row.scope, row.device_id,
         )  # fmt: skip
 
     async def issue_for_code(
@@ -221,21 +234,37 @@ class TokenService:
         ctx = await self._active_membership(code.tenant_id, code.user_id)
         sub_status = await self._subscription_ok(code.tenant_id)
         scopes = effective_scopes(code.scope, ctx.permission_codes)
+        device_id = await self._bindable_device(client, code.tenant_id, code.device_id, ctx)
         refresh = secrets.token_urlsafe(48)
         now = datetime.now(UTC)
-        idle = now + timedelta(seconds=self._policy.session_idle_s)
-        absolute = now + timedelta(seconds=self._policy.session_absolute_s)
+        idle = now + timedelta(seconds=self._policy.idle_s(device_id))
+        absolute = now + timedelta(seconds=self._policy.absolute_s(device_id))
         issued = await self._repo.issue_tokens(
-            user_id=code.user_id, tenant_id=code.tenant_id, client_id=client.id, device_id=None,
+            user_id=code.user_id, tenant_id=code.tenant_id, client_id=client.id, device_id=device_id,
             refresh_hash=token_hash(refresh), refresh_expires_at=min(idle, absolute), scope=code.scope,
             with_session=client.is_bff, idle_expires_at=idle if client.is_bff else None,
             absolute_expires_at=absolute if client.is_bff else None, ip=meta.ip, user_agent=meta.user_agent,
         )  # fmt: skip
         access, ttl = await self._mint(
-            client, code.user_id, code.tenant_id, scopes, ctx, issued.session_id, None, sub_status,
+            client, code.user_id, code.tenant_id, scopes, ctx, issued.session_id, device_id, sub_status,
             family_id=issued.family_id,
         )  # fmt: skip
         return self._response(access, ttl, refresh, scopes)
+
+    async def _bindable_device(
+        self, client: OAuthClient, tenant_id: UUID, device_id: UUID | None, ctx: MembershipContext
+    ) -> UUID | None:
+        """14 §7.2: bind the login to the device only if it is this tenant's live device of the client's
+        kind and the user may work in its branch — otherwise the session is an ordinary unbound one."""
+        kind = CLIENT_DEVICE_KINDS.get(client.client_id)
+        if device_id is None or kind is None:
+            return None
+        binding = await self._repo.device_binding(tenant_id, device_id)
+        if binding is None or binding.revoked or binding.kind != kind:
+            return None
+        if ctx.branch_ids and binding.branch_id not in ctx.branch_ids:
+            return None
+        return device_id
 
     # --- refresh token -------------------------------------------------------------------------
     async def lookup_refresh(self, token: str) -> RefreshCredential | None:
@@ -278,9 +307,10 @@ class TokenService:
                 # before rotation so the token is not burnt
                 raise InvalidScopeError(description="suspended_sync_drain_only")
         now = datetime.now(UTC)
+        idle_s = self._policy.idle_s(row.device_id)
         new_expires = min(
-            now + timedelta(seconds=self._policy.session_idle_s),
-            row.family_issued_at + timedelta(seconds=self._policy.session_absolute_s),
+            now + timedelta(seconds=idle_s),
+            row.family_issued_at + timedelta(seconds=self._policy.absolute_s(row.device_id)),
         )
         if new_expires <= now:
             raise InvalidGrantError(description="refresh_token_expired")
@@ -312,9 +342,7 @@ class TokenService:
             ttl=ttl, family_id=row.family_id,
         )  # fmt: skip
         if row.session_id is not None:
-            await self._repo.touch_session(
-                row.session_id, now + timedelta(seconds=self._policy.session_idle_s)
-            )
+            await self._repo.touch_session(row.session_id, now + timedelta(seconds=idle_s))
         response = self._response(access, ttl, new_refresh, scopes)
         await self._grace.put(credential.token, response)
         return response
@@ -367,7 +395,9 @@ class TokenService:
             if sid is not None:
                 await self._repo.revoke_session(sid, "revoked_by_client")
             await self._revocation.mark_jti_revoked(str(claims["jti"]), int(claims["exp"]))
-            await self._revocation.mark_sessions_revoked([sid])
+            if sid is not None:  # the session's refresh family died with it (auth_revoke_session)
+                family = UUID(str(claims["fam"])) if claims.get("fam") else None
+                await self._revocation.mark_revoked(sids=[sid], families=[family])
         if sid is not None and tenant_id is not None:
             await self._audit.write(
                 tenant_id=tenant_id, user_id=user_id, action="session_revoked", entity="sessions",

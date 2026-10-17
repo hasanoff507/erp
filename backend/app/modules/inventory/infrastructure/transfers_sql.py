@@ -25,7 +25,7 @@ _HEAD = (
 _FROM = (
     "FROM app.transfers t LEFT JOIN LATERAL (SELECT x.id, x.status, x.operator_doc_id FROM "
     "app.ettn_documents x "
-    "WHERE x.transfer_id = t.id AND x.direction = 'out' ORDER BY x.created_at DESC, x.id DESC LIMIT 1) e "
+    "WHERE x.transfer_id = t.id AND x.direction = 'out' ORDER BY x.id DESC LIMIT 1) e "  # uuid7: newest
     "ON true"
 )
 

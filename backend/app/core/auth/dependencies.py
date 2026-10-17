@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth.ports import AuthGateway
 from app.core.auth.principal import Principal
+from app.core.context import session_user_var
 from app.core.db.session import Database, tenant_transaction
 from app.core.error_codes import ErrorCode
 from app.core.errors import AppError
@@ -39,6 +40,8 @@ async def authenticate(request: Request, *, allow_sync_drain: bool = False) -> P
         structlog.contextvars.bind_contextvars(
             tenant_id=str(principal.tenant_id), user_id=str(principal.user_id)
         )
+        # 14 §4.3: a PIN-verified actor on a device session — audit keeps the session's own user
+        session_user_var.set(principal.session_user_id)
     if principal.has_scope(SCOPE_SYNC_DRAIN) and not allow_sync_drain:
         raise AppError(ErrorCode.PERMISSION_DENIED, params={"reason": "sync_drain_only"})
     return principal

@@ -20,12 +20,14 @@ from app.core.idempotency import IdempotencyMiddleware, IdempotencyStore, PgIdem
 from app.core.logging import configure_logging
 from app.core.middleware import RequestContextMiddleware
 from app.core.telemetry import install_telemetry, observe_engine
+from app.modules.access.api import approval_requests as approval_requests_api
 from app.modules.access.api import roles as access_roles_api
 from app.modules.access.wiring import build_access_module
 from app.modules.accounting.api import ledger as accounting_ledger_api
 from app.modules.accounting.wiring import build_accounting_module
 from app.modules.auth.api import admin_users as auth_admin_api
 from app.modules.auth.api import bff as auth_bff_api
+from app.modules.auth.api import devices as auth_devices_api
 from app.modules.auth.api import oauth as auth_oauth_api
 from app.modules.auth.api import signup as auth_signup_api
 from app.modules.auth.wiring import build_auth_module
@@ -35,12 +37,18 @@ from app.modules.branches.api import cash_registers as cash_registers_api
 from app.modules.branches.api import devices as devices_api
 from app.modules.branches.api import tenant as tenant_api
 from app.modules.branches.wiring import build_branches_module
+from app.modules.cash.api import cash_movements as cash_movements_api
+from app.modules.cash.api import shifts as cash_shifts_api
+from app.modules.cash.wiring import build_approvals, build_cash_module
 from app.modules.catalog.api import router as catalog_api
 from app.modules.catalog.wiring import build_catalog_module
 from app.modules.debts.api import counterparties as debts_counterparties_api
 from app.modules.debts.wiring import build_debts_module
 from app.modules.imports.api import router as imports_api
 from app.modules.imports.wiring import build_imports_module
+from app.modules.integrations.card_terminal.api import router as card_terminal_api
+from app.modules.integrations.card_terminal.wiring import build_card_terminal_module
+from app.modules.integrations.fiscal.api import fiscal_receipts as fiscal_receipts_api
 from app.modules.inventory.api import stock as inventory_stock_api
 from app.modules.inventory.api import stock_counts as inventory_stock_counts_api
 from app.modules.inventory.api import transfers as inventory_transfers_api
@@ -52,6 +60,15 @@ from app.modules.purchasing.api import goods_receipts as purchasing_goods_receip
 from app.modules.purchasing.api import purchase_orders as purchasing_purchase_orders_api
 from app.modules.purchasing.api import supplier_returns as purchasing_supplier_returns_api
 from app.modules.purchasing.wiring import build_purchasing_module
+from app.modules.returns.api import returns as returns_api
+from app.modules.returns.wiring import build_returns_queries
+from app.modules.sales.api import sales as sales_api
+from app.modules.sales.wiring import build_sales_module
+from app.modules.sync.api import sync as sync_api
+from app.modules.sync.api import sync_exceptions as sync_exceptions_api
+from app.modules.sync.wiring import build_sync_module
+from app.modules.vat.api import vat as vat_api
+from app.modules.vat.wiring import build_vat_service
 
 
 async def _token_tenant(request: Request) -> UUID | None:
@@ -91,6 +108,22 @@ def create_app(
         app.state.inventory = build_inventory_module(settings, db)
         app.state.debts = build_debts_module(settings, db)
         app.state.purchasing = build_purchasing_module(settings, db)
+        # Bosqich 3 modules (one anchor per slice — add your app.state lines right under your anchor)
+        # --- B3 device-auth ---
+        # --- B3 cash ---
+        app.state.cash = build_cash_module(settings, db)
+        app.state.approvals = build_approvals(settings, db, app.state.cash, lambda: app.state.redis)
+        app.state.vat = build_vat_service(db)
+        # --- B3 sales ---
+        sales_module = build_sales_module(settings, db)
+        app.state.sales = sales_module
+        app.state.fiscal = sales_module.fiscal
+        app.state.returns = build_returns_queries(db)
+        # --- B3 card ---
+        app.state.card_terminal = build_card_terminal_module(settings, db)
+        # --- B3 sync ---
+        app.state.sync = build_sync_module(settings, db, lambda: app.state.redis)
+        # --- B3 print ---
         app.state.readiness = ReadinessProbe(
             gating={"postgres": postgres_check(db, alembic_head()), "redis": redis_check(redis)},
         )
@@ -164,6 +197,24 @@ def create_app(
         debts_counterparties_api.router, accounting_ledger_api.router,
     ):  # fmt: skip
         app.include_router(module_router, prefix=settings.api_prefix)
+    # Bosqich 3 routers (one anchor per slice — add include_router lines right under your anchor)
+    # --- B3 device-auth routers ---
+    app.include_router(auth_devices_api.router)  # /auth/devices/register, /auth/pin/verify (14 §7.2, §4.3)
+    # --- B3 cash routers ---
+    for module_router in (
+        cash_shifts_api.router, cash_movements_api.router, approval_requests_api.router, vat_api.router,
+    ):  # fmt: skip
+        app.include_router(module_router, prefix=settings.api_prefix)
+    # --- B3 sales routers ---
+    app.include_router(sales_api.router, prefix=settings.api_prefix)
+    app.include_router(fiscal_receipts_api.router, prefix=settings.api_prefix)
+    app.include_router(returns_api.router, prefix=settings.api_prefix)
+    # --- B3 card routers ---
+    app.include_router(card_terminal_api.router, prefix=settings.api_prefix)
+    # --- B3 sync routers ---
+    app.include_router(sync_api.router, prefix=settings.api_prefix)
+    app.include_router(sync_exceptions_api.router, prefix=settings.api_prefix)
+    # --- B3 print routers ---
     return app
 
 

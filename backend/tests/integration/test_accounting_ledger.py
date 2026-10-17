@@ -31,6 +31,7 @@ from tests.support.inventory import (
     set_go_live,
     use_account,
 )
+from tests.support.ordering import TXN_ORDER
 
 pytestmark = [pytest.mark.db, pytest.mark.redis]
 __all__ = ["catalog_env_fixture"]
@@ -114,7 +115,7 @@ async def test_storno_swaps_ledger_negates_vat_and_is_idempotent(env: Env) -> No
     vats = await rows(
         env,
         shop.tenant_id,
-        "SELECT id, base_amount, vat_amount, reversal_of_id FROM app.vat_moves ORDER BY created_at, id",
+        f"SELECT id, base_amount, vat_amount, reversal_of_id FROM app.vat_moves ORDER BY {TXN_ORDER}, id",
     )
     assert [(v["base_amount"], v["vat_amount"]) for v in vats] == [
         (D("100.00"), D("12.00")),

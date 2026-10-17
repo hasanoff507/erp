@@ -5,7 +5,6 @@ import { Link } from "react-router-dom";
 
 import { toApiError } from "@shared/api";
 import { useTranslation } from "@shared/i18n";
-import { formatDateTime } from "@shared/lib/date";
 import { useCan } from "@shared/state/permissions";
 import {
   Banner,
@@ -30,6 +29,7 @@ import {
   type DataTableColumn,
 } from "@shared/ui";
 
+import { DeviceSyncCell } from "#/features/device-sync-health/index.ts";
 import { errorText } from "#/shared/lib/errors.ts";
 import { useOnline } from "#/shared/ui/hooks.ts";
 
@@ -119,10 +119,11 @@ export function DevicesTab() {
       ),
     },
     {
+      // --- Bosqich 3 settings: device-auth slice --- sync health (16 §3.1, §6)
       id: "sync",
       header: t("devices.table.lastSync"),
-      cell: (d) => (d.last_sync_at ? formatDateTime(d.last_sync_at) : t("devices.neverSynced")),
-      width: "160px",
+      cell: (d) => <DeviceSyncCell device={d} />,
+      width: "210px",
     },
     {
       id: "pending",

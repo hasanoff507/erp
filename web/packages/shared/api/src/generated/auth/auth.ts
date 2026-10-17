@@ -11,6 +11,8 @@ import type {
   CredentialsIn,
   CsrfToken,
   DeviceListOut,
+  DeviceRegisterIn,
+  DeviceRegisteredOut,
   GoogleCallbackParams,
   GoogleStartParams,
   GoogleTokenIn,
@@ -21,6 +23,8 @@ import type {
   OtpRequestOut,
   OtpVerifyIn,
   OtpVerifyOut,
+  PinVerifiedOut,
+  PinVerifyIn,
   RevokeAllResult,
   SessionInfo,
   SessionListOut,
@@ -43,6 +47,8 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
   /**
  * Start Authorization Code + PKCE: state/verifier stay server-side, the browser goes to the AS page.
+ *
+ * A registered web device (signed ``__Host-erp_device`` cookie) gets a device-bound login (14 §7.2).
  * @summary Login Start
  */
 export const loginStart = (
@@ -354,6 +360,53 @@ export const termsCurrent = (
     },
       options);
     }
+  /**
+ * Register this browser as the web device of a cash register (14 §7.2) — Owner/Manager.
+ *
+ * BFF cookie session only. The current session is replaced by a device-bound one (sliding 14 d /
+ * absolute 180 d): new ``__Host-sid`` and ``__Host-erp_device`` cookies; fetch a new CSRF token.
+ * @summary Register Device
+ */
+export const devicesRegister = (
+    deviceRegisterIn: DeviceRegisterIn,
+ options?: SecondParameter<typeof apiRequest<DeviceRegisteredOut>>,) => {
+      return apiRequest<DeviceRegisteredOut>(
+      {url: `/auth/devices/register`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: deviceRegisterIn
+    },
+      options);
+    }
+  /**
+ * Online PIN check on a registered device (14 §4.3, §12): "who pressed", never a token.
+ *
+ * The device's session must be device-bound (``403 PERMISSION_DENIED reason=device_required``).
+ * @summary Verify Pin
+ */
+export const pinVerify = (
+    pinVerifyIn: PinVerifyIn,
+ options?: SecondParameter<typeof apiRequest<PinVerifiedOut>>,) => {
+      return apiRequest<PinVerifiedOut>(
+      {url: `/auth/pin/verify`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: pinVerifyIn
+    },
+      options);
+    }
+  /**
+ * End the PIN actor of this device session (SEC-05): cashier lock/switch, shift close, logout.
+ *
+ * Idempotent; afterwards every ``/api/v1`` call needs a new online ``POST /auth/pin/verify``.
+ * @summary Release Pin Actor
+ */
+export const pinRelease = (
+
+ options?: SecondParameter<typeof apiRequest<void>>,) => {
+      return apiRequest<void>(
+      {url: `/auth/pin/release`, method: 'POST'
+    },
+      options);
+    }
   export type LoginStartResult = NonNullable<Awaited<ReturnType<typeof loginStart>>>
 export type CallbackResult = NonNullable<Awaited<ReturnType<typeof callback>>>
 export type SessionGetResult = NonNullable<Awaited<ReturnType<typeof sessionGet>>>
@@ -378,3 +431,6 @@ export type GoogleStartResult = NonNullable<Awaited<ReturnType<typeof googleStar
 export type GoogleCallbackResult = NonNullable<Awaited<ReturnType<typeof googleCallback>>>
 export type GoogleTokenResult = NonNullable<Awaited<ReturnType<typeof googleToken>>>
 export type TermsCurrentResult = NonNullable<Awaited<ReturnType<typeof termsCurrent>>>
+export type DevicesRegisterResult = NonNullable<Awaited<ReturnType<typeof devicesRegister>>>
+export type PinVerifyResult = NonNullable<Awaited<ReturnType<typeof pinVerify>>>
+export type PinReleaseResult = NonNullable<Awaited<ReturnType<typeof pinRelease>>>

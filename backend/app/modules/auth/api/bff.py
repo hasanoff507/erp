@@ -21,6 +21,7 @@ from app.core.error_codes import ErrorCode
 from app.core.errors import AppError
 from app.modules.auth.api.deps import auth_module
 from app.modules.auth.application.bff import LOGIN_STATE_TTL_S, BffError
+from app.modules.auth.application.device_cookie import DEVICE_COOKIE
 from app.modules.auth.application.gateway import request_meta
 from app.modules.auth.domain.constants import LOGIN_COOKIE, SID_COOKIE
 
@@ -46,6 +47,14 @@ class SessionBranch(BaseModel):
     name: str
 
 
+class SessionDevice(BaseModel):
+    """The registered device this session is bound to (14 §7.2); ``null`` — an unbound session."""
+
+    id: UUID
+    cash_register_id: UUID | None
+    branch_id: UUID | None
+
+
 class SessionInfo(BaseModel):
     """``GET /auth/session`` (14 §20): SPA shell data + heartbeat."""
 
@@ -58,6 +67,7 @@ class SessionInfo(BaseModel):
     client_id: str
     sub_status: str | None
     access_expires_at: int
+    device: SessionDevice | None = None
 
 
 class CsrfToken(BaseModel):
@@ -89,6 +99,15 @@ def _require_cookie_session(principal: Principal) -> UUID:
     return principal.sid
 
 
+def _refuse_device_session(principal: Principal) -> None:
+    """SEC-01: a device-bound session cannot switch tenant or end the user's other sessions (14 §7.2).
+
+    The POS keeps ``/auth/logout``; switching would escape the device binding into an unbound session.
+    """
+    if principal.device_id is not None:
+        raise AppError(ErrorCode.PERMISSION_DENIED, params={"reason": "device_session"})
+
+
 async def _retire_previous_session(request: Request, new_sid: UUID) -> None:
     """A re-login in the same browser ends the session its old ``__Host-sid`` pointed to (14 §2.1, §9).
 
@@ -113,8 +132,13 @@ async def login_start(
     return_to: Annotated[str | None, Query(max_length=2048)] = None,
     tenant_id: UUID | None = None,
 ) -> RedirectResponse:
-    """Start Authorization Code + PKCE: state/verifier stay server-side, the browser goes to the AS page."""
-    start = await auth_module(request).bff.start_login(return_to, tenant_id)
+    """Start Authorization Code + PKCE: state/verifier stay server-side, the browser goes to the AS page.
+
+    A registered web device (signed ``__Host-erp_device`` cookie) gets a device-bound login (14 §7.2).
+    """
+    module = auth_module(request)
+    device = module.device_cookies.unsign(request.cookies.get(DEVICE_COOKIE))
+    start = await module.bff.start_login(return_to, tenant_id, device.device_id if device else None)
     response = RedirectResponse(start.authorize_url, status_code=302, headers=_NO_STORE)
     _set_cookie(response, LOGIN_COOKIE, start.login_id, LOGIN_STATE_TTL_S)
     return response
@@ -163,9 +187,17 @@ async def session_info(
 
 
 async def _session_response(request: Request, principal: Principal) -> Response:
-    profile = await auth_module(request).profiles.profile(principal.tenant_id, principal.user_id)
+    module = auth_module(request)
+    profile = await module.profiles.profile(principal.tenant_id, principal.user_id)
     if profile is None:
         raise AppError(ErrorCode.PERMISSION_DENIED, params={"reason": "membership_inactive"})
+    device = None
+    if principal.device_id is not None:
+        binding = await module.repo.device_binding(principal.tenant_id, principal.device_id)
+        if binding is not None:
+            device = SessionDevice(
+                id=binding.device_id, cash_register_id=binding.cash_register_id, branch_id=binding.branch_id
+            )
     info = SessionInfo(
         user=SessionUser(
             id=principal.user_id, full_name=profile.full_name, phone_masked=profile.phone_masked
@@ -178,6 +210,7 @@ async def _session_response(request: Request, principal: Principal) -> Response:
         client_id=principal.client_id,
         sub_status=principal.sub_status,
         access_expires_at=principal.expires_at,
+        device=device,
     )
     return Response(info.model_dump_json(), media_type="application/json", headers=_NO_STORE)
 
@@ -201,6 +234,7 @@ async def switch_tenant(
     current session stays as it was.
     """
     sid = _require_cookie_session(principal)
+    _refuse_device_session(principal)
     if body.tenant_id == principal.tenant_id:
         return await _session_response(request, principal)
     module = auth_module(request)
@@ -240,6 +274,7 @@ async def revoke_all(
     request: Request, principal: Annotated[Principal, Depends(current_principal)]
 ) -> Response:
     _require_cookie_session(principal)
+    _refuse_device_session(principal)
     count = await auth_module(request).bff.revoke_all(
         principal.user_id, principal.tenant_id, request_meta(request)
     )

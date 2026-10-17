@@ -10,6 +10,8 @@ from uuid import UUID
 request_id_var: ContextVar[str | None] = ContextVar("request_id", default=None)
 tenant_id_var: ContextVar[UUID | None] = ContextVar("tenant_id", default=None)
 user_id_var: ContextVar[UUID | None] = ContextVar("user_id", default=None)
+# 14 §4.3: the device session's own user while a PIN-verified actor acts (audit `on_behalf_session_user`)
+session_user_var: ContextVar[UUID | None] = ContextVar("session_user", default=None)
 
 
 def current_request_id() -> str | None:

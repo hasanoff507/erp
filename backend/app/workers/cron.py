@@ -16,7 +16,10 @@ from sqlalchemy import text
 
 from app.core.db.session import Database, unscoped_transaction
 from app.core.queue import JobQueue
+from app.workers.jobs.approvals import approval_requests_expire_fanout
+from app.workers.jobs.card import card_orphan_sweep_fanout
 from app.workers.jobs.einvoice import einvoice_ettn_sweep_fanout
+from app.workers.jobs.fiscal import fiscal_ofd_sweep_fanout, fiscal_unacked_monitor_fanout
 from app.workers.jobs.inventory import inventory_daily_fanout, inventory_recost_sweep_fanout
 from app.workers.jobs.system import purge_idempotency_keys_fanout, purge_login_attempts
 
@@ -29,6 +32,14 @@ CRON_JOBS: list[CronJob[Any]] = [
     CronJob(inventory_recost_sweep_fanout, cron="*/15 * * * *"),
     # e-TTN outbox: retries (backoff ≥ 1 min), lost enqueues, dead workers
     CronJob(einvoice_ettn_sweep_fanout, cron="* * * * *"),
+    # --- B3 sales/fiscal cron ---
+    CronJob(fiscal_ofd_sweep_fanout, cron="* * * * *"),  # ofd_send retries / lost enqueues (21 §1)
+    CronJob(fiscal_unacked_monitor_fanout, cron="*/5 * * * *"),  # 24/40/46/48 h fiscal timer (16 §6)
+    # --- B3 cash cron ---
+    CronJob(approval_requests_expire_fanout, cron="*/5 * * * *"),  # pending past expires_at → expired
+    # --- B3 card cron ---
+    CronJob(card_orphan_sweep_fanout, cron="5 * * * *"),  # hourly: approved purchase w/o document > 24 h
+    # --- B3 sync cron ---
 ]
 
 _ACTIVE_TENANTS = text("SELECT app.list_active_tenant_ids()")

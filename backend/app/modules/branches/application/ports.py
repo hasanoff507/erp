@@ -86,6 +86,15 @@ class DeviceRow:
 
 
 @dataclass(frozen=True, slots=True)
+class RegisterTarget:
+    cash_register_id: UUID
+    cash_register_name: str
+    branch_id: UUID
+    branch_name: str
+    archived: bool
+
+
+@dataclass(frozen=True, slots=True)
 class DeviceFilter:
     allowed_branches: tuple[UUID, ...]  # empty = every branch (and devices without a cash register)
     branch_id: UUID | None
@@ -246,6 +255,39 @@ class DeviceRepository(Protocol):
         ...
 
     async def force_pin_reset(self, session: AsyncSession, user_id: UUID) -> None: ...
+
+    # --- B3 device-auth ---
+    async def register_target(
+        self, session: AsyncSession, tenant_id: UUID, cash_register_id: UUID
+    ) -> RegisterTarget | None:
+        """The cash register a web device is registered to, with its branch (locked ``FOR SHARE``)."""
+        ...
+
+    async def insert_device(
+        self,
+        session: AsyncSession,
+        tenant_id: UUID,
+        device_id: UUID,
+        cash_register_id: UUID,
+        kind: str,
+        app_version: str | None,
+    ) -> None: ...
+
+    async def set_app_version(self, session: AsyncSession, device_id: UUID, app_version: str) -> None: ...
+
+    async def member_elsewhere(self, session: AsyncSession, user_id: UUID, tenant_id: UUID) -> bool:
+        """An active membership in another tenant (``app.auth_member_elsewhere``) — the PIN is shared."""
+        ...
+
+    async def mark_tenant_pin_reset(self, session: AsyncSession, tenant_id: UUID, user_id: UUID) -> None:
+        """``memberships.pin_reset_at = now()`` — tenant-local PIN reset (16 §9)."""
+        ...
+
+    async def revoke_device_tokens(
+        self, session: AsyncSession, device_id: UUID, reason: str
+    ) -> tuple[list[UUID], list[UUID]]:
+        """``app.auth_revoke_device``: the device's sessions and refresh families (revoked now)."""
+        ...
 
 
 class TenantSettingsRepository(Protocol):

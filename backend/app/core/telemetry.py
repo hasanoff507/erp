@@ -311,6 +311,10 @@ def _sentry_before_breadcrumb(crumb: Any, _hint: Any) -> Any:
 
 
 def _sentry_before_send(event: Any, _hint: Any) -> Any:
+    # redact_pii also scrubs bot tokens / bearer values inside strings (breadcrumb URLs, exception texts).
+    # The tags are added after it: they are our own ids, and a UUID whose groups are all digits
+    # (e.g. 42022192-1331-4000-…) would otherwise be mangled by the card-number pattern.
+    event = redact_pii(None, "sentry", event)
     tenant = tenant_id_var.get()
     request_id = request_id_var.get()
     tags = event.setdefault("tags", {})
@@ -319,8 +323,7 @@ def _sentry_before_send(event: Any, _hint: Any) -> Any:
     if request_id is not None:
         tags["request_id"] = request_id
     # TODO(23 §8): branch tag once a branch context variable exists in app.core.context
-    # redact_pii also scrubs bot tokens / bearer values inside strings (breadcrumb URLs, exception texts)
-    return redact_pii(None, "sentry", event)
+    return event
 
 
 def _init_sentry(settings: Settings, service: str) -> None:

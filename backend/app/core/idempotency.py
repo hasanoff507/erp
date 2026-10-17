@@ -45,7 +45,12 @@ log = structlog.get_logger(__name__)
 
 HEADER = "idempotency-key"
 WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
-DEFAULT_EXEMPT_PREFIXES: tuple[str, ...] = ("/api/v1/sync/push", "/api/v1/onec-agent/")
+# 18 §16a.3: card-terminal-transactions are upserted by id = attempt_id (no Idempotency-Key)
+DEFAULT_EXEMPT_PREFIXES: tuple[str, ...] = (
+    "/api/v1/sync/push",
+    "/api/v1/onec-agent/",
+    "/api/v1/card-terminal-transactions",
+)
 MAX_KEY_LENGTH = 200
 _CONFLICT = -1  # pseudo status: the unit of work lost the PRIMARY KEY race
 

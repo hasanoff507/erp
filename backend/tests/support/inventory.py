@@ -29,6 +29,7 @@ from app.modules.inventory.wiring import (
     stock_service,
 )
 from tests.support.catalog import Env, Shop, create_product
+from tests.support.ordering import TXN_ORDER
 
 API = "/api/v1"
 D = Decimal
@@ -153,7 +154,7 @@ async def ledger(env: Env, shop: Shop, doc_id: UUID | None = None) -> list[dict[
     return await rows(
         env, shop.tenant_id,
         "SELECT id, entry_date, account_dt, account_kt, amount, branch_id, doc_type, doc_id, analytics, "
-        f"reversal_of_id FROM app.ledger_entries {where}ORDER BY created_at, (reversal_of_id IS NULL), id",
+        f"reversal_of_id FROM app.ledger_entries {where}ORDER BY {TXN_ORDER}, (reversal_of_id IS NULL), id",
         d=doc_id,
     )  # fmt: skip
 
@@ -189,7 +190,7 @@ async def moves(env: Env, shop: Shop, product: UUID, doc_id: UUID | None = None)
     return await rows(
         env, shop.tenant_id,
         "SELECT id, lot_id, qty, cost_amount, doc_type, doc_id, line_id, reversal_of_id, moved_at "
-        f"FROM app.stock_moves WHERE product_id = :p {extra}ORDER BY created_at, moved_at, id",
+        f"FROM app.stock_moves WHERE product_id = :p {extra}ORDER BY {TXN_ORDER}, moved_at, id",
         p=product, d=doc_id,
     )  # fmt: skip
 

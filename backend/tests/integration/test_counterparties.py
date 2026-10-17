@@ -12,6 +12,7 @@ from app.core.db.base import uuid7
 from app.core.db.session import tenant_transaction
 from app.modules.access.domain.permissions import SystemRole
 from app.modules.debts.wiring import DebtMoveInput, debt_register
+from tests.support.ordering import TXN_ORDER
 from tests.support.purchasing import (
     API,
     Env,
@@ -112,7 +113,9 @@ async def test_counterparty_crud_version_archive(env: Env) -> None:
         actions = (
             (
                 await s.execute(
-                    text("SELECT action FROM app.audit_log WHERE entity = 'counterparties' ORDER BY at, id")
+                    text(
+                        f"SELECT action FROM app.audit_log WHERE entity = 'counterparties' ORDER BY {TXN_ORDER}, id"
+                    )
                 )
             )
             .scalars()

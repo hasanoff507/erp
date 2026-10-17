@@ -28,6 +28,7 @@ from app.modules.access.domain.permissions import SystemRole
 from scripts.seed import seed_demo_tenant, seed_demo_user
 from tests.conftest import MigratedDb
 from tests.support.auth import ISSUER, PASSWORD, android_tokens, auth_settings, bearer, new_phone
+from tests.support.ordering import TXN_ORDER
 
 
 @dataclass(frozen=True)
@@ -334,7 +335,7 @@ async def audit_rows(admin_engine: AsyncEngine, tenant_id: UUID, action: str) ->
         rows = await conn.execute(
             text(
                 "SELECT user_id, entity, entity_id, before, after, device_id FROM app.audit_log "
-                "WHERE tenant_id = :t AND action = :a ORDER BY at"
+                f"WHERE tenant_id = :t AND action = :a ORDER BY {TXN_ORDER}, id"
             ),
             {"t": tenant_id, "a": action},
         )

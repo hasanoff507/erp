@@ -26,7 +26,7 @@ import { routes as settingsRoutes } from "@pages/settings";
 import { routes as warehouseRoutes } from "@pages/warehouse";
 
 import { IosPosGate } from "#/features/ios-install-gate/index.ts";
-import { ProtectedRoute } from "#/features/protected-route/index.ts";
+import { PosRouteGate, ProtectedRoute } from "#/features/protected-route/index.ts";
 import {
   ComingSoonPage,
   NoPermissionPage,
@@ -35,7 +35,7 @@ import {
   Splash,
 } from "../ui/status/index.tsx";
 
-import { DefaultRedirect, RootRedirect, RoutePermissionGuard } from "./guards.tsx";
+import { DefaultRedirect, PosPermissionGuard, RootRedirect, RoutePermissionGuard } from "./guards.tsx";
 
 /** BO-21 ③b Excel/CSV: the catalog import flow for `kind=opening_stock` (19 §6). */
 function OpeningStockImport(props: OpeningStockImportSlotProps) {
@@ -106,16 +106,17 @@ export const appRoutes: RouteObject[] = [
           return {
             element: (
               <IosPosGate>
-                <ProtectedRoute pending={<Splash />} noPermission={<NoPermissionPage />}>
+                {/* POS only: an offline reload renders from local device + cashier state (16 §1) */}
+                <PosRouteGate pending={<Splash />} noPermission={<NoPermissionPage />}>
                   <PosLayout />
-                </ProtectedRoute>
+                </PosRouteGate>
               </IosPosGate>
             ),
           };
         },
         hydrateFallbackElement: <Splash />,
         errorElement: <RouteErrorPage />,
-        children: [{ element: <RoutePermissionGuard inline />, children: posRoutes }],
+        children: [{ element: <PosPermissionGuard />, children: posRoutes }],
       },
       { path: "*", element: <NotFoundPage /> },
     ],

@@ -30,6 +30,11 @@ export interface CspOptions {
   /** Extra API origins when the API is not same-origin (normally empty: BFF cookie is same-origin). */
   connectSrc?: readonly string[];
   /**
+   * LAN HTTP receipt printers (Epson ePOS / Star WebPRNT, 24 §6.1) of this deployment — exact origins from the
+   * deploy config `ERP_CSP_LAN_PRINTERS` (`parseLanPrinterOrigins`), never wildcards. Default: none.
+   */
+  lanPrinterOrigins?: readonly string[];
+  /**
    * Style nonce of this response. Default: the placeholder (substituted when index.html is served).
    * `null` — no nonce (responses that are not index.html: their CSP does not govern the document).
    */
@@ -46,6 +51,7 @@ export type CspDirectives = Record<string, readonly string[]>;
 export function cspDirectives({
   agentPort = 47110,
   connectSrc = [],
+  lanPrinterOrigins = [],
   nonce = CSP_NONCE_PLACEHOLDER,
   styleHashes = [],
 }: CspOptions = {}): CspDirectives {
@@ -55,7 +61,7 @@ export function cspDirectives({
     "style-src": ["'self'", ...(nonce ? [`'nonce-${nonce}'`] : []), ...styleHashes],
     "img-src": ["'self'"],
     "font-src": ["'self'"],
-    "connect-src": ["'self'", `http://127.0.0.1:${agentPort}`, ...connectSrc],
+    "connect-src": ["'self'", `http://127.0.0.1:${agentPort}`, ...connectSrc, ...lanPrinterOrigins],
     "manifest-src": ["'self'"],
     "worker-src": ["'self'"],
     "frame-src": ["'none'"],
@@ -64,6 +70,40 @@ export function cspDirectives({
     "form-action": ["'self'"],
     "frame-ancestors": ["'none'"],
   };
+}
+
+const PRIVATE_IPV4 = /^(10\.\d{1,3}|172\.(1[6-9]|2\d|3[01])|192\.168)\.\d{1,3}\.\d{1,3}$/;
+
+/**
+ * `ERP_CSP_LAN_PRINTERS` (comma/space separated) → CSP origins. Each entry must be `http(s)://<private IPv4>[:port]`
+ * (10/8, 172.16/12, 192.168/16) — no hostnames, paths or wildcards; anything else fails the build/deploy step.
+ */
+export function parseLanPrinterOrigins(raw: string | undefined): string[] {
+  const out: string[] = [];
+  for (const entry of (raw ?? "").split(/[\s,]+/).filter(Boolean)) {
+    let url: URL;
+    try {
+      url = new URL(entry);
+    } catch {
+      throw new Error(`ERP_CSP_LAN_PRINTERS: invalid origin "${entry}"`);
+    }
+    const octetsOk = url.hostname.split(".").every((o) => o.length > 0 && (o.length < 3 || o <= "255"));
+    if (
+      !["http:", "https:"].includes(url.protocol) ||
+      !PRIVATE_IPV4.test(url.hostname) ||
+      !octetsOk ||
+      url.username ||
+      url.password ||
+      url.pathname !== "/" ||
+      url.search ||
+      url.hash ||
+      entry.endsWith("/")
+    ) {
+      throw new Error(`ERP_CSP_LAN_PRINTERS: "${entry}" must be http(s)://<private IPv4>[:port]`);
+    }
+    if (!out.includes(url.origin)) out.push(url.origin);
+  }
+  return out;
 }
 
 const HEADER_ONLY = new Set(["frame-ancestors", "report-uri", "report-to", "sandbox"]);

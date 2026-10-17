@@ -24,6 +24,7 @@ import {
   applyNonce,
   cspDirectives,
   generateNonce,
+  parseLanPrinterOrigins,
   securityHeaders,
   serializeCsp,
   type CspOptions,
@@ -153,7 +154,7 @@ function cspInlineGuard(policy: CspOptions): Plugin {
  * substituted in the HTML (CSP <meta>, `<meta property="csp-nonce">`) and in the CSP header — and
  * `Cache-Control: no-store`. Other files keep the static headers (preview.headers, no nonce).
  */
-function previewCspNonce(agentPort: number): Plugin {
+function previewCspNonce(base: CspOptions): Plugin {
   return {
     name: "erp-preview-csp-nonce",
     configurePreviewServer(server) {
@@ -169,7 +170,7 @@ function previewCspNonce(agentPort: number): Plugin {
 
         const nonce = generateNonce();
         const html = applyNonce(readFileSync(path.join(distDir, "index.html"), "utf8"), nonce);
-        for (const [name, value] of Object.entries(securityHeaders({ agentPort, nonce }))) {
+        for (const [name, value] of Object.entries(securityHeaders({ ...base, nonce }))) {
           res.setHeader(name, value);
         }
         res.setHeader("Cache-Control", "no-store");
@@ -186,10 +187,16 @@ export default defineConfig(({ mode }) => {
   const useMock = env.ERP_API_MOCK === "1" || process.env.ERP_API_MOCK === "1";
   const apiTarget = env.ERP_DEV_API_TARGET || "http://localhost:8000";
   const agentPort = 47110;
+  // 24 §6.1: LAN HTTP printers (Epson ePOS / Star WebPRNT) of this deployment — exact origins, empty by default.
+  const lanPrinterOrigins = parseLanPrinterOrigins(
+    env.ERP_CSP_LAN_PRINTERS || process.env.ERP_CSP_LAN_PRINTERS,
+  );
   // 24 §4.4: "nonce" (default — nginx / BFF / vite preview mint one per response) or "hash" (static host).
   const cspMode: CspMode = (env.ERP_CSP_MODE || process.env.ERP_CSP_MODE) === "hash" ? "hash" : "nonce";
   const policy: CspOptions =
-    cspMode === "hash" ? { agentPort, nonce: null, styleHashes: runtimeStyleHashes() } : { agentPort };
+    cspMode === "hash"
+      ? { agentPort, lanPrinterOrigins, nonce: null, styleHashes: runtimeStyleHashes() }
+      : { agentPort, lanPrinterOrigins };
   const proxy = Object.fromEntries(
     BACKEND_PATHS.map((path) => [path, { target: apiTarget, changeOrigin: false, secure: false }]),
   );
@@ -202,7 +209,7 @@ export default defineConfig(({ mode }) => {
       react(),
       fontPreload(),
       cspMeta(policy),
-      cspMode === "hash" ? cspHashMode(policy) : previewCspNonce(agentPort),
+      cspMode === "hash" ? cspHashMode(policy) : previewCspNonce({ agentPort, lanPrinterOrigins }),
       cspInlineGuard(policy),
       VitePWA({
         registerType: "autoUpdate",
@@ -256,7 +263,7 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       // Non-HTML responses; index.html gets per-response nonce headers from previewCspNonce().
       // Hash mode: one static policy for everything, as on the static host.
-      headers: securityHeaders(cspMode === "hash" ? policy : { agentPort, nonce: null }),
+      headers: securityHeaders(cspMode === "hash" ? policy : { agentPort, lanPrinterOrigins, nonce: null }),
       proxy,
     },
     build: {

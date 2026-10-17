@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import itertools
 import re
 import secrets
 from collections.abc import AsyncIterator
@@ -57,8 +58,15 @@ def client_at(app: FastAPI, ip: str) -> httpx.AsyncClient:
     return httpx.AsyncClient(transport=httpx.ASGITransport(app=app, client=(ip, 50001)), base_url=ISSUER)
 
 
+# One run creates thousands of users (``app.users.phone`` is globally UNIQUE): independent random draws from
+# 10^7 numbers collide in most full runs (birthday bound), and a collided seed user then fails with
+# ``memberships_user_id_fkey`` (seed_demo_user's ON CONFLICT (phone) DO NOTHING keeps the other tenant's
+# user, which RLS hides). A random start + a counter keeps the numbers distinct within the process.
+_PHONE_SEQ = itertools.count(secrets.randbelow(10**7))
+
+
 def new_phone() -> str:
-    return f"+99890{secrets.randbelow(10**7):07d}"
+    return f"+99890{next(_PHONE_SEQ) % 10**7:07d}"
 
 
 @dataclass(frozen=True)

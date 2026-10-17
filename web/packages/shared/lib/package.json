@@ -17,7 +17,13 @@
     "./barcode": "./src/barcode/index.ts",
     "./file": "./src/file/index.ts",
     "./platform": "./src/platform/index.ts",
-    "./settings-tabs": "./src/settings-tabs/index.ts"
+    "./settings-tabs": "./src/settings-tabs/index.ts",
+    "./receipt": "./src/receipt/index.ts",
+    "./printer": "./src/printer/index.ts",
+    "./scale": "./src/scale/index.ts",
+    "./scanner": "./src/scanner/index.ts",
+    "./agent": "./src/agent/index.ts",
+    "./card-terminal": "./src/card-terminal/index.ts"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",

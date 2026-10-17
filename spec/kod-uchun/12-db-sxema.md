@@ -405,6 +405,20 @@ CREATE TABLE auth.sessions (
 CREATE INDEX idx_sessions_user ON auth.sessions (user_id);
 ```
 
+Qurilmaga bog'langan login va lokal PIN verifikatori (`0027a web_pos`, append-only): `authorization_codes.device_id` — kod qaysi ro'yxatdan o'tgan qurilma uchun berilganini saqlaydi (AS uni token juftligiga ko'chiradi, `14-autentifikatsiya-oauth2.md` §7, §7.2); `user_credentials.pin_local_hash` — offline PIN tekshiruvi uchun alohida PBKDF2-SHA256 verifikatori (format va qachon yozilishi — `14-autentifikatsiya-oauth2.md` §13; argon2id `pin_hash` serverdan chiqmaydi), PIN o'rnatilganda/bekor qilinganda `NULL`ga tushadi va ilova uni `app.auth_set_pin_local_hash` bilan yozadi.
+
+```sql
+-- 0027a web_pos
+ALTER TABLE auth.authorization_codes ADD COLUMN device_id UUID NULL REFERENCES app.devices(id);
+ALTER TABLE auth.user_credentials ADD COLUMN pin_local_hash TEXT NULL;
+```
+
+```sql
+-- 0027a down
+ALTER TABLE auth.authorization_codes DROP COLUMN IF EXISTS device_id;
+ALTER TABLE auth.user_credentials DROP COLUMN IF EXISTS pin_local_hash;
+```
+
 Barcha `auth.*` jadvallarda RLS **o'chirilgan holatda qoladi** (yoqilmaydi) — bu jadvallar DB darajasida tenant kontekstidan tashqarida qidiriladi; himoya DB-GRANT yo'qligi + `SECURITY DEFINER` funksiya qamrovi bilan ta'minlanadi (4-bo'lim, CI tekshiruvi 6-bo'lim).
 
 ### 2.3 Tashkilot, foydalanuvchilar, huquqlar (`app` sxemasi)
@@ -734,6 +748,20 @@ CREATE TABLE app.valuation_method_history (
 );
 ```
 
+`memberships.pin_reset_at` (`0027a web_pos`) — PIN'ni **tenant-lokal** bekor qilish belgisi (`16-offline-sync.md` §9): qurilma bekor qilinganda uning so'nggi foydalanuvchisi boshqa tenantda ham faol a'zo bo'lsa, umumiy (global) PIN kredensialiga tegilmaydi — faqat shu tenantdagi a'zolikka `pin_reset_at = now()` yoziladi. Belgi `NULL` bo'lmaguncha shu tenantda PIN qabul qilinmaydi va qurilmalarga verifikator yuborilmaydi (`must_change_pin = true`); foydalanuvchi yangi PIN o'rnatganda `app.auth_set_credentials` barcha a'zoliklardagi belgini `NULL` qiladi (vaqt belgilari solishtirilmaydi — DB soati orqaga siljisa ham natija bir xil). `erp_system`ga faqat shu ustunni yangilash huquqi beriladi.
+
+```sql
+-- 0027a web_pos
+ALTER TABLE app.memberships ADD COLUMN pin_reset_at TIMESTAMPTZ NULL;
+GRANT UPDATE (pin_reset_at) ON app.memberships TO erp_system;
+```
+
+```sql
+-- 0027a down
+REVOKE UPDATE (pin_reset_at) ON app.memberships FROM erp_system;
+ALTER TABLE app.memberships DROP COLUMN IF EXISTS pin_reset_at;
+```
+
 ### 2.4 Katalog va narxlar
 
 ```sql
@@ -839,6 +867,25 @@ CREATE TABLE app.discount_rules (
   version     INT NOT NULL DEFAULT 1
 );
 CREATE INDEX idx_discount_rules_active ON app.discount_rules (tenant_id, priority DESC) WHERE archived_at IS NULL;
+```
+
+`product_barcodes` o'zgarishi (qo'shish, tahrir, **o'chirish**) tovarning `products.updated_at` ini yangilaydi (`0027a web_pos`, append-only): `/sync/pull` `barcodes` scope'i tovar bo'yicha to'liq shtrix-kod to'plamini `products.updated_at` kursori bilan yuboradi — o'chirilgan shtrix-kod qurilmaga shu yo'l bilan yetadi (`16-offline-sync.md` §1, §3.2).
+
+```sql
+-- 0027a web_pos
+CREATE OR REPLACE FUNCTION app.touch_product_on_barcode_change() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  UPDATE app.products SET updated_at = now()
+   WHERE id = CASE WHEN TG_OP = 'DELETE' THEN OLD.product_id ELSE NEW.product_id END;
+  IF TG_OP = 'UPDATE' AND OLD.product_id <> NEW.product_id THEN
+    UPDATE app.products SET updated_at = now() WHERE id = OLD.product_id;
+  END IF;
+  RETURN NULL;
+END;
+$$;
+CREATE TRIGGER trg_product_barcodes_touch_product AFTER INSERT OR UPDATE OR DELETE ON app.product_barcodes
+  FOR EACH ROW EXECUTE FUNCTION app.touch_product_on_barcode_change();
 ```
 
 ### 2.5 Kontragentlar
@@ -2841,6 +2888,28 @@ CREATE TABLE app.doc_sequences (
 );
 ```
 
+`sync_exceptions.kind` ga ikki tur qo'shiladi (`0027a web_pos`, append-only; `16-offline-sync.md` §5): `actor_unverified` — online voqeaning `actor_user_id`/tasdiqlovchisi shu qurilma sessiyasiga PIN bilan bog'lanmagan (`15-xavfsizlik-va-audit.md` §2.3a), `late_in_closed_shift` — smena yopilgandan keyin qabul qilingan hujjat (`18-api-kassa.md` §3.2).
+
+```sql
+-- 0027a web_pos
+ALTER TABLE app.sync_exceptions DROP CONSTRAINT sync_exceptions_kind_check;
+ALTER TABLE app.sync_exceptions ADD CONSTRAINT sync_exceptions_kind_check CHECK (kind IN ('price_mismatch','archived_product','stock_negative',
+    'debt_limit_exceeded_offline','approval_limit_exceeded_offline','receipt_seq_conflict',
+    'debt_overpayment_offline','debt_allocation_mismatch','late_in_closed_period','cost_unknown',
+    'count_late_move','card_result_mismatch','card_orphan_transaction',
+    'actor_unverified','late_in_closed_shift'));
+```
+
+```sql
+-- 0027a down
+DELETE FROM app.sync_exceptions WHERE kind IN ('actor_unverified','late_in_closed_shift');
+ALTER TABLE app.sync_exceptions DROP CONSTRAINT IF EXISTS sync_exceptions_kind_check;
+ALTER TABLE app.sync_exceptions ADD CONSTRAINT sync_exceptions_kind_check CHECK (kind IN ('price_mismatch','archived_product','stock_negative',
+    'debt_limit_exceeded_offline','approval_limit_exceeded_offline','receipt_seq_conflict',
+    'debt_overpayment_offline','debt_allocation_mismatch','late_in_closed_period','cost_unknown',
+    'count_late_move','card_result_mismatch','card_orphan_transaction'));
+```
+
 **Hujjat raqami generatori** (aniqlashtirish #12 — 11-model faqat `K-01-2026-000154` namunasini beradi, to'liq `doc_type` kod jadvali ro'yxatlanmagan):
 
 ```sql
@@ -4619,6 +4688,327 @@ GRANT EXECUTE ON FUNCTION app.auth_purge_login_attempts(interval) TO erp_app;
 REVOKE CREATE ON SCHEMA app FROM erp_system;
 ```
 
+#### Qurilmaga bog'langan login va PIN funksiyalari (`0027a web_pos`)
+
+`14-autentifikatsiya-oauth2.md` §4.3, §5, §7, §7.2, §13, §19 va `16-offline-sync.md` §9 uchun (Bosqich 3, append-only). `auth_issue_code` oxirgi argument `p_device_id` oladi, `auth_consume_code` `device_id`ni qaytaradi (oldingi imzolar o'chiriladi); `auth_set_credentials`/`auth_reset_credentials` PIN o'zgarganda yoki bekor qilinganda `pin_local_hash`ni ham `NULL` qiladi (eskirgan verifikator qolmaydi). Yangi 7 ta funksiya: `auth_set_pin_local_hash` (verifikatorni faqat `pin_hash` o'zgarmagan bo'lsa yozadi — parallel PIN almashtirishga qarshi), `auth_pin_state` (`/auth/pin/verify` va server tomonidagi PIN tekshiruvi), `auth_staff_pin_states` (`permissions` pull scope'i uchun xodimlar verifikatori — chaqiruvchi foydalanuvchilar ro'yxatini RLS ostida a'zoliklardan oladi), `auth_family_revoked` (Redis ishlamaganda `sid`siz tokenning refresh oilasi bekor qilinganmi — fail-closed, 14 §5), `auth_session_family` (bitta sessiyani bekor qilishda uning oilasi — `fam` belgisi uchun), `auth_revoke_device` (qurilma bekor qilinganda unga bog'langan barcha sessiya va refresh oilalari; qaytaradi — Redis `sid`/`fam` belgilari uchun) va `auth_member_elsewhere` (foydalanuvchining boshqa tenantda faol a'zoligi bormi — PIN'ni global yoki tenant-lokal bekor qilish tanlovi, `16-offline-sync.md` §9). Naqsh 0027 bilan bir xil (`erp_system` egaligida, `CREATE` huquqi faqat topshirish davomida).
+
+```sql
+-- 0027a web_pos
+GRANT CREATE ON SCHEMA app TO erp_system;
+
+DROP FUNCTION app.auth_issue_code(text, uuid, uuid, uuid, text, text, text, int);
+
+-- Authorization Code berish (14 §4, §7.2): TTL standart 60 s; p_device_id — qurilmaga bog'langan login (NULL — yo'q).
+CREATE OR REPLACE FUNCTION app.auth_issue_code(
+  p_code_hash text, p_client_id uuid, p_user_id uuid, p_tenant_id uuid, p_code_challenge text,
+  p_redirect_uri text, p_scope text, p_ttl_s int, p_device_id uuid
+) RETURNS void
+LANGUAGE sql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+  INSERT INTO auth.authorization_codes
+    (code_hash, client_id, user_id, tenant_id, code_challenge, code_challenge_method, redirect_uri, scope,
+     expires_at, device_id)
+  VALUES
+    (p_code_hash, p_client_id, p_user_id, p_tenant_id, p_code_challenge, 'S256', p_redirect_uri, p_scope,
+     now() + make_interval(secs => COALESCE(p_ttl_s, 60)), p_device_id);
+$$;
+
+DROP FUNCTION app.auth_consume_code(text);
+
+-- Authorization Code — bir martalik iste'mol (atomik), device_id bilan (14 §7.2).
+CREATE OR REPLACE FUNCTION app.auth_consume_code(p_code_hash text)
+RETURNS TABLE (client_id uuid, user_id uuid, tenant_id uuid, code_challenge text,
+               code_challenge_method text, redirect_uri text, scope text, device_id uuid)
+LANGUAGE sql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+  UPDATE auth.authorization_codes c
+     SET used_at = now()
+   WHERE c.code_hash = p_code_hash AND c.used_at IS NULL AND c.expires_at > now()
+  RETURNING c.client_id, c.user_id, c.tenant_id, c.code_challenge, c.code_challenge_method, c.redirect_uri,
+            c.scope, c.device_id;
+$$;
+
+-- Parol/PIN o'rnatish (UPSERT): NULL argument — o'sha maydon o'zgarmaydi; berilganda *_updated_at = now(),
+-- mos must_change_* = false; yangi PIN eski lokal verifikatorni o'chiradi (ilova yangisini
+-- auth_set_pin_local_hash bilan yozadi).
+CREATE OR REPLACE FUNCTION app.auth_set_credentials(p_user_id uuid, p_password_hash text, p_pin_hash text)
+RETURNS void
+LANGUAGE sql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+  INSERT INTO auth.user_credentials AS c
+    (user_id, password_hash, password_updated_at, pin_hash, pin_updated_at)
+  VALUES
+    (p_user_id, p_password_hash, CASE WHEN p_password_hash IS NOT NULL THEN now() END,
+     p_pin_hash, CASE WHEN p_pin_hash IS NOT NULL THEN now() END)
+  ON CONFLICT (user_id) DO UPDATE SET
+    password_hash        = COALESCE(p_password_hash, c.password_hash),
+    password_updated_at  = CASE WHEN p_password_hash IS NOT NULL THEN now() ELSE c.password_updated_at END,
+    must_change_password = CASE WHEN p_password_hash IS NOT NULL THEN false ELSE c.must_change_password END,
+    pin_hash             = COALESCE(p_pin_hash, c.pin_hash),
+    pin_local_hash       = CASE WHEN p_pin_hash IS NOT NULL THEN NULL ELSE c.pin_local_hash END,
+    pin_updated_at       = CASE WHEN p_pin_hash IS NOT NULL THEN now() ELSE c.pin_updated_at END,
+    must_change_pin      = CASE WHEN p_pin_hash IS NOT NULL THEN false ELSE c.must_change_pin END,
+    updated_at           = now();
+  -- yangi PIN barcha tenant-lokal bekor qilish belgilarini yechadi (16 §9) — vaqt solishtirilmaydi
+  UPDATE app.memberships m SET pin_reset_at = NULL
+   WHERE p_pin_hash IS NOT NULL AND m.user_id = p_user_id AND m.pin_reset_at IS NOT NULL;
+$$;
+
+-- Admin tomonidan tiklash: tanlangan hash NULL (PIN bilan birga lokal verifikator ham), must_change_* = true;
+-- parol tiklansa foydalanuvchining barcha sessiya/refresh tokenlari bekor qilinadi (revoked_reason='credential_reset').
+CREATE OR REPLACE FUNCTION app.auth_reset_credentials(p_user_id uuid, p_reset_password boolean, p_reset_pin boolean)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+BEGIN
+  UPDATE auth.user_credentials c
+     SET password_hash        = CASE WHEN p_reset_password THEN NULL ELSE c.password_hash END,
+         must_change_password = CASE WHEN p_reset_password THEN true ELSE c.must_change_password END,
+         pin_hash             = CASE WHEN p_reset_pin THEN NULL ELSE c.pin_hash END,
+         pin_local_hash       = CASE WHEN p_reset_pin THEN NULL ELSE c.pin_local_hash END,
+         must_change_pin      = CASE WHEN p_reset_pin THEN true ELSE c.must_change_pin END,
+         updated_at           = now()
+   WHERE c.user_id = p_user_id;
+  IF p_reset_password THEN
+    UPDATE auth.refresh_tokens t SET revoked_at = now(), revoked_reason = 'credential_reset'
+     WHERE t.user_id = p_user_id AND t.revoked_at IS NULL;
+    UPDATE auth.sessions s SET revoked_at = now(), revoked_reason = 'credential_reset'
+     WHERE s.user_id = p_user_id AND s.revoked_at IS NULL;
+  END IF;
+END;
+$$;
+
+-- Lokal PIN verifikatorini yozish (14 §13): faqat joriy pin_hash ilova tekshirgan/yaratgan qiymat bilan bir xil
+-- bo'lsa (oraliqda PIN almashtirilgan yoki bekor qilingan bo'lsa — false, hech narsa yozilmaydi).
+CREATE OR REPLACE FUNCTION app.auth_set_pin_local_hash(p_user_id uuid, p_pin_hash text, p_pin_local_hash text)
+RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+BEGIN
+  UPDATE auth.user_credentials c
+     SET pin_local_hash = p_pin_local_hash, updated_at = now()
+   WHERE c.user_id = p_user_id AND c.pin_hash IS NOT NULL AND c.pin_hash = p_pin_hash
+     AND NOT c.must_change_pin;
+  RETURN FOUND;
+END;
+$$;
+
+-- /auth/pin/verify va server tomonidagi PIN tekshiruvi (14 §4.3). Faqat joriy tenant (app.current_tenant_id(),
+-- tenant_transaction) a'zosi uchun javob beradi — boshqa tenant foydalanuvchisi uchun bo'sh natija.
+CREATE OR REPLACE FUNCTION app.auth_pin_state(p_user_id uuid)
+RETURNS TABLE (pin_hash text, pin_local_hash text, must_change_pin boolean, pin_updated_at timestamptz)
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+  SELECT c.pin_hash, c.pin_local_hash, c.must_change_pin, c.pin_updated_at
+  FROM auth.user_credentials c
+  JOIN app.memberships m ON m.user_id = c.user_id AND m.tenant_id = app.current_tenant_id()
+  WHERE c.user_id = p_user_id;
+$$;
+
+-- permissions pull scope'i (16 §1, §3.2): berilgan foydalanuvchilarning lokal verifikatori (argon2 pin_hash emas).
+-- Faqat joriy tenant (app.current_tenant_id()) a'zolari qaytadi.
+CREATE OR REPLACE FUNCTION app.auth_staff_pin_states(p_user_ids uuid[])
+RETURNS TABLE (user_id uuid, pin_set boolean, pin_local_hash text, must_change_pin boolean,
+               pin_updated_at timestamptz)
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+  SELECT c.user_id, c.pin_hash IS NOT NULL, c.pin_local_hash, c.must_change_pin, c.pin_updated_at
+  FROM auth.user_credentials c
+  JOIN app.memberships m ON m.user_id = c.user_id AND m.tenant_id = app.current_tenant_id()
+  WHERE c.user_id = ANY (p_user_ids);
+$$;
+
+-- RS zaxirasi (14 §5): Redis ishlamaganda sid'siz access tokenning `fam` oilasi tirikmi — oilada bekor
+-- qilinmagan token qolmagan (yoki oila yo'q) bo'lsa true.
+CREATE OR REPLACE FUNCTION app.auth_family_revoked(p_family_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+  SELECT NOT EXISTS (
+    SELECT 1 FROM auth.refresh_tokens t WHERE t.family_id = p_family_id AND t.revoked_at IS NULL
+  );
+$$;
+
+-- Sessiyaning joriy refresh oilasi (bitta sessiyani bekor qilishda `fam` belgisi uchun, 14 §5).
+CREATE OR REPLACE FUNCTION app.auth_session_family(p_session_id uuid)
+RETURNS uuid
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+  SELECT f.family_id
+  FROM auth.sessions s JOIN auth.refresh_tokens f ON f.id = s.current_refresh_token_id
+  WHERE s.id = p_session_id;
+$$;
+
+-- Qurilma bekor qilinganda (16 §9, 14 §7): unga bog'langan barcha sessiya va refresh tokenlar bekor qilinadi;
+-- qaytaradi — bekor qilingan sessiyalar va oilalar (Redis sid/fam belgilari uchun).
+CREATE OR REPLACE FUNCTION app.auth_revoke_device(p_device_id uuid, p_reason text)
+RETURNS TABLE (session_ids uuid[], family_ids uuid[])
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+DECLARE
+  v_sids uuid[];
+  v_fams uuid[];
+BEGIN
+  WITH s AS (
+    UPDATE auth.sessions se SET revoked_at = now(), revoked_reason = p_reason
+     WHERE se.device_id = p_device_id AND se.revoked_at IS NULL
+    RETURNING se.id
+  ) SELECT COALESCE(array_agg(s.id), '{}') INTO v_sids FROM s;
+  WITH t AS (
+    UPDATE auth.refresh_tokens rt SET revoked_at = now(), revoked_reason = p_reason
+     WHERE rt.device_id = p_device_id AND rt.revoked_at IS NULL
+    RETURNING rt.family_id
+  ) SELECT COALESCE(array_agg(DISTINCT t.family_id), '{}') INTO v_fams FROM t;
+  RETURN QUERY SELECT v_sids, v_fams;
+END;
+$$;
+
+-- Foydalanuvchining p_tenant_id dan boshqa tenantda faol a'zoligi bormi (16 §9: PIN global yoki tenant-lokal
+-- bekor qilinadi — bir tenant boshqa tenant bilan umumiy kredensialga tegmaydi).
+CREATE OR REPLACE FUNCTION app.auth_member_elsewhere(p_user_id uuid, p_tenant_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM app.memberships m
+    WHERE m.user_id = p_user_id AND m.tenant_id <> p_tenant_id AND m.status = 'active'
+  );
+$$;
+
+ALTER FUNCTION app.auth_issue_code(text, uuid, uuid, uuid, text, text, text, int, uuid) OWNER TO erp_system;
+ALTER FUNCTION app.auth_consume_code(text) OWNER TO erp_system;
+ALTER FUNCTION app.auth_set_pin_local_hash(uuid, text, text) OWNER TO erp_system;
+ALTER FUNCTION app.auth_pin_state(uuid) OWNER TO erp_system;
+ALTER FUNCTION app.auth_staff_pin_states(uuid[]) OWNER TO erp_system;
+ALTER FUNCTION app.auth_family_revoked(uuid) OWNER TO erp_system;
+ALTER FUNCTION app.auth_session_family(uuid) OWNER TO erp_system;
+ALTER FUNCTION app.auth_revoke_device(uuid, text) OWNER TO erp_system;
+ALTER FUNCTION app.auth_member_elsewhere(uuid, uuid) OWNER TO erp_system;
+
+REVOKE ALL ON FUNCTION app.auth_issue_code(text, uuid, uuid, uuid, text, text, text, int, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_consume_code(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_set_pin_local_hash(uuid, text, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_pin_state(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_staff_pin_states(uuid[]) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_family_revoked(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_session_family(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_revoke_device(uuid, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_member_elsewhere(uuid, uuid) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION app.auth_issue_code(text, uuid, uuid, uuid, text, text, text, int, uuid) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_consume_code(text) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_set_pin_local_hash(uuid, text, text) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_pin_state(uuid) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_staff_pin_states(uuid[]) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_family_revoked(uuid) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_session_family(uuid) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_revoke_device(uuid, text) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_member_elsewhere(uuid, uuid) TO erp_app;
+
+REVOKE CREATE ON SCHEMA app FROM erp_system;
+```
+
+Orqaga qaytarish (`0027a` down): yangi funksiyalar avtomatik o'chiriladi, so'ng `auth_issue_code`/`auth_consume_code`/`auth_set_credentials`/`auth_reset_credentials`ning 0027 dagi tanalari (yuqoridagi 0027 bloklari bilan aynan) qayta yaratiladi.
+
+```sql
+-- 0027a down
+GRANT CREATE ON SCHEMA app TO erp_system;
+
+CREATE OR REPLACE FUNCTION app.auth_issue_code(
+  p_code_hash text, p_client_id uuid, p_user_id uuid, p_tenant_id uuid, p_code_challenge text,
+  p_redirect_uri text, p_scope text, p_ttl_s int
+) RETURNS void
+LANGUAGE sql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+  INSERT INTO auth.authorization_codes
+    (code_hash, client_id, user_id, tenant_id, code_challenge, code_challenge_method, redirect_uri, scope, expires_at)
+  VALUES
+    (p_code_hash, p_client_id, p_user_id, p_tenant_id, p_code_challenge, 'S256', p_redirect_uri, p_scope,
+     now() + make_interval(secs => COALESCE(p_ttl_s, 60)));
+$$;
+
+CREATE OR REPLACE FUNCTION app.auth_consume_code(p_code_hash text)
+RETURNS TABLE (client_id uuid, user_id uuid, tenant_id uuid, code_challenge text,
+               code_challenge_method text, redirect_uri text, scope text)
+LANGUAGE sql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+  UPDATE auth.authorization_codes c
+     SET used_at = now()
+   WHERE c.code_hash = p_code_hash AND c.used_at IS NULL AND c.expires_at > now()
+  RETURNING c.client_id, c.user_id, c.tenant_id, c.code_challenge, c.code_challenge_method, c.redirect_uri, c.scope;
+$$;
+
+CREATE OR REPLACE FUNCTION app.auth_set_credentials(p_user_id uuid, p_password_hash text, p_pin_hash text)
+RETURNS void
+LANGUAGE sql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+  INSERT INTO auth.user_credentials AS c
+    (user_id, password_hash, password_updated_at, pin_hash, pin_updated_at)
+  VALUES
+    (p_user_id, p_password_hash, CASE WHEN p_password_hash IS NOT NULL THEN now() END,
+     p_pin_hash, CASE WHEN p_pin_hash IS NOT NULL THEN now() END)
+  ON CONFLICT (user_id) DO UPDATE SET
+    password_hash        = COALESCE(p_password_hash, c.password_hash),
+    password_updated_at  = CASE WHEN p_password_hash IS NOT NULL THEN now() ELSE c.password_updated_at END,
+    must_change_password = CASE WHEN p_password_hash IS NOT NULL THEN false ELSE c.must_change_password END,
+    pin_hash             = COALESCE(p_pin_hash, c.pin_hash),
+    pin_updated_at       = CASE WHEN p_pin_hash IS NOT NULL THEN now() ELSE c.pin_updated_at END,
+    must_change_pin      = CASE WHEN p_pin_hash IS NOT NULL THEN false ELSE c.must_change_pin END,
+    updated_at           = now();
+$$;
+
+CREATE OR REPLACE FUNCTION app.auth_reset_credentials(p_user_id uuid, p_reset_password boolean, p_reset_pin boolean)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = app, auth, pg_temp
+AS $$
+BEGIN
+  UPDATE auth.user_credentials c
+     SET password_hash        = CASE WHEN p_reset_password THEN NULL ELSE c.password_hash END,
+         must_change_password = CASE WHEN p_reset_password THEN true ELSE c.must_change_password END,
+         pin_hash             = CASE WHEN p_reset_pin THEN NULL ELSE c.pin_hash END,
+         must_change_pin      = CASE WHEN p_reset_pin THEN true ELSE c.must_change_pin END,
+         updated_at           = now()
+   WHERE c.user_id = p_user_id;
+  IF p_reset_password THEN
+    UPDATE auth.refresh_tokens t SET revoked_at = now(), revoked_reason = 'credential_reset'
+     WHERE t.user_id = p_user_id AND t.revoked_at IS NULL;
+    UPDATE auth.sessions s SET revoked_at = now(), revoked_reason = 'credential_reset'
+     WHERE s.user_id = p_user_id AND s.revoked_at IS NULL;
+  END IF;
+END;
+$$;
+
+ALTER FUNCTION app.auth_issue_code(text, uuid, uuid, uuid, text, text, text, int) OWNER TO erp_system;
+ALTER FUNCTION app.auth_consume_code(text) OWNER TO erp_system;
+ALTER FUNCTION app.auth_set_credentials(uuid, text, text) OWNER TO erp_system;
+ALTER FUNCTION app.auth_reset_credentials(uuid, boolean, boolean) OWNER TO erp_system;
+REVOKE ALL ON FUNCTION app.auth_issue_code(text, uuid, uuid, uuid, text, text, text, int) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_consume_code(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_set_credentials(uuid, text, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.auth_reset_credentials(uuid, boolean, boolean) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION app.auth_issue_code(text, uuid, uuid, uuid, text, text, text, int) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_consume_code(text) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_set_credentials(uuid, text, text) TO erp_app;
+GRANT EXECUTE ON FUNCTION app.auth_reset_credentials(uuid, boolean, boolean) TO erp_app;
+
+REVOKE CREATE ON SCHEMA app FROM erp_system;
+```
+
 #### Do'kon agenti va 1C integratsiyasi funksiyalari (`0028 store_agent`, `0029 onec_integration`)
 
 7 ta funksiya — agentni ulash (RFC 8628 device grant, `auth.onec_device_authorizations`), agent tokeni (`private_key_jwt`) va SAQ cron fan-out uchun (`33-1c-integratsiya.md` §5.18, §4.4, §9.2). Naqsh yuqoridagi bilan bir xil: `erp_system` egaligida, `SET search_path = app, auth, pg_temp` (`auth`ga tegmaydiganlarida `app, pg_temp`), `erp_app`ga faqat `EXECUTE`. `0028 store_agent` — `onec_device_auth_start/lookup/approve/poll/deny`, `onec_agent_credentials` (6 ta); `0029 onec_integration` — `onec_tenants_due`.
@@ -4983,12 +5373,13 @@ INSERT INTO app.warehouses (tenant_id, branch_id, name, type, inventory_account)
 
 ### 6.1 Alembic revizion rejasi
 
-Revizionlardan oldin — DBA bootstrap (0-bo'lim: rollar, parollar, `GRANT erp_system TO erp_migrator`, `search_path`, `erp_migrator` egaligidagi baza); barcha revizionlar `erp_migrator` bilan ishlaydi. Revizionlar zanjiri chiziqli: `0001` → … → `0027` → `0028` → `0029`; `0028 store_agent` ning `down_revision` — `0027` (yadro revizionlarining oxirgisi).
+Revizionlardan oldin — DBA bootstrap (0-bo'lim: rollar, parollar, `GRANT erp_system TO erp_migrator`, `search_path`, `erp_migrator` egaligidagi baza); barcha revizionlar `erp_migrator` bilan ishlaydi. Revizionlar zanjiri chiziqli: `0001` → … → `0027` → `0027a` → `0028` → `0029`; `0027a web_pos` (Bosqich 3, veb-kassa) — **append-only** revizion: `0027` gacha qo'llangan bazaga faqat qo'shimcha o'zgarishlar (yangi ustun/jadval, funksiya imzosi); `0028 store_agent` ning `down_revision` — `0027a`.
 
 **SQL fayllar shu hujjatdan generatsiya qilinadi** (`backend/scripts/gen_migration_sql.py` → `backend/alembic/sql/NNNN_<nom>.{up,down}.sql`; `--check` rejimi CI'da drift'ni ushlaydi). Har ` ```sql ` bloki revizionga quyidagi tartibda biriktiriladi:
 1. Blokning birinchi qatori — marker izoh: `-- NNNN <nom>` (masalan `-- 0015 registers`, `-- 0027 boshida`) — butun blok shu revizionga; `-- DBA bootstrap` — revizion emas (0-bo'lim, `initdb.sh`); `-- namuna` — DDL emas, misol.
 2. Markersiz blok — bo'lim sarlavhasi bo'yicha: 0, 1.1–1.4 → `0001`; 2.1–2.9 → har bayonot o'z jadvalining revizioniga (quyidagi jadval; jadvaldan keyin yozilgan kechiktirilgan FK/indeks — FK bog'langan eng kech jadval revizioniga), `app.next_doc_number()` → `0019`; 2.11 → `0028`/`0029`; 4.1–4.4 → `0026`; 4.5 → `0027`; 5 (seed) va 6.2 (CI) — revizion emas.
-3. `0028`/`0029` bloklari tegishli bosqichgacha generatsiya qilinmaydi.
+3. `0027a` bloklari faqat marker bilan: `-- 0027a web_pos` (up) va `-- 0027a down` (down skriptiga so'zma-so'z — `DROP COLUMN`, funksiyaning oldingi tanasi va h.k., avtomatik chiqarib bo'lmaydigan teskari bayonotlar); har blok o'zgartirgan jadval bo'limida, `CREATE TABLE`dan keyin turadi.
+4. `0028`/`0029` bloklari tegishli bosqichgacha generatsiya qilinmaydi.
 
 | № | Revizion | Mazmuni |
 |---|---|---|
@@ -5019,6 +5410,7 @@ Revizionlardan oldin — DBA bootstrap (0-bo'lim: rollar, parollar, `GRANT erp_s
 | 0025 | `updated_at_triggers` | 2.10-bo'limdagi `DO` bloki (jumladan `card_terminals`, `card_terminal_transactions`, `card_terminal_settlements`, `platform.card_bin_rules`) |
 | 0026 | `rls_policies` | 4.2–4.4-bo'limlardagi `DO` bloki + maxsus siyosatlar + GRANT/REVOKE (+`platform.label_templates`/`marking_product_groups`/`terms_versions`/`turnover_tax_rates`/`card_bin_rules` SELECT, `platform.fx_rates` SELECT/INSERT/UPDATE); sxema-GRANT'lardan keyin append-only `REVOKE`lar qayta qo'llanadi, `auth.login_attempts` uchun `erp_system`dan `UPDATE` (4.4) |
 | 0027 | `security_definer_functions` | 4.5-bo'limdagi 4 funksiya + `auth_consume_code`/`auth_rotate_refresh`/`auth_revoke_tenant`/`auth_suspend_tenant` + (`payments_checkout_by_provider_tx`, `payments_checkout_by_ref`, `billing_payment_by_id`, `public_statement_by_token`) + 17 ta AS yozuvchi/sessiya funksiyasi (`auth_issue_code` … `auth_telegram_chat_by_phone`, `auth_lookup_refresh`, `auth_revoke_refresh_family`, `auth_purge_login_attempts`) — jami 29; ular o'qiydigan `app` jadvallariga `erp_system` uchun nomma-nom `GRANT SELECT`; boshida `GRANT CREATE ON SCHEMA app TO erp_system`, oxirida `REVOKE` (egalik topshirish uchun vaqtincha, 4.5) |
+| 0027a | `web_pos` | Bosqich 3 (veb-kassa) — append-only o'zgarishlar: qurilmaga bog'langan login va POS uchun qo'shimchalar (blok markerlari `-- 0027a web_pos` / `-- 0027a down`, mazmuni — bloklarning o'zida) |
 | 0028 | `store_agent` | Do'kon agenti umumiy registri (2.11-bo'lim, qaror #66): `app.onec_agents` (+`capabilities`), `app.onec_agent_tasks` (1C ustunlari FK'siz; fiskal/printer/tarozi/karta terminali xizmat vazifalari — `card.status`, `card.settlement` (qaror #71), `purpose='device_service'`), `app.onec_task_results`, `auth.onec_device_authorizations`; `fk_cr_fiscal_agent` (`cash_registers.fiscal_agent_id` → `onec_agents`), `fk_ct_agent` (`card_terminals.agent_id` → `onec_agents`, qaror #71); `updated_at` trigger'lari (2.10, 2 jadval); RLS uchligi (4.2, 3 jadval); grantlar (4.4); 6 ta `SECURITY DEFINER` funksiya (`onec_device_auth_start/lookup/approve/poll/deny`, `onec_agent_credentials`; 4.5). `0002`/`0007` dagi `devices`, `signing_keys`, `cash_registers` ga bog'liq. Bosqich 5 |
 | 0029 | `onec_integration` | 1C integratsiyasi (2.11-bo'lim, `33-1c-integratsiya.md` §5): 15 ta `app.onec_*` jadval (FK tartibida: `onec_bases` → `onec_settings`, `onec_branch_bindings`, `onec_metadata_snapshots`, `onec_catalog_items`, `onec_mappings`, `onec_value_mappings`, `onec_ref_create_requests` → `onec_export_batches` → `onec_export_items` → `onec_export_item_sources`, `onec_object_refs` → `onec_reconciliations`, `onec_events`, `onec_agent_logs`); `onec_forbid_namespace_change` trigger'i; kechiktirilgan FK'lar, jumladan `onec_agent_tasks` ga `fk_oat_base`, `fk_oat_batch`, `fk_oat_item`, `fk_oat_ref_create`, `fk_oat_reconciliation`; `updated_at` trigger'lari (2.10, 11 jadval); RLS uchligi (4.2, 15 jadval); grantlar (4.4); `onec_tenants_due` (4.5). `onec_metadata_snapshots`/`onec_reconciliations`/`onec_events` `task_id` FK'lari `ON DELETE SET NULL` (o'qish vazifalari 30 kunda tozalanadi). `0018` dagi `attachments`ga bog'liq. Bosqich 7 |
 

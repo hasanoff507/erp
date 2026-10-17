@@ -11,6 +11,7 @@ from app.core.db.session import tenant_transaction
 from app.modules.access.domain.permissions import SystemRole
 from app.modules.catalog.domain.barcodes import is_valid_ean13, is_weight_prefixed
 from tests.support.catalog import Env, catalog_env_fixture, create_product, product_body
+from tests.support.ordering import TXN_ORDER
 
 pytestmark = [pytest.mark.db, pytest.mark.redis]
 __all__ = ["catalog_env_fixture"]
@@ -77,7 +78,7 @@ async def test_product_crud_version_archive(env: Env) -> None:
         actions = [
             r[0]
             for r in await s.execute(
-                text("SELECT action FROM app.audit_log WHERE entity_id = :id ORDER BY at, id"),
+                text(f"SELECT action FROM app.audit_log WHERE entity_id = :id ORDER BY {TXN_ORDER}, id"),
                 {"id": p["id"]},
             )
         ]

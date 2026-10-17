@@ -19,6 +19,7 @@ from app.core.db.session import Database, unscoped_transaction
 from app.modules.auth.application.passwords import hash_password
 from scripts.seed import seed_demo_tenant, seed_demo_user
 from tests.support.auth import PASSWORD, bearer, new_phone
+from tests.support.ordering import TXN_ORDER
 
 
 @dataclass(frozen=True)
@@ -92,7 +93,8 @@ async def credentials(admin_engine: AsyncEngine, user_id: UUID) -> Any:
 async def audit_actions(admin_engine: AsyncEngine, tenant_id: UUID) -> list[str]:
     async with admin_engine.connect() as conn:
         rows = await conn.execute(
-            text("SELECT action FROM app.audit_log WHERE tenant_id = :t ORDER BY at, id"), {"t": tenant_id}
+            text(f"SELECT action FROM app.audit_log WHERE tenant_id = :t ORDER BY {TXN_ORDER}, id"),
+            {"t": tenant_id},
         )
         return [r[0] for r in rows]
 

@@ -29,7 +29,13 @@ def exhausted(attempts: int) -> bool:
     return attempts >= MAX_ATTEMPTS
 
 
-def next_run_at(now: datetime, attempts: int, unit_random: float) -> datetime:
-    """``unit_random`` ∈ [0, 1) — the jitter draw (injected so tests are deterministic)."""
+def retry_delay(attempts: int, unit_random: float) -> timedelta:
+    """Backoff + jitter after the ``attempts``-th failed try; ``unit_random`` ∈ [0, 1) — the jitter draw
+    (injected so tests are deterministic). The outbox adds it to the database ``now()`` — the same clock
+    the claim (``next_run_at <= now()``) compares with."""
     delay = backoff_seconds(attempts)
-    return now + timedelta(seconds=delay + delay * JITTER_SHARE * min(max(unit_random, 0.0), 1.0))
+    return timedelta(seconds=delay + delay * JITTER_SHARE * min(max(unit_random, 0.0), 1.0))
+
+
+def next_run_at(now: datetime, attempts: int, unit_random: float) -> datetime:
+    return now + retry_delay(attempts, unit_random)

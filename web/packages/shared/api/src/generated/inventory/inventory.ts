@@ -29,6 +29,8 @@ import type {
   StockBalancePage,
   StockLotPage,
   StockMovePage,
+  StockSettingsOut,
+  StockSettingsPatch,
   ValuationSettingsOut,
   ValuationSettingsPatch,
   WriteOffCancel,
@@ -179,6 +181,30 @@ export const updateValuationSettings = (
       {url: `/api/v1/valuation-settings`, method: 'PATCH',
       headers: {'Content-Type': 'application/json', },
       data: valuationSettingsPatch
+    },
+      options);
+    }
+  /**
+ * @summary Get Stock Settings
+ */
+export const getStockSettings = (
+
+ options?: SecondParameter<typeof apiRequest<StockSettingsOut>>,) => {
+      return apiRequest<StockSettingsOut>(
+      {url: `/api/v1/stock-settings`, method: 'GET'
+    },
+      options);
+    }
+  /**
+ * @summary Update Stock Settings
+ */
+export const updateStockSettings = (
+    stockSettingsPatch: StockSettingsPatch,
+ options?: SecondParameter<typeof apiRequest<StockSettingsOut>>,) => {
+      return apiRequest<StockSettingsOut>(
+      {url: `/api/v1/stock-settings`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: stockSettingsPatch
     },
       options);
     }
@@ -358,6 +384,8 @@ export type ListStockLotsResult = NonNullable<Awaited<ReturnType<typeof listStoc
 export type ListStockMovesResult = NonNullable<Awaited<ReturnType<typeof listStockMoves>>>
 export type GetValuationSettingsResult = NonNullable<Awaited<ReturnType<typeof getValuationSettings>>>
 export type UpdateValuationSettingsResult = NonNullable<Awaited<ReturnType<typeof updateValuationSettings>>>
+export type GetStockSettingsResult = NonNullable<Awaited<ReturnType<typeof getStockSettings>>>
+export type UpdateStockSettingsResult = NonNullable<Awaited<ReturnType<typeof updateStockSettings>>>
 export type ListRecostJobsResult = NonNullable<Awaited<ReturnType<typeof listRecostJobs>>>
 export type GetRecostJobResult = NonNullable<Awaited<ReturnType<typeof getRecostJob>>>
 export type RetryRecostJobResult = NonNullable<Awaited<ReturnType<typeof retryRecostJob>>>

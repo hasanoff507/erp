@@ -22,11 +22,13 @@ from app.modules.auth.application.ports import (
     BranchRow,
     ClientRow,
     CodeRow,
+    DeviceBinding,
     InviteAcceptance,
     IssuedTokens,
     MembershipContext,
     MembershipRow,
     OtpOutcome,
+    PinState,
     RefreshRow,
     RevokedFamily,
     RotateResult,
@@ -76,11 +78,11 @@ _MEMBERSHIPS = text(
 )
 _ISSUE_CODE = text(
     "SELECT app.auth_issue_code(:code_hash, :client_id, :user_id, :tenant_id, :challenge, :redirect_uri, "
-    ":scope, :ttl)"
+    ":scope, :ttl, :device_id)"
 )
 _CONSUME_CODE = text(
-    "SELECT client_id, user_id, tenant_id, code_challenge, code_challenge_method, redirect_uri, scope "
-    "FROM app.auth_consume_code(:code_hash)"
+    "SELECT client_id, user_id, tenant_id, code_challenge, code_challenge_method, redirect_uri, scope, "
+    "device_id FROM app.auth_consume_code(:code_hash)"
 )
 _ISSUE_TOKENS = text(
     "SELECT session_id, refresh_token_id, family_id FROM app.auth_issue_tokens("
@@ -119,6 +121,22 @@ _OTP_VERIFY = text("SELECT app.auth_otp_verify(:challenge_id, :code_hash)")
 _TELEGRAM_CHAT = text("SELECT app.auth_telegram_chat_by_phone(:phone)")
 _DEVICE_REVOKED = text(
     "SELECT revoked_at IS NOT NULL FROM app.devices WHERE tenant_id = :tenant_id AND id = :device_id"
+)
+
+# --- B3 device-auth ---
+_DEVICE_BINDING = text(
+    "SELECT d.id, d.kind, d.cash_register_id, cr.branch_id, d.revoked_at IS NOT NULL AS revoked "
+    "FROM app.devices d LEFT JOIN app.cash_registers cr ON cr.id = d.cash_register_id "
+    "AND cr.tenant_id = d.tenant_id WHERE d.tenant_id = :tenant_id AND d.id = :device_id"
+)
+_FAMILY_REVOKED = text("SELECT app.auth_family_revoked(:family_id)")
+_SESSION_FAMILY = text("SELECT app.auth_session_family(:sid)")
+_PIN_STATE = text(
+    "SELECT pin_hash, pin_local_hash, must_change_pin, pin_updated_at FROM app.auth_pin_state(:user_id)"
+)
+_SET_PIN_LOCAL = text("SELECT app.auth_set_pin_local_hash(:user_id, :pin_hash, :local)")
+_PIN_RESET_AT = text(
+    "SELECT pin_reset_at FROM app.memberships WHERE tenant_id = :tenant_id AND user_id = :user_id"
 )
 
 _MEMBERSHIP = text(
@@ -252,10 +270,12 @@ class AuthRepository:
         redirect_uri: str,
         scope: str,
         ttl_s: int,
+        device_id: UUID | None = None,
     ) -> None:
         params = {
             "code_hash": code_hash, "client_id": client_id, "user_id": user_id, "tenant_id": tenant_id,
             "challenge": code_challenge, "redirect_uri": redirect_uri, "scope": scope, "ttl": ttl_s,
+            "device_id": device_id,
         }  # fmt: skip
         async with self._sf() as s, unscoped_transaction(s):
             await s.execute(_ISSUE_CODE, params)
@@ -407,3 +427,47 @@ class AuthRepository:
         async with self._sf() as s, tenant_transaction(s, tenant_id):
             value = (await s.execute(_SUBSCRIPTION, {"tenant_id": tenant_id})).scalar()
         return str(value) if value is not None else None
+
+    # --- B3 device-auth ---
+    async def device_binding(self, tenant_id: UUID, device_id: UUID) -> DeviceBinding | None:
+        async with self._sf() as s, tenant_transaction(s, tenant_id):
+            row = (await s.execute(_DEVICE_BINDING, {"tenant_id": tenant_id, "device_id": device_id})).first()
+        return (
+            DeviceBinding(row.id, row.kind, row.cash_register_id, row.branch_id, bool(row.revoked))
+            if row
+            else None
+        )
+
+    async def family_revoked(self, family_id: UUID) -> bool:
+        """14 §5 DB fallback: a family without a live refresh token is dead (fail-closed)."""
+        async with self._sf() as s, unscoped_transaction(s):
+            value = (await s.execute(_FAMILY_REVOKED, {"family_id": family_id})).scalar()
+        return value is None or bool(value)
+
+    async def session_family(self, sid: UUID) -> UUID | None:
+        async with self._sf() as s, unscoped_transaction(s):
+            value = (await s.execute(_SESSION_FAMILY, {"sid": sid})).scalar()
+        return UUID(str(value)) if value else None
+
+    async def pin_state(self, tenant_id: UUID, user_id: UUID) -> PinState | None:
+        # SEC-12: app.auth_pin_state answers only for members of app.current_tenant_id()
+        async with self._sf() as s, tenant_transaction(s, tenant_id, user_id=user_id):
+            row = (await s.execute(_PIN_STATE, {"user_id": user_id})).first()
+        return (
+            PinState(row.pin_hash, row.pin_local_hash, bool(row.must_change_pin), row.pin_updated_at)
+            if row
+            else None
+        )
+
+    async def set_pin_local_hash(self, user_id: UUID, pin_hash: str, pin_local_hash: str) -> bool:
+        params = {"user_id": user_id, "pin_hash": pin_hash, "local": pin_local_hash}
+        async with self._sf() as s, unscoped_transaction(s):
+            return bool((await s.execute(_SET_PIN_LOCAL, params)).scalar())
+
+    async def pin_reset_at(self, tenant_id: UUID, user_id: UUID) -> datetime | None:
+        """Tenant-local PIN reset marker (16 §9) — read under RLS."""
+        async with self._sf() as s, tenant_transaction(s, tenant_id, user_id=user_id):
+            value: datetime | None = (
+                await s.execute(_PIN_RESET_AT, {"tenant_id": tenant_id, "user_id": user_id})
+            ).scalar()
+        return value

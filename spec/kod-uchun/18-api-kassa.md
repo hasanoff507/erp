@@ -114,9 +114,11 @@
 | `status` | enum | `accepted` / `rejected` / `duplicate` |
 | `server` | object\|null | `{id, number, ...}` — pastda har voqea uchun aniqlashtiriladi |
 | `error_code` | string\|null | §18 ro'yxatidan |
-| `message` | string\|null | Inson o'qiydigan xabar (frontend `message_key`ga map qiladi) |
+| `message` | string\|null | Xatoning `message_key`i (`errors.*`) — frontend uni tarjima qiladi |
 | `retryable` | boolean | `true` — qurilma qayta yuboradi; `false` — qo'lda tuzatish/eskalatsiya |
 | `warnings` | string[] | Katalog kodlari (masalan `STOCK_NEGATIVE`, `DEBT_LIMIT_EXCEEDED`) — amal qabul qilindi, lekin ogohlantirish bilan |
+| `params` | object | Rad etilganda xatoning `params`i (`17-api-umumiy.md` §7.1, i18n interpolatsiyasi); aks holda `{}` |
+| `details` | object[] | Rad etilganda maydon xatolari `[{field, message_key}]` (payload maydonlari `payload.` prefiksi bilan); aks holda `[]` |
 
 ### 2.3 `Money` / `Qty`
 
@@ -201,7 +203,7 @@ Integratsiyalangan karta to'lovi/qaytarishida terminal natijasi — `sale.create
 **Javob** (`server`): `{id, cash_register_id, shift_no}`.
 **Xatolar**: `SHIFT_ALREADY_OPEN` (shu `cash_register_id`da yopilmagan smena bor), `VALIDATION_ERROR`.
 **Idempotentlik**: `client_event_id`.
-**Offline**: to'liq ishlaydi — smena ochilishi internet talab qilmaydi (`16-offline-sync.md` §1, `shift` jadvali). Invariant: bitta smena — bitta qurilma (`shifts.device_id = device_id`, keyingi voqealar boshqa qurilmadan kelsa `SHIFT_DEVICE_MISMATCH`).
+**Offline**: to'liq ishlaydi — smena ochilishi internet talab qilmaydi (`16-offline-sync.md` §1, `shift` jadvali). Invariant: bitta smena — bitta qurilma (`shifts.device_id = device_id`, keyingi voqealar boshqa qurilmadan kelsa `SHIFT_DEVICE_MISMATCH`). Server hali bilmagan smenaga tegishli voqea (uning `shift.opened` i hali qabul qilinmagan) — `DEPENDENCY_NOT_SYNCED` (`params.entity="shifts"`, `retryable:true`, `16-offline-sync.md` §3.3). Smena yopilgandan keyingi `created_at` bilan yaratilgan hujjat — `SHIFT_NOT_OPEN`.
 **Bog'liq**: US-M01-04, POS-01.
 
 ### 3.2 Voqea: `shift.closed`
@@ -215,14 +217,15 @@ Integratsiyalangan karta to'lovi/qaytarishida terminal natijasi — `sale.create
 |---|---|---|---|
 | `shift_id` | UUID | ha | `shifts.id`, `status=open`, shu `device_id`ga tegishli |
 | `counted_cash` | Money | ha | Kassir sanagan naqd |
-| `counted_card_total` | Money | yo'q | Terminalsiz (rekvizitsiz, `card_entry_mode='manual'`) karta to'lovlari jami — do'kon o'z terminal cheklari bo'yicha solishtiradi; qurilma hisoblab yuboradi, server qayta tekshiradi |
+| `counted_card_total` | Money | yo'q | Terminalsiz (rekvizitsiz, `card_entry_mode='manual'`) karta to'lovlari jami — do'kon o'z terminal cheklari bo'yicha solishtiradi; qurilma hisoblab yuboradi va `shifts.counted_card_total`ga shu qiymat yoziladi; yuborilmasa server shu smenaning `sale_payments` (`card_entry_mode='manual'`) jamini yozadi. Server hisobi har doim `z_report.card_split.manual`da, farq bo'lsa ikkala qiymat `audit_log` (`shift_closed`)da |
 | `card_settlements[]` | array | yo'q | Smena yopilishida bajarilgan terminal settlement'lari (qaror #71) — har biri §16a.6 tanasi (`id`, `card_terminal_id`, `batch_no`, `settled_at`, `purchase_count`, `purchase_total`, `refund_count`, `refund_total`, `status`); offline'da shu voqea bilan, online'da §16a.6 bilan ham yuborilishi mumkin (`id` bo'yicha idempotent). Hal qilinmagan (`pending`/`unknown`) karta urinishi bo'lsa smena yopilmaydi — `CARD_OUTCOME_UNKNOWN` |
 | `variance_note` | string | shartli | `expected_cash ≠ counted_cash` bo'lsa majburiy |
 
 Server hisoblaydi: `expected_cash = opening_cash + Σcash_moves(shift_id)` (`cash_moves` (`shift_id`, `method='cash'`), US-M16-02 formulasi). `variance = counted_cash − expected_cash`.
 
 **Javob** (`server`): `{id, shift_no, z_report: {expected_cash, counted_cash, variance, totals_by_method: {cash, card, uzqr, click, payme, uzum, debt}, card_split: {integrated, manual}, card_settlements: [{card_terminal_id, net_total, expected_total, variance, status}], vat_total, discount_total, returns_total, sales_count, returns_count}, fiscal: {status: "pending"}}` — `card_split` — karta tushumi kiritish usuli bo'yicha (Z-hisobot, BO-24; qaror #71), `card_settlements[].status='mismatch'` — ogohlantirish (`card.settlement.mismatch`), smena yopilishini bloklamaydi.
-**Xatolar**: `SHIFT_NOT_OPEN`, `SHIFT_DEVICE_MISMATCH`, `CARD_OUTCOME_UNKNOWN` (shu smenada hal qilinmagan karta urinishi — qurilma avval holat so'rovi yoki menejer yopishini bajaradi), `VALIDATION_ERROR` (`variance_note` yo'q — `details[].message_key="validation.variance_note_required"`).
+**Kech kelgan hujjat** (smena yopilishidan oldin yaratilgan — `created_at ≤ closed_at`, lekin yopilgandan keyin qabul qilingan; qurilma `shift.closed` ni shu smenaning oldingi voqealari yuborilmaguncha ushlab turadi, `16-offline-sync.md` §3.3): hujjat qabul qilinadi (pul haqiqatan harakatlangan); shu tranzaksiyada `shifts.expected_cash` hujjatning naqd farqiga (`Σ cash_moves(method='cash')`) o'zgartiriladi, farq provodkasi tuzatuvchi yozuv bilan o'zgartiriladi (`13-provodka-qoidalari.md` X-01) va `sync_exceptions(kind='late_in_closed_shift')` yoziladi; fiskallangan Z-hisobot qayta chiqarilmaydi (`GET /shifts/{id}` va `z-report` joriy `expected_cash` ni ko'rsatadi).
+**Xatolar**: `SHIFT_NOT_OPEN`, `DEPENDENCY_NOT_SYNCED` (`shift_id` serverda hali yo'q, `retryable:true`), `SHIFT_DEVICE_MISMATCH`, `CARD_OUTCOME_UNKNOWN` (shu smenada hal qilinmagan karta urinishi — qurilma avval holat so'rovi yoki menejer yopishini bajaradi), `VALIDATION_ERROR` (`variance_note` yo'q — `details[].message_key="validation.variance_note_required"`).
 **Idempotentlik**: `client_event_id`.
 **Offline**: to'liq ishlaydi; Z-hisobot `fiscal_receipts.status=pending` bilan OFD'ga navbatga qo'yiladi (internet qaytganda, `21-integratsiyalar.md` §1).
 **Bog'liq**: US-M01-04, US-M16-02, POS-07, POS-15.
@@ -247,7 +250,7 @@ Server hisoblaydi: `expected_cash = opening_cash + Σcash_moves(shift_id)` (`cas
 
 #### `GET /api/v1/shifts/{id}/z-report`
 
-**Maqsad**: §3.2'dagi `z_report` obyekti + `fiscal.status`.
+**Maqsad**: §3.2'dagi `z_report` obyekti + `fiscal.status`. Faqat yopilgan smena uchun — `status=open` bo'lsa `409 DOC_INVALID_STATE` (ochiq smena jamlari — `GET /shifts/{id}` dagi `running_totals`).
 **Ruxsat**: `reports.sales.view` yoki `cash.count.shift`.
 **Bog'liq**: US-M16-03, POS-07.
 
@@ -300,7 +303,7 @@ Server hisoblaydi: `expected_cash = opening_cash + Σcash_moves(shift_id)` (`cas
 | `line_total` | Money | ha | Qator jami (chegirmadan keyin, QQS bilan) — `sale_lines.line_total` |
 | `vat_amount` | Money | ha | Qator QQS summasi — `sale_lines.vat_amount` |
 
-`line_no` — qurilma yubormaydi, server massiv indeksi+1 sifatida belgilaydi. `line_total`, `vat_amount` — qurilma qaror #26 formulasi bilan hisoblaydi (`vat_amount = ROUND_HALF_UP(line_total × r / (100 + r), 2)`), server qayta hisoblab tekshiradi (mos kelmasa `VALIDATION_ERROR`). `cost_amount` — qurilma yubormaydi, faqat server hisoblaydi (FIFO/AVECO).
+`line_no` — qurilma yubormaydi, server massiv indeksi+1 sifatida belgilaydi. `line_total`, `vat_amount` — qurilma qaror #26 formulasi bilan hisoblaydi (`vat_amount = ROUND_HALF_UP(line_total × r / (100 + r), 2)`), server qayta hisoblab tekshiradi (mos kelmasa `VALIDATION_ERROR`). `cost_amount` — qurilma yubormaydi, faqat server hisoblaydi (FIFO/AVECO). Qoldiq filialning savdo zali omboridan yechiladi: arxivlanmagan eng eski `warehouses.type='store'` ombor, u bo'lmasa filialning eng eski faol ombori (qaytarish ham shu omborga). `temp_number` shu qurilmada takrorlansa — `VALIDATION_ERROR` (`validation.duplicate_temp_number`). `doc_date` va registr sanalari server qisqartirgan voqea vaqti (`effective_created_at`, `16-offline-sync.md` §8) bo'yicha Toshkent kunidan olinadi; qurilma yuborgan `doc_date` faqat ma'lumot.
 
 **`payments[]`** (→ `sale_payments`):
 
@@ -333,7 +336,7 @@ Mos kelmagan shart (masalan `method=card` va `card_entry_mode` yo'q, `manual`da 
   - `off` — POS `POST /api/v1/marking-codes/verify`ni chaqirmaydi;
   - `warn` — online sotuvda POS §15ni chaqiradi; kod tekshiruvdan o'tmasa yoki CRPT javob bermasa (timeout) §15 javobida `200` + `warnings=["MARKING_PRECHECK_WARNING"]`, `audit_log` yozuvi, sotuv **davom etadi** (`sale.created` bu sabab bilan rad etilmaydi);
   - `block` — §15 tekshiruvdan o'tmagan kod `MARKING_VERIFY_FAILED`, CRPT javob bermasa `MARKING_VERIFY_UNAVAILABLE` qaytaradi; POS bunday kodli qatorni chekka qo'shmaydi; offline/zaxira yo'l yo'q (qaror #62). `sale.created` CRPT'ni qayta chaqirmaydi.
-- **Lokal takror-kod tekshiruvi** (rejimdan qat'i nazar, offline'da ham): bitta chekda bir xil kod ikki marta — `VALIDATION_ERROR`; tenantda allaqachon sotilgan kod (qurilmadagi lokal outbox va sinxronlangan `marking_codes` keshi, serverda `marking_codes.status IN ('sold','pending_verification')`) — `MARKING_CODE_ALREADY_SOLD`. Format xatosi (DataMatrix o'qilmadi) — `MARKING_CODE_INVALID`.
+- **Lokal takror-kod tekshiruvi** (rejimdan qat'i nazar, offline'da ham): bitta chekda bir xil kod ikki marta — `VALIDATION_ERROR`; tenantda allaqachon sotilgan kod (qurilmadagi lokal outbox va sinxronlangan `marking_codes` keshi, serverda `marking_codes.status IN ('sold','pending_verification')`) — `MARKING_CODE_ALREADY_SOLD`; server sinxronda: `fiscal_result` yo'q bo'lsa — rad (`retryable:false`), `fiscal_result` bor (FM imzolagan) bo'lsa — qabul, `warnings=["MARKING_CODE_ALREADY_SOLD"]`, `audit_log` `marking.verify_failed`, kod birinchi sotuvda qoladi (`16-offline-sync.md` §7). Format xatosi (DataMatrix o'qilmadi) — `MARKING_CODE_INVALID`.
 - `marking_offline=true` — offline sotuv, oldindan tekshiruv qilinmagan; narx qurilmada noma'lum bo'lsa sotuv taqiq (`MARKING_PRICE_UNKNOWN_OFFLINE`, `16-offline-sync.md` §7).
 
 ### 4.3 Qarz (debt) va offline limit
@@ -347,7 +350,7 @@ Server chegirma summasini **qayta hisoblamaydi** (narx kabi "qotirilgan", manba 
 
 - Qator foizini server o'zi hisoblaydi: `pct_i = discount_amount_i / ROUND_HALF_UP(qty × price, 0) × 100` (`discount_pct` — faqat ma'lumot).
 - Chek darajasidagi chegirma qatorlarga `line_gross = ROUND_HALF_UP(qty × price, 0)` ulushida taqsimlanadi, yaxlitlash qoldig'i eng katta qatorga; har qatorda `discount_source='manual'`.
-- Limit tekshiruvi: `Σ discount_manual / Σ line_gross × 100`.
+- Limit tekshiruvi: `Σ discount_manual / Σ line_gross × 100` — yig'indilar faqat `discount_source='manual'` qatorlari bo'yicha (chegirmasiz qatorlar foizni "suyultirmaydi"); limitdan oshsa — chekdagi birinchi `discount_approval` bitta `ApprovalGate` chaqiruvi bilan tekshiriladi (`kind=discount_over_limit`).
 
 ### 4.5 Server javobi va fiskal holat
 
@@ -418,7 +421,7 @@ Asosiy himoya — POS'ning o'zida: qurilma 24 soatda 🟡, 40 soatda 🔴 + Egas
 | `voided_lines[]` | array\|null | yo'q — `null` = butun chek bekor qilindi |
 | `reason` | string | yo'q |
 
-**Javob**: `{status: "accepted"}` — faqat `audit_log` yozuvi.
+**Javob**: `{status: "accepted"}` — faqat `audit_log` yozuvi: `action='sale.draft_voided'`, `entity='sales'`, `entity_id` NULL, `after={draft_ref, voided_lines, whole_receipt, reason, shift_id, cash_register_id, client_event_id}` (`shift_id` — qurilma kassasining ochiq smenasi; Z-hisobot `voided_count` manbasi).
 **Xatolar**: `VALIDATION_ERROR`.
 **Idempotentlik**: `client_event_id`.
 **Offline**: to'liq ishlaydi.
@@ -439,7 +442,7 @@ Asosiy himoya — POS'ning o'zida: qurilma 24 soatda 🟡, 40 soatda 🔴 + Egas
 | `sale_id` | UUID\|null | yo'q |
 | `reason` | string | yo'q |
 
-**Javob**: `{status: "accepted", copy_label: "NUSXA"}`. Son cheklanmaydi.
+**Javob**: `{status: "accepted", copy_label: "NUSXA"}`. Son cheklanmaydi. Har voqea — bitta `audit_log` (`action='receipt.reprinted'`, `entity='fiscal_receipts'`). `fiscal_receipt_id` serverda hali yo'q bo'lsa — `DEPENDENCY_NOT_SYNCED` (`retryable:true`).
 **Idempotentlik**: `client_event_id` (har chaqiruv alohida audit yozuvi, dedupe faqat takror yuborishdan himoya qiladi).
 **Bog'liq**: US-M01-01, POS-04.
 
@@ -462,7 +465,7 @@ Asosiy himoya — POS'ning o'zida: qurilma 24 soatda 🟡, 40 soatda 🔴 + Egas
 | `receipt_seq` | integer\|null | shartli | Qurilma beradi, shu smena ichida ketma-ket (`kind='return'` cheki OFD'ga yuboriladi); pul bilan qaytariladigan qism (`money_part`) 0 bo'lsa `null` — chek yo'q |
 | `fiscal_result` | object\|null | shartli | `sale.created` (§4.1) bilan bir xil: lokal ko'prik rejimida qaytarish cheki FM'da imzolangan bo'lsa majburiy `{fm_terminal_id, fm_receipt_seq, fiscal_sign, qr_url, fiscal_at}`; hamkor bulut/`fake` rejimida va chek yo'q bo'lsa — `null` (qaror #68) |
 | `sale_id` | UUID\|null | shartli | `null` = chek topilmagan qaytarish — **har doim** `approval` majburiy (summadan qat'i nazar) |
-| `counterparty_id` | UUID\|null | shartli | `refund_method=debt_adjustment`da majburiy |
+| `counterparty_id` | UUID\|null | shartli | `refund_method=debt_adjustment`da majburiy; `sale_id` bilan — asl sotuv kontragenti (boshqa qiymat — `VALIDATION_ERROR`, `validation.counterparty_mismatch`, odatda yuborilmaydi); `sale_id`siz — shu tenantda bo'lishi shart (aks holda `DEPENDENCY_NOT_SYNCED`) |
 | `is_offline` | boolean | ha | Qurilma hisoblaydi |
 | `lines[]` | array | ha, ≥1 | pastda |
 | `reason` | enum | ha | `defective`/`wrong_item`/`customer_changed_mind`/`other` |
@@ -488,10 +491,12 @@ Asosiy himoya — POS'ning o'zida: qurilma 24 soatda 🟡, 40 soatda 🔴 + Egas
 - Qarzli sotuvni qaytarish: avval shu sotuvning ochiq qarzi kamayadi — `debt_part = min(return_amount, open_debt_of_sale)` (chek yo'q, `Kt 4010`); qolgani `money_part = return_amount − debt_part` `refund_method` bo'yicha pul bilan qaytariladi va faqat shu qismga `kind='return'` chek chiqadi.
 - Fiskal qaytarish chegarasi: `fiscal_refund ≤ fiscalized_amount(sale) − already_fiscally_refunded(sale)` (`fiscalized_amount` — sotuvning `sale`/`debt_settlement` cheklaridagi summalar).
 - Provodka: `Kt 5710` analitikasi `payment_method = refund_method`; `debt_adjustment` → `Kt 4010` (`13-provodka-qoidalari.md` §2.5).
+- Tannarx: asl chek bilan — asl qator partiyalariga teskari tartibda, asl `unit_cost`da (`13-provodka-qoidalari.md` §3.2a); asl qatorning hali qoplanmagan (`pending`, manfiy qoldiq) qismi qaytarilsa — `DEPENDENCY_NOT_SYNCED` (`retryable:true`, kirim kelib qoplangach qayta yuboriladi). Chek topilmagan qaytarish — shu ombordagi tovarning sotilgan joyi bor eng yangi partiyalariga (`qty_in − qty_left`), ularning `unit_cost`ida; joy yetmasa `VALIDATION_ERROR` (`validation.return_exceeds_sold_stock`).
+- Tasdiq bitta `ApprovalGate` chaqiruvi bilan: chek topilmagan — `return_no_receipt` (har doim); muddati o'tgan qator — `return_over_limit` (faqat limitsiz `returns.approve` qoplaydi); aks holda summa `returns.approve` limitiga solishtiriladi (`RETURN_LIMIT_EXCEEDED`).
 
 **Muddati o'tgan tovarni qaytarish** (qaror #48): qator tovarining yaroqlilik muddati o'tgan bo'lsa (`expiry_date < bugun`, Toshkent kuni; asl sotuv partiyasi bo'yicha) — qaytarish ruxsat, lekin:
 - `restock` majburan `false` (qurilma `true` yuborsa ham server `false` yozadi, `warnings`siz);
-- `actor_user_id`da `returns.approve` bo'lmasa `approval` (`ApprovalRef`, `returns.approve` egasi — Menejer/Egasi) majburiy, aks holda `APPROVAL_REQUIRED` (`retryable:false`; POS PIN yoki BO-16 so'rovini taklif qiladi — `kind=return_over_limit`, `context.expired_return=true`);
+- `actor_user_id`da **limitsiz** `returns.approve` bo'lmasa (Kassirning `returns.approve` limiti bilan — ham) `approval` (`ApprovalRef`, limitsiz `returns.approve` egasi — Menejer/Egasi) majburiy, aks holda `APPROVAL_REQUIRED` (`retryable:false`; POS PIN yoki BO-16 so'rovini taklif qiladi — `kind=return_over_limit`, `context.expired_return=true`);
 - posting shu tranzaksiyada `write_offs` **qoralamasini** yaratadi (`source_return_id` = shu qaytarish, `write_off_lines.reason='expired_return'`), Menejer keyin back-office'da o'tkazadi (`19-api-ombor.md` §15).
 
 **Markirovka qoidasi**: `marking_code` bor qatorli `return.created` — **faqat `is_offline=false`** bilan qabul qilinadi; qurilma offline'da bu amal tugmasini bloklaydi (POS-05), lekin server ham qayta tekshiradi: offline voqea markirovka qatori bilan kelsa `MARKING_RETURN_REQUIRES_ONLINE`. Bu qonundan qat'iyroq ichki tanlov (kod holatini tekshirish, firibgarlikdan himoya). Kod Asl belgisi'ga qaytarish fiskal cheki ichida OFD orqali boradi (§4.2 bilan bir xil, `items[].marking_codes`).
@@ -581,7 +586,8 @@ Umumiy mexanizm — chegirma (limitdan yuqori), qaytarish (limitdan yuqori/chek 
 | `context` | object | ha |
 | `linked_doc_type`, `linked_doc_id` | string\|null | shartli |
 
-**Javob**: `201 {id, kind, status: "pending", expires_at}` — bu nuqtada M18 (Telegram/push) orqali Menejer/Egasiga ogohlantirish yuboriladi (implementatsiya — notifications moduli).
+**Javob**: `201 {id, kind, status: "pending", expires_at}` — bu nuqtada M18 (Telegram/push) orqali Menejer/Egasiga ogohlantirish yuboriladi (implementatsiya — notifications moduli, voqea turi `over_limit_action`).
+**Qoidalar**: filial — `X-Branch-Id` (a'zolik bitta filialga bog'langan bo'lsa — o'sha filial); `requested_value` `context`dan olinadi — `discount_over_limit`/`price_change`da `context.requested_pct`, qolganlarida `context.amount` (decimal satr, `card_manual_entry`da ixtiyoriy). So'rovchi ruxsati `kind` bo'yicha: `discount_over_limit`, `card_manual_entry` → `sales.create`; `return_over_limit`, `return_no_receipt` → `returns.create`; `debt_over_limit` → `debts.create`; `cash_withdrawal_over_limit` → `cash.withdraw`. `price_change`, `write_off_over_limit`, `expense_over_limit` so'rovlari faqat o'z hujjatining `post`ida yaratiladi — bu endpoint orqali `422 VALIDATION_ERROR` (`validation.approval_kind_not_requestable`).
 **Idempotentlik**: `Idempotency-Key` majburiy.
 **Offline**: faqat online (§9.6).
 **Bog'liq**: BO-16.
@@ -590,7 +596,7 @@ Umumiy mexanizm — chegirma (limitdan yuqori), qaytarish (limitdan yuqori/chek 
 
 **Maqsad**: BO-16 navbati.
 **Ruxsat**: `discount.approve`/`returns.approve`/`debts.approve`/`prices.approve`/`cash.withdraw` (limit ≥ summa)/`expenses.approve`/`stock.writeoff` (yuqori limit) — mos `kind` bo'yicha filtrlanadi (foydalanuvchi faqat o'z huquqiga mos `kind`larni ko'radi); to'liq `kind` → tasdiqlovchi ruxsati xaritasi — `15-xavfsizlik-va-audit.md` §2.3 (yagona manba).
-**So'rov**: `?status=pending&cursor=&limit=`. POS tomoni `GET /api/v1/approval-requests/{id}` orqali **poll** qiladi (har 3 soniyada — standart, sozlanadi, 26 #87) `status` o'zgarishini kutib.
+**So'rov**: `?status=pending&cursor=&limit=`. POS tomoni `GET /api/v1/approval-requests/{id}` orqali **poll** qiladi (har 3 soniyada — standart, sozlanadi, 26 #87) `status` o'zgarishini kutib — so'rovchi o'z so'rovini har doim ko'radi; boshqa foydalanuvchiga ko'rinmaydigan so'rov — `404 NOT_FOUND`. `pending` holatdagi, `expires_at` o'tgan so'rov o'qishda `expired` bo'lib qaytadi (fon vazifasi ham uni 5 daqiqada bir `expired`ga o'tkazadi).
 **Bog'liq**: BO-16.
 
 ### 9.4 `POST /api/v1/approval-requests/{id}/approve`
@@ -599,7 +605,8 @@ Umumiy mexanizm — chegirma (limitdan yuqori), qaytarish (limitdan yuqori/chek 
 **Ruxsat**: `kind`ga mos `*.approve` (masalan `discount_over_limit` → `discount.approve`; `cash_withdrawal_over_limit` → `cash.withdraw`, tasdiqlovchining `limit_value`i `context.amount`dan yuqori yoki limitsiz bo'lishi shart).
 **So'rov**: `{pin}`. Server PIN'ni tekshiradi va `resolved_by`ning `limit_value`i `context.amount`/`requested_pct`ni qoplashini tasdiqlaydi; muvaffaqiyatli bo'lsa `status=approved`, keyinchalik bog'langan hujjat postingda shu so'rovni **bir marta** ishlatadi va `status=consumed`ga o'tkazadi (`doc_approvals` qatori yoziladi).
 **Javob**: `{status: "approved", resolved_by, resolved_at}`.
-**Xatolar**: `APPROVAL_INVALID` (noto'g'ri `kind`/huquq), `PIN_INVALID` (noto'g'ri PIN), `APPROVAL_REQUEST_ALREADY_RESOLVED`, `APPROVAL_REQUEST_EXPIRED`.
+**Xatolar**: `APPROVAL_INVALID` (noto'g'ri `kind`/huquq; so'rovchining o'zi tasdiqlay yoki rad eta olmaydi — QT-PERM-06), `PIN_INVALID` (noto'g'ri PIN), `ACCOUNT_LOCKED` (PIN urinishlari limiti — `14-autentifikatsiya-oauth2.md` §12), `APPROVAL_REQUEST_ALREADY_RESOLVED`, `APPROVAL_REQUEST_EXPIRED`.
+**Bog'langan hujjat**: `linked_doc_type='cash_movements'` (back-office `POST /cash-movements` limitdan oshgan qoralamasi, `20-api-moliya-admin.md` #53) — tasdiqlash shu tranzaksiyada qoralamani o'tkazadi va so'rovni `consumed` qiladi (smena ochiq bo'lishi shart, aks holda `409 SHIFT_NOT_OPEN`, so'rov `pending` qoladi).
 **Bog'liq**: BO-16.
 
 ### 9.5 `POST /api/v1/approval-requests/{id}/reject`
@@ -615,7 +622,7 @@ Umumiy mexanizm — chegirma (limitdan yuqori), qaytarish (limitdan yuqori/chek 
 
 ## 10. Narx o'zgarishi (`price-changes`) — tasdiqlash bilan bog'lanish
 
-`price-changes` resursining to'liq ta'rifi — **`19-api-ombor.md` §4 (yagona manba)**: `POST /api/v1/price-changes` body'da `lines[].new_price` (4 xonali satr) va `lines[].valid_from` (qator darajasida, hujjat `doc_date` bilan birga). Tasdiqlash — **faqat `approval-requests`** (`kind=price_change`, BO-16 yagona navbat) orqali: `POST /api/v1/price-changes/{id}/post` limitdan katta bo'lsa `202 {status:"pending_approval", approval_request_id}` qaytaradi (`APPROVAL_REQUIRED`) — `price_changes` `pending_approval` holatiga o'tadigan yagona hujjat turi (qaror #25); Egasi (`prices.approve`, faqat Egasi) `approve`laganda server `linked_doc_id`ga tegishli `price_changes` ni `posted` qiladi, `reject` — `rejected`. `POST /price-changes/{id}/approve`/`reject` endpoint'lari bu faylda **yo'q**.
+`price-changes` resursining to'liq ta'rifi — **`19-api-ombor.md` §4 (yagona manba)**: `POST /api/v1/price-changes` body'da `lines[].new_price` (4 xonali satr) va `lines[].valid_from` (qator darajasida, hujjat `doc_date` bilan birga). Tasdiqlash — **faqat `approval-requests`** (`kind=price_change`, BO-16 yagona navbat) orqali: `POST /api/v1/price-changes/{id}/post` limitdan katta bo'lsa `202 {status:"pending_approval", approval_request_id}` qaytaradi (`APPROVAL_REQUIRED`) — `price_changes` `pending_approval` holatiga o'tadigan yagona hujjat turi (qaror #25); Egasi (`prices.approve`, faqat Egasi) `approve`laganda server shu tranzaksiyada `linked_doc_id`ga tegishli `price_changes` ni `posted` qiladi (narxlar, `C-…` raqam, yorliqlar; so'rov `consumed`, `doc_approvals(mode='remote_request')`), `reject` — `rejected` (narx o'zgarmaydi); so'rov javobsiz `expired` bo'lsa (`expires_at` o'tgani — fon vazifasi har 5 daqiqada) hujjat `pending_approval`dan `draft`ga qaytadi (narx o'zgarmaydi, audit `price_change_approval_expired`) — muallif uni qayta `post` qilib yangi so'rov oladi. `POST /price-changes/{id}/approve`/`reject` endpoint'lari bu faylda **yo'q**.
 
 **Xatolar**: `PRICE_CHANGE_LIMIT_EXCEEDED` (API himoyasi sifatida saqlanadi), `VERSION_CONFLICT` (agar tovar narxi orada boshqa amal bilan o'zgargan bo'lsa).
 **Bog'liq**: BO-16.
@@ -818,7 +825,7 @@ Qarz eskirishi hisoboti — **yagona manba `20-api-moliya-admin.md` #21, `GET /a
 | `approval` | `ApprovalRef`\|null | shartli | `direction=out` va summa `cash.withdraw.limit_value` (standart 50 000 so'm)dan oshsa majburiy |
 
 **Javob**: `{id}`.
-**Xatolar**: `CASH_WITHDRAW_LIMIT_EXCEEDED`, `APPROVAL_INVALID`, `SHIFT_NOT_OPEN`, `VALIDATION_ERROR` (`reason↔direction` juftligi, `account`/`counterparty_id`/`employee_id` shartlari).
+**Xatolar**: `CASH_WITHDRAW_LIMIT_EXCEEDED`, `APPROVAL_INVALID`, `SHIFT_NOT_OPEN`, `DEPENDENCY_NOT_SYNCED` (smena serverda hali yo'q, `retryable:true`), `VALIDATION_ERROR` (`reason↔direction` juftligi, `account`/`counterparty_id`/`employee_id` shartlari). Yopilgan smenaga kech kelgan harakat — §3.2 «Kech kelgan hujjat» qoidasi. Online `local_pin` tasdiqlovchisi qurilma sessiyasiga PIN bilan bog'lanmagan bo'lsa — qabul qilinadi, `sync_exceptions(kind='actor_unverified')` (`15-xavfsizlik-va-audit.md` §2.3a).
 **Offline**: to'liq ishlaydi (`local_pin` yo'li bilan — Menejer jismonan); masofadan (`remote_request`) — faqat online, chunki jismoniy pul darhol topshiriladi, aks holda kassir jismonan kutadi.
 **Bog'liq**: US-M16-01, POS-14.
 
@@ -869,7 +876,7 @@ Qarz eskirishi hisoboti — **yagona manba `20-api-moliya-admin.md` #21, `GET /a
 **Maqsad**: BO-14 "Qayta urinish" tugmasi — `outbox_jobs(kind=ofd_send)`ni `queued`ga qaytaradi.
 **Ruxsat**: `integrations.retry` (OFD/e-faktura/markirovka integratsiya ishini qo'lda qayta navbatga qo'yish, Egasi/Menejer/Buxgalter).
 **Idempotentlik**: `Idempotency-Key` majburiy.
-**Javob**: `{status: "requeued"}`.
+**Javob**: `{status: "requeued"}` — `failed` chek `pending`ga qaytadi, audit `fiscal.retry`. Allaqachon `fiscalized` chek yoki serverda yuborilmaydigan (lokal ko'prik) rejim — `409 DOC_INVALID_STATE`.
 
 ---
 
@@ -932,6 +939,7 @@ Server avval **lokal** tekshiradi (format, tenantdagi `marking_codes.status IN (
 | CRPT javob bermadi (timeout 3 s) | `200 {valid: null, warnings: ["MARKING_PRECHECK_WARNING"]}` — sotuv davom etadi | `503 MARKING_VERIFY_UNAVAILABLE` — POS qatorni chekka qo'shmaydi, zaxira yo'l yo'q (qaror #62) |
 
 **Offline**: bu endpoint umuman chaqirilmaydi (internet yo'q) — POS mahalliy format va takror-kod (sinxronlangan `marking_codes` keshi) tekshiradi, `sale.created`ga `marking_offline=true` bilan yuboradi (§4.2).
+**Bosqich**: endpoint Bosqich 5 da (B5-EP-18#36). Bosqich 3 veb-kassasi uni chaqirmaydi va online sotuvda "CRPT javob bermadi" qatoridagidek ishlaydi: `warn` — sotuv davom etadi, `block` — qator `MARKING_VERIFY_UNAVAILABLE` bilan qo'shilmaydi; lokal format va takror-kod tekshiruvi har doim ishlaydi.
 **Bog'liq**: US-M01-03, POS-02.
 
 ---
@@ -1065,7 +1073,7 @@ Kassir karta raqami/RRN'ni yozmaydi: POS summani do'kondagi bank terminaliga tar
 **Ruxsat**: `GET` — `cash_register.manage` yoki `sales.create` (o'z kassasi); `POST`/`PATCH` — `cash_register.manage`.
 **`GET`** `?branch_id=&cash_register_id=&status=&page=&size=` → `{items: [CardTerminal], total, page, size}` (page pagination — ma'lumotnoma).
 **`CardTerminal`**: `{id, branch_id, cash_register_id, name, vendor, model, adapter, driver, agent_id, local_id, host, port, vendor_terminal_ref, tid, mid, acquirer_counterparty_id, status, is_default, capabilities, health_status, health_checked_at, version}` — `card_terminals` ustunlari (`12-db-sxema.md`).
-**`POST`** tanasi — `CardTerminal` (`id`, `health_*`, `capabilities`, `version`siz); qoidalar: `adapter=agent_ecr` — `agent_id`, `local_id`, `host` majburiy (`local_id` agent `capabilities.card_terminal.devices[]`da bo'lishi, `host` — RFC 1918 xususiy IPv4); `adapter=cloud` — `vendor_terminal_ref` majburiy, vendor kredensiali `tenant_secrets(kind='card_terminal_vendor')`da; `adapter=fake` — faqat dev/test/staging va demo-tenant (prod'da `VALIDATION_ERROR`); faol real terminalda `tid` majburiy va tenantda yagona; `is_default=true` — `cash_register_id` majburiy, shu kassadagi oldingi standart avtomatik `false`.
+**`POST`** tanasi — `CardTerminal` (`id`, `health_*`, `capabilities`, `version`siz); qoidalar: `adapter=agent_ecr` — `agent_id`, `local_id`, `host` majburiy (`local_id` agent `capabilities.card_terminal.devices[]`da bo'lishi, `host` — RFC 1918 xususiy IPv4); `adapter=cloud` — `vendor_terminal_ref` majburiy, vendor kredensiali `tenant_secrets(kind='card_terminal_vendor')`da; `adapter=fake` — faqat `ERP_CARD_FAKE_TERMINALS=true` bo'lgan dev/test/staging muhitida (prod'da sozlamaning o'zi taqiqlangan; aks holda `VALIDATION_ERROR`, `validation.card_terminal_fake_forbidden`); faol real terminalda `tid` majburiy va tenantda yagona; `is_default=true` — `cash_register_id` majburiy, shu kassadagi oldingi standart avtomatik `false`.
 **`PATCH`** — `version` majburiy (`409 VERSION_CONFLICT`); `status` `active`/`disabled`/`archived` (arxivlangan terminal tahrirlanmaydi); hal qilinmagan (`pending`/`unknown`) urinishi bor terminal `disabled`/`archived` qilinmaydi — `CARD_OUTCOME_UNKNOWN`.
 **Idempotentlik**: `POST` — `Idempotency-Key` majburiy. **Audit**: `card_terminal.created` / `card_terminal.updated` / `card_terminal.archived`.
 **Xatolar**: `VALIDATION_ERROR`, `VERSION_CONFLICT`, `CARD_OUTCOME_UNKNOWN`, `NOT_FOUND`, `PERMISSION_DENIED`.
@@ -1074,7 +1082,7 @@ Kassir karta raqami/RRN'ni yozmaydi: POS summani do'kondagi bank terminaliga tar
 
 **Maqsad**: smena yopilishida terminal settlement'i («сверка итогов») natijasini yozish — POS agent orqali (`POST /v1/card/settlement {local_id}`) bajaradi; POS yopiq bo'lsa server agent vazifasini (`card.settlement`) navbatga qo'yadi va natijani agent API orqali o'zi yozadi.
 **Ruxsat**: `shift.close`.
-**So'rov**: `{id (UUIDv7, qurilma beradi), card_terminal_id, shift_id, batch_no, business_date, settled_at, purchase_count, purchase_total, refund_count, refund_total, terminal_response}` (pul — Money; `SettlementResult.total_tiyin` va `by_scheme[]` adapterda xaritalanadi).
+**So'rov**: `{id (UUIDv7, qurilma beradi), card_terminal_id, shift_id, batch_no, business_date, settled_at, purchase_count, purchase_total, refund_count, refund_total, status?, terminal_response}` (pul — Money; `SettlementResult.total_tiyin` va `by_scheme[]` adapterda xaritalanadi; `status` — faqat `failed` (terminal settlement'ni bajarmadi), boshqa holatni server hisoblaydi).
 **Server**: `expected_count`/`expected_total`ni shu terminalning `approved` `purchase`/`refund` urinishlaridan hisoblaydi (partiyaga — `settlement_id` yozadi), `status` — `matched` / `mismatch` (farq → `card.settlement.mismatch`, BO-14, Egasiga M18) / `failed` (terminal settlement'ni bajarmadi); bank ko'chirmasi bilan moslashtirish — `13-provodka-qoidalari.md` §2.18a, `20-api-moliya-admin.md` (BO-24).
 **Javob**: `201 {id, status, net_total, expected_total, variance}`. **Idempotentlik**: `id` (takror — saqlangan natija). Offline — `shift.closed.card_settlements[]` (§3.2).
 **Xatolar**: `VALIDATION_ERROR`, `SHIFT_NOT_OPEN` (smena allaqachon boshqa qurilmada yopilgan bo'lsa ham qabul qilinadi — faqat `shift_id` mavjudligi tekshiriladi), `NOT_FOUND`.
@@ -1117,6 +1125,7 @@ To'liq protokol — `16-offline-sync.md` §1–3 (bu fayl **qaytarib yozmaydi**,
 | `PRICE_CHANGE_LIMIT_EXCEEDED` | §10 | Narx o'zgarishi foizi limitdan katta |
 | `APPROVAL_INVALID` | §2.4, §4, §7, §9, §13 | `ApprovalRef` kutilgan, kelmagan yoki tasdiqlovchi huquqi/limiti yetarli emas |
 | `PIN_INVALID` | §9.4 | Noto'g'ri PIN bilan `approve` |
+| `ACCOUNT_LOCKED` | §9.4 | 423 — PIN urinishlari limitidan oshdi (`14-autentifikatsiya-oauth2.md` §12) |
 | `APPROVAL_REQUIRED` | §7.1, §10 | Muddati o'tgan tovar qaytarilmoqda, `actor`da `returns.approve` va `approval` yo'q (qaror #48); narx o'zgarishi limitdan katta — `202 {status:"pending_approval"}` (§10) |
 | `FISCAL_OFFLINE_48H_BLOCKED` | §4.6, §4.10, §7.1, §12.2 | 409 — kassadagi OFD tasdig'ini olmagan eng eski chek ≥ 48 soat; yangi fiskal chek yo'q, faqat sinxron/yuborish (qaror #43) |
 | `FISCAL_DEVICE_LOCKED` | §4.6, §4.10, §7.1, §12.2 | 409 — `cash_registers.fm_state ≠ 'ok'` |
@@ -1146,10 +1155,10 @@ To'liq protokol — `16-offline-sync.md` §1–3 (bu fayl **qaytarib yozmaydi**,
 | `CARD_VOID_FAILED` | §16a.2 | 502 — avtomatik `void`/`refund` bajarilmadi, BO-14 + M18 |
 | `CARD_TRANSACTION_MISMATCH` | §4.1, §4.6, §7.1, §12.2, §16a.3 | Voqeada — `warnings[]` + `sync_exceptions(kind='card_result_mismatch')`; §16a.3 da — 409 |
 | `PAYMENT_NOT_CONFIRMED` | §4.6, §12.2 | Checkout `confirmed` emas yoki allaqachon `consumed` (§16.1) |
-| `DEPENDENCY_NOT_SYNCED` | §4.6, §7.1, §12.2 | `retryable:true` — bog'liq voqea hali qabul qilinmagan |
+| `DEPENDENCY_NOT_SYNCED` | §3.1, §3.2, §4.6, §7.1, §12.2, §13.1 | `retryable:true` — bog'liq voqea hali qabul qilinmagan (`params.entity="shifts"` — smena hali sinxronlanmagan) |
 | `DEBT_ALREADY_PAID` | §12.5 | 409 — mijozning ochiq qarzi 0 |
 | `DOUBTFUL_FLAG_REQUIRES_OWNER` | §12.6 | 403 — faqat Egasi |
-| `DOC_INVALID_STATE` | §12.5a | 409 — hujjat bekor qilish uchun mos holatda emas |
+| `DOC_INVALID_STATE` | §3.3, §12.5a | 409 — hujjat bekor qilish uchun mos holatda emas; ochiq smenaning Z-hisoboti so'ralgan |
 | `DEVICE_REVOKED` | Barcha sync/REST (403) | `16-offline-sync.md` §9 |
 | `NOT_FOUND` | §11, §12 va umumiy | `params.resource` bilan |
 | `PERMISSION_DENIED` | Umumiy | — |

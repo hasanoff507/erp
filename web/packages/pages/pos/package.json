@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Veb-kassa (POS-01…16)",
+  "description": "Veb-kassa (POS-01\u202616)",
   "imports": {
     "#*": "./src/*"
   },
@@ -12,18 +12,23 @@
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@shared/api": "workspace:*",
     "@shared/i18n": "workspace:*",
     "@shared/lib": "workspace:*",
     "@shared/models": "workspace:*",
+    "@shared/offline": "workspace:*",
     "@shared/state": "workspace:*",
     "@shared/ui": "workspace:*",
+    "@tanstack/react-virtual": "catalog:",
+    "decimal.js": "catalog:",
     "effector": "catalog:",
     "effector-react": "catalog:",
-    "patronum": "catalog:",
     "lucide-react": "catalog:",
+    "patronum": "catalog:",
     "react-router-dom": "catalog:"
   },
   "peerDependencies": {
@@ -38,6 +43,7 @@
     "eslint": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

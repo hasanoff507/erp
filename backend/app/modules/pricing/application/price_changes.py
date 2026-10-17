@@ -328,6 +328,67 @@ class PriceChangeService:
         )
         await self._repo.queue_labels(s, tenant_id, [line.product_id for line in doc.lines], "price_changed")
 
+    async def resolve_approval(
+        self, s: AsyncSession, *, tenant_id: UUID, doc_id: UUID, decision: str, resolver_id: UUID
+    ) -> None:
+        """BO-16 decided the document's ``price_change`` request (18 §10) — inside the approve/reject txn.
+
+        ``approved`` → the ``pending_approval`` document is posted exactly like an in-limit ``post``
+        (``product_prices`` rows, ``C-…`` number, labels; prices set by the document's author);
+        ``rejected`` → ``status='rejected'``, prices unchanged. Any other document state: no-op.
+        """
+        doc = await self._repo.get_price_change(s, doc_id, lock=True)
+        if doc is None or doc.status != "pending_approval":
+            return
+        if decision != "approved":
+            await self._repo.mark_rejected(s, doc.id)
+            await record_audit(
+                s,
+                tenant_id=tenant_id,
+                user_id=resolver_id,
+                action="price_change_rejected",
+                entity="price_changes",
+                entity_id=doc.id,
+                before={"status": "pending_approval"},
+                after={"status": "rejected"},
+            )
+            return
+        now = datetime.now(UTC)
+        number = await next_doc_number(
+            s, tenant_id=tenant_id, branch_id=doc.branch_id, table="price_changes", year=doc.doc_date.year
+        )
+        await self.apply(s, tenant_id, doc.created_by, doc, now)
+        await self._repo.mark_posted(s, doc.id, number)
+        await record_audit(
+            s,
+            tenant_id=tenant_id,
+            user_id=resolver_id,
+            action="price_changed",
+            entity="price_changes",
+            entity_id=doc.id,
+            after={
+                "number": number,
+                "approved_by": str(resolver_id),
+                "lines": [
+                    {"product_id": str(ln.product_id), "new_price": str(ln.new_price)} for ln in doc.lines
+                ],
+            },
+        )
+
+    async def approval_expired(self, s: AsyncSession, *, tenant_id: UUID, doc_id: UUID) -> None:
+        """The ``price_change`` request expired unanswered (18 §10): ``pending_approval`` → ``draft`` (prices
+        unchanged) so the author can ``post`` again and get a new request. Inside the expiry txn."""
+        if await self._repo.mark_draft_from_pending(s, doc_id):
+            await record_audit(
+                s,
+                tenant_id=tenant_id,
+                action="price_change_approval_expired",
+                entity="price_changes",
+                entity_id=doc_id,
+                before={"status": "pending_approval"},
+                after={"status": "draft"},
+            )
+
     async def post_initial_prices(
         self,
         s: AsyncSession,

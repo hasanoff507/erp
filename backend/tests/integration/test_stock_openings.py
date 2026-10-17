@@ -4,11 +4,14 @@ go_live_date − 1``, no VAT; storno on cancel."""
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import date, timedelta
 from typing import Any
 from uuid import UUID
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from app.modules.access.domain.permissions import SystemRole
 from app.modules.accounting.wiring import business_today, day_end
@@ -216,7 +219,27 @@ async def _upload(env: Env, shop: Shop, content: bytes) -> Any:
     )
 
 
+@contextmanager
+def _fk_details() -> Iterator[None]:
+    """Re-raise an ``IntegrityError`` with the constraint, table, DETAIL and statement (a rare full-run-only
+    ForeignKeyViolation was seen here with a truncated one-line summary only)."""
+    try:
+        yield
+    except IntegrityError as exc:
+        pg = exc.orig.__cause__ if exc.orig is not None else None
+        info = {
+            "constraint": getattr(pg, "constraint_name", None), "table": getattr(pg, "table_name", None),
+            "detail": getattr(pg, "detail", None), "statement": exc.statement,
+        }  # fmt: skip
+        raise AssertionError(f"IntegrityError {info}") from exc
+
+
 async def test_opening_stock_import_creates_and_posts_one_document(env: Env) -> None:
+    with _fk_details():
+        await _import_creates_and_posts_one_document(env)
+
+
+async def _import_creates_and_posts_one_document(env: Env) -> None:
     shop = await env.shop("Import opening")
     await set_go_live(env, shop, _go_live())
     wh = await use_account(env, shop, "2910")

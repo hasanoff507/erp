@@ -1,5 +1,5 @@
 import { useUnit } from "effector-react";
-import { Archive, CreditCard, Monitor, Pencil, Plus, TriangleAlert } from "lucide-react";
+import { Archive, Monitor, Pencil, Plus, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -32,6 +32,7 @@ import {
 } from "@shared/ui";
 import { Controller, RhfField, useZodForm, z } from "@shared/ui/form";
 
+import { RegisterTerminalCell } from "#/features/card-terminals/index.ts";
 import { errorText } from "#/shared/lib/errors.ts";
 import { applyServerErrors } from "#/shared/lib/form.ts";
 import { useOnline } from "#/shared/ui/hooks.ts";
@@ -116,15 +117,7 @@ export function CashRegisters({ branch, canManage }: { branch: Branch; canManage
     {
       id: "terminal",
       header: t("branches.registers.cardTerminal"),
-      cell: () => (
-        <div className="flex flex-col items-start gap-1">
-          <span className="flex items-center gap-1.5 text-[13px]">
-            <Icon as={CreditCard} size="sm" className="text-muted-foreground" />
-            {t("branches.registers.noTerminal")}
-          </span>
-          <span className="text-[11px] text-muted-foreground">{t("branches.registers.terminalLater")}</span>
-        </div>
-      ),
+      cell: (r) => <RegisterTerminalCell registerId={r.id} />,
     },
     {
       id: "archived",

@@ -6,7 +6,7 @@ from here — never from ``branches.infrastructure``. Signatures are a cross-mod
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date
 from uuid import UUID
@@ -14,6 +14,7 @@ from uuid import UUID
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.db.session import Database
 from app.modules.auth.application.gateway import mark_device_revoked
 from app.modules.branches.application import branches as branch_services
@@ -56,14 +57,21 @@ def build_branches_module(db: Database, redis: Callable[[], Redis]) -> BranchesM
     sf = db.session_factory
     branch_repo = SqlBranchRepository()
 
-    async def device_revoked(device_id: UUID) -> None:
-        # auth RS refuses the device's tokens immediately (DB fallback within session_check_cache_s otherwise)
-        await mark_device_revoked(redis(), device_id)
+    async def device_revoked(device_id: UUID, sids: Sequence[UUID], families: Sequence[UUID]) -> None:
+        # the auth RS refuses the device's tokens at once (else DB fallback within session_check_cache_s);
+        # the device's sessions/families were revoked in the DB in the same transaction — their live
+        # access tokens die now through the sid/fam markers (SEC-09)
+        await mark_device_revoked(redis(), device_id, sids=sids, families=families)
 
     return BranchesModule(
         branches=BranchesService(sf, branch_repo, SqlWarehouseRepository()),
         cash_registers=CashRegistersService(sf, SqlCashRegisterRepository(), branch_repo),
-        devices=DevicesService(sf, SqlDeviceRepository(), device_revoked),
+        devices=DevicesService(
+            sf,
+            SqlDeviceRepository(),
+            device_revoked,
+            pin_lookback_days=get_settings().pin_revoke_lookback_days,
+        ),
         tenant_settings=TenantSettingsService(sf, SqlTenantSettingsRepository()),
     )
 

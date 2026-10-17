@@ -15,6 +15,7 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.core.context import session_user_var
 from app.core.db.session import tenant_transaction
 
 log = structlog.get_logger(__name__)
@@ -43,7 +44,14 @@ async def record_audit(
     ip: str | None = None,
     device_id: UUID | None = None,
 ) -> None:
-    """Insert inside the caller's ``tenant_transaction``."""
+    """Insert inside the caller's ``tenant_transaction``.
+
+    While a PIN-verified actor acts on a device session (14 §4.3), ``user_id`` is the actor and the
+    device session's own user is kept in ``after.on_behalf_session_user`` (15 §6.1).
+    """
+    session_user = session_user_var.get()
+    if session_user is not None and session_user != user_id:
+        after = {**(after or {}), "on_behalf_session_user": str(session_user)}
     await session.execute(
         _INSERT,
         {

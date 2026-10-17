@@ -9,7 +9,7 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.branches.application.ports import DeviceFilter, DeviceRow
+from app.modules.branches.application.ports import DeviceFilter, DeviceRow, RegisterTarget
 
 _DEVICE_SELECT: Final = (
     "SELECT d.id, d.kind, d.app_version, d.cash_register_id, cr.name AS cash_register_name, "
@@ -58,6 +58,29 @@ _RECENT_USERS = text(
     "ORDER BY x.user_id"
 )
 _FORCE_PIN_RESET = text("SELECT app.auth_reset_credentials(:user_id, false, true)")
+# --- B3 device-auth ---
+_REGISTER_TARGET = text(
+    "SELECT cr.id, cr.name, cr.branch_id, b.name AS branch_name, "
+    "(cr.archived_at IS NOT NULL OR b.archived_at IS NOT NULL) AS archived "
+    "FROM app.cash_registers cr JOIN app.branches b ON b.id = cr.branch_id AND b.tenant_id = cr.tenant_id "
+    "WHERE cr.tenant_id = :tenant_id AND cr.id = :id FOR SHARE OF cr"
+)
+_INSERT_DEVICE = text(
+    "INSERT INTO app.devices (id, tenant_id, cash_register_id, kind, app_version, last_seen_at) "
+    "VALUES (:id, :tenant_id, :cash_register_id, :kind, :app_version, now())"
+)
+_SET_APP_VERSION = text(
+    "UPDATE app.devices SET app_version = :app_version, last_seen_at = now(), updated_at = now() "
+    "WHERE id = :id"
+)
+_MEMBER_ELSEWHERE = text("SELECT app.auth_member_elsewhere(:user_id, :tenant_id)")
+_TENANT_PIN_RESET = text(
+    "UPDATE app.memberships SET pin_reset_at = now(), version = version + 1 "
+    "WHERE tenant_id = :tenant_id AND user_id = :user_id"
+)
+_REVOKE_DEVICE_TOKENS = text(
+    "SELECT session_ids, family_ids FROM app.auth_revoke_device(:device_id, :reason)"
+)
 
 
 def _device(row: Any) -> DeviceRow:
@@ -113,3 +136,48 @@ class SqlDeviceRepository:
     async def force_pin_reset(self, session: AsyncSession, user_id: UUID) -> None:
         # SECURITY DEFINER (12 §4.5): PIN hash NULL + must_change_pin; sessions stay (password untouched)
         await session.execute(_FORCE_PIN_RESET, {"user_id": user_id})
+
+    # --- B3 device-auth ---
+    async def register_target(
+        self, session: AsyncSession, tenant_id: UUID, cash_register_id: UUID
+    ) -> RegisterTarget | None:
+        row = (
+            await session.execute(_REGISTER_TARGET, {"tenant_id": tenant_id, "id": cash_register_id})
+        ).first()
+        if row is None:
+            return None
+        return RegisterTarget(row.id, row.name, row.branch_id, row.branch_name, bool(row.archived))
+
+    async def insert_device(
+        self,
+        session: AsyncSession,
+        tenant_id: UUID,
+        device_id: UUID,
+        cash_register_id: UUID,
+        kind: str,
+        app_version: str | None,
+    ) -> None:
+        params = {
+            "id": device_id,
+            "tenant_id": tenant_id,
+            "cash_register_id": cash_register_id,
+            "kind": kind,
+            "app_version": app_version,
+        }
+        await session.execute(_INSERT_DEVICE, params)
+
+    async def set_app_version(self, session: AsyncSession, device_id: UUID, app_version: str) -> None:
+        await session.execute(_SET_APP_VERSION, {"id": device_id, "app_version": app_version})
+
+    async def member_elsewhere(self, session: AsyncSession, user_id: UUID, tenant_id: UUID) -> bool:
+        params = {"user_id": user_id, "tenant_id": tenant_id}
+        return bool((await session.execute(_MEMBER_ELSEWHERE, params)).scalar())
+
+    async def mark_tenant_pin_reset(self, session: AsyncSession, tenant_id: UUID, user_id: UUID) -> None:
+        await session.execute(_TENANT_PIN_RESET, {"tenant_id": tenant_id, "user_id": user_id})
+
+    async def revoke_device_tokens(
+        self, session: AsyncSession, device_id: UUID, reason: str
+    ) -> tuple[list[UUID], list[UUID]]:
+        row = (await session.execute(_REVOKE_DEVICE_TOKENS, {"device_id": device_id, "reason": reason})).one()
+        return list(row.session_ids or ()), list(row.family_ids or ())

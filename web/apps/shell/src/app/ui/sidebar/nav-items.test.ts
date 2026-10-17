@@ -99,3 +99,23 @@ describe("route permissions come from the sidebar definition (24 §2, 06 §1.9)"
     expect(firstAllowedNavItem({ permissions: ["stock.view"], scopes: [] })).toBeNull();
   });
 });
+
+describe("Bosqich 3 back-office items (BO-07, BO-16)", () => {
+  it("«QQS va davlat hisoboti» opens BO-07 for tax.vat.view, otherwise its own route", () => {
+    const tax = NAV_GROUPS.flatMap((g) => g.items).find((i) => i.key === "taxReconciliation");
+    expect(tax).toBeDefined();
+    if (!tax) return;
+    expect(navItemTarget(tax, access(["tax.vat.view"]))).toBe("/app/tax/vat");
+    expect(navItemTarget(tax, access(["tax.compare.review"]))).toBe("/app/tax/reconciliation");
+    expect(navItemForPath("/app/tax/vat")?.key).toBe("taxReconciliation");
+  });
+
+  it("«Tasdiqlash navbati» is shown for any approver code, card.manual_entry.approve included", () => {
+    const approvals = navItemForPath("/app/approvals");
+    expect(approvals?.key).toBe("approvals");
+    if (!approvals) return;
+    expect(hasPermissions(access(["card.manual_entry.approve"]), approvals.requires)).toBe(true);
+    expect(hasPermissions(access(["cash.withdraw"]), approvals.requires)).toBe(true);
+    expect(hasPermissions(access(["sales.create"]), approvals.requires)).toBe(false);
+  });
+});

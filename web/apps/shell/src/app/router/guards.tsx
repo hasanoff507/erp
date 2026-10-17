@@ -6,7 +6,7 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 
 import { useGrantedAccess } from "@shared/state/permissions";
 
-import { ProtectedRoute } from "#/features/protected-route/index.ts";
+import { PosRouteGate, ProtectedRoute } from "#/features/protected-route/index.ts";
 import { firstAllowedNavItem, navItemTarget, requiresForPath } from "../ui/sidebar/nav-items.ts";
 import { NoPermissionPage, Splash } from "../ui/status/index.tsx";
 
@@ -24,11 +24,29 @@ export function RoutePermissionGuard({ inline = true }: { inline?: boolean }) {
   );
 }
 
+/** `/pos/*` children: same permission rule, but an offline reload passes on local POS state (PosRouteGate). */
+export function PosPermissionGuard() {
+  const { pathname } = useLocation();
+  return (
+    <PosRouteGate
+      pending={<Splash />}
+      noPermission={<NoPermissionPage inline />}
+      requires={requiresForPath(pathname)}
+    >
+      <Outlet />
+    </PosRouteGate>
+  );
+}
+
 /** `/` and `/app`: the first screen the user may open; NoPermissionState when there is none. */
 export function DefaultRedirect({ inline = false }: { inline?: boolean }) {
   const granted = useGrantedAccess();
   const target = firstAllowedNavItem(granted);
-  return target ? <Navigate to={navItemTarget(target, granted)} replace /> : <NoPermissionPage inline={inline} />;
+  return target ? (
+    <Navigate to={navItemTarget(target, granted)} replace />
+  ) : (
+    <NoPermissionPage inline={inline} />
+  );
 }
 
 /** `/` is outside every layout: check the session first (anonymous → /login?next=%2F). */

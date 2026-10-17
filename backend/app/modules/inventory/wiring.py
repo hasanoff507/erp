@@ -13,11 +13,13 @@ counts, write-offs; sales/returns in Bosqich 3) — import it from here:
 * :func:`product_cost_reader` — ``current_cost`` for the catalog list (19 §1);
 * stock documents (19 §13–§15): :func:`transfer_service` (e-TTN outbox via
   ``integrations.einvoice``), :func:`stock_count_service`, :func:`write_off_service`; offline sync
-  payload validators for Bosqich 3 — :func:`parse_transfer_sent`, :func:`parse_transfer_received`,
-  :func:`parse_line_recorded`.
+  payload validators — :func:`parse_transfer_sent`, :func:`parse_transfer_received`,
+  :func:`parse_line_recorded`; :func:`sync_handlers` — the ``/sync/push`` handlers of these events.
 """
 
 from __future__ import annotations
+
+from collections.abc import Mapping
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -43,6 +45,8 @@ from app.modules.inventory.application.stock import (
     StockTxn,
 )
 from app.modules.inventory.application.stock_counts import StockCountService
+from app.modules.inventory.application.stock_settings import StockSettingsService
+from app.modules.inventory.application.sync_events import InventorySyncDeps, InventorySyncHandlers
 from app.modules.inventory.application.transfers import OutboxConfig, TransferService
 from app.modules.inventory.application.valuation import ValuationService
 from app.modules.inventory.application.write_offs import WriteOffService
@@ -61,11 +65,14 @@ from app.modules.inventory.infrastructure.counts_sql import SqlCountRepository
 from app.modules.inventory.infrastructure.docs_sql import SqlOpeningRepository, SqlStockQueryRepository
 from app.modules.inventory.infrastructure.queue import SaqEnqueuer
 from app.modules.inventory.infrastructure.recost_sql import SqlRecostRepository
+from app.modules.inventory.infrastructure.stock_settings_sql import SqlStockSettingsRepository
 from app.modules.inventory.infrastructure.stock_sql import SqlStockRepository
+from app.modules.inventory.infrastructure.sync_events_sql import SqlInventorySyncRepository
 from app.modules.inventory.infrastructure.transfers_sql import SqlTransferRepository
 from app.modules.inventory.infrastructure.write_offs_sql import SqlWriteOffRepository
 from app.modules.notifications.wiring import event_recorder
 from app.modules.pricing.wiring import current_price_reader
+from app.modules.sync.application.handlers import SyncEventHandler
 
 __all__ = [
     "EVENT_LINE_RECORDED",
@@ -99,6 +106,7 @@ __all__ = [
     "stock_count_service",
     "stock_notifier",
     "stock_service",
+    "sync_handlers",
     "transfer_service",
     "valuation_service",
     "write_off_service",
@@ -202,6 +210,27 @@ def write_off_service(
     )
 
 
+def sync_handlers(settings: Settings, db: Database) -> Mapping[str, SyncEventHandler]:
+    """``transfer.sent`` / ``transfer.received`` / ``stock_count.line_recorded`` for ``/sync/push``
+    (PLAN contract 1; Bosqich 3) — posted through the same transfer / stock-count services as REST."""
+    sf = db.session_factory
+    queue = _queue(settings)
+    return InventorySyncHandlers(
+        InventorySyncDeps(
+            transfers=transfer_service(sf, settings, queue=queue),
+            transfer_docs=SqlTransferRepository(),
+            counts=stock_count_service(sf, settings),
+            count_docs=SqlCountRepository(),
+            stock_repo=SqlStockRepository(),
+            stock=stock_service(settings, queue=queue),
+            poster=ledger_poster(),
+            sync_repo=SqlInventorySyncRepository(),
+            queue=queue,
+            outbox=OutboxConfig(auto_send=ettn_auto_send(settings), job=ETTN_SEND_JOB),
+        )
+    ).handlers()
+
+
 def build_inventory_module(settings: Settings, db: Database) -> InventoryModule:
     sf = db.session_factory
     return InventoryModule(
@@ -213,4 +242,5 @@ def build_inventory_module(settings: Settings, db: Database) -> InventoryModule:
         transfers=transfer_service(sf, settings),
         stock_counts=stock_count_service(sf, settings),
         write_offs=write_off_service(sf, settings),
+        stock_settings=StockSettingsService(sf, SqlStockSettingsRepository()),
     )

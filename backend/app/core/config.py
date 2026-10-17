@@ -183,6 +183,44 @@ class Settings(BaseSettings):
     log_json: bool = True
     cors_origins: list[str] = Field(default_factory=list)
 
+    # --- Bosqich 3 settings: device-auth slice ---
+    device_session_idle_s: int = Field(default=14 * 86400, ge=3600)  # 14 §7 sliding (26 #73)
+    device_session_absolute_s: int = Field(default=180 * 86400, ge=86400)  # 14 §7 absolute
+    device_cookie_max_age_s: int = Field(default=400 * 86400, ge=86400)  # __Host-erp_device (14 §7.2)
+    pin_max_failures: int = Field(default=5, ge=1)  # per (tenant, user, device) — qaror #54, 14 §12
+    pin_failure_window_s: int = Field(default=900, ge=60)
+    pin_user_failures_per_day: int = Field(default=20, ge=5)  # per (tenant, user) across devices
+    pin_revoke_lookback_days: int = Field(default=30, ge=1)  # 16 §9 PIN_REVOKE_LOOKBACK_DAYS
+    actor_binding_ttl_s: int = Field(default=12 * 3600, ge=300)  # PIN actor on device sessions (14 §4.3)
+    # --- Bosqich 3 settings: sales/fiscal slice ---
+    # ERP_FISCAL_PROVIDER (21 §1) is declared above; "fake" — the FM emulator, refused in prod by
+    # integrations.fiscal.wiring.fiscal_port (the app does not start with it in prod)
+    # --- Bosqich 3 settings: cash slice ---
+    approval_ttl_minutes: int = Field(default=15, ge=1, le=1440)  # approval_requests.expires_at (18 §9.1)
+    # --- Bosqich 3 settings: card slice ---
+    # ERP_CARD_FAKE_TERMINALS: card_terminals.adapter='fake' (FakeCardTerminalAdapter) may be registered —
+    # dev/test/staging only (21 §9.4, qaror #34); refused in prod
+    card_fake_terminals: bool = False
+
+    @model_validator(mode="after")
+    def _guard_card_fake(self) -> Self:
+        if self.environment == "prod" and self.card_fake_terminals:
+            raise ValueError("prod'da ERP_CARD_FAKE_TERMINALS ruxsat etilmaydi (21 §9.4, qaror #71)")
+        return self
+
+    # --- Bosqich 3 settings: sync slice ---
+    # 16 §3.1/§8, qaror #54 defaults: batch ≤ 100, 5 req/s per device, 4 concurrent pushes per tenant
+    sync_push_max_events: int = Field(default=100, ge=1, le=1000)
+    sync_push_rate_per_s: int = Field(default=5, ge=1)
+    sync_push_tenant_concurrency: int = Field(default=4, ge=1)
+    sync_push_lock_ttl_s: int = Field(default=120, ge=5)  # single flight per device (crash safety net)
+    sync_clock_skew_warn_s: int = Field(default=300, ge=0)  # CLOCK_SKEW_WARN_S
+    sync_offline_clamp_window_s: int = Field(default=7 * 86400, ge=3600)  # OFFLINE_CLAMP_WINDOW
+    sync_pull_page_size: int = Field(default=500, ge=1)
+    sync_pull_max_page_size: int = Field(default=1000, ge=1)
+    # pull waits this long for a row's transaction to settle (late commits never skip a cursor position)
+    sync_pull_settle_s: float = Field(default=2.0, ge=0, le=60)
+    # --- Bosqich 3 settings: print slice ---
     # --- telemetry (23 §8, 25 §5; app/core/telemetry.py) — all off by default ---
     metrics_enabled: bool = False  # GET /metrics + HTTP metrics middleware
     # Prometheus scrape bearer token; mandatory in staging/prod when metrics are on

@@ -38,6 +38,7 @@ from tests.support.inventory_docs import (
     stock_in,
     today,
 )
+from tests.support.ordering import TXN_ORDER
 
 pytestmark = [pytest.mark.db, pytest.mark.redis]
 __all__ = ["docs_env_fixture"]
@@ -170,7 +171,7 @@ async def test_gift_other_books_vat_from_the_market_value(env: Env) -> None:
     )
     assert cancelled["status"] == "cancelled"
     vats = await rows(
-        env, shop.tenant_id, "SELECT base_amount, vat_amount FROM app.vat_moves WHERE doc_id = :d ORDER BY created_at",
+        env, shop.tenant_id, f"SELECT base_amount, vat_amount FROM app.vat_moves WHERE doc_id = :d ORDER BY {TXN_ORDER}",
         d=UUID(doc["id"]),
     )  # fmt: skip
     assert [(v["base_amount"], v["vat_amount"]) for v in vats] == [
@@ -384,16 +385,19 @@ async def test_approval_covers_only_the_estimate_it_was_given(env: Env) -> None:
     found = await rows(
         env,
         shop.tenant_id,
-        "SELECT id, status, requested_value FROM app.approval_requests ORDER BY requested_at",
+        "SELECT id, status, requested_value FROM app.approval_requests ORDER BY requested_value",
     )
     assert [(str(r["id"]), r["status"], r["requested_value"]) for r in found] == [
         (old_id, "approved", D("150000.0000")), (new_id, "pending", D("180000.0000")),
     ]  # fmt: skip
     assert await balance(env, shop, wh, p) == (D("20.000"), D("360000.00"))  # nothing moved
 
+    # requested_at is the DB now(): a clock stepped back (seen in the test VM) must not make the older
+    # request look "latest" — the newest request is found by its (application uuid7) id
     await execute(
         env, shop.tenant_id,
-        "UPDATE app.approval_requests SET status = 'approved', resolved_by = :u, resolved_at = now() WHERE id = :id",
+        "UPDATE app.approval_requests SET status = 'approved', resolved_by = :u, resolved_at = now(), "
+        "requested_at = requested_at - interval '1 hour' WHERE id = :id",
         u=shop.user_ids["owner"], id=UUID(new_id),
     )  # fmt: skip
     posted = await ok(await _post(env, shop, doc["id"], "manager"))

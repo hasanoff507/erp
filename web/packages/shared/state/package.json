@@ -10,7 +10,8 @@
     "./session": "./src/session/index.ts",
     "./network": "./src/network/index.ts",
     "./device": "./src/device/index.ts",
-    "./permissions": "./src/permissions/index.ts"
+    "./permissions": "./src/permissions/index.ts",
+    "./sync": "./src/sync/index.ts"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
@@ -20,6 +21,7 @@
   "dependencies": {
     "@shared/api": "workspace:*",
     "@shared/models": "workspace:*",
+    "@shared/offline": "workspace:*",
     "effector": "catalog:",
     "effector-react": "catalog:",
     "patronum": "catalog:"

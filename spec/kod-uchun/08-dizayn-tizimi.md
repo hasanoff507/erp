@@ -401,6 +401,8 @@ Maketlar va USLUB lucide uslubidagi chiziqli ikonlardan foydalanadi (24×24 view
 | Input balandligi | 52px (`h-[52px]`; skaner/qidiruv maydoni — 56px) | `h-11` (44px) |
 | Gap (tugmalar orasida) | `gap-3` (12px, tasodifiy bosilmasin) | `gap-2` (8px) |
 
+`touch` rejimida (`data-density="touch"`) har bir `<Button>` — `min-height: var(--tap-min)` (48px), ikon-tugma — `min-width: var(--tap-min)`; `Input`/`NativeSelect` — 52px; POS holat qatoridagi chip'lar — 48px balandlik; offline va 48 soat shkalasi chip'i — 13px / 600 (`StatusChip size="md"`).
+
 Amalga oshirish: `<html data-density="touch">` POS shell'ida, `data-density="compact"` back-office shell'ida; Tailwind `data-[density=touch]:h-14` variant guruhi yoki CSS custom property orqali (`--tap-min: 48px`).
 
 > **Eslatma (mobil back-office teginish nishoni)**: yuqoridagi jadvaldagi `compact` 36×36px qiymati **desktop** back-office uchun vakolatli minimum (sichqoncha-birinchi, kursor aniq). 6.3-bo'limdagi mobil PWA (Egasi telefonida) — bu kursorsiz teginish ekrani, shuning uchun unga alohida **`compact-mobile/touch`** rejimi kerak: `@media (pointer: coarse)` yoki `<768px` breakpointda `data-density="touch"`ga o'tadi, lekin POS'ning 48px/56px emas, balki WCAG 2.5.5 bo'yicha **minimal 44×44px** teginish nishoniga mo'ljallanadi (desktop 36px kompakt qiymatidan katta, lekin POS'ning 48px'idan kichik — mobil veb-sahifa zichligi uchun amaliy minimum).
@@ -601,13 +603,19 @@ Veb-kassa klaviatura/skaner-birinchi (`24-frontend-arxitekturasi.md` §5). Stand
 | `F6` | Qaytarish ekrani | Global (POS shell) |
 | `F7` | Qarz daftari | Global |
 | `F8` | Smenani yopish | Global |
-| `F9` | Mahsulot/narx qidirish (POS-11) | Global |
+| `F9` | Mahsulot/narx qidirish (POS-11) | Global; istisno — ombor ekranlari (`/pos/warehouse*`: POS-08/09/10) — u yerda `F9` hujjatni yakunlash/yuborish, POS-11 esa ombor sahifasidagi «Narx/qoldiq» plitkasidan (`stock.view`) ochiladi |
 | `F12` | Sinxronizatsiya holati (POS-12) | Global |
 | `Enter` | Skanerdan kelgan kodni qabul qilish / tanlangan qatorni tasdiqlash | Hamma joy |
 | `Esc` | Joriy dialog/sheet'ni yopish, amalni bekor qilish | Hamma joy |
 | `+` / `-` | Tanlangan qator miqdorini oshirish/kamaytirish | POS-02 |
 | `Delete` | Tanlangan qatorni o'chirish | POS-02 |
 | `Ctrl+P` | Chekni qayta chop etish | POS-04 |
+
+Qoidalar (veb-kassa, joriy holat):
+- Global tugmalar (`F6`, `F8`, `F9`, `F12`) faqat hech qanday dialog ochiq bo'lmaganda va ekran klaviaturani o'zi ushlab turmaganda ishlaydi (masalan POS-05 da karta terminalida qaytarish bajarilayotganda — tugmalar va «Orqaga» o'chiq).
+- `/pos/*` da `F1`–`F12` ning brauzer standart amallari (yordam, qidiruv, sahifani qayta yuklash va h.k.) har doim bekor qilinadi.
+- Fokusdagi tugma, havola yoki radio ustida `Enter`/`Space` — shu elementning o'z amali (ekran qisqa yo'li emas); dialog ichida bosilgan tugmalar faqat o'sha dialogga tegishli.
+- POS-11 va POS-12 da `Esc` — oldingi POS ekraniga qaytish (tarix bo'lmasa POS-02, `sales.create` huquqi yo'q foydalanuvchi uchun `/pos/warehouse`).
 
 Back-office'da F-tugmalar band qilinmaydi (brauzer standart xatti-harakati saqlanadi); o'rniga `cmdk` buyruq paneli — `Ctrl+K` / `Cmd+K` tezkor qidiruv/navigatsiya uchun.
 
@@ -746,7 +754,7 @@ Adapter: `shared/lib/printer` — `WebUsbPrinterAdapter` / `WebSerialPrinterAdap
 **Rekvizitlar (VMQ-943 1-ilova 7-band):** har qatorda — nom, (markirovka kodi), MXIK, katalog bo'yicha o'lchov birligi, shtrix kod, miqdor, narx, QQS stavkasi, QQS summasi; chek oxirida — **to'lov shakli** (naqd / bank kartalari (+ integratsiyalangan to'lovda karta turi) / QR-kodli to'lov / aralash), jami summa, jami QQS, sana-vaqt, FM raqami, fiskal belgi, QR-kod (**≥30×30 mm**; kredit/bo'nak/bo'lib to'lash turidagi cheklarda QR va fiskal belgi yo'q). Karta turi, karta niqobi (`NNNN****NNNN`) va RRN faqat integratsiyalangan terminal to'lovida (`card_entry_mode='integrated'`) terminal natijasidan avtomatik chiqariladi; terminalsiz karta to'lovida chekda faqat «Bank kartalari» to'lov shakli — karta rekvizitlarisiz (bunday chekning yetarliligi — 26 #178). Bosma kenglik **≥55 mm** (58 mm qog'oz). Stavka bo'yicha jamlanma qator — ixtiyoriy (chiqariladi).
 
 ```
-       [Do'kon nomi]                 ← markazda, bold, 80mm: 32 belgi / 58mm: 24 belgi
+       [Do'kon nomi]                 ← markazda, bold, ikki baravar shrift: 58mm — 16, 80mm — 24 belgi
    Manzil, telefon                   ← kichik shrift
    STIR: 000000000  Filial: Chilonzor-3
 ----------------------------------------
@@ -778,7 +786,7 @@ Adapter: `shared/lib/printer` — `WebUsbPrinterAdapter` / `WebSerialPrinterAdap
       Rahmat! Yana kuting. / Спасибо! Ждём вас.
       [NUSXA / КОПИЯ] ← faqat qayta chop etishda
 ```
-MXIK, o'lchov birligi, shtrix kod va **QQS stavkasi/summasi** (qator darajasida, qaror #26 formulasi) har tovar qatori ostida kichik shrift bilan chiqariladi (rekvizitlar ro'yxati yuqorida; 1-qator: 24 000 × 12/112 = 2 571,43). QQSsiz qatorda: `· QQSsiz (imtiyoz: <kod>)`. Chek oxiridagi "QQS / НДС (12%, ichida)" jami qatori — qator QQSlari yig'indisi. 58mm'da qator kengligi 24 belgi (nom ikkinchi qatorga tushishi mumkin — ikki tilli nom uzun bo'lsa ruscha qism alohida qatorga tushadi), 80mm'da 32 belgi.
+MXIK, o'lchov birligi, shtrix kod va **QQS stavkasi/summasi** (qator darajasida, qaror #26 formulasi) har tovar qatori ostida kichik shrift bilan chiqariladi (rekvizitlar ro'yxati yuqorida; 1-qator: 24 000 × 12/112 = 2 571,43). QQSsiz qatorda: `· QQSsiz (imtiyoz: <kod>)`. Chek oxiridagi "QQS / НДС (12%, ichida)" jami qatori — qator QQSlari yig'indisi. 58mm'da qator kengligi 32 belgi (Font A, 384 nuqta; ruscha nom alohida kichik qatorda), 80mm'da 48 belgi (576 nuqta; `"{name} / {name_ru}"` sig'sa bitta qatorda); kichik shrift (Font B) — 42/64 belgi (`24-frontend-arxitekturasi.md` §6.1).
 
 **To'lov shakli yorliqlari (ikki tilda)**: Naqd/Наличные; Bank kartalari/Банковские карты (+ faqat integratsiyalangan to'lovda karta turi: shaxsiy/личная, korporativ/корпоративная, ijtimoiy/социальная, noma'lum/не определён; terminalsiz kartada karta turi chiqmaydi — 26 #178); QR-kodli to'lov/Оплата по QR-коду (UzQR, Payme, Click, Uzum — provayder nomi qavsda); Aralash/Смешанная (bir chekda bir nechta shakl). `debt_settlement` chekida to'lov shakli `debt_payments.method` dan; chek sarlavhasi «Qarz to'lovi / Погашение долга» (nasiya sotuvida bu shablonning o'zi chiqarilmaydi).
 

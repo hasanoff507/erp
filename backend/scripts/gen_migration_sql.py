@@ -9,8 +9,11 @@ from a ```sql block of 12. Each block is routed by the rule in 12 §6.1:
    in the table sections (2.1–2.9) each statement follows its table
    (``TABLES`` mirrors the 12 §6.1 plan).
 
-Revisions 0028 (store_agent, Bosqich 5) and 0029 (onec_integration, Bosqich 7)
-are not generated yet. ``down`` scripts are derived from what ``up`` creates.
+Revision 0027a (web_pos, Bosqich 3) is append-only: its blocks carry the marker
+``-- 0027a web_pos`` (up) or ``-- 0027a down`` (verbatim down statements — ALTER/DROP
+COLUMN, previous function bodies — that cannot be derived). Revisions 0028
+(store_agent, Bosqich 5) and 0029 (onec_integration, Bosqich 7) are not generated
+yet. Other ``down`` scripts are derived from what ``up`` creates.
 
     uv run python scripts/gen_migration_sql.py          # write files
     uv run python scripts/gen_migration_sql.py --check  # exit 1 on drift
@@ -57,6 +60,7 @@ REVISIONS: dict[str, str] = {
     "0025": "updated_at_triggers",
     "0026": "rls_policies",
     "0027": "security_definer_functions",
+    "0027a": "web_pos",  # Bosqich 3 — append-only (27 B3: device-bound login, POS deltas)
 }
 LATER_REVISIONS = frozenset({"0028", "0029"})  # Bosqich 5 / 7
 
@@ -229,6 +233,10 @@ FUNCTION_REV = {"app.next_doc_number": "0019"}
 
 
 def _marker_route(marker: str) -> str:
+    if marker.endswith(" down"):
+        if marker[: -len(" down")] in REVISIONS:
+            return marker
+        raise SystemExit(f"unknown down marker '-- {marker}' in 12-db-sxema.md")
     if marker in ("DBA bootstrap", "namuna"):
         return SKIP
     if marker in REVISIONS:
@@ -294,6 +302,7 @@ def build() -> dict[str, tuple[str, str]]:
     foreign_indexes: dict[str, list[str]] = defaultdict(list)
     foreign_triggers: dict[str, list[tuple[str, str]]] = defaultdict(list)
     system_grants: dict[str, list[str]] = defaultdict(list)
+    explicit_down: dict[str, list[str]] = defaultdict(list)
 
     last_table_rev = "0000"
     for st in statements():
@@ -301,6 +310,9 @@ def build() -> dict[str, tuple[str, str]]:
             last_table_rev = TABLE_REV[st.target]
         rev = route(st, last_table_rev)
         if rev in (SKIP, DEFERRED):
+            continue
+        if rev.endswith(" down"):
+            explicit_down[rev[: -len(" down")]].append(st.sql + "\n")
             continue
         up[rev].append(st.sql + "\n")
         if st.kind == "table":
@@ -332,6 +344,9 @@ def build() -> dict[str, tuple[str, str]]:
             foreign_triggers[rev],
             system_grants[rev],
         )
+        if explicit_down[rev]:  # append-only revisions: derived drops first, then the hand-written
+            # down statements (they restore the previous function bodies the derived drops removed)
+            down = (down + "\n" if down else "") + "\n".join(explicit_down[rev])
         out[rev] = (header + "\n".join(up[rev]), header + down)
     return out
 

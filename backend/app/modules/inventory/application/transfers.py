@@ -519,18 +519,35 @@ class TransferService:
         await self._stock.after_commit(txn)
         return body
 
-    async def send_in(self, s: AsyncSession, tenant_id: UUID, user_id: UUID, doc: Transfer) -> StockTxn:
-        """``posted → sent`` inside the caller's transaction (REST ``send``; Bosqich 3 ``transfer.sent``)."""
+    async def send_in(
+        self,
+        s: AsyncSession,
+        tenant_id: UUID,
+        user_id: UUID,
+        doc: Transfer,
+        *,
+        entry_date: date | None = None,
+        moved_at: datetime | None = None,
+    ) -> StockTxn:
+        """``posted → sent`` inside the caller's transaction (REST ``send``; Bosqich 3 ``transfer.sent``).
+
+        ``entry_date`` — offline event whose ``doc_date`` fell into a period closed meanwhile (16 §3.4,
+        qaror #69): no ``PERIOD_CLOSED``, the ledger line is dated in the first open period; ``doc_date``
+        stays (the receive lines carry ``analytics.correction_of_period``). ``moved_at`` — the offline
+        event's (effective) business time for ``stock_moves.moved_at`` / ``sent_at`` (13 §5.1, 16 §8)."""
         if doc.status != "posted":
             raise invalid_state("posted", doc.status)
         if doc.transport_mode == "vehicle":
             status = doc.ettn.status if doc.ettn is not None else "missing"
             if status != "registered":
                 raise AppError(ErrorCode.ETTN_REQUIRED, params={"ettn_status": status})
-        await self._poster.assert_period_open(s, doc.doc_date)
+        if entry_date is None:
+            await self._poster.assert_period_open(s, doc.doc_date)
         txn = await self._stock.lock(
             s, tenant_id, [(doc.from_warehouse_id, ln.product_id) for ln in doc.lines]
         )
+        # the stock-cost line keeps the cost-line contract (``correction_of_period`` is reserved for recost,
+        # inventory.domain.analytics); the original month stays in ``doc_date`` and the sync exception
         extra = {"from_branch_id": str(doc.from_branch_id), "to_branch_id": str(doc.to_branch_id)}
         updates: list[dict[str, Any]] = []
         for ln in doc.lines:
@@ -541,7 +558,8 @@ class TransferService:
                 doc_type=DOC_TYPE,
                 doc_id=doc.id,
                 line_id=ln.id,
-                cost=CostPosting(TRANSIT_ACCOUNT, doc.doc_date, doc.from_branch_id, extra),
+                cost=CostPosting(TRANSIT_ACCOUNT, entry_date or doc.doc_date, doc.from_branch_id, extra),
+                moved_at=moved_at,
             )
             updates.append(
                 {
@@ -550,7 +568,7 @@ class TransferService:
                     "lot_allocations": json.dumps(res.allocations_json()),
                 }
             )
-        await self._docs.mark_sent(s, doc.id, txn.at, user_id, updates)
+        await self._docs.mark_sent(s, doc.id, moved_at or txn.at, user_id, updates)
         return txn
 
     # --- receive (sent → received | discrepancy) -----------------------------------------------------
@@ -591,8 +609,17 @@ class TransferService:
         user_id: UUID,
         doc: Transfer,
         lines: Sequence[ReceiveLineInput],
+        *,
+        entry_date: date | None = None,
+        moved_at: datetime | None = None,
+        correction_of_period: str | None = None,
     ) -> tuple[StockTxn, str]:
-        """``sent → received|discrepancy`` inside the caller's transaction (REST; ``transfer.received``)."""
+        """``sent → received|discrepancy`` inside the caller's transaction (REST; ``transfer.received``).
+
+        Offline (``transfer.received``, 16 §3.4/§8): ``moved_at`` — the event's business time
+        (``stock_moves.moved_at``, ``received_at``); ``entry_date`` — the ledger date;
+        ``correction_of_period`` (``"YYYY-MM"``) when the event's own month is closed and ``entry_date`` is
+        the first open day."""
         if doc.status != "sent":
             raise invalid_state("sent", doc.status)
         received = _received_by_line(doc, lines)
@@ -600,7 +627,7 @@ class TransferService:
         keys += [(doc.to_warehouse_id, ln.product_id) for ln in doc.lines]
         txn = await self._stock.lock(s, tenant_id, keys)
         assert doc.sent_at is not None
-        entry_date = max(doc.doc_date, business_date(txn.at))
+        entry_date = entry_date or max(doc.doc_date, business_date(moved_at or txn.at))
         inv_to = await txn.inv_acct(doc.to_warehouse_id)
         moves = await self._repo.doc_moves(s, DOC_TYPE, doc.id, live_only=True)
         ledger: list[LedgerLine] = []
@@ -636,6 +663,7 @@ class TransferService:
                     source_line_id=ln.id,
                     expiry_date=lot.expiry_date if lot else None,
                     received_at=lot.received_at if lot else doc.sent_at,
+                    moved_at=moved_at,
                 )
                 lot_ids.append(str(res.lot_id))
             analytics = {
@@ -644,6 +672,8 @@ class TransferService:
                 "from_branch_id": str(doc.from_branch_id),
                 "to_branch_id": str(doc.to_branch_id),
             }
+            if correction_of_period is not None:
+                analytics["correction_of_period"] = correction_of_period
             ledger.append(
                 LedgerLine(
                     entry_date,
@@ -677,7 +707,7 @@ class TransferService:
             )
         await self._poster.post(s, tenant_id, DOC_TYPE, doc.id, ledger)
         status = "received" if all(received[ln.id] == ln.qty_sent for ln in doc.lines) else "discrepancy"
-        await self._docs.mark_received(s, doc.id, status, txn.at, user_id, updates)
+        await self._docs.mark_received(s, doc.id, status, moved_at or txn.at, user_id, updates)
         return txn, status
 
     # --- cancel -----------------------------------------------------------------------------------

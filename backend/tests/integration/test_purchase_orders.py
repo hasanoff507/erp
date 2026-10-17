@@ -13,6 +13,7 @@ from app.core.db.session import tenant_transaction
 from app.core.errors import AppError
 from app.modules.access.domain.permissions import SystemRole
 from app.modules.purchasing.application.module import PurchasingModule
+from tests.support.ordering import TXN_ORDER
 from tests.support.purchasing import (
     API,
     Env,
@@ -104,7 +105,7 @@ async def test_qt_m07_01_purchase_order_draft_then_sent(env: Env) -> None:
                 await s.execute(
                     text(
                         "SELECT action FROM app.audit_log WHERE entity = 'purchase_orders' AND entity_id = :id "
-                        "ORDER BY at, id"
+                        f"ORDER BY {TXN_ORDER}, id"
                     ),
                     {"id": UUID(po["id"])},
                 )

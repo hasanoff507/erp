@@ -17,9 +17,11 @@ from app.core.config import Settings
 from app.core.db.session import Database
 from app.core.secrets import EnvelopeCipher
 from app.modules.access.wiring import provision_system_roles
+from app.modules.auth.application.actor import ActorBindings
 from app.modules.auth.application.admin_users import AdminUsersService
 from app.modules.auth.application.bff import BffService
 from app.modules.auth.application.credentials import CredentialService
+from app.modules.auth.application.device_cookie import DeviceCookieSigner
 from app.modules.auth.application.gateway import AccessGuard, ErpAuthGateway
 from app.modules.auth.application.google import GoogleSignInService
 from app.modules.auth.application.keys import AccessTokenCodec, SigningKeyRing
@@ -27,10 +29,12 @@ from app.modules.auth.application.login import LoginPolicy, LoginService
 from app.modules.auth.application.oauth_server import ErpAuthorizationServer
 from app.modules.auth.application.otp import OtpPolicy, OtpService
 from app.modules.auth.application.passwords import hash_password
+from app.modules.auth.application.pin import PinPolicy, PinService
 from app.modules.auth.application.ports import AuthStore, GoogleOidcPort, MessageSender, TenantProvisioning
 from app.modules.auth.application.revocation import RevocationCache
 from app.modules.auth.application.session_profile import SessionProfileService
 from app.modules.auth.application.signup import SignupService
+from app.modules.auth.application.staff_snapshot import StaffPinRow, StaffPinSnapshot
 from app.modules.auth.application.subscription import SubscriptionStatusService
 from app.modules.auth.application.tokens import ClientRegistry, TokenPolicy, TokenService
 from app.modules.auth.domain.constants import PURPOSE_ACCESS
@@ -38,6 +42,7 @@ from app.modules.auth.infrastructure.admin_repositories import MembershipAdminRe
 from app.modules.auth.infrastructure.google_oidc import GoogleOidcAdapter
 from app.modules.auth.infrastructure.repositories import AuthRepository, ClientRow
 from app.modules.auth.infrastructure.signup_repository import IdentityRepository, SignupRepository
+from app.modules.auth.infrastructure.staff_snapshot_sql import SqlStaffSnapshotStore
 from app.modules.billing.wiring import start_trial
 from app.modules.branches.wiring import (
     ActivityType,
@@ -53,7 +58,18 @@ from app.modules.integrations.otp.wiring import (
     build_telegram_sender,
 )
 
-__all__ = ["AuthModule", "build_auth_module", "build_auth_store", "build_cipher", "hash_password"]
+__all__ = [
+    "AuthModule",
+    "PinVerifier",
+    "StaffPinRow",
+    "StaffPinSnapshot",
+    "build_auth_module",
+    "build_auth_store",
+    "build_cipher",
+    "hash_password",
+    "pin_verifier",
+    "staff_pin_snapshot",
+]
 
 
 def client_secret_aad(client_id: str) -> bytes:
@@ -91,6 +107,10 @@ class AuthModule:
     signup: SignupService
     credentials: CredentialService
     google: GoogleSignInService
+    # --- B3 device-auth ---
+    pin: PinService
+    device_cookies: DeviceCookieSigner
+    actors: ActorBindings
 
 
 def build_auth_store(db: Database) -> AuthStore:
@@ -252,6 +272,8 @@ def build_auth_module(settings: Settings, db: Database, redis: Callable[[], Redi
             code_ttl_s=settings.auth_code_ttl_s,
             session_idle_s=settings.session_idle_s,
             session_absolute_s=settings.session_absolute_s,
+            device_idle_s=settings.device_session_idle_s,
+            device_absolute_s=settings.device_session_absolute_s,
         ),
     )
     server = ErpAuthorizationServer(clients, tokens)
@@ -267,6 +289,7 @@ def build_auth_module(settings: Settings, db: Database, redis: Callable[[], Redi
         client_secret=settings.web_bff_client_secret.get_secret_value(),
         session_absolute_s=settings.session_absolute_s,
         refresh_lock_ttl_s=settings.refresh_lock_ttl_s,
+        device_absolute_s=settings.device_session_absolute_s,
     )
     cookies = SessionCookieSigner(settings.auth_secret.get_secret_value())
     # BO-11 / RS access guard: revoked device (16 §9) and claims stale (14 §5) — slice A2
@@ -276,6 +299,7 @@ def build_auth_module(settings: Settings, db: Database, redis: Callable[[], Redi
         access_ttl_s=settings.access_token_ttl_s,
         device_check_cache_s=settings.session_check_cache_s,
     )
+    actors = ActorBindings(redis, ttl_s=settings.actor_binding_ttl_s)
     gateway = ErpAuthGateway(
         codec=codec,
         revocation=revocation,
@@ -285,6 +309,8 @@ def build_auth_module(settings: Settings, db: Database, redis: Callable[[], Redi
         cookies=cookies,
         csrf=CsrfTokens(settings.auth_secret.get_secret_value(), settings.session_absolute_s),
         guard=access_guard,
+        actors=actors,
+        api_prefix=settings.api_prefix,
     )
     profiles = SessionProfileService(repo, redis)
     otp, otp_outbox = build_otp(settings, repo, redis, audit)
@@ -317,7 +343,49 @@ def build_auth_module(settings: Settings, db: Database, redis: Callable[[], Redi
         redis,
         issuer=settings.issuer,
     )
+    pin = PinService(repo, redis, audit, pin_policy(settings))
+    device_cookies = DeviceCookieSigner(settings.auth_secret.get_secret_value())
     return AuthModule(
         settings, repo, cipher, ring, codec, clients, revocation, subscriptions, login, tokens, server, bff,
-        gateway, admin_users, cookies, profiles, otp, otp_outbox, signup, credentials, google,
+        gateway, admin_users, cookies, profiles, otp, otp_outbox, signup, credentials, google, pin,
+        device_cookies, actors,
     )  # fmt: skip
+
+
+# --- B3 device-auth ---
+def pin_policy(settings: Settings) -> PinPolicy:
+    return PinPolicy(
+        max_failures=settings.pin_max_failures,
+        failure_window_s=settings.pin_failure_window_s,
+        user_failures_per_day=settings.pin_user_failures_per_day,
+    )
+
+
+class PinVerifier:
+    """Server-side PIN check for other modules (approvals, 18 §9.4) — rules of ``POST /auth/pin/verify``.
+
+    Runs in its own transactions: call it before your ``tenant_transaction``. ``True`` — the PIN
+    matches an active member of the tenant; ``False`` — wrong PIN (counted and audited). Raises
+    ``ACCOUNT_LOCKED`` (locked), ``PIN_INVALID`` ``reason=must_change_pin`` (PIN reset/not set) and
+    ``RATE_LIMITED`` (Redis unavailable — fail-closed).
+    """
+
+    def __init__(self, service: PinService) -> None:
+        self._service = service
+
+    async def verify(
+        self, *, tenant_id: UUID, user_id: UUID, pin: str, device_id: UUID | None, ip: str | None
+    ) -> bool:
+        return await self._service.check(
+            tenant_id=tenant_id, user_id=user_id, pin=pin, device_id=device_id, ip=ip
+        )
+
+
+def pin_verifier(settings: Settings, db: Database, redis: Callable[[], Redis]) -> PinVerifier:
+    repo = AuthRepository(db.session_factory)
+    return PinVerifier(PinService(repo, redis, AuditLog(db.session_factory), pin_policy(settings)))
+
+
+def staff_pin_snapshot() -> StaffPinSnapshot:
+    """Staff + local PIN verifiers of a branch for the ``permissions`` pull scope (b3-sync, 16 §3.2)."""
+    return StaffPinSnapshot(SqlStaffSnapshotStore())

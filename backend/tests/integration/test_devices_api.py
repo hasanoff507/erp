@@ -216,9 +216,9 @@ async def test_revoked_device_tokens_are_refused_at_once(
     rotated = await refresh(client, tokens["refresh_token"])
     assert rotated.status_code == 200, rotated.text
     access = rotated.json()["access_token"]
-    assert (
-        await client.get("/api/v1/branches", headers=bearer(access))
-    ).status_code == 200  # positive cache set
+    before = await client.get("/api/v1/branches", headers=bearer(access))
+    # the device check passes (positive cache set); without a PIN actor the read is refused (14 §4.3, F-4)
+    assert before.status_code == 403 and before.json()["error"]["params"]["reason"] == "actor_required"
 
     r = await client.post(
         f"/api/v1/devices/{device}/revoke",

@@ -88,6 +88,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
             "cash.withdraw",
             "expenses.approve",
             "stock.writeoff",
+            "card.manual_entry.approve",
           ],
         },
       },
@@ -238,11 +239,19 @@ export function requiresForPath(pathname: string): PermissionRequirement {
   return navItemForPath(pathname)?.requires ?? {};
 }
 
+/** BO-07 «QQS ichki hisobi» — the built tab of the «QQS va davlat hisoboti» section (07 BO-07). */
+export const VAT_INTERNAL_PATH = "/app/tax/vat";
+
 /**
  * Where an item's link goes for this user: «Sozlamalar» → the first Settings tab the user may open
- * (same order and permissions as the Settings tab bar); every other item → its route.
+ * (same order and permissions as the Settings tab bar); «QQS va davlat hisoboti» → the BO-07 tab for a
+ * `tax.vat.view` holder (BO-10 «Davlat hisoboti bilan solishtirish» is a later stage); every other item →
+ * its route.
  */
 export function navItemTarget(item: NavItem, granted: GrantedAccess): string {
+  if (item.key === "taxReconciliation") {
+    return hasPermissions(granted, { permission: "tax.vat.view" }) ? VAT_INTERNAL_PATH : item.to;
+  }
   if (item.key !== "settings") return item.to;
   return SETTINGS_TABS.find((tab) => hasPermissions(granted, tab.requires))?.to ?? item.to;
 }

@@ -369,6 +369,14 @@
     },
     "lastSync": "sinxron {{at}}",
     "neverSynced": "Sinxronlanmagan",
+    "health": {
+      "ok": "Sinxron",
+      "warning": "24 soatdan ortiq kutmoqda",
+      "critical": "40 soatdan ortiq — fiskal muddat yaqin",
+      "never": "Hali sinxronlanmagan"
+    },
+    "oldestPending": "eng eski yuborilmagan: {{at}}",
+    "lastSeen": "oxirgi faollik: {{at}}",
     "pendingCount": "{{count}} ta kutmoqda",
     "status": {
       "active": "Faol",
@@ -389,7 +397,7 @@
     "revoked": "«{{name}}» bekor qilindi",
     "confirm": {
       "title": "Qurilmani bekor qilasizmi?",
-      "description": "«{{name}}» tokenlari va litsenziyasi bekor qilinadi, unda PIN bilan kirgan xodimlar PINni almashtiradi."
+      "description": "«{{name}}» sessiyalari, tokenlari va litsenziyasi darhol bekor qilinadi. Unda so'nggi 30 kunda ishlagan xodimlar shu do'konda keyingi kirishda yangi PIN o'rnatadi."
     },
     "reason": "Sabab",
     "reasonPlaceholder": "Masalan: qurilma yo'qolgan",
@@ -717,6 +725,310 @@
       "withdrawConfirm": "Qaytarib olish",
       "givenToast": "Rozilik berildi",
       "withdrawnToast": "Rozilik qaytarib olindi"
+    }
+  },
+  "cardTerminals": {
+    "title": "Karta terminallari",
+    "description": "Kassaga bog'langan integratsiyalangan bank terminallari (qaror #71). Karta ma'lumoti hech qachon kiritilmaydi",
+    "add": "Terminalni bog'lash",
+    "edit": "Tahrirlash",
+    "disable": "O'chirish",
+    "enable": "Yoqish",
+    "archive": "Arxivlash",
+    "empty": "Kassada terminal yo'q — karta terminalsiz (rekvizitsiz) qabul qilinadi",
+    "none": "Yo'q — karta terminalsiz",
+    "count": "{{count}} ta terminal",
+    "default": "standart",
+    "created": "Terminal bog'landi",
+    "saved": "Terminal saqlandi",
+    "archived": "Terminal arxivlandi",
+    "archiveTitle": "Terminal arxivlansinmi?",
+    "archiveHint": "Kassa {{name}} kartani terminalsiz (rekvizitsiz) qabul qiladi. Davom etasizmi?",
+    "dialogTitle": "Terminalni bog'lash",
+    "editTitle": "Terminalni tahrirlash",
+    "fields": {
+      "register": "Kassa",
+      "name": "Terminal nomi",
+      "vendor": "Ta'minotchi",
+      "model": "Model",
+      "adapter": "Ulanish turi",
+      "driver": "Drayver",
+      "agentId": "Do'kon agenti ID",
+      "localId": "Agent qurilmasi (local_id)",
+      "host": "LAN manzili",
+      "port": "Port",
+      "vendorTerminalRef": "Bulutdagi terminal ID",
+      "tid": "TID",
+      "mid": "MID",
+      "isDefault": "Kassada standart",
+      "status": "Holat",
+      "health": "Aloqa"
+    },
+    "adapter": {
+      "agent_ecr": "Do'kon agenti orqali (LAN/Wi-Fi)",
+      "cloud": "Vendor bulut API",
+      "android_intent": "Android smart-terminal",
+      "softpos": "SoftPOS (NFC)",
+      "fake": "Sinov terminali"
+    },
+    "status": {
+      "active": "Faol",
+      "disabled": "O'chirilgan",
+      "archived": "Arxivlangan"
+    },
+    "hostHint": "Faqat xususiy tarmoq IPv4 (10.x, 172.16–31.x, 192.168.x)",
+    "fakeHint": "Sinov terminali — faqat dev/test/staging, real pul yo'q",
+    "noCardData": "Karta raqami, niqob yoki RRN bu yerda kiritilmaydi — ular faqat terminal natijasidan keladi"
+  },
+  "approvals": {
+    "title": "Tasdiqlash navbati",
+    "subtitle": "Rol limitidan oshgan so'rovlar. Tasdiqlash — PIN bilan, rad etish — sabab bilan. Natija darhol kassaga qaytadi.",
+    "offline": "Internet yo'q — so'rovlarni faqat ko'rish mumkin. Menejer kassada PIN bilan joyida tasdiqlaydi.",
+    "tabsLabel": "So'rov holati",
+    "tabs": {
+      "pending": "Kutilmoqda",
+      "pendingCount": "Kutilmoqda ({{count}})",
+      "approved": "Tasdiqlangan",
+      "consumed": "Hujjatda ishlatilgan",
+      "rejected": "Rad etilgan",
+      "expired": "Muddati o'tgan"
+    },
+    "kindFilter": "So'rov turi",
+    "allKinds": "Barchasi",
+    "kinds": {
+      "discount_over_limit": "Chegirma",
+      "return_over_limit": "Qaytarish",
+      "return_no_receipt": "Cheksiz qaytarish",
+      "debt_over_limit": "Nasiya",
+      "cash_withdrawal_over_limit": "Pul olish",
+      "price_change": "Narx o'zgarishi",
+      "expense_over_limit": "Katta xarajat",
+      "write_off_over_limit": "Hisobdan chiqarish",
+      "card_manual_entry": "Terminalsiz karta"
+    },
+    "status": {
+      "pending": "Kutilmoqda",
+      "approved": "Tasdiqlandi",
+      "consumed": "Ishlatildi",
+      "rejected": "Rad etildi",
+      "expired": "Muddati o'tdi"
+    },
+    "minutesLeft": "{{count}} daq qoldi",
+    "due": "Muddati tugadi",
+    "titleWithValue": "{{kind}} — {{value}}",
+    "requestedBy": "{{name}} · {{branch}}",
+    "unknownUser": "Noma'lum xodim",
+    "unknownBranch": "filial ko'rsatilmagan",
+    "requested": "So'ralgan",
+    "document": "Hujjat",
+    "docTypes": {
+      "sales": "Sotuv (chek)",
+      "returns": "Qaytarish",
+      "debt_payments": "Qarz to'lovi",
+      "cash_movements": "Kassa pul harakati",
+      "price_changes": "Narx o'zgarishi hujjati",
+      "write_offs": "Hisobdan chiqarish",
+      "expenses": "Xarajat",
+      "other": "Bog'langan hujjat"
+    },
+    "context": {
+      "amount": "Summa",
+      "requestedPct": "Foiz",
+      "reason": "Sabab",
+      "manualReason": "Sabab",
+      "comment": "Izoh",
+      "lines": "Qatorlar",
+      "direction": "Yo'nalish"
+    },
+    "enum": {
+      "reason": {
+        "collection": "Inkassatsiya",
+        "deposit": "Kassaga qo'yish",
+        "owner_withdrawal": "Ta'sischi oldi",
+        "other": "Boshqa"
+      },
+      "manualReason": {
+        "standalone_terminal": "Kassaga terminal bog'lanmagan",
+        "terminal_offline": "Terminal ulanmagan",
+        "terminal_error": "Terminal xatosi",
+        "unknown_result": "Terminal natijasi noma'lum"
+      }
+    },
+    "linesCount": "{{count}} ta qator",
+    "resolvedAt": "Hal qilingan",
+    "rejectReason": "Rad etish sababi",
+    "ownRequest": "Bu sizning so'rovingiz — uni boshqa tasdiqlovchi hal qiladi.",
+    "pin": "PIN",
+    "approve": "Tasdiqlash",
+    "reject": "Rad etish",
+    "rejectReasonLabel": "Rad etish sababi (majburiy)",
+    "rejectReasonRequired": "Rad etish sababini yozing",
+    "cancelReject": "Bekor",
+    "sendReject": "Rad etishni yuborish",
+    "pinInvalid": "PIN noto'g'ri",
+    "pinMustChange": "PIN o'rnatilmagan yoki tiklangan — avval yangi PIN o'rnating",
+    "pinLocked": "PIN urinishlari tugadi — birozdan keyin qayta urinib ko'ring",
+    "pinLockedFor": "PIN urinishlari tugadi — {{minutes}} daqiqadan keyin qayta urinib ko'ring",
+    "empty": {
+      "pending": "Navbat bo'sh",
+      "pendingHint": "Kassadan limitdan oshgan so'rov kelsa, shu yerda ko'rinadi.",
+      "other": "So'rov yo'q"
+    },
+    "loadMore": "Yana yuklash",
+    "resolvedToday": "Bugun hal qilinganlar",
+    "resolvedTodayEmpty": "Bugun hali hech narsa hal qilinmagan.",
+    "limitsTitle": "Rol limitlari",
+    "limitsHint": "Tasdiqsiz ruxsat etilgan chegaralar har rol uchun alohida.",
+    "limitsLink": "Limitlarni Rollar bo'limida o'zgartirish",
+    "note": "Internet bo'lmasa bu yerda yangi tasdiqlash cheklanadi — Menejer kassada PIN bilan joyida tasdiqlaydi. Muddati o'tgan so'rov avtomatik bekor bo'ladi, kassir qayta so'raydi."
+  },
+  "fiscal": {
+    "title": "OFD ga yuborilmagan cheklar",
+    "subtitle": "Fiskal cheklar holati. Provayder qabul qilmagan chekni qayta navbatga qo'yish mumkin.",
+    "filter": "Holat",
+    "allStatuses": "Barcha holatlar",
+    "tableLabel": "Fiskal cheklar",
+    "registersTitle": "Kassalar fiskal moduli: {{count}} ta, OFD tasdig'i kutilayotgani: {{unacked}} ta",
+    "unackedSince": "tasdiqsiz chek {{at}} dan",
+    "columns": {
+      "created": "Yaratilgan",
+      "receipt": "Chek",
+      "register": "Kassa",
+      "status": "Holat",
+      "attempts": "Urinish",
+      "offlineSince": "Yuborilmagan",
+      "action": "Amal"
+    },
+    "kind": {
+      "sale": "Sotuv",
+      "return": "Qaytarish",
+      "z_report": "Z-hisobot",
+      "debt_settlement": "Qarz to'lovi",
+      "credit_sale": "Nasiya sotuv"
+    },
+    "status": {
+      "pending": "Kutilmoqda",
+      "sent": "Yuborildi",
+      "fiscalized": "Fiskallashtirildi",
+      "failed": "Yuborilmadi"
+    },
+    "fmState": {
+      "ok": "Ishlayapti",
+      "locked": "Bloklangan",
+      "ack_overdue": "OFD tasdig'i kechikkan",
+      "memory_full": "Xotira to'lgan",
+      "unknown": "Holati noma'lum"
+    },
+    "acked": "OFD tasdiqladi",
+    "requeued": "Navbatga qo'yildi",
+    "retry": "Qayta urinish",
+    "retryFor": "Qayta urinish — {{receipt}}",
+    "empty": {
+      "failed": "Yuborilmagan chek yo'q",
+      "other": "Bu holatda chek yo'q"
+    }
+  },
+  "syncExceptions": {
+    "title": "Sinxron istisnolari",
+    "subtitle": "Kassadan offline kelgan va istisno sifatida qabul qilingan voqealar. «Ko'rib chiqildi» provodkaga ta'sir qilmaydi.",
+    "filter": "Ko'rib chiqish",
+    "filters": {
+      "open": "Ko'rib chiqilmagan",
+      "reviewed": "Ko'rib chiqilgan",
+      "all": "Barchasi"
+    },
+    "tableLabel": "Sinxron istisnolari",
+    "columns": {
+      "created": "Vaqt",
+      "kind": "Istisno",
+      "document": "Hujjat",
+      "branch": "Filial",
+      "review": "Ko'rib chiqish"
+    },
+    "kinds": {
+      "price_mismatch": "Narx farqi",
+      "archived_product": "Arxivlangan tovar",
+      "stock_negative": "Qoldiq manfiy",
+      "debt_limit_exceeded_offline": "Nasiya limiti oshdi (offline)",
+      "approval_limit_exceeded_offline": "Tasdiq limiti oshdi (offline)",
+      "receipt_seq_conflict": "Chek raqami to'qnashuvi",
+      "debt_overpayment_offline": "Qarzdan ortiq to'lov (offline)",
+      "debt_allocation_mismatch": "Qarz taqsimoti farqi",
+      "late_in_closed_period": "Yopilgan davrga kech kelgan",
+      "cost_unknown": "Tannarx noma'lum",
+      "count_late_move": "Inventarizatsiyadan keyingi harakat",
+      "card_result_mismatch": "Karta natijasi mos emas",
+      "card_orphan_transaction": "Hujjatsiz karta tranzaksiyasi",
+      "actor_unverified": "Tasdiqlanmagan bajaruvchi",
+      "late_in_closed_shift": "Yopilgan smenaga kech kelgan hujjat"
+    },
+    "hints": {
+      "price_mismatch": "Kassadagi narx serverdagidan farq qilgan — sotuv kassa narxida o'tkazildi",
+      "archived_product": "Sotilgan tovar arxivda bo'lgan",
+      "stock_negative": "Sotuvdan keyin qoldiq manfiyga tushdi",
+      "debt_limit_exceeded_offline": "Offline nasiya mijoz limitidan oshgan",
+      "approval_limit_exceeded_offline": "Offline tasdiqlovchining limiti yetmagan",
+      "receipt_seq_conflict": "Qurilmadagi chek raqami takrorlangan",
+      "debt_overpayment_offline": "Offline to'lov qarzdan ko'p — ortig'i avans",
+      "debt_allocation_mismatch": "To'lov qarz hujjatlariga boshqacha taqsimlandi",
+      "late_in_closed_period": "Hujjat sanasi yopilgan oyda — registrlar birinchi ochiq oyga yozildi",
+      "cost_unknown": "Tannarx noma'lum — qayta hisoblash navbatida",
+      "count_late_move": "Sanoqdan keyin tovar harakati kelgan",
+      "card_result_mismatch": "Terminal natijasi hujjatdagi to'lovdan farq qiladi",
+      "card_orphan_transaction": "Terminal tranzaksiyasi hech qaysi hujjatga bog'lanmagan",
+      "actor_unverified": "Onlayn voqeani shu qurilmada PIN bilan tasdiqlanmagan xodim nomidan yuborilgan — tekshiring.",
+      "late_in_closed_shift": "Hujjat smena yopilgandan keyin keldi — kutilgan naqd va farq tuzatildi."
+    },
+    "docTypes": {
+      "sales": "Sotuv",
+      "returns": "Qaytarish",
+      "shifts": "Smena",
+      "cash_movements": "Kassa pul harakati",
+      "transfers": "Ko'chirish",
+      "stock_counts": "Inventarizatsiya",
+      "debt_payments": "Qarz to'lovi",
+      "other": "Hujjat"
+    },
+    "review": "Ko'rib chiqildi",
+    "reviewFor": "Ko'rib chiqildi — {{kind}}",
+    "reviewed": "Ko'rib chiqilgan",
+    "reviewTitle": "Istisnoni ko'rib chiqildi deb belgilash",
+    "note": "Izoh",
+    "noteRequired": "Izoh majburiy (500 belgigacha)",
+    "empty": {
+      "open": "Ko'rib chiqilmagan istisno yo'q",
+      "other": "Istisno yo'q"
+    }
+  },
+  "scaleTemplates": {
+    "title": "Tarozi shtrix-kodi",
+    "format": "EAN-13 · PP CCCCC VVVVV K (prefiks 20–29)",
+    "cols": {
+      "prefixes": "Prefikslar",
+      "kind": "Qiymat",
+      "plu": "PLU uzunligi",
+      "value": "Qiymat uzunligi",
+      "decimals": "Kasr xonalari",
+      "enabled": "Yoqilgan"
+    },
+    "kinds": {
+      "WEIGHT": "Og'irlik (gramm)",
+      "AMOUNT": "Summa (so'm)"
+    },
+    "add": "Shablon qo'shish",
+    "remove": "Shablonni o'chirish",
+    "lowStock": "Kam qoldiq tekshiruvi",
+    "expiryDays": "Yaroqlilik muddati ogohlantirishi (kun)",
+    "posNote": "O'zgarish kassalarga keyingi sinxronlashda yetib boradi.",
+    "save": "Saqlash",
+    "saved": "Tarozi sozlamasi saqlandi",
+    "reload": "Qayta yuklash",
+    "conflict": "Sozlamani boshqa foydalanuvchi o'zgartirdi. Qayta yuklab, yana saqlang.",
+    "errors": {
+      "prefix_format": "Har bir prefiks 20–29 oralig'ida 2 raqam",
+      "prefix_duplicate": "Prefiks takrorlanmasin",
+      "prefix_required": "Kamida bitta prefiks kiriting",
+      "range": "0 dan 365 gacha"
     }
   }
 }

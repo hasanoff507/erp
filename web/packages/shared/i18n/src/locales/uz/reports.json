@@ -30,5 +30,181 @@
       "ask": "So'rash"
     },
     "pending": "Ma'lumotlar hisobot moduli ulanganda ko'rinadi."
+  },
+  "center": {
+    "title": "Hisobotlar markazi",
+    "subtitle": "Hisobotni tanlang — davr va filtrlar hisobot ichida. Ruxsat berilmagan hisobotlar ko'rinmaydi.",
+    "offline": "Internet yo'q — oxirgi yuklangan hisobot ko'rsatilmoqda.",
+    "back": "Hisobotlar",
+    "soon": "Tez orada",
+    "groups": {
+      "sales": "SAVDO",
+      "stock": "OMBOR",
+      "finance": "MOLIYA",
+      "tax": "SOLIQ"
+    },
+    "items": {
+      "daily-sales": {
+        "title": "Kunlik savdo",
+        "description": "Kunlar bo'yicha savdo, chek soni va o'rtacha chek"
+      },
+      "top-products": {
+        "title": "Top tovarlar",
+        "description": "Eng ko'p sotilgan tovarlar — miqdor va summa"
+      },
+      "cash-history": {
+        "title": "Kassa / smena tarixi",
+        "description": "Har smena: boshlanish, sotuv, qo'yilgan/olingan, kutilgan va sanalgan naqd, farq"
+      },
+      "cashier-sales": {
+        "title": "Kassirlar bo'yicha savdo",
+        "description": "Kassir kesimida savdo va qaytarishlar"
+      },
+      "stock": {
+        "title": "Ombor qoldig'i",
+        "description": "Tovar qoldig'i va tannarx bo'yicha qiymat"
+      },
+      "stock-moves": {
+        "title": "Tovar harakati",
+        "description": "Kirim, sotuv, ko'chirish, hisobdan chiqarish"
+      },
+      "low-stock": {
+        "title": "Kam qolgan tovarlar",
+        "description": "Minimal qoldiqdan past tovarlar"
+      },
+      "count-diffs": {
+        "title": "Inventarizatsiya farqlari",
+        "description": "Sanoq natijasi va farq summasi"
+      },
+      "profit-and-loss": {
+        "title": "Foyda va zarar",
+        "description": "Daromad, tannarx, xarajat, sof foyda"
+      },
+      "trial-balance": {
+        "title": "Sinov balansi",
+        "description": "Hisoblar bo'yicha oborot va qoldiq"
+      },
+      "balance-sheet": {
+        "title": "Buxgalteriya balansi",
+        "description": "Aktiv va passiv sana holatiga"
+      },
+      "debts-aging": {
+        "title": "Qarzdorlik muddati",
+        "description": "Qarzlar muddat guruhlari bo'yicha"
+      },
+      "vat-returns": {
+        "title": "QQS registri (qaytarishlar bilan)",
+        "description": "Qaytarishlar bo'yicha QQS harakatlari"
+      },
+      "vat-form": {
+        "title": "QQS hisoboti (DSQ №3221, 1-ilova)",
+        "description": "Rasmiy shakl tayyorlovi — satr kodlari bilan"
+      },
+      "turnover-form": {
+        "title": "Aylanma solig'i (9-ilova)",
+        "description": "Rasmiy shakl tayyorlovi — satr kodlari bilan"
+      },
+      "financial-form": {
+        "title": "Moliyaviy hisobot (MEF №181)",
+        "description": "1- va 2-ilova tayyorlovi"
+      }
+    }
+  },
+  "cashHistory": {
+    "register": "Kassa",
+    "registerPlaceholder": "Kassani tanlang",
+    "quickLabel": "Davr",
+    "quick": {
+      "today": "Bugun",
+      "week": "Hafta",
+      "month": "Oy"
+    },
+    "from": "Dan",
+    "to": "Gacha",
+    "rangeInvalid": "«Dan» «Gacha» dan keyin bo'lmasin",
+    "tableLabel": "Smenalar bo'yicha naqd pul",
+    "empty": "Bu davrda smena yo'q",
+    "totals": "Davr jami",
+    "open": "ochiq",
+    "status": {
+      "open": "Ochiq",
+      "closed": "Yopilgan"
+    },
+    "columns": {
+      "shift": "Smena",
+      "period": "Ochilgan / yopilgan",
+      "status": "Holat",
+      "opening": "Boshlanish",
+      "cashSales": "Naqd sotuv",
+      "cashIn": "Qo'yilgan",
+      "cashOut": "Olingan",
+      "expected": "Kutilgan naqd",
+      "counted": "Sanalgan naqd",
+      "variance": "Farq",
+      "card": "Karta (sanalgan)"
+    },
+    "methods": {
+      "cash": "Naqd",
+      "card": "Karta",
+      "uzqr": "UzQR",
+      "click": "Click",
+      "payme": "Payme",
+      "uzum": "Uzum",
+      "debt": "Nasiya"
+    },
+    "direction": {
+      "in": "Qo'yildi",
+      "out": "Olindi"
+    },
+    "reasons": {
+      "collection": "Inkassatsiya",
+      "deposit": "Kassaga qo'yish",
+      "owner_withdrawal": "Ta'sischi oldi",
+      "other": "Boshqa"
+    },
+    "movementStatus": {
+      "draft": "Tasdiq kutmoqda",
+      "posted": "O'tkazilgan",
+      "cancelled": "Bekor qilingan"
+    },
+    "panel": {
+      "hint": "Smena qatorini tanlang — Z-hisobot va kassa pul harakatlari shu yerda ko'rinadi.",
+      "title": "Smena №{{no}}",
+      "loading": "Smena",
+      "close": "Smena panelini yopish",
+      "zReport": "Z-hisobot — to'lov usullari",
+      "running": "Joriy holat — to'lov usullari",
+      "cardSplit": "Karta",
+      "cardIntegrated": "Karta (integratsiyalangan)",
+      "cardManual": "Karta (terminalsiz)",
+      "settlement": "Terminal yakuni: {{total}}",
+      "settlementStatus": {
+        "matched": "Mos",
+        "mismatch": "Farq bor",
+        "failed": "Xato"
+      },
+      "salesCount": "Cheklar soni",
+      "returns": "Qaytarishlar ({{count}} ta)",
+      "vat": "QQS",
+      "discounts": "Chegirmalar",
+      "movements": "Kassa pul harakati",
+      "noMovements": "Smenada pul qo'yilmagan va olinmagan."
+    }
+  },
+  "vatReturns": {
+    "period": "Oy",
+    "tableLabel": "Qaytarishlar bo'yicha QQS",
+    "empty": "Bu oyda qaytarish bo'yicha QQS harakati yo'q",
+    "totals": "Oy jami",
+    "kinds": {
+      "output": "Chiquvchi QQS",
+      "input": "Kiruvchi QQS"
+    },
+    "columns": {
+      "created": "Yozilgan",
+      "kind": "Turi",
+      "base": "Baza",
+      "vat": "QQS"
+    }
   }
 }

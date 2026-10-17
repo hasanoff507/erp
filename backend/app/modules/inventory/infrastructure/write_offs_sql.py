@@ -142,13 +142,15 @@ class SqlWriteOffRepository:
         return found is not None
 
     async def latest_approval(self, s: AsyncSession, doc_id: UUID) -> Approval | None:
+        # newest = the largest application uuid7 id (creation order); requested_at is the DB now() of
+        # separate transactions and does not order them reliably
         row = (
             await s.execute(
                 text(
                     "SELECT id, CASE WHEN status = 'pending' AND expires_at < now() THEN 'expired' ELSE "
                     "status END, requested_value "
                     "FROM app.approval_requests WHERE linked_doc_type = 'write_offs' AND linked_doc_id = :d "
-                    "AND kind = 'write_off_over_limit' ORDER BY requested_at DESC, id DESC LIMIT 1"
+                    "AND kind = 'write_off_over_limit' ORDER BY id DESC LIMIT 1"
                 ),
                 {"d": doc_id},
             )

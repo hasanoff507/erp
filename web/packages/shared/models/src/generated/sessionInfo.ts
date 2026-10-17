@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { SessionBranch } from './sessionBranch.ts';
+import type { SessionDevice } from './sessionDevice.ts';
 import type { SessionTenant } from './sessionTenant.ts';
 import type { SessionUser } from './sessionUser.ts';
 
@@ -21,4 +22,5 @@ export interface SessionInfo {
   client_id: string;
   sub_status: string | null;
   access_expires_at: number;
+  device?: SessionDevice | null;
 }

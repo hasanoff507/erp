@@ -10,7 +10,7 @@
 ## Asosiy xulosalar
 
 1. Bu fayl **ombor/katalog/xarid** qatlamini qamrab oladi: mahsulot katalogi, narxlar, yorliqlar, import, qoldiq/partiyalar, kirim, yetkazib beruvchilar, xaridnoma, to'lov, qaytarish, ko'chirish, inventarizatsiya, hisobdan chiqarish, boshlang'ich qoldiq, baholash sozlamalari, qayta hisoblash ishlari, kiruvchi e-faktura, e-TTN, e-ishonchnoma (§8a).
-2. Barcha hujjat turlari (`goods-receipts`, `supplier-returns`, `transfers`, `stock-counts`, `write-offs`, `stock-openings`) umumiy hayot sikliga amal qiladi: `POST /{resource}` (draft) → `POST /{id}/post` → `POST /{id}/cancel` (storno — registrlarga teskari yozuv, alohida teskari hujjat yo'q, `11-malumotlar-modeli.md` §1/§6). `doc_date` > joriy biznes kuni → `422 VALIDATION_ERROR` (`validation.doc_date_in_future`). `price-changes` bundan mustasno — o'z holat mashinasi bor: `draft → pending_approval (202) → posted | rejected` (§4).
+2. Barcha hujjat turlari (`goods-receipts`, `supplier-returns`, `transfers`, `stock-counts`, `write-offs`, `stock-openings`) umumiy hayot sikliga amal qiladi: `POST /{resource}` (draft) → `POST /{id}/post` → `POST /{id}/cancel` (storno — registrlarga teskari yozuv, alohida teskari hujjat yo'q, `11-malumotlar-modeli.md` §1/§6). `doc_date` > joriy biznes kuni → `422 VALIDATION_ERROR` (`validation.doc_date_in_future`). `price-changes` bundan mustasno — o'z holat mashinasi bor: `draft → pending_approval (202) → posted | rejected`, tasdiq so'rovi muddati o'tsa `pending_approval → draft` (§4).
 3. Ma'lumotnomalar (`products`, `product-categories`, `counterparties` (`is_supplier=true`)) — `archive`/`unarchive` bilan, hech qachon `DELETE` qilinmaydi; `PATCH` optimistik qulflash (`version`) talab qiladi → mos kelmasa `409 VERSION_CONFLICT`.
 4. **Import oqimi** (`import-jobs`) uch bosqichli: `upload` (fayl) → `validate` (qator/maydon xatolari) → `commit` (bitta tranzaksiyada `stock-openings`/`debt-openings` yaratiladi). Mahsulot (US-M04-04) va qarz (US-M08-07) importi shu bir yo'l orqali.
 5. **Partiya (lot) — tannarxning yagona manbai**: har kirim (qo'lda, e-fakturadan, AI-03 OCR'dan, boshlang'ich qoldiqdan) `stock-lots` yozuvi yaratadi; FIFO/AVECO (`valuation-settings`) shu ma'lumotdan hisoblanadi. Usul faqat **keyingi hisobot yili boshidan** o'zgartiriladi (US-M04-05); usul almashtirish — `13-provodka-qoidalari.md` §3.1 (FIFO↔AVECO o'tish algoritmi).
@@ -237,7 +237,7 @@ Kodni tasdiqlash + QQS toifasi.
 
 **Maqsad**: hujjatni o'tkazish (faqat `draft` holatidan). Har qator uchun server joriy narx bilan farqni (%) hisoblaydi va `prices.approve` limitiga (`role_permissions.limit_value`) solishtiradi. Formula: `base` = filial narxi, yo'q bo'lsa global narx; `base` yo'q — limit tekshirilmaydi; `pct = |new − base| / base × 100`; bitta qator limitdan oshsa butun hujjat tasdiqqa yuboriladi, `requested_value = max(pct)`.
 - Limit ichida → darhol `product_prices` yangilanadi, hujjat `status="posted"`, `label_print_queue`ga `reason="price_changed"` qatorlari qo'shiladi (US-M09-04).
-- Limitdan katta → `202 {status:"pending_approval", approval_request_id}` (`APPROVAL_REQUIRED`) — `approval_requests(kind='price_change')` yozuvi yaratiladi (`linked_doc_type="price_changes"`); `price_changes` — `pending_approval` ga o'tadigan yagona hujjat turi (qaror #25); `product_prices` hali o'zgarmaydi.
+- Limitdan katta → `202 {status:"pending_approval", approval_request_id}` (`APPROVAL_REQUIRED`) — `approval_requests(kind='price_change')` yozuvi yaratiladi (`linked_doc_type="price_changes"`); `price_changes` — `pending_approval` ga o'tadigan yagona hujjat turi (qaror #25); `product_prices` hali o'zgarmaydi. So'rov BO-16 da tasdiqlansa hujjat shu tranzaksiyada `posted` bo'ladi, rad etilsa — `rejected`; javobsiz muddati o'tsa (`expired`, `18-api-kassa.md` §9.1) — `draft`ga qaytadi (audit `price_change_approval_expired`), qayta `post` yangi so'rov yaratadi (`18-api-kassa.md` §10).
 
 **Ruxsat**: `prices.edit`.
 **Aniqlashtirishlar**: postlovchida `prices.approve` granti bo'lmasa limit `10.00`% deb olinadi (26 #5) — aks holda Menejerning har narx o'zgarishi tasdiqqa tushardi (QT-M09-01). Hujjat `branch_id` si = `X-Branch-Id`; sarlavha bo'lmasa — standart filial (barcha filialli foydalanuvchi) yoki foydalanuvchining yagona filiali, aks holda `422`. Filial bilan cheklangan foydalanuvchi global narx (`lines[].branch_id=null`) qo'ya olmaydi — `403 BRANCH_SCOPE_DENIED`. Javob (201/200/202) — to'liq hujjat + `approval_request_id` + `warnings` (202 da `["APPROVAL_REQUIRED"]`).
@@ -884,21 +884,22 @@ Server joriy sanani tekshiradi: agar joriy hisobot yili ichida bo'lsa — darhol
 
 **Maqsad**: tarozi shtrix-kod formati/versiyasi (US-M09-06), kam qoldiq ogohlantirish standart kuni (US-M04-02/06 — "7 kun qolganda", sozlanadi).
 **Ruxsat**: `stock.view` (GET), `catalog.manage` (PATCH).
-**So'rov/Javob maydonlari**: `{weight_barcode_templates: [...], low_stock_check_enabled: bool, expiry_warning_days: int}` — saqlash joyi: `tenants.settings` JSONB kalitlari, alohida jadval emas; `PATCH` tanasidagi `version` = `tenants.version`.
+**So'rov/Javob maydonlari**: `{weight_barcode_templates: [...] (≤ 10 ta), low_stock_check_enabled: bool, expiry_warning_days: int (0..365), version}` — saqlash joyi: `tenants.settings` JSONB kalitlari, alohida jadval emas (kalit yo'q bo'lsa javobda standart qiymat); `version` = `tenants.version`. `PATCH` — qisman: yuborilgan kalitlar almashtiriladi (`null` = o'zgarmaydi), `version` majburiy; eskirgan `version` → `409 VERSION_CONFLICT` (`params.current_version`). O'zgarish bo'lsa `tenants.version + 1` va audit `stock_settings.updated` (`before`/`after`, `changed[]`); qiymatlar bir xil bo'lsa yozuv ham, audit ham yo'q.
 
 `weight_barcode_templates[]` — tarozi EAN-13 og'irlik kodi `PP CCCCC VVVVV K` shablonlari:
 
 | Maydon | Tur | Validatsiya |
 |---|---|---|
-| `prefixes` | string[] | har biri `20`–`29` oralig'ida 2 raqam, shablonlar orasida takrorlanmaydi |
+| `prefixes` | string[] | 1..10 ta, har biri `20`–`29` oralig'ida 2 raqam, shablonlar orasida takrorlanmaydi (`validation.weight_prefix_duplicate`) |
 | `item_code_len` | int | 4..6, standart `5` (PLU kodi) |
-| `value_len` | int | `5` |
+| `value_len` | int | 4..6, standart `5`; `item_code_len + value_len = 10` (EAN-13: 2 prefiks + kod + qiymat + nazorat raqami), aks holda `validation.weight_template_length` |
 | `value_kind` | enum | `WEIGHT` (og'irlik) / `AMOUNT` (summa, so'm) |
 | `decimals` | int | 0..3; `WEIGHT` uchun `3` (grammdan kg) |
 | `enabled` | bool | — |
 
 Standart ikki shablon: `{prefixes:["22"], value_kind:"WEIGHT", decimals:3}` (og'irlik grammda) va `{prefixes:["21"], value_kind:"AMOUNT", decimals:0}` (summa so'mda, miqdor = summa ÷ joriy narx); prefiks — do'kon sozlamasi. Nazorat raqami mos kelmagan kod rad etiladi (`03-modullar-talablari.md` US-M09-06).
-**Offline**: `/sync/pull?scope=settings` orqali POS'ga keshlanadi; shablonlar o'zgarsa majburiy pull (`16-offline-sync.md` §1).
+**Idempotentlik**: `PATCH` — `Idempotency-Key` majburiy.
+**Offline**: `/sync/pull?scope=settings` orqali POS'ga keshlanadi; shablonlar o'zgarsa `settings` dayjesti va `weight_barcode_version` o'zgaradi — qurilma keyingi (majburiy) pull'da yangi shablonlarni oladi (`16-offline-sync.md` §1).
 
 ### `GET /stock-settings/plu-export`
 

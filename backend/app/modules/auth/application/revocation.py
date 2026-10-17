@@ -14,8 +14,11 @@ Per request the RS does one ``MGET``:
 * ``auth:sid_ok:{sid}`` — positive cache (30 s) of the DB session check.
 
 Markers live for ``access TTL + 2 min`` — after that the tokens they target
-have expired anyway. Without Redis every request falls back to the DB check
-of the session row.
+have expired anyway. Without Redis every request falls back to the database and
+fails closed (14 §5, SEC-08): a token with ``sid`` is checked against its session
+row; a token without ``sid`` (Android/Bearer, device tokens) against its refresh
+family (``app.auth_family_revoked`` — revoke-all, admin block, reuse and device
+revoke all revoke the family rows); a token with neither is refused.
 """
 
 from __future__ import annotations
@@ -39,6 +42,13 @@ class TokenRevokedError(Exception):
     pass
 
 
+def _as_uuid(value: Any) -> UUID | None:
+    try:
+        return UUID(str(value)) if value else None
+    except ValueError:
+        return None
+
+
 def _sid_revoked(sid: str) -> str:
     return f"auth:sid_revoked:{sid}"
 
@@ -57,6 +67,26 @@ def _family_revoked(family: str) -> str:
 
 def _user_revoked(tenant: str, user: str) -> str:
     return f"auth:user_revoked:{tenant}:{user}"
+
+
+async def mark_revoked_markers(
+    redis: Redis, *, sids: Iterable[UUID | None], families: Iterable[UUID | None], ttl_s: int
+) -> None:
+    """``auth:sid_revoked``/``auth:fam_revoked`` markers — the live access tokens die at once (14 §5)."""
+    sid_keys = [str(s) for s in sids if s is not None]
+    fam_keys = [str(f) for f in families if f is not None]
+    if not sid_keys and not fam_keys:
+        return
+    try:
+        async with redis.pipeline(transaction=False) as pipe:
+            for sid in sid_keys:
+                pipe.set(_sid_revoked(sid), "1", ex=ttl_s)
+                pipe.delete(_sid_ok(sid))
+            for family in fam_keys:
+                pipe.set(_family_revoked(family), "1", ex=ttl_s)
+            await pipe.execute()
+    except RedisError:
+        log.warning("revoke_cache_unavailable", sessions=len(sid_keys), families=len(fam_keys))
 
 
 class RevocationCache:
@@ -90,20 +120,7 @@ class RevocationCache:
         self, *, sids: Iterable[UUID | None] = (), families: Iterable[UUID | None] = ()
     ) -> None:
         """Sessions and refresh families in one pipeline — their live access tokens die at once."""
-        sid_keys = [str(s) for s in sids if s is not None]
-        fam_keys = [str(f) for f in families if f is not None]
-        if not sid_keys and not fam_keys:
-            return
-        try:
-            async with self._redis().pipeline(transaction=False) as pipe:
-                for sid in sid_keys:
-                    pipe.set(_sid_revoked(sid), "1", ex=self._marker_ttl)
-                    pipe.delete(_sid_ok(sid))
-                for family in fam_keys:
-                    pipe.set(_family_revoked(family), "1", ex=self._marker_ttl)
-                await pipe.execute()
-        except RedisError:
-            log.warning("revoke_cache_unavailable", sessions=len(sid_keys), families=len(fam_keys))
+        await mark_revoked_markers(self._redis(), sids=sids, families=families, ttl_s=self._marker_ttl)
 
     async def mark_user_revoked(self, user_id: UUID, tenant_id: UUID | None) -> None:
         scope = str(tenant_id) if tenant_id is not None else "*"
@@ -161,6 +178,11 @@ class RevocationCache:
                 return
         if sid:
             await self._check_session_row(UUID(str(sid)), cache=values is not None)
+            return
+        # --- B3 device-auth --- SEC-08: Redis is down and the token has no session row
+        family_id = _as_uuid(family)
+        if family_id is None or await self._repo.family_revoked(family_id):
+            raise TokenRevokedError
 
     async def _check_session_row(self, sid: UUID, *, cache: bool) -> None:
         row = await self._repo.session_by_id(sid)

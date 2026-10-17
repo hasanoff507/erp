@@ -99,7 +99,7 @@ def _idem_app(
         calls.append("fail")
         raise ValueError("boom")
 
-    @app.post("/api/v1/sync/push")
+    @app.post("/api/v1/sync/push-probe")  # under the exempt prefix; the real /sync/push needs a device
     async def sync_push() -> dict[str, int]:
         calls.append("sync")
         return {"n": len(calls)}
@@ -195,7 +195,7 @@ async def test_failures_are_not_stored_and_sync_push_is_exempt(
     async for client in _client(_idem_app(migrated_db, redis_url, calls)):
         r1 = await client.post("/api/v1/fails", headers=headers)
         r2 = await client.post("/api/v1/fails", headers=headers)
-        s1 = await client.post("/api/v1/sync/push", headers={"x-test-tenant": str(tenant.tenant_id)})
+        s1 = await client.post("/api/v1/sync/push-probe", headers={"x-test-tenant": str(tenant.tenant_id)})
     assert r1.status_code == r2.status_code == 500
     assert calls[:2] == ["fail", "fail"]  # retried, not replayed
     assert s1.status_code == 200

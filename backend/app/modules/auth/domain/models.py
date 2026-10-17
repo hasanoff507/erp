@@ -73,6 +73,7 @@ class AuthenticatedUser:
 
     user_id: UUID
     tenant_id: UUID
+    device_id: UUID | None = None  # device-bound login (14 §7.2)
 
     def get_user_id(self) -> UUID:
         return self.user_id
@@ -87,6 +88,7 @@ class AuthorizationCode(AuthorizationCodeMixin):  # type: ignore[misc]
     code_challenge_method: str
     redirect_uri: str
     scope: str
+    device_id: UUID | None = None  # device-bound login (14 §7.2)
 
     def get_redirect_uri(self) -> str:
         return self.redirect_uri

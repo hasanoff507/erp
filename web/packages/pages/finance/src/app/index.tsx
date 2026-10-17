@@ -3,8 +3,9 @@
  * Package router (24 §1): route objects relative to the back-office root `/app`.
  *
  * - BO-08 `/app/accounting/journal` — buxgalteriya jurnali + «Qayta hisoblash navbati» (Bosqich 2 part).
+ * - BO-07 `/app/tax/vat` — QQS ichki hisobi: vat-summary KPI + QQS registri (Bosqich 3 part).
  *
- * Not built yet (the shell shows "Tez orada"): BO-07 /app/tax/vat, BO-10 /app/tax/reconciliation,
+ * Not built yet (the shell shows "Tez orada"): BO-10 /app/tax/reconciliation,
  * BO-15 /app/einvoices, BO-17 /app/expenses, BO-24 /app/finance/bank-settlements (07).
  * Each screen lives in src/pages/<screen>/{model/{events,stores,effects,connections,types,lib},ui}.
  */
@@ -13,11 +14,10 @@ import type { RouteObject } from "react-router-dom";
 import type { RouteHandle } from "@shared/models";
 
 import { Journal } from "#/pages/journal/ui/page/Page.tsx";
+import { Vat } from "#/pages/vat/ui/page/Page.tsx";
 
-export const routes: RouteObject[] = [
-  {
-    path: Journal.route,
-    element: <Journal.Page />,
-    handle: { titleKey: Journal.titleKey } satisfies RouteHandle,
-  },
-];
+export const routes: RouteObject[] = [Journal, Vat].map((screen) => ({
+  path: screen.route,
+  element: <screen.Page />,
+  handle: { titleKey: screen.titleKey } satisfies RouteHandle,
+}));

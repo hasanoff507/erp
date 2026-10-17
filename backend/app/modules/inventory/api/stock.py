@@ -1,4 +1,4 @@
-"""Stock registers, valuation settings, recost jobs, stock openings (19 §7, §16–§18). Tag ``inventory``."""
+"""Stock registers, valuation/stock settings, recost jobs, openings (19 §7, §16–§18). Tag ``inventory``."""
 
 from __future__ import annotations
 
@@ -26,6 +26,7 @@ CanView = Annotated[PermissionGrant, Depends(require_permission("stock.view"))]
 CanOpen = Annotated[PermissionGrant, Depends(require_permission("stock.opening.manage"))]
 CanValuate = Annotated[PermissionGrant, Depends(require_permission("valuation.settings.manage"))]
 CanPost = Annotated[PermissionGrant, Depends(require_permission("accounting.post"))]
+CanCatalog = Annotated[PermissionGrant, Depends(require_permission("catalog.manage"))]
 Cursor = Annotated[str | None, Query(max_length=512)]
 Limit = Annotated[int, Query(ge=1, le=200)]
 
@@ -118,6 +119,37 @@ class ValuationSettingsPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     method: Method
+
+
+# 19 §17 /stock-settings — EAN-13 `PP CCCCC VVVVV K` weight-barcode templates (US-M09-06)
+WeightPrefix = Annotated[str, StringConstraints(pattern=r"^2[0-9]$")]
+
+
+class WeightBarcodeTemplate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    prefixes: list[WeightPrefix] = Field(min_length=1, max_length=10, description="2 digits, 20–29")
+    item_code_len: int = Field(default=5, ge=4, le=6, description="PLU code length")
+    value_len: int = Field(default=5, ge=4, le=6, description="item_code_len + value_len = 10 (EAN-13)")
+    value_kind: Literal["WEIGHT", "AMOUNT"]
+    decimals: int = Field(ge=0, le=3, description="WEIGHT: 3 (grams → kg); AMOUNT: 0 (so'm)")
+    enabled: bool = True
+
+
+class StockSettingsOut(BaseModel):
+    weight_barcode_templates: list[WeightBarcodeTemplate]
+    low_stock_check_enabled: bool
+    expiry_warning_days: int
+    version: int = Field(description="tenants.version — send it back in PATCH (17 §8)")
+
+
+class StockSettingsPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    weight_barcode_templates: list[WeightBarcodeTemplate] | None = Field(default=None, max_length=10)
+    low_stock_check_enabled: bool | None = None
+    expiry_warning_days: int | None = Field(default=None, ge=0, le=365)
+    version: int
 
 
 class RecostJobOut(BaseModel):
@@ -296,6 +328,24 @@ async def update_valuation_settings(
     request: Request, body: ValuationSettingsPatch, actor: Actor, _: CanValuate
 ) -> dict[str, Any]:
     return await inventory_module(request).valuation.change(actor, body.method, _ip(request))
+
+
+@router.get("/stock-settings", operation_id="inventory_get_stock_settings", response_model=StockSettingsOut)
+async def get_stock_settings(request: Request, actor: Actor, _: CanView) -> dict[str, Any]:
+    return await inventory_module(request).stock_settings.get(actor)
+
+
+@router.patch(
+    "/stock-settings", operation_id="inventory_update_stock_settings", response_model=StockSettingsOut
+)
+async def update_stock_settings(
+    request: Request, body: StockSettingsPatch, actor: Actor, _: CanCatalog
+) -> dict[str, Any]:
+    patch = body.model_dump(exclude_unset=True, exclude={"version"})
+    for key in ("weight_barcode_templates", "low_stock_check_enabled", "expiry_warning_days"):
+        if key in patch and patch[key] is None:
+            del patch[key]  # null = unchanged
+    return await inventory_module(request).stock_settings.update(actor, body.version, patch, _ip(request))
 
 
 # --- recost jobs (19 §18) ------------------------------------------------------------------------

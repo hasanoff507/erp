@@ -21,6 +21,7 @@ credentials the user shares with his other tenants; he simply logs in with them.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import secrets
@@ -39,6 +40,7 @@ from app.modules.auth.application.otp import VerifiedOtp
 from app.modules.auth.application.passwords import PASSWORD_MAX, PASSWORD_MIN, hash_password, hash_pin
 from app.modules.auth.application.ports import AuthStore
 from app.modules.auth.application.revocation import RevocationCache
+from app.modules.auth.domain.pin_verifier import make_pin_verifier
 
 log = structlog.get_logger(__name__)
 
@@ -135,11 +137,16 @@ class CredentialService:
         if not await self._redis().getdel(_key(token)):
             raise AppError(ErrorCode.UNAUTHORIZED, params={"reason": "credential_token_invalid"})
         user_id = UUID(str(record["user_id"]))
+        pin_hash = hash_pin(pin) if pin is not None else None
         await self._store.set_credentials(
             user_id,
             password_hash=hash_password(password) if password is not None else None,
-            pin_hash=hash_pin(pin) if pin is not None else None,
+            pin_hash=pin_hash,
         )
+        if pin is not None and pin_hash is not None:
+            # decision D1 (14 §13): the offline PBKDF2 verifier of the new PIN (argon2 never leaves)
+            verifier = await asyncio.to_thread(make_pin_verifier, pin)
+            await self._store.set_pin_local_hash(user_id, pin_hash, verifier)
         revoked = 0
         if password is not None and purpose in ("recovery", "admin_reset"):
             sids = await self._store.list_user_sessions(user_id, None)

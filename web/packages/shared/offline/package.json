@@ -8,12 +8,23 @@
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@shared/eslint-config": "workspace:*",
     "@shared/typescript-config": "workspace:*",
     "eslint": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "fake-indexeddb": "catalog:",
+    "vitest": "catalog:"
+  },
+  "dependencies": {
+    "@shared/api": "workspace:*",
+    "@shared/lib": "workspace:*",
+    "@shared/models": "workspace:*",
+    "dexie": "catalog:",
+    "effector": "catalog:",
+    "uuid": "catalog:"
   }
 }

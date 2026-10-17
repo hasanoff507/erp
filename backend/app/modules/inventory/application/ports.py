@@ -197,3 +197,20 @@ class EventRecorderPort(Protocol):
     async def record_event(
         self, s: AsyncSession, tenant_id: UUID, kind: str, payload: Mapping[str, Any], dedupe_key: str
     ) -> bool: ...
+
+
+@dataclass(frozen=True, slots=True)
+class TenantSettingsRow:
+    """``tenants.settings`` + optimistic ``version`` (19 §17 ``/stock-settings``)."""
+
+    settings: dict[str, Any]
+    version: int
+
+
+class StockSettingsRepository(Protocol):
+    async def read(
+        self, s: AsyncSession, tenant_id: UUID, *, for_update: bool = False
+    ) -> TenantSettingsRow: ...
+    async def write(self, s: AsyncSession, tenant_id: UUID, patch: Mapping[str, Any]) -> int:
+        """Merge ``patch`` into ``tenants.settings`` (top-level keys), ``version + 1``; new version."""
+        ...

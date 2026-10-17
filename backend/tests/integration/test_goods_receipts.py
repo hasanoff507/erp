@@ -30,6 +30,7 @@ from tests.support.inventory import (
     set_method,
     use_account,
 )
+from tests.support.ordering import TXN_ORDER
 from tests.support.purchasing import (
     GR,
     Env,
@@ -70,7 +71,7 @@ async def _vat_moves(env: Env, shop: Shop, doc_id: str) -> list[tuple[str, Any, 
     found = await rows(
         env, shop.tenant_id,
         "SELECT kind, base_amount, vat_amount, reversal_of_id FROM app.vat_moves WHERE doc_id = :d "
-        "ORDER BY created_at, id",
+        f"ORDER BY {TXN_ORDER}, id",
         d=UUID(doc_id),
     )  # fmt: skip
     return [(r["kind"], r["base_amount"], r["vat_amount"], r["reversal_of_id"]) for r in found]
@@ -78,7 +79,7 @@ async def _vat_moves(env: Env, shop: Shop, doc_id: str) -> list[tuple[str, Any, 
 
 async def _debt(env: Env, shop: Shop, doc_id: str) -> list[Any]:
     found = await rows(
-        env, shop.tenant_id, "SELECT amount FROM app.debt_moves WHERE doc_id = :d ORDER BY created_at, id",
+        env, shop.tenant_id, f"SELECT amount FROM app.debt_moves WHERE doc_id = :d ORDER BY {TXN_ORDER}, id",
         d=UUID(doc_id),
     )  # fmt: skip
     return [r["amount"] for r in found]
@@ -468,7 +469,7 @@ async def _vat_ids(env: Env, shop: Shop, doc_id: str) -> list[UUID]:
     found = await rows(
         env,
         shop.tenant_id,
-        "SELECT id FROM app.vat_moves WHERE doc_id = :d ORDER BY created_at, id",
+        f"SELECT id FROM app.vat_moves WHERE doc_id = :d ORDER BY {TXN_ORDER}, id",
         d=UUID(doc_id),
     )
     return [r["id"] for r in found]

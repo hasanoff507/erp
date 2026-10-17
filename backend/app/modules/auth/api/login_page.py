@@ -20,6 +20,7 @@ from app.modules.auth.application.login import TenantChoice
 
 OAUTH_PARAMS: Final = (
     "response_type", "client_id", "redirect_uri", "scope", "state", "code_challenge", "code_challenge_method",
+    "device_id",
 )  # fmt: skip
 UI_LOCALES_PARAM: Final = "ui_locales"  # OpenID Connect Core §3.1.2.1
 

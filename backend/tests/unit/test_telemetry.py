@@ -194,9 +194,10 @@ def test_worker_metrics_listener_guards_path_and_token() -> None:
 
 
 def test_sentry_event_gets_tenant_tag_and_is_redacted() -> None:
-    from uuid import uuid4
+    from uuid import UUID
 
-    tenant = uuid4()
+    # all-digit leading groups: the card pattern (13–19 digits) must not mangle the tenant tag
+    tenant = UUID("42022192-1331-4000-91f6-64b6940c09f6")
     t1, t2 = tenant_id_var.set(tenant), request_id_var.set("req-12345678")
     try:
         event = telemetry._sentry_before_send(

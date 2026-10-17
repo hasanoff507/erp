@@ -26,6 +26,7 @@ from tests.support.inventory import (
     set_method,
     use_account,
 )
+from tests.support.ordering import TXN_ORDER
 from tests.support.purchasing import (
     GR,
     SR,
@@ -73,7 +74,7 @@ async def _payable(env: Env, shop: Shop, supplier_id: str) -> Any:
 
 async def _debt(env: Env, shop: Shop, doc_id: str) -> list[Any]:
     found = await rows(
-        env, shop.tenant_id, "SELECT amount FROM app.debt_moves WHERE doc_id = :d ORDER BY created_at, id",
+        env, shop.tenant_id, f"SELECT amount FROM app.debt_moves WHERE doc_id = :d ORDER BY {TXN_ORDER}, id",
         d=UUID(doc_id),
     )  # fmt: skip
     return [r["amount"] for r in found]

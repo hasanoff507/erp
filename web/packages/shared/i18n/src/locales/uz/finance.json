@@ -126,5 +126,103 @@
     "bank_settlements": "Bank tushumi",
     "tax_settlements": "Soliq hisob-kitobi",
     "ledger_adjustments": "Tuzatuvchi yozuv"
+  },
+  "vat": {
+    "title": "QQS ichki hisob-kitobi",
+    "sectionLabel": "QQS va davlat hisoboti",
+    "tabs": {
+      "internal": "QQS ichki hisobi",
+      "reconciliation": "Davlat hisoboti bilan solishtirish"
+    },
+    "subtitle": "Sotuv, qaytarish va kirimlardan tizim hisoblagan QQS. Bu deklaratsiya topshirish emas — davlat tuzgan hisobot bilan solishtirish uchun ichki hisob.",
+    "offline": "Internet yo'q — oxirgi yuklangan ma'lumot ko'rsatilmoqda.",
+    "period": "Davr",
+    "periodMonth": "{{month}} {{year}}",
+    "periodQuarter": "{{year}} — {{quarter}}-chorak",
+    "currentMonth": "{{label}} (joriy)",
+    "months": {
+      "10": "Oktyabr",
+      "11": "Noyabr",
+      "12": "Dekabr",
+      "01": "Yanvar",
+      "02": "Fevral",
+      "03": "Mart",
+      "04": "Aprel",
+      "05": "May",
+      "06": "Iyun",
+      "07": "Iyul",
+      "08": "Avgust",
+      "09": "Sentyabr"
+    },
+    "regime": {
+      "vat": "QQS to'lovchi · 12%",
+      "turnover": "Aylanma solig'i · {{rate}}"
+    },
+    "mixedRegime": "Chorak ichida soliq rejimi o'zgargan — yig'indi oxirgi oy rejimida ko'rsatilgan, oylarni alohida tanlab ko'ring.",
+    "kpi": {
+      "output": "Chiquvchi QQS (6410)",
+      "outputNote": "Sotuvlardan · Kt 6410, qaytarishlar ayirilgan",
+      "input": "Kiruvchi QQS, hisobga olinadi",
+      "inputNote": "Kirim e-fakturalaridan · Dt 4410",
+      "payable": "Byudjetga to'lanadi",
+      "carryForward": "Keyingi davrga o'tadi",
+      "netNote": "Chiquvchi − hisobga olinadigan kiruvchi (ichki hisob)",
+      "turnoverBase": "Aylanma (soliq bazasi)",
+      "turnoverBaseNote": "Davr savdosi, qaytarishlar ayirilgan",
+      "turnoverRate": "Stavka",
+      "turnoverAmount": "Aylanma solig'i",
+      "turnoverAmountNote": "Dt 9430 / Kt 6410"
+    },
+    "credit": {
+      "title": "Kutilayotgan QQS krediti",
+      "hint": "Qizil e-fakturalar bo'yicha QQS yetkazib beruvchiga to'langach hisobga olinadi. Davr ulushi 10% dan oshmasligi kerak.",
+      "share": "Davr kiruvchi QQSdan {{pct}} · limit {{limit}}",
+      "invoices": "Qizil e-fakturalar: {{count}} ta",
+      "none": "Qizil e-faktura yo'q",
+      "quarterNote": "Chorak uchun ulush hisoblanmaydi — oyni tanlang.",
+      "overLimit": "Kutilayotgan QQS krediti ulushi 10% limitdan oshdi — e-fakturalarni E-faktura markazida tekshiring."
+    },
+    "empty": {
+      "title": "Bu davrda QQS harakati yo'q",
+      "description": "Sotuv yoki kirim o'tkazilgach summalar shu yerda ko'rinadi."
+    },
+    "nextStage": "Keyingi bosqichda",
+    "settlement": {
+      "title": "Soliq hisob-kitobi (ST)",
+      "description": "Oy yakunida kiruvchi va chiquvchi QQSni hisobga olish (Dt 6410 / Kt 4410) yoki aylanma solig'i provodkasi — qoralama, o'tkazish va bekor qilish keyingi bosqichda qo'shiladi."
+    },
+    "moves": {
+      "title": "QQS registri",
+      "subtitle": "Har bir hujjatdan yozilgan QQS harakatlari (qaytarishlar manfiy summa bilan).",
+      "kindFilter": "Turi",
+      "allKinds": "Barchasi",
+      "docFilter": "Hujjat",
+      "allDocs": "Barcha hujjatlar",
+      "kinds": {
+        "output": "Chiquvchi",
+        "input": "Kiruvchi"
+      },
+      "columns": {
+        "created": "Yozilgan",
+        "period": "Davr",
+        "kind": "Turi",
+        "document": "Hujjat",
+        "base": "Baza",
+        "vat": "QQS"
+      },
+      "empty": "Tanlangan davr va filtr bo'yicha yozuv yo'q",
+      "totals": "Ko'rsatilgan qatorlar jami",
+      "totalBase": "Baza jami",
+      "totalVat": "QQS jami"
+    },
+    "docTypes": {
+      "sales": "Sotuv",
+      "returns": "Qaytarish",
+      "goods_receipts": "Kirim",
+      "supplier_returns": "Yetkazib beruvchiga qaytarish",
+      "write_offs": "Hisobdan chiqarish",
+      "supplier_payments": "Yetkazib beruvchiga to'lov",
+      "other": "Hujjat"
+    }
   }
 }

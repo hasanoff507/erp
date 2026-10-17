@@ -9,6 +9,7 @@ from app.modules.inventory.application.queries import StockQueryService
 from app.modules.inventory.application.recost import RecostService
 from app.modules.inventory.application.stock import StockService
 from app.modules.inventory.application.stock_counts import StockCountService
+from app.modules.inventory.application.stock_settings import StockSettingsService
 from app.modules.inventory.application.transfers import TransferService
 from app.modules.inventory.application.valuation import ValuationService
 from app.modules.inventory.application.write_offs import WriteOffService
@@ -24,3 +25,4 @@ class InventoryModule:
     transfers: TransferService
     stock_counts: StockCountService
     write_offs: WriteOffService
+    stock_settings: StockSettingsService

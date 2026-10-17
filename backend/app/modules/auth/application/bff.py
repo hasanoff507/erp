@@ -54,6 +54,7 @@ class BffSession:
     access_exp: int
     refresh_token: str
     absolute_exp: int
+    device_id: str | None = None  # device-bound session (14 §7.2)
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,6 +96,7 @@ class BffService:
         client_secret: str,
         session_absolute_s: int,
         refresh_lock_ttl_s: int,
+        device_absolute_s: int = 180 * 86400,
     ) -> None:
         self._server = server
         self._codec = codec
@@ -106,6 +108,7 @@ class BffService:
         self._issuer = issuer
         self._basic = "Basic " + base64.b64encode(f"{WEB_BFF_CLIENT_ID}:{client_secret}".encode()).decode()
         self._absolute_s = session_absolute_s
+        self._device_absolute_s = device_absolute_s
         self._lock_ttl = refresh_lock_ttl_s
 
     @property
@@ -113,11 +116,16 @@ class BffService:
         return f"{self._issuer}/auth/callback"
 
     # --- login -----------------------------------------------------------------------------------
-    async def start_login(self, return_to: str | None, tenant_id: UUID | None) -> LoginStart:
+    async def start_login(
+        self, return_to: str | None, tenant_id: UUID | None, device_id: UUID | None = None
+    ) -> LoginStart:
+        """``device_id`` comes from the signed ``__Host-erp_device`` cookie only (14 §7.2)."""
         login_id = secrets.token_urlsafe(32)
         state = secrets.token_urlsafe(32)
         verifier = secrets.token_urlsafe(64)
         record = {"state": state, "verifier": verifier, "return_to": safe_return_to(return_to)}
+        if device_id is not None:
+            record["device_id"] = str(device_id)
         await self._redis().set(f"bff:login:{_digest(login_id)}", json.dumps(record), ex=LOGIN_STATE_TTL_S)
         params = {
             "response_type": "code",
@@ -129,6 +137,8 @@ class BffService:
         }
         if tenant_id is not None:
             params["tenant_id"] = str(tenant_id)
+        if device_id is not None:
+            params["device_id"] = str(device_id)
         return LoginStart(login_id, f"{self._issuer}/oauth/authorize?{urlencode(params)}")
 
     async def complete_login(
@@ -155,6 +165,10 @@ class BffService:
             meta,
         )
         session = await self._store_tokens(body)
+        if session.device_id is not None and session.device_id != record.get("device_id"):
+            # 14 §7.2: the code was bound to a device this browser did not prove (edited authorize URL)
+            await self.logout(UUID(session.sid), UUID(session.user_id), UUID(session.tenant_id), meta)
+            raise BffError(ErrorCode.UNAUTHORIZED, "device_mismatch")
         return session, record["return_to"]
 
     async def login_direct(
@@ -207,7 +221,31 @@ class BffService:
         )  # fmt: skip
         return new
 
-    async def _direct_exchange(self, user_id: UUID, tenant_id: UUID, meta: RequestMeta) -> BffSession:
+    async def bind_device(
+        self, sid: UUID, user_id: UUID, tenant_id: UUID, device_id: UUID, meta: RequestMeta
+    ) -> BffSession:
+        """Device registration (14 §7.2): the cookie session is replaced by a device-bound one.
+
+        Same server-side code exchange as the tenant switch — the AS re-checks membership,
+        subscription and the device itself; the old ``sid`` dies only after the new one exists.
+        """
+        old = await self.session(sid)
+        new = await self._direct_exchange(user_id, tenant_id, meta, device_id=device_id)
+        if new.device_id != str(device_id):
+            await self.logout(UUID(new.sid), user_id, tenant_id, meta)
+            raise BffError(ErrorCode.PERMISSION_DENIED, "device_not_bindable")
+        family = None
+        if old is not None:
+            row = await self._repo.lookup_refresh(token_hash(old.refresh_token))
+            family = row.family_id if row is not None else None
+        await self._repo.revoke_session(sid, "device_bound")
+        await self._revocation.mark_revoked(sids=[sid], families=[family])
+        await self.drop(sid)
+        return new
+
+    async def _direct_exchange(
+        self, user_id: UUID, tenant_id: UUID, meta: RequestMeta, *, device_id: UUID | None = None
+    ) -> BffSession:
         """One-time code with a fresh PKCE pair, redeemed through the in-process ``/oauth/token``."""
         await self._server.clients.refresh()
         client = self._server.clients.get(WEB_BFF_CLIENT_ID)
@@ -218,7 +256,7 @@ class BffService:
         await self._server.tokens.save_code(
             code,
             client,
-            AuthenticatedUser(user_id, tenant_id),
+            AuthenticatedUser(user_id, tenant_id, device_id),
             create_s256_code_challenge(verifier),
             self.redirect_uri,
             client.get_allowed_scope(None),
@@ -294,13 +332,16 @@ class BffService:
                     ErrorCode.SUBSCRIPTION_RESTRICTED, params={"tenant_id": current.tenant_id}
                 ) from exc
             await self.drop(UUID(current.sid))
+            if exc.reason == "device_revoked":
+                raise AppError(ErrorCode.DEVICE_REVOKED) from exc  # 16 §9: wipe, not a re-login
             return None
         return await self._store_tokens(body)
 
     # --- logout ----------------------------------------------------------------------------------
     async def logout(self, sid: UUID, user_id: UUID, tenant_id: UUID, meta: RequestMeta) -> None:
+        family = await self._repo.session_family(sid)
         await self._repo.revoke_session(sid, "logout")
-        await self._revocation.mark_sessions_revoked([sid])
+        await self._revocation.mark_revoked(sids=[sid], families=[family])
         await self.drop(sid)
         await self._audit.write(
             tenant_id=tenant_id, user_id=user_id, action="session_revoked", entity="sessions", entity_id=sid,
@@ -354,7 +395,9 @@ class BffService:
         claims = await self._codec.verify(str(body["access_token"]))
         sid = str(claims["sid"])
         existing = await self.session(UUID(sid))
-        absolute = existing.absolute_exp if existing else int(time.time()) + self._absolute_s
+        device_id = str(claims["device_id"]) if claims.get("device_id") else None
+        lifetime = self._device_absolute_s if device_id else self._absolute_s
+        absolute = existing.absolute_exp if existing else int(time.time()) + lifetime
         session = BffSession(
             sid=sid,
             user_id=str(claims["sub"]),
@@ -363,6 +406,7 @@ class BffService:
             access_exp=int(claims["exp"]),
             refresh_token=str(body["refresh_token"]),
             absolute_exp=absolute,
+            device_id=device_id,
         )
         sealed = self._cipher.encrypt(json.dumps(asdict(session)).encode(), f"bff_session:{sid}".encode())
         await self._redis().set(f"bff:sess:{sid}", sealed, ex=max(1, absolute - int(time.time())))

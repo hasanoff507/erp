@@ -28,6 +28,7 @@ export function NativeSelect({ options, className, wrapperClassName, ref, ...pro
         className={cn(
           "h-[42px] w-full appearance-none rounded-lg border border-input bg-card pl-3 pr-9 text-[14px] font-semibold text-foreground",
           "focus-visible:border-primary focus-visible:shadow-focus-soft focus-visible:outline-none focus-visible:ring-0",
+          "[[data-density=touch]_&]:min-h-[52px]",
           className,
         )}
         {...props}

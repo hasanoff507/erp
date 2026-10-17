@@ -39,6 +39,13 @@ SECURITY_DEFINER_FUNCTIONS_0027: Final[tuple[str, ...]] = (
     "auth_lookup_refresh", "auth_revoke_refresh_family", "auth_purge_login_attempts",
 )  # fmt: skip
 
+# --- Bosqich 3 settings: device-auth slice ---
+# 0027a web_pos — device-bound login and PIN (12 §4.5 "Qurilmaga bog'langan login va PIN funksiyalari")
+SECURITY_DEFINER_FUNCTIONS_0027A_DEVICE_AUTH: Final[tuple[str, ...]] = (
+    "auth_set_pin_local_hash", "auth_pin_state", "auth_staff_pin_states", "auth_family_revoked",
+    "auth_session_family", "auth_revoke_device", "auth_member_elsewhere",
+)  # fmt: skip
+
 _TABLES_WITHOUT_RLS = text(
     """
     SELECT n.nspname || '.' || c.relname AS table_name

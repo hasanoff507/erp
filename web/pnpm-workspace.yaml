@@ -30,6 +30,9 @@ catalog:
   axios: ^1.20.0
   orval: ^8.43.0
   uuid: ^14.0.3
+  # offline POS (24 §4, 16): IndexedDB via Dexie; fake-indexeddb only in unit tests
+  dexie: ^4.4.6
+  "@tanstack/react-virtual": ^3.14.21
   # 24 §4.4: Radix (react-style-singleton) reads the style nonce from get-nonce.
   get-nonce: ^1.0.1
   # ui
@@ -84,6 +87,7 @@ catalog:
   "@testing-library/jest-dom": ^7.0.1
   "@testing-library/user-event": ^14.6.8
   msw: ^3.0.3
+  fake-indexeddb: ^6.2.6
   "@playwright/test": ^1.64.1
 
 # Security fixes for transitive dependencies (CI gate: pnpm audit --audit-level=high, qaror #57).

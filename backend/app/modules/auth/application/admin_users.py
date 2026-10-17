@@ -393,14 +393,15 @@ class AdminUsersService:
             await self._guard_owner_target(s, tenant, actor.user_id, staff.role_ids)
             if session_id not in await self._repo.session_ids(s, user_id, tenant):
                 raise AppError(ErrorCode.NOT_FOUND, params={"resource": "sessions"})
-            await self._repo.revoke_session(s, session_id, REVOKE_REASON_ADMIN)
+            family = await self._repo.revoke_session(s, session_id, REVOKE_REASON_ADMIN)
             await record_audit(
                 s, tenant_id=tenant, user_id=actor.user_id, action="session_revoked", entity="sessions",
                 entity_id=session_id, ip=ip, after={"user_id": str(user_id), "reason": REVOKE_REASON_ADMIN},
             )  # fmt: skip
             result = SessionsRevoked(user_id, 1)
             stage_response(asdict(result))
-        await self._revocation.mark_sessions_revoked([session_id])
+        # SEC-09: the session's live access tokens die at once — by sid and by refresh family
+        await self._revocation.mark_revoked(sids=[session_id], families=[family])
         await self._drop(session_id)
         return result
 

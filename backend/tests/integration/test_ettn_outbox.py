@@ -5,7 +5,7 @@ cap 1 h, 24 tries), permanent ones dead-lettered; the telegram outbox is never t
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import Any
 from uuid import UUID
 
@@ -42,7 +42,9 @@ async def _posted_vehicle_transfer(env: Env, name: str) -> tuple[Shop, dict[str,
     p = await new_product(env, shop)
     await stock_in(env, shop, src, p, "5.000", "25000.00")
     doc = await create_transfer(env, shop, src, dst, [(p, "1.000")])
-    return shop, await ok(await act(env, shop, doc["id"], "post"))
+    posted = await ok(await act(env, shop, doc["id"], "post"))
+    await _due_now(env, shop)  # enqueued at the post's DB now(); the test VM clock may step back since
+    return shop, posted
 
 
 async def _job(env: Env, shop: Shop) -> dict[str, Any]:
@@ -61,11 +63,12 @@ async def _ettn(env: Env, shop: Shop) -> dict[str, Any]:
 
 
 async def _due_now(env: Env, shop: Shop, **values: Any) -> None:
+    """Make the job due: an hour back, so a DB clock that steps backwards (~1 s) still sees it as due."""
     sets = ", ".join(f"{k} = :{k}" for k in values)
     extra = f", {sets}" if sets else ""
     await execute(
         env, shop.tenant_id,
-        f"UPDATE app.outbox_jobs SET next_run_at = now() - interval '1 second'{extra} WHERE kind = 'ettn_send'",
+        f"UPDATE app.outbox_jobs SET next_run_at = now() - interval '1 hour'{extra} WHERE kind = 'ettn_send'",
         **values,
     )  # fmt: skip
 
@@ -74,12 +77,12 @@ async def test_transient_errors_retry_with_backoff_then_dead_letter(env: Env) ->
     shop, doc = await _posted_vehicle_transfer(env, "e-TTN retry")
     down = FakeEInvoiceAdapter(fail=True)
     service = _service(env, down)
-    before = datetime.now(UTC)
     first = await service.run(shop.tenant_id)
     assert first is not None and (first.status, first.ettn_status) == ("retry", "sending")
     job = await _job(env, shop)
     assert (job["status"], job["attempts"]) == ("retry", 1) and "down" in job["last_error"]
-    assert before + timedelta(seconds=59) < job["next_run_at"] < datetime.now(UTC) + timedelta(seconds=61)
+    # next_run_at = the database now() + backoff (jitter 0) — the same clock as updated_at and the claim
+    assert job["next_run_at"] - job["updated_at"] == timedelta(minutes=1)
     ettn = await _ettn(env, shop)
     assert ettn["status"] == "sending" and "down" in ettn["last_error"]
     assert await service.run(shop.tenant_id) is None  # not due yet
@@ -88,15 +91,13 @@ async def test_transient_errors_retry_with_backoff_then_dead_letter(env: Env) ->
     await service.run(shop.tenant_id)
     job = await _job(env, shop)
     assert job["attempts"] == 2
-    assert timedelta(seconds=119) < job["next_run_at"] - job["updated_at"] < timedelta(seconds=121)  # 2 min
+    assert job["next_run_at"] - job["updated_at"] == timedelta(minutes=2)
 
     await _due_now(env, shop, attempts=10)
     await service.run(shop.tenant_id)
     job = await _job(env, shop)
     assert job["attempts"] == 11
-    assert (
-        timedelta(seconds=3599) < job["next_run_at"] - job["updated_at"] < timedelta(seconds=3601)
-    )  # cap 1 h
+    assert job["next_run_at"] - job["updated_at"] == timedelta(hours=1)  # cap 1 h
 
     await _due_now(env, shop, attempts=23)
     last = await service.run(shop.tenant_id)
@@ -177,8 +178,10 @@ async def test_sweeper_runs_through_saq_and_reclaims_a_dead_worker(env: Env) -> 
     await execute(env, shop2.tenant_id, "UPDATE app.ettn_documents SET status = 'sending'")
     fresh = EttnOutboxService(env.db.session_factory, SqlEttnOutboxRepository(), FakeEInvoiceAdapter())
     assert await fresh.process_due(shop2.tenant_id) == []  # a live worker holds it (< 10 min)
+    # stale threshold −60 s (not 0): updated_at comes from the DB now() (trigger), and the test VM clock can
+    # step back ~1 s between the two transactions — this still treats the running job as a dead worker's
     stale = EttnOutboxService(
-        env.db.session_factory, SqlEttnOutboxRepository(stale_running_s=0), FakeEInvoiceAdapter()
+        env.db.session_factory, SqlEttnOutboxRepository(stale_running_s=-60), FakeEInvoiceAdapter()
     )
     [outcome] = await stale.process_due(shop2.tenant_id)
     assert (outcome.status, outcome.ettn_status) == ("done", "registered")

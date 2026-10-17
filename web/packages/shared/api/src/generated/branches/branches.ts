@@ -23,6 +23,10 @@ import type {
   ConsentIn,
   ConsentOut,
   ListBranchesParams,
+  ListSyncExceptionsParams,
+  SyncExceptionPage,
+  SyncExceptionReview,
+  SyncExceptionReviewed,
   TaxRegimeIn,
   TaxRegimeOut,
   TaxSettingCreatedOut,
@@ -249,6 +253,32 @@ export const tenantConsentsCreate = (
     },
       options);
     }
+  /**
+ * @summary List Sync Exceptions
+ */
+export const listSyncExceptions = (
+    params?: ListSyncExceptionsParams,
+ options?: SecondParameter<typeof apiRequest<SyncExceptionPage>>,) => {
+      return apiRequest<SyncExceptionPage>(
+      {url: `/api/v1/sync-exceptions`, method: 'GET',
+        params
+    },
+      options);
+    }
+  /**
+ * @summary Review Sync Exception
+ */
+export const reviewSyncException = (
+    exceptionId: string,
+    syncExceptionReview: SyncExceptionReview,
+ options?: SecondParameter<typeof apiRequest<SyncExceptionReviewed>>,) => {
+      return apiRequest<SyncExceptionReviewed>(
+      {url: `/api/v1/sync-exceptions/${exceptionId}/review`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: syncExceptionReview
+    },
+      options);
+    }
   export type ListBranchesResult = NonNullable<Awaited<ReturnType<typeof listBranches>>>
 export type CreateBranchResult = NonNullable<Awaited<ReturnType<typeof createBranch>>>
 export type GetBranchResult = NonNullable<Awaited<ReturnType<typeof getBranch>>>
@@ -265,3 +295,5 @@ export type TenantSettingsGetResult = NonNullable<Awaited<ReturnType<typeof tena
 export type TenantSettingsUpdateResult = NonNullable<Awaited<ReturnType<typeof tenantSettingsUpdate>>>
 export type TenantTaxRegimesCreateResult = NonNullable<Awaited<ReturnType<typeof tenantTaxRegimesCreate>>>
 export type TenantConsentsCreateResult = NonNullable<Awaited<ReturnType<typeof tenantConsentsCreate>>>
+export type ListSyncExceptionsResult = NonNullable<Awaited<ReturnType<typeof listSyncExceptions>>>
+export type ReviewSyncExceptionResult = NonNullable<Awaited<ReturnType<typeof reviewSyncException>>>

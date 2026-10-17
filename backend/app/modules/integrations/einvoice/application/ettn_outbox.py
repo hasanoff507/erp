@@ -29,7 +29,7 @@ from __future__ import annotations
 import random
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import timedelta
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -43,7 +43,7 @@ from app.modules.integrations.einvoice.application.ports import (
     EInvoiceProviderError,
     ETtnResult,
 )
-from app.modules.integrations.einvoice.domain.retry import exhausted, next_run_at
+from app.modules.integrations.einvoice.domain.retry import exhausted, retry_delay
 
 log = structlog.get_logger(__name__)
 
@@ -87,8 +87,10 @@ class EttnOutboxRepository(Protocol):
         job_id: UUID,
         status: str,
         last_error: str | None,
-        run_at: datetime | None = None,
-    ) -> None: ...
+        run_after: timedelta | None = None,
+    ) -> None:
+        """``run_after`` → ``next_run_at = now() + run_after`` (database clock); ``None`` keeps it."""
+        ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,12 +213,12 @@ class EttnOutboxService:
         if exhausted(job.attempts):
             return await self._failed(tenant_id, job, ettn, f"transient, {job.attempts} attempts: {error}")
         error = error[:1000]
-        when = next_run_at(datetime.now(UTC), job.attempts, self._rand())
+        delay = retry_delay(job.attempts, self._rand())
         async with self._sf() as s, tenant_transaction(s, tenant_id):
             current = await self._lock_for_record(s, job, ettn)
             if current is not None and current.status == "sending":
                 await self._repo.set_ettn(s, ettn.id, "sending", operator_doc_id=None, last_error=error)
-            await self._repo.finish(s, job.id, "retry", error, when)
+            await self._repo.finish(s, job.id, "retry", error, delay)
         return Outcome(job.id, "retry", "sending")
 
 

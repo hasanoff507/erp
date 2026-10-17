@@ -41,6 +41,7 @@ from tests.support.auth import (
     refresh,
     running_app,
 )
+from tests.support.ordering import TXN_ORDER
 
 pytestmark = [pytest.mark.db, pytest.mark.redis]
 
@@ -92,7 +93,8 @@ def _claims(token: str) -> tuple[dict[str, object], dict[str, object]]:
 async def _audit_actions(admin_engine: AsyncEngine, tenant_id: UUID) -> list[str]:
     async with admin_engine.connect() as conn:
         rows = await conn.execute(
-            text("SELECT action FROM app.audit_log WHERE tenant_id = :t ORDER BY at"), {"t": tenant_id}
+            text(f"SELECT action FROM app.audit_log WHERE tenant_id = :t ORDER BY {TXN_ORDER}, id"),
+            {"t": tenant_id},
         )
         return [r[0] for r in rows]
 
@@ -593,8 +595,9 @@ async def test_auth_session_profile(world: World, settings, clean_redis: Redis) 
         body = r.json()
         assert set(body) == {
             "user", "tenant", "branches", "roles", "permissions", "scope", "client_id", "sub_status",
-            "access_expires_at",
+            "access_expires_at", "device",
         }  # fmt: skip
+        assert body["device"] is None  # an unbound (non-device) session (14 §7.2)
         phone = world.cashier_phone
         assert body["user"] == {
             "id": str(world.cashier_id),

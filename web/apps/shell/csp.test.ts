@@ -9,6 +9,7 @@ import {
   cspDirectives,
   generateNonce,
   NGINX_NONCE,
+  parseLanPrinterOrigins,
   securityHeaders,
   serializeCsp,
 } from "./csp.ts";
@@ -76,5 +77,26 @@ describe("CSP — qaror #57, 24 §4.4", () => {
     expect(document).toContain("sub_filter_once off;");
     expect(document).toContain('add_header Cache-Control "no-store" always;');
     expect(document).toContain("frame-ancestors 'none'");
+  });
+
+  it("LAN HTTP printers (24 §6.1): exact private-IPv4 origins from ERP_CSP_LAN_PRINTERS, never wildcards", () => {
+    expect(parseLanPrinterOrigins(undefined)).toEqual([]);
+    expect(parseLanPrinterOrigins("http://192.168.1.60, https://10.0.0.5:8443 http://192.168.1.60")).toEqual([
+      "http://192.168.1.60",
+      "https://10.0.0.5:8443",
+    ]);
+    for (const bad of [
+      "http://*.local",
+      "http://printer.lan",
+      "http://8.8.8.8",
+      "http://192.168.1.60/cgi-bin",
+      "ftp://10.0.0.1",
+      "*",
+    ]) {
+      expect(() => parseLanPrinterOrigins(bad)).toThrow(/ERP_CSP_LAN_PRINTERS/);
+    }
+    const header = serializeCsp(cspDirectives({ lanPrinterOrigins: ["http://192.168.1.60"] }), "header");
+    expect(header).toContain("connect-src 'self' http://127.0.0.1:47110 http://192.168.1.60;");
+    expect(serializeCsp(cspDirectives(), "header")).toContain("connect-src 'self' http://127.0.0.1:47110;");
   });
 });

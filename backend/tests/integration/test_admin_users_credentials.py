@@ -119,7 +119,7 @@ async def test_qt_m13_06_reset_password_kills_sessions_and_sends_admin_reset_cod
     async with admin_engine.connect() as conn:
         purpose = (
             await conn.execute(
-                text("SELECT purpose FROM auth.otp_challenges WHERE phone = :p ORDER BY id DESC LIMIT 1"),
+                text("SELECT purpose FROM auth.otp_challenges WHERE phone = :p AND purpose <> 'invite'"),
                 {"p": phone},
             )
         ).scalar()
@@ -147,7 +147,7 @@ async def test_qt_m13_06_reset_pin_forces_a_new_pin_and_keeps_sessions(
     async with admin_engine.connect() as conn:
         purpose = (
             await conn.execute(
-                text("SELECT purpose FROM auth.otp_challenges WHERE phone = :p ORDER BY id DESC LIMIT 1"),
+                text("SELECT purpose FROM auth.otp_challenges WHERE phone = :p AND purpose <> 'invite'"),
                 {"p": phone},
             )
         ).scalar()

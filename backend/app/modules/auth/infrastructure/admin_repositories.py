@@ -84,6 +84,7 @@ _SESSIONS = text(
     "ORDER BY s.last_seen_at DESC, s.session_id"
 )
 _REVOKE_SESSION = text("SELECT app.auth_revoke_session(:sid, :reason)")
+_SESSION_FAMILY = text("SELECT app.auth_session_family(:sid)")  # --- B3 device-auth --- SEC-09
 _REVOKE_USER = text("SELECT app.auth_revoke_user(:user_id, :tenant_id, :reason)")
 _DEVICES = text(
     "SELECT d.id, d.kind, d.app_version, d.cash_register_id, cr.name AS cash_register_name, "
@@ -216,8 +217,10 @@ class MembershipAdminRepository:
             for r in rows
         ]  # fmt: skip
 
-    async def revoke_session(self, s: AsyncSession, session_id: UUID, reason: str) -> None:
+    async def revoke_session(self, s: AsyncSession, session_id: UUID, reason: str) -> UUID | None:
+        family = (await s.execute(_SESSION_FAMILY, {"sid": session_id})).scalar()
         await s.execute(_REVOKE_SESSION, {"sid": session_id, "reason": reason})
+        return UUID(str(family)) if family else None
 
     async def revoke_user(self, s: AsyncSession, user_id: UUID, tenant_id: UUID, reason: str) -> int:
         params = {"user_id": user_id, "tenant_id": tenant_id, "reason": reason}

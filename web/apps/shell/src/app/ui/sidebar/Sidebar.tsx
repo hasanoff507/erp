@@ -7,12 +7,21 @@
  * full labels inside the <768px off-canvas menu.
  */
 import { useUnit } from "effector-react";
+import { useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
 import { useTranslation } from "@shared/i18n";
 import { hasPermissions, useGrantedAccess } from "@shared/state/permissions";
 import { $tenant } from "@shared/state/session";
 import { cn, Icon, LogoMark } from "@shared/ui";
+
+import {
+  $approvalsPending,
+  approvalsBadgeMounted,
+  approvalsBadgeUnmounted,
+  approvalsCountRequested,
+  badgeText,
+} from "#/features/approvals-count/index.ts";
 
 import { NAV_GROUPS, navItemForPath, navItemTarget } from "./nav-items.ts";
 import { UserCard } from "./UserCard.tsx";
@@ -32,10 +41,28 @@ export function Sidebar({ variant, onNavigate }: SidebarProps) {
   // In the rail, text is hidden between md and lg (icon-only); in the drawer it is always shown.
   const label = rail ? "md:sr-only lg:not-sr-only" : "";
 
+  const [pending, badgeMounted, badgeUnmounted, countRequested] = useUnit([
+    $approvalsPending,
+    approvalsBadgeMounted,
+    approvalsBadgeUnmounted,
+    approvalsCountRequested,
+  ]);
+
   const groups = NAV_GROUPS.map((group) => ({
     ...group,
     items: group.items.filter((item) => hasPermissions(granted, item.requires)),
   })).filter((group) => group.items.length > 0);
+  // WEB-12: the pending-approvals badge polls only for users who see «Tasdiqlash navbati».
+  const showsApprovals = groups.some((g) => g.items.some((i) => i.key === "approvals"));
+  useEffect(() => {
+    if (!showsApprovals) return;
+    badgeMounted();
+    return () => badgeUnmounted();
+  }, [showsApprovals, badgeMounted, badgeUnmounted]);
+  useEffect(() => {
+    if (showsApprovals) countRequested();
+  }, [pathname, showsApprovals, countRequested]);
+  const approvalsBadge = showsApprovals ? badgeText(pending) : null;
 
   return (
     <nav
@@ -90,8 +117,29 @@ export function Sidebar({ variant, onNavigate }: SidebarProps) {
                       : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
                   )}
                 >
-                  <Icon as={item.icon} size="md" className="shrink-0" />
+                  <span className="relative inline-flex shrink-0">
+                    <Icon as={item.icon} size="md" />
+                    {item.key === "approvals" && approvalsBadge && rail ? (
+                      <span
+                        aria-hidden="true"
+                        className="absolute -right-1.5 -top-1.5 size-2.5 rounded-full bg-destructive lg:hidden"
+                      />
+                    ) : null}
+                  </span>
                   <span className={cn("flex-1 truncate", label)}>{text}</span>
+                  {item.key === "approvals" && approvalsBadge ? (
+                    <span
+                      className={cn(
+                        "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-extrabold text-destructive-foreground tabular-nums",
+                        label,
+                      )}
+                    >
+                      <span aria-hidden="true">{approvalsBadge}</span>
+                      <span className="sr-only">
+                        {t("approvalsBadge.pending", { count: approvalsBadge })}
+                      </span>
+                    </span>
+                  ) : null}
                 </NavLink>
               );
             })}

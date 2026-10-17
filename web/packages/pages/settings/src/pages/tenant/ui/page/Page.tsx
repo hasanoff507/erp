@@ -26,6 +26,9 @@ import {
 } from "@shared/ui";
 import { RhfField, useZodForm, z, zDecimal } from "@shared/ui/form";
 
+import { FiscalReceiptsCard } from "#/features/fiscal-receipts/index.ts";
+import { ScaleTemplatesCard } from "#/features/scale-templates/index.ts";
+import { SyncExceptionsCard } from "#/features/sync-exceptions/index.ts";
 import { applyServerErrors } from "#/shared/lib/form.ts";
 import { errorText } from "#/shared/lib/errors.ts";
 import { NextStageCard, PageHeader } from "#/shared/ui/PageHeader.tsx";
@@ -108,8 +111,11 @@ function isTab(value: string | null): value is TenantTab {
  * BO-14 — Tenant/do'kon sozlamalari, Bosqich 1 part (07, route /app/settings/tenant, `settings.tenant`
  * — owner only): name, legal form, bank details, the tenant policies of 20 #40b, tax regime (#40c),
  * AI cross-border consent (#40h). Bosqich 2: «Zaxira baholash usuli» (19 §17, `valuation.settings.manage`)
- * and the «Qayta hisoblash navbati» status line (qaror #56c, → BO-08). Integrations, scales, store agent,
- * receipt template and sync exceptions are later stages and shown as disabled sections.
+ * and the «Qayta hisoblash navbati» status line (qaror #56c, → BO-08). Bosqich 3: «Fiskal» — registers'
+ * fiscal module state + unsent receipts with «Qayta urinish» (18 §14); «Xavfsizlik» — «Sinxron istisnolari»
+ * with «Ko'rib chiqildi» (20 #40f/#40g); «Fiskal» also hosts the weight-barcode templates (b3-pos-wh
+ * feature, `PATCH /stock-settings`). Integration keys, store agent and receipt template are later
+ * stages and shown as disabled sections.
  */
 function TenantPage() {
   const { t } = useTranslation("settings");
@@ -167,6 +173,9 @@ function TenantForm({
   const { t } = useTranslation("settings");
   const { t: tc } = useTranslation("common");
   const online = useOnline();
+  const canRetryFiscal = useCan({ permission: "integrations.retry" });
+  // GET /fiscal-receipts — reports.sales.view or sales.create (18 §14.1).
+  const canReadFiscal = useCan({ anyOf: ["reports.sales.view", "sales.create"] });
   const [update, saving, reload] = useUnit([
     updateSettingsFx,
     updateSettingsFx.pending,
@@ -508,8 +517,9 @@ function TenantForm({
               />
             </div>
           </Card>
+          {canReadFiscal ? <FiscalReceiptsCard canRetry={canRetryFiscal} online={online} /> : null}
           <NextStageCard title={t("tenant.agent.title")} description={t("tenant.agent.description")} />
-          <NextStageCard title={t("tenant.scales.title")} description={t("tenant.scales.description")} />
+          <ScaleTemplatesCard />
         </TabsContent>
 
         <TabsContent value="receipt" className="mt-3.5">
@@ -535,10 +545,7 @@ function TenantForm({
               disabled={!online}
             />
           </Card>
-          <NextStageCard
-            title={t("tenant.syncExceptions.title")}
-            description={t("tenant.syncExceptions.description")}
-          />
+          <SyncExceptionsCard online={online} />
           <RecostStatusLine />
         </TabsContent>
       </Tabs>

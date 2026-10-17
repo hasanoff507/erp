@@ -18,7 +18,8 @@ from __future__ import annotations
 
 import contextlib
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
+from dataclasses import replace
 from decimal import Decimal
 from typing import Any, Final, Literal
 from uuid import UUID
@@ -32,11 +33,17 @@ from app.core.auth.principal import Principal
 from app.core.auth.tokens import CsrfTokens, SessionCookieSigner
 from app.core.error_codes import ErrorCode
 from app.core.errors import AppError
+from app.modules.auth.application.actor import (
+    ACTOR_HEADER,
+    ActorBindings,
+    ActorBindingUnavailableError,
+    session_key,
+)
 from app.modules.auth.application.admin_ports import DeviceStatusReader
 from app.modules.auth.application.bff import BffService, BffSession
 from app.modules.auth.application.keys import AccessTokenCodec, InvalidAccessTokenError
 from app.modules.auth.application.ports import AuthStore
-from app.modules.auth.application.revocation import RevocationCache, TokenRevokedError
+from app.modules.auth.application.revocation import RevocationCache, TokenRevokedError, mark_revoked_markers
 from app.modules.auth.application.subscription import SubscriptionStatusService
 from app.modules.auth.application.tokens import RequestMeta
 from app.modules.auth.domain.constants import CSRF_HEADER, SID_COOKIE
@@ -47,6 +54,24 @@ log = structlog.get_logger(__name__)
 SAFE_METHODS: Final = frozenset({"GET", "HEAD", "OPTIONS"})
 _BEARER_CHALLENGE: Final = {"WWW-Authenticate": 'Bearer error="invalid_token"'}
 DEVICE_REVOKED_MARKER_S: Final = 86400  # the database stays authoritative after the marker expires
+
+
+def _actor_not_verified() -> AppError:
+    return AppError(ErrorCode.PERMISSION_DENIED, params={"reason": "actor_not_verified"})
+
+
+def _most_generous(limits: list[Decimal | None]) -> Decimal | None:
+    if any(limit is None for limit in limits):
+        return None
+    return max(limit for limit in limits if limit is not None)
+
+
+def _stricter(a: Decimal | None, b: Decimal | None) -> Decimal | None:
+    if a is None:
+        return b
+    if b is None:
+        return a
+    return min(a, b)
 
 
 def request_meta(request: Request) -> RequestMeta:
@@ -73,12 +98,22 @@ def _claims_stale_key(tenant_id: str, user_id: str) -> str:
     return f"auth:claims_stale:{tenant_id}:{user_id}"
 
 
-async def mark_device_revoked(redis: Redis, device_id: UUID) -> None:
+async def mark_device_revoked(
+    redis: Redis,
+    device_id: UUID,
+    *,
+    sids: Iterable[UUID | None] = (),
+    families: Iterable[UUID | None] = (),
+    marker_ttl_s: int = 900 + 120,
+) -> None:
     """Call right after ``app.devices.revoked_at`` is committed (``POST /devices/{id}/revoke``, 20 #29b).
 
     Makes the rejection immediate; without it the RS notices within the positive-cache TTL
-    (``session_check_cache_s``) through the database fallback.
+    (``session_check_cache_s``) through the database fallback. ``sids``/``families`` — the device's
+    sessions and refresh families ``app.auth_revoke_device`` revoked in the same transaction: their
+    live access tokens die at once even where the device claim is not checked (SEC-09).
     """
+    await mark_revoked_markers(redis, sids=sids, families=families, ttl_s=marker_ttl_s)
     try:
         async with redis.pipeline(transaction=False) as pipe:
             pipe.set(_device_revoked_key(str(device_id)), "1", ex=DEVICE_REVOKED_MARKER_S)
@@ -166,6 +201,8 @@ class ErpAuthGateway:
         cookies: SessionCookieSigner,
         csrf: CsrfTokens,
         guard: AccessGuard | None = None,
+        actors: ActorBindings | None = None,
+        api_prefix: str = "/api/v1",
     ) -> None:
         self._codec = codec
         self._revocation = revocation
@@ -175,6 +212,10 @@ class ErpAuthGateway:
         self._cookies = cookies
         self._csrf = csrf
         self._guard = guard
+        self._actors = actors
+        self._api_prefix = api_prefix
+        # /sync/* events carry and authorize their own actor_user_id (16 §2); /auth/csrf is a read
+        self._actor_exempt = (f"{api_prefix}/sync/", f"{api_prefix}/auth/")
 
     async def authenticate(self, request: Request) -> Principal:
         header = request.headers.get("authorization")
@@ -186,7 +227,7 @@ class ErpAuthGateway:
             if await self._guarded(claims) == "stale":
                 # 14 §5 claims stale: the client refreshes and gets the current roles/branches
                 raise AppError(ErrorCode.TOKEN_EXPIRED, headers=_BEARER_CHALLENGE)
-            return self._principal(claims, via_cookie=False)
+            return await self._with_actor(request, self._principal(claims, via_cookie=False))
 
         sid = self._cookies.unsign(request.cookies.get(SID_COOKIE))
         if sid is None:
@@ -201,7 +242,7 @@ class ErpAuthGateway:
             # 14 §5 claims stale: the BFF re-issues the access token with the current roles/branches
             claims = await self._cookie_claims(sid, request, force=True)
             await self._guarded(claims)
-        return self._principal(claims, via_cookie=True)
+        return await self._with_actor(request, self._principal(claims, via_cookie=True))
 
     async def peek_tenant(self, request: Request) -> UUID | None:
         """Idempotency tenant (23 §3): a revoked token/session gets no replay — it falls through to 401."""
@@ -235,10 +276,29 @@ class ErpAuthGateway:
         return await self._subs.status(tenant_id)
 
     async def permission_limits(self, principal: Principal, code: str) -> list[Decimal | None]:
-        return await self._repo.permission_limits(principal.tenant_id, principal.user_id, code)
+        limits = await self._repo.permission_limits(principal.tenant_id, principal.user_id, code)
+        if principal.session_user_id is None or not limits:
+            return limits
+        # 14 §4.3 actor: never more than the device session's own user may do (intersection)
+        session = await self._repo.permission_limits(principal.tenant_id, principal.session_user_id, code)
+        if not session:
+            return []
+        return [_stricter(_most_generous(limits), _most_generous(session))]
 
     async def branch_ids(self, principal: Principal) -> tuple[UUID, ...] | None:
-        ctx = await self._repo.membership_context(principal.tenant_id, principal.user_id)
+        own = await self._member_branches(principal.tenant_id, principal.user_id)
+        if principal.session_user_id is None or own is None:
+            return own
+        session = await self._member_branches(principal.tenant_id, principal.session_user_id)
+        if session is None:
+            return None
+        if not own or not session:  # empty = every branch
+            return own or session
+        both = tuple(b for b in own if b in session)
+        return both or None  # disjoint scopes: nothing is allowed
+
+    async def _member_branches(self, tenant_id: UUID, user_id: UUID) -> tuple[UUID, ...] | None:
+        ctx = await self._repo.membership_context(tenant_id, user_id)
         if ctx is None or ctx.status != "active":
             return None
         return ctx.branch_ids
@@ -273,6 +333,13 @@ class ErpAuthGateway:
         try:
             await self._revocation.check(claims)
         except TokenRevokedError as exc:
+            # a revoked device revokes its sessions/families too: the client must still learn
+            # DEVICE_REVOKED (wipe + export, 16 §9), not a plain re-login (16 §3.4)
+            if self._guard is not None and claims.get("device_id"):
+                try:
+                    await self._guard.check(claims)
+                except DeviceRevokedError:
+                    raise AppError(ErrorCode.DEVICE_REVOKED) from exc
             raise AppError(ErrorCode.TOKEN_REVOKED, headers=headers) from exc
         return claims
 
@@ -299,6 +366,41 @@ class ErpAuthGateway:
         branches = {str(b) for b in claims.get("branch_ids") or ()}
         return roles == sorted(ctx.role_codes) and branches == {str(b) for b in ctx.branch_ids}
 
+    async def _with_actor(self, request: Request, principal: Principal) -> Principal:
+        """14 §4.3: on a device session ``X-Actor-User-Id`` names the PIN actor — reads too (F-4)."""
+        if principal.device_id is None or self._actors is None:
+            return principal  # back-office (non-device) sessions are unchanged
+        path = request.url.path
+        if not path.startswith(f"{self._api_prefix}/") or path.startswith(self._actor_exempt):
+            return principal
+        raw = request.headers.get(ACTOR_HEADER)
+        if not raw:
+            raise AppError(ErrorCode.PERMISSION_DENIED, params={"reason": "actor_required"})
+        actor = _uuid(raw.strip())
+        key = session_key(principal.sid, principal.family_id)
+        if actor is None or key is None:
+            raise _actor_not_verified()
+        try:
+            bound = await self._actors.bound(principal.device_id, key, actor)
+        except ActorBindingUnavailableError as exc:
+            raise AppError(ErrorCode.RATE_LIMITED, headers={"Retry-After": "30"}) from exc
+        if not bound:
+            raise _actor_not_verified()
+        ctx = await self._repo.membership_context(principal.tenant_id, actor)
+        if ctx is None or ctx.status != "active":
+            raise _actor_not_verified()
+        if ctx.branch_ids:
+            device = await self._repo.device_binding(principal.tenant_id, principal.device_id)
+            if device is None or device.branch_id not in ctx.branch_ids:
+                raise _actor_not_verified()
+        return replace(
+            principal,
+            user_id=actor,
+            roles=ctx.role_codes,
+            branch_ids=ctx.branch_ids,
+            session_user_id=principal.user_id,
+        )
+
     async def _guard_device(self, claims: dict[str, Any]) -> None:
         if self._guard is not None:
             await self._guard.check(claims)
@@ -322,4 +424,5 @@ class ErpAuthGateway:
             expires_at=int(claims["exp"]),
             sub_status=claims.get("sub_status"),
             via_cookie=via_cookie,
+            family_id=_uuid(claims.get("fam")),
         )

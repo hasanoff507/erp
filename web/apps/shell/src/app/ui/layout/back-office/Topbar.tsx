@@ -1,15 +1,17 @@
 /**
  * Back-office topbar — 06 §1.9 / 08 §6.2, mockup Bo02Dashboard.dc.html: white, bottom border,
  * px-7 py-4; page title (text-h1); search (min 240px, muted background; Ctrl+K focuses it — the cmdk
- * palette arrives later, 08 §9); branch select; notifications bell (only with reports.sales.view);
+ * palette arrives later, 08 §9); branch select; notifications bell (only with reports.sales.view) — its
+ * list (BO-02 alerts / M18) is Bosqich 4, so the bell opens a «Tez orada» panel (WEB-12; the Bosqich 3
+ * part — the pending-approvals badge — is on the «Tasdiqlash navbati» sidebar item, 06 §1.9);
  * «UZ · RU» on the far right. The user is NOT shown here (sidebar card only).
  */
-import { Bell, Menu, Search } from "lucide-react";
+import { Bell, BellOff, Menu, Search } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import { useTranslation } from "@shared/i18n";
 import { Can } from "@shared/state/permissions";
-import { Button, Icon } from "@shared/ui";
+import { Button, Icon, Popover, PopoverContent, PopoverTrigger } from "@shared/ui";
 
 import { LanguageSwitcher } from "#/features/language-switcher/index.ts";
 import { BranchSelect } from "#/features/tenant-switcher/index.ts";
@@ -57,14 +59,25 @@ export function Topbar({ onOpenMenu }: { onOpenMenu: () => void }) {
       </label>
       <BranchSelect />
       <Can permission="reports.sales.view">
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-[42px] w-[42px]"
-          aria-label={t("topbar.notifications")}
-        >
-          <Icon as={Bell} size="lg" />
-        </Button>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-[42px] w-[42px]"
+              aria-label={t("topbar.notifications")}
+            >
+              <Icon as={Bell} size="lg" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-72" aria-label={t("topbar.notifications")}>
+            <div className="flex flex-col items-center gap-2 py-3 text-center">
+              <Icon as={BellOff} size="lg" className="text-muted-foreground" />
+              <p className="text-[14px] font-bold">{t("notificationsPanel.title")}</p>
+              <p className="text-small text-foreground-secondary">{t("notificationsPanel.soon")}</p>
+            </div>
+          </PopoverContent>
+        </Popover>
       </Can>
       <LanguageSwitcher />
     </header>

@@ -76,6 +76,7 @@ class CodeRow:
     code_challenge_method: str
     redirect_uri: str
     scope: str
+    device_id: UUID | None = None  # device-bound login (14 §7.2)
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,6 +130,27 @@ class RevokedFamily:
     session_id: UUID | None
     user_id: UUID
     tenant_id: UUID | None
+
+
+@dataclass(frozen=True, slots=True)
+class DeviceBinding:
+    """A device as the AS sees it when binding a login to it (14 §7.2), read under RLS."""
+
+    device_id: UUID
+    kind: str
+    cash_register_id: UUID | None
+    branch_id: UUID | None
+    revoked: bool
+
+
+@dataclass(frozen=True, slots=True)
+class PinState:
+    """``app.auth_pin_state`` (14 §4.3, §13) — the argon2 hash stays inside the auth module."""
+
+    pin_hash: str | None
+    pin_local_hash: str | None
+    must_change_pin: bool
+    pin_updated_at: datetime | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -187,6 +209,7 @@ class AuthStore(Protocol):
         redirect_uri: str,
         scope: str,
         ttl_s: int,
+        device_id: UUID | None = None,
     ) -> None: ...
     async def consume_code(self, code_hash: str) -> CodeRow | None: ...
     async def issue_tokens(
@@ -221,6 +244,16 @@ class AuthStore(Protocol):
     async def permission_limits(self, tenant_id: UUID, user_id: UUID, code: str) -> list[Decimal | None]: ...
     async def subscription_status(self, tenant_id: UUID) -> str | None: ...
     async def device_revoked(self, tenant_id: UUID, device_id: UUID) -> bool: ...
+    # --- B3 device-auth ---
+    async def device_binding(self, tenant_id: UUID, device_id: UUID) -> DeviceBinding | None: ...
+    async def family_revoked(self, family_id: UUID) -> bool: ...
+    async def session_family(self, sid: UUID) -> UUID | None: ...
+    async def pin_state(self, tenant_id: UUID, user_id: UUID) -> PinState | None:
+        """Only for a member of ``tenant_id`` (SEC-12: joins the current tenant's memberships)."""
+        ...
+
+    async def set_pin_local_hash(self, user_id: UUID, pin_hash: str, pin_local_hash: str) -> bool: ...
+    async def pin_reset_at(self, tenant_id: UUID, user_id: UUID) -> datetime | None: ...
 
 
 # --- OTP (14 §4.2) ------------------------------------------------------------------------------------

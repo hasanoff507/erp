@@ -10,7 +10,9 @@ import { cn } from "#/lib/cn.ts";
 export const buttonVariants = cva(
   "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap font-bold no-underline transition-colors " +
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 " +
-    "disabled:pointer-events-none disabled:opacity-60",
+    "disabled:pointer-events-none disabled:opacity-60 " +
+    // touch density (08 §5, POS): every button is at least the tap size
+    "[[data-density=touch]_&]:min-h-[var(--tap-min)]",
   {
     variants: {
       variant: {
@@ -35,7 +37,9 @@ export const buttonVariants = cva(
         lg: "h-12 rounded-lg px-6 text-[15px]",
         pos: "h-14 rounded-xl px-6 text-[16px]",
         "pos-cta": "h-16 rounded-xl px-6 text-[19px] font-extrabold shadow-cta",
-        icon: "h-11 w-11 rounded-lg border border-input bg-card text-foreground-secondary hover:bg-accent",
+        icon:
+          "h-11 w-11 rounded-lg border border-input bg-card text-foreground-secondary hover:bg-accent " +
+          "[[data-density=touch]_&]:min-w-[var(--tap-min)]",
         "icon-pos":
           "h-12 w-12 rounded-lg border border-input bg-card text-foreground-secondary hover:bg-accent",
       },

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Iterable, Mapping
 from typing import Any, ClassVar
+from uuid import UUID
 
 import anyio.from_thread
 import anyio.to_thread
@@ -53,6 +54,13 @@ def bridge[**P, R](fn: Callable[P, Awaitable[R]], *args: P.args, **kwargs: P.kwa
         return await fn(*args, **kwargs)
 
     return anyio.from_thread.run(call)
+
+
+def _uuid_or_none(value: str | None) -> UUID | None:
+    try:
+        return UUID(value) if value else None
+    except ValueError:
+        return None
 
 
 class ErpPayload(OAuth2Payload):  # type: ignore[misc]
@@ -126,6 +134,11 @@ class ErpAuthorizationCodeGrant(AuthorizationCodeGrant):  # type: ignore[misc]
 
     def save_authorization_code(self, code: str, request: ErpOAuth2Request) -> None:
         user: AuthenticatedUser = request.user
+        if user.device_id is None:
+            # 14 §7.2: the device the login is for; validated against the tenant at code exchange
+            device = _uuid_or_none(request.payload.data.get("device_id"))
+            if device is not None:
+                user = AuthenticatedUser(user.user_id, user.tenant_id, device)
         bridge(
             self.tokens.save_code,
             code,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import timedelta
 from typing import Any
 from uuid import UUID
 
@@ -92,13 +92,20 @@ class SqlEttnOutboxRepository:
         job_id: UUID,
         status: str,
         last_error: str | None,
-        run_at: datetime | None = None,
+        run_after: timedelta | None = None,
     ) -> None:
         await s.execute(
             text(
                 "UPDATE app.outbox_jobs SET status = :st, last_error = :err, "
-                "next_run_at = COALESCE(:at, next_run_at), updated_at = now() WHERE id = :id AND kind = "
+                "next_run_at = CASE WHEN CAST(:after AS double precision) IS NULL THEN next_run_at "
+                "ELSE now() + make_interval(secs => CAST(:after AS double precision)) END, "
+                "updated_at = now() WHERE id = :id AND kind = "
                 "'ettn_send'"
             ),
-            {"st": status, "err": last_error, "at": run_at, "id": job_id},
+            {
+                "st": status,
+                "err": last_error,
+                "id": job_id,
+                "after": run_after.total_seconds() if run_after is not None else None,
+            },
         )

@@ -200,6 +200,27 @@ class SqlPricingRepository:
             {"id": doc_id, "n": number},
         )
 
+    async def mark_draft_from_pending(self, s: AsyncSession, doc_id: UUID) -> bool:
+        row = (
+            await s.execute(
+                text(
+                    "UPDATE app.price_changes SET status = 'draft' "
+                    "WHERE id = :id AND status = 'pending_approval' RETURNING id"
+                ),
+                {"id": doc_id},
+            )
+        ).first()
+        return row is not None
+
+    async def mark_rejected(self, s: AsyncSession, doc_id: UUID) -> None:
+        await s.execute(
+            text(
+                "UPDATE app.price_changes SET status = 'rejected' "
+                "WHERE id = :id AND status = 'pending_approval'"
+            ),
+            {"id": doc_id},
+        )
+
     async def mark_pending(self, s: AsyncSession, doc_id: UUID) -> None:
         await s.execute(
             text("UPDATE app.price_changes SET status = 'pending_approval' WHERE id = :id"), {"id": doc_id}

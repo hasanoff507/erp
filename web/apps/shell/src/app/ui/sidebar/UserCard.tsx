@@ -3,20 +3,14 @@
  * (never in the topbar); clicking opens a menu with «Chiqish» and «Barcha seanslarni tugatish»
  * (POST /auth/sessions/revoke-all, 14 §20). A modal Radix menu: its scroll-lock <style> carries the
  * CSP nonce (get-nonce, 24 §4.4). A failed logout keeps the user signed in and says so ($logoutError).
+ * On a POS device browser both actions first apply the POS logout rules and wipe the POS cache
+ * (SEC-07, features/device-logout).
  */
 import { useUnit } from "effector-react";
 import { LogOut, MonitorX, TriangleAlert } from "lucide-react";
 
 import { useTranslation } from "@shared/i18n";
-import {
-  $logoutError,
-  $roleCodes,
-  $tenant,
-  $user,
-  logoutRequested,
-  LOGOUT_FAILED_KEY,
-  revokeAllSessionsRequested,
-} from "@shared/state/session";
+import { $logoutError, $roleCodes, $tenant, $user, LOGOUT_FAILED_KEY } from "@shared/state/session";
 import {
   Avatar,
   Banner,
@@ -29,6 +23,12 @@ import {
   DropdownMenuTrigger,
   Icon,
 } from "@shared/ui";
+
+import {
+  $deviceBoundSession,
+  DeviceLogoutDialog,
+  deviceLogoutRequested,
+} from "#/features/device-logout/index.ts";
 
 const KNOWN_ROLES = ["owner", "manager", "accountant", "cashier", "storekeeper"] as const;
 type KnownRole = (typeof KNOWN_ROLES)[number];
@@ -43,12 +43,12 @@ export function useRoleLabel(): string | null {
 
 export function UserCard({ compact }: { compact: boolean }) {
   const { t } = useTranslation();
-  const [user, tenant, logoutError, logout, revokeAll] = useUnit([
+  const [user, tenant, logoutError, requestLogout, deviceBound] = useUnit([
     $user,
     $tenant,
     $logoutError,
-    logoutRequested,
-    revokeAllSessionsRequested,
+    deviceLogoutRequested,
+    $deviceBoundSession,
   ]);
   const roleLabel = useRoleLabel();
   if (!user) return null;
@@ -93,16 +93,19 @@ export function UserCard({ compact }: { compact: boolean }) {
         <DropdownMenuContent side="top" align="start" className="w-60">
           {tenant ? <DropdownMenuLabel>{tenant.name}</DropdownMenuLabel> : null}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => logout()}>
+          <DropdownMenuItem onSelect={() => requestLogout("logout")}>
             <Icon as={LogOut} size="md" />
             {t("actions.logout")}
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => revokeAll()}>
-            <Icon as={MonitorX} size="md" />
-            {t("user.revokeAll")}
-          </DropdownMenuItem>
+          {deviceBound ? null : (
+            <DropdownMenuItem onSelect={() => requestLogout("revokeAll")}>
+              <Icon as={MonitorX} size="md" />
+              {t("user.revokeAll")}
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
+      <DeviceLogoutDialog />
     </div>
   );
 }

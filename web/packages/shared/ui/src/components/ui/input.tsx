@@ -10,7 +10,8 @@ export const inputClassName =
   "flex h-11 w-full min-w-0 rounded-lg border border-input bg-card px-3.5 text-[15px] text-foreground " +
   "placeholder:text-muted-foreground transition-[border-color,box-shadow] " +
   "focus-visible:border-primary focus-visible:shadow-focus-soft focus-visible:outline-none focus-visible:ring-0 " +
-  "aria-[invalid=true]:border-destructive disabled:cursor-not-allowed disabled:text-disabled-foreground";
+  "aria-[invalid=true]:border-destructive disabled:cursor-not-allowed disabled:text-disabled-foreground " +
+  "[[data-density=touch]_&]:min-h-[52px]";
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   ref?: Ref<HTMLInputElement>;

@@ -22,7 +22,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@shared/i18n";
 import { formatMoney, formatPercent } from "@shared/lib/format";
 import type { Money } from "@shared/lib/money";
-import { $fiscalLadder, customers, type CustomerRow } from "@shared/offline";
+import { $fiscalLadder } from "@shared/offline";
 import { $isOnline } from "@shared/state/network";
 import {
   Banner,
@@ -41,14 +41,7 @@ import {
   type LucideIcon,
 } from "@shared/ui";
 
-import {
-  $draft,
-  $totals,
-  cmpMoney,
-  customerSet,
-  isPositive,
-  sumMoney,
-} from "#/entities/receipt-draft/index.ts";
+import { $draft, $totals, cmpMoney, isPositive, sumMoney } from "#/entities/receipt-draft/index.ts";
 import { $posCashier, cashierCan } from "#/entities/pos-session/index.ts";
 import {
   $cardPanelLocked,
@@ -57,7 +50,6 @@ import {
   CardPayment,
   saleCancelled,
 } from "#/features/card-payment/index.ts";
-import { ManagerApprovalDialog } from "#/features/manager-approval/index.ts";
 import { errorText } from "#/shared/lib/i18n-errors.ts";
 import { posPrinter } from "#/shared/lib/device-runtime.ts";
 import { useHotkeys } from "#/shared/lib/use-hotkeys.ts";
@@ -74,9 +66,6 @@ import {
   cashReceivedChanged,
   completeSaleFx,
   confirmPressed,
-  debtApproved,
-  debtOverLimit,
-  dueDateChanged,
   electronicChosen,
   mixedPartAdded,
   mixedPartRemoved,
@@ -87,7 +76,7 @@ import {
   uzqrRefChanged,
   type PayMode,
 } from "../model/payment.ts";
-import { CustomerDialog } from "./SaleDialogs.tsx";
+import { DebtSalePanel, debtReady, useDebtView } from "./DebtSalePanel.tsx";
 
 interface MethodButton {
   id: PayMode | "click" | "payme" | "uzum";
@@ -95,11 +84,6 @@ interface MethodButton {
   hint: string;
   disabled: boolean;
   tone?: "warning";
-}
-
-function addDays(days: number): string {
-  const d = new Date(Date.now() + days * 86_400_000);
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tashkent" }).format(d);
 }
 
 function MethodGrid({
@@ -200,122 +184,6 @@ function UzqrPanel({ online }: { online: boolean }) {
         onChange={(e) => setRef(e.target.value)}
         className="h-12"
       />
-    </div>
-  );
-}
-
-function DebtPanel({ amount, online }: { amount: Money; online: boolean }) {
-  const { t } = useTranslation("pos");
-  const [p, draft, cashier, setDue, approve, setCustomer] = useUnit([
-    $payment,
-    $draft,
-    $posCashier,
-    dueDateChanged,
-    debtApproved,
-    customerSet,
-  ]);
-  const [loadedCustomer, setCustomerRow] = useState<CustomerRow | undefined>(undefined);
-  const customer = loadedCustomer && loadedCustomer.id === draft.customerId ? loadedCustomer : undefined;
-  const [picking, setPicking] = useState(false);
-  const [approving, setApproving] = useState(false);
-  useEffect(() => {
-    if (!draft.customerId) return;
-    void customers.get(draft.customerId).then(setCustomerRow);
-  }, [draft.customerId]);
-  const over = debtOverLimit(customer, amount);
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-3 rounded-xl border border-border p-3">
-        <div className="min-w-0 flex-1">
-          <div className="font-bold">{customer?.name ?? t("payment.debtNoCustomer")}</div>
-          {customer ? (
-            <div className="text-[12px] text-muted-foreground">
-              {t("sale.customerDebt", {
-                amount: formatMoney(customer.receivable_balance ?? "0.00", { withCurrency: false }),
-              })}
-              {customer.credit_limit
-                ? ` · ${t("sale.customerLimit", { amount: formatMoney(customer.credit_limit, { withCurrency: false }) })}`
-                : ""}
-            </div>
-          ) : null}
-        </div>
-        <Button size="sm" variant="secondary" onClick={() => setPicking(true)} data-testid="debt-customer">
-          {t("payment.debtPickCustomer")}
-        </Button>
-      </div>
-      <Label>{t("payment.dueDate")}</Label>
-      <div className="flex flex-wrap items-center gap-2">
-        {[7, 14, 30].map((d) => (
-          <Button
-            key={d}
-            size="sm"
-            variant={p?.dueDate === addDays(d) ? "default" : "secondary"}
-            onClick={() => setDue(addDays(d))}
-          >
-            {t("payment.dueDays", { n: d })}
-          </Button>
-        ))}
-        <Input
-          type="date"
-          aria-label={t("payment.dueDate")}
-          min={addDays(0)}
-          value={p?.dueDate ?? ""}
-          onChange={(e) => setDue(e.target.value || null)}
-          className="h-9 w-44"
-        />
-      </div>
-      {over && online && !p?.debtApproval ? (
-        <Banner
-          tone="warning"
-          icon={CircleAlert}
-          action={
-            <Button size="sm" variant="warning" onClick={() => setApproving(true)}>
-              {t("payment.debtAskApproval")}
-            </Button>
-          }
-        >
-          {t("payment.debtOverLimit")}
-        </Banner>
-      ) : null}
-      {over && !online ? (
-        <Banner tone="info" icon={CircleAlert}>
-          {t("payment.debtOverLimitOffline")}
-        </Banner>
-      ) : null}
-      {p?.debtApproval ? (
-        <p className="text-[13px] font-bold text-success-strong">{t("payment.debtApproved")}</p>
-      ) : null}
-      {!cashierCan(cashier, "debts.create") ? (
-        <Banner tone="destructive" icon={CircleAlert}>
-          {t("payment.debtNoRight")}
-        </Banner>
-      ) : null}
-      {picking ? (
-        <CustomerDialog
-          selectedId={draft.customerId}
-          onSelect={(c) => {
-            setCustomer(c?.id ?? null);
-            setPicking(false);
-          }}
-          onClose={() => setPicking(false)}
-        />
-      ) : null}
-      {approving ? (
-        <ManagerApprovalDialog
-          kind="debt_over_limit"
-          permission="debts.approve"
-          amount={amount}
-          context={{ amount, counterparty_id: draft.customerId }}
-          requesterId={cashier?.userId ?? null}
-          reason={t("payment.debtOverLimit")}
-          allowRemote={online}
-          onApproved={(ref) => {
-            approve(ref);
-            setApproving(false);
-          }}
-          onClose={() => setApproving(false)}
-        />
-      ) : null}
     </div>
   );
 }
@@ -429,6 +297,7 @@ export function PaymentDialog({ receiptLabel, onDone }: PaymentDialogProps) {
     error,
     pending,
     cashier,
+    draft,
   ] = useUnit([
     $payment,
     $totals,
@@ -442,6 +311,7 @@ export function PaymentDialog({ receiptLabel, onDone }: PaymentDialogProps) {
     $paymentError,
     completeSaleFx.pending,
     $posCashier,
+    $draft,
   ]);
   const [uzqrConfirm, setUzqrConfirm] = useState(false);
   const [printerReady, setPrinterReady] = useState<boolean | null>(null);
@@ -481,6 +351,12 @@ export function PaymentDialog({ receiptLabel, onDone }: PaymentDialogProps) {
   ];
 
   const parts: PaymentPart[] = p ? partsFor(p, totals.total, cardPart) : [];
+  // B4 (w-debts): the debt part needs a customer and its over-limit step (approval online / confirm offline)
+  const debtPart = sumMoney(parts.filter((x) => x.method === "debt").map((x) => x.amount));
+  const debtView = useDebtView(draft.customerId);
+  const debtOk =
+    !isPositive(debtPart) ||
+    debtReady(debtView, debtPart, online, p?.debtApproval != null, p?.debtOverLimitConfirmed === true);
   const cardIntegrated = cardOutcome?.mode === "integrated";
   const canConfirm =
     !!p?.mode &&
@@ -488,7 +364,8 @@ export function PaymentDialog({ receiptLabel, onDone }: PaymentDialogProps) {
     !(blocked && parts.some((x) => x.method !== "debt")) &&
     !(p.mode === "card" && cardPart === null) &&
     !(p.mode === "mixed" && isPositive(remaining)) &&
-    !(p.mode === "uzqr" && !online);
+    !(p.mode === "uzqr" && !online) &&
+    debtOk;
   const close = () => {
     if (locked) return;
     if (cardIntegrated) return; // an approved card must be finished or voided («Sotuvni bekor qilish»)
@@ -554,14 +431,11 @@ export function PaymentDialog({ receiptLabel, onDone }: PaymentDialogProps) {
             <div className="min-h-0 flex-1">
               {p.mode === "cash" ? <CashPanel total={totals.total} /> : null}
               {p.mode === "uzqr" ? <UzqrPanel online={online} /> : null}
-              {p.mode === "debt" ? <DebtPanel amount={totals.total} online={online} /> : null}
+              {p.mode === "debt" ? <DebtSalePanel amount={totals.total} online={online} /> : null}
               {p.mode === "mixed" ? <MixedPanel online={online} /> : null}
               {p.mode === "mixed" && parts.some((x) => x.method === "debt") ? (
                 <div className="mt-3">
-                  <DebtPanel
-                    amount={sumMoney(parts.filter((x) => x.method === "debt").map((x) => x.amount))}
-                    online={online}
-                  />
+                  <DebtSalePanel amount={debtPart} online={online} />
                 </div>
               ) : null}
               {p.mode === "card" || p.mode === "mixed" ? <CardPayment /> : null}

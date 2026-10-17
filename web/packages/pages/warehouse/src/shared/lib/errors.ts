@@ -5,6 +5,7 @@
  */
 import { toApiError, type ApiError } from "@shared/api";
 import { i18next, serverErrorText } from "@shared/i18n";
+import { formatMoney } from "@shared/lib/format";
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
@@ -13,13 +14,26 @@ function t(key: string, options?: Record<string, unknown>): string {
 }
 
 /** `params.reason` values with their own explanation (`warehouse:reasons.*`). */
-const REASONS = new Set(["reverse_sale_required", "gratuitous_receipt", "receipt_not_posted"]);
+const REASONS = new Set([
+  "reverse_sale_required",
+  "gratuitous_receipt",
+  "receipt_not_posted",
+  // B4 (19 §11 cancel): a later receipt already used the supplier payment's advance
+  "advance_consumed",
+  // B4 (19 §11 cancel): a supplier payment is allocated to this receipt — cancel that payment first
+  "supplier_payment_allocated",
+  // B4: a cash document of a closed shift is never cancelled
+  "shift_closed",
+]);
 
 export function errorText(error: unknown): string {
   const e = toApiError(error);
   const reason = e.params.reason;
   if (e.code === "DOC_INVALID_STATE" && typeof reason === "string" && REASONS.has(reason)) {
-    return t(`warehouse:reasons.${reason}`, { date: e.params.receipt_doc_date ?? "" });
+    return t(`warehouse:reasons.${reason}`, {
+      date: e.params.receipt_doc_date ?? "",
+      advance: typeof e.params.advance === "string" ? formatMoney(e.params.advance, { precision: 2 }) : "",
+    });
   }
   if (e.code === "ETTN_REQUIRED") {
     const status = e.params.ettn_status;

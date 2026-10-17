@@ -636,7 +636,7 @@ Umumiy mexanizm — chegirma (limitdan yuqori), qaytarish (limitdan yuqori/chek 
 ### 11.1 Voqea: `counterparty.created` (POS tezkor yaratish, offline ham)
 
 **Maqsad**: US-M08-05 — "2-3 soniyada, daftarga yozgandek".
-**Ruxsat**: `sales.create` yoki `debts.create`.
+**Ruxsat**: `debts.create` (tezkor mijoz qarzni yuritish uchun yaratiladi — `16-offline-sync.md` §3.4 bilan bir xil; ruxsatsiz kassirda POS "+ Mijoz" tezkor yaratish ko'rinmaydi; 26 #188).
 
 **So'rov** (payload):
 
@@ -693,8 +693,10 @@ Umumiy mexanizm — chegirma (limitdan yuqori), qaytarish (limitdan yuqori/chek 
 ### 12.1 `GET /api/v1/counterparties/{id}/debt-ledger`
 
 **Maqsad**: qog'oz "qarz daftari" ko'rinishi.
-**Ruxsat**: `debts.create`/`debts.payment.accept` (POS) yoki `reports.sales.view` (BO-06).
-**Javob**: `{counterparty: {...}, balance: "230000.00", entries: [{id, doc_type, doc_id, doc_date, amount, direction, due_date, promise_date, comment, status: "open"|"partially_paid"|"paid", products: [...]}], next_cursor}` — `cursor`/`limit` bilan sahifalanadi. `promise_date` — hosila: oxirgi `debt_payments.promise_date` yoki (hali to'lov bo'lmagan bo'lsa) `sale_payments.due_date`; `status` — allokatsiyalardan hisoblanadi (`11-malumotlar-modeli.md` §8 nasiya holat mashinasi).
+**So'rov**: `?direction=receivable|payable` (standart `receivable`; `payable` — "Men qarzdorman", US-M08-11) `&cursor=&limit=`.
+**Ruxsat**: `receivable` — `debts.create`/`debts.payment.accept` (POS) yoki `reports.sales.view` (BO-06); `payable` — `purchases.pay` yoki `reports.finance.view`.
+**Javob**: `{counterparty: {id, name, phone, kind, is_customer, is_supplier, credit_limit, receivable_balance, payable_balance, debt_due_date, doubtful_flag: {id, reason}|null}, direction, balance: "230000.00", entries: [{id, doc_type, doc_id, number, doc_date, amount, direction, kind: "debt"|"payment"|"credit", running_balance, due_date, promise_date, comment, status: "open"|"partially_paid"|"paid"|"written_off"|null, open_amount, created_by, created_by_name, paid_amount, products: [{product_id, name, name_ru, qty, line_total}], allocations: [{target_doc_type, target_doc_id, target_number, amount}]}], next_cursor}` — har hujjat bitta qator (`debt_moves` shu hujjat bo'yicha netto, storno bilan — bekor qilingan hujjat ko'rinmaydi), eng yangisi birinchi, `running_balance` — shu qatordan keyingi qoldiq; `cursor`/`limit` bilan sahifalanadi. `amount` ishorali (+ qarz oshdi, − kamaydi); qarzni harakatlantirmagan `posted` to'lov (faqat hisobdan chiqarilgan qarz yoki ortiqcha summa) ham `amount="0.00"` va `paid_amount` bilan ko'rinadi. `promise_date` — hosila: shu hujjatga allokatsiya qilingan oxirgi `debt_payments.promise_date` yoki (hali bo'lmasa) `sale_payments.due_date`/`debt_openings.due_date`; `status` (qarz qatorlarida) — allokatsiyalardan hisoblanadi (`11-malumotlar-modeli.md` §8 nasiya holat mashinasi; kechish bilan yopilgan — `written_off`); `payable` qatorlari holati — balansni eng yangi kirimlar tashkil qiladi deb (FIFO) hisoblanadi. `receivable` qarz qatorlarining `open_amount` va `status`i balansga moslashtirilgan qoldiqdan (`13-provodka-qoidalari.md` §2.14) olinadi; `account='4010'` kassa harakatlari (§13.1) ham qator bo'lib, raqami, sanasi va muallifi bilan ko'rinadi. Muddati o'tganlik — yagona ta'rif `20-api-moliya-admin.md` #21 (`COALESCE(due_date, doc_date) < as_of`; `promise_date` muddatni surmaydi).
+**Filial doirasi**: filialga cheklangan foydalanuvchi (`Scope`, `branch_ids` bo'sh emas) faqat ruxsat etilgan filiallar hujjatlari qatorlarini ko'radi — `balance`, `running_balance` va boshqa barcha raqamlar shu filtrlangan qatorlar bo'yicha hisoblanadi.
 **Bog'liq**: US-M08-06, BO-06/POS-13.
 
 ### 12.2 Voqea: `debt_payment.created` (POS, offline ham)
@@ -703,10 +705,12 @@ Umumiy mexanizm — chegirma (limitdan yuqori), qaytarish (limitdan yuqori/chek 
 **Ruxsat**: `debts.payment.accept`.
 
 **Fiskal chek** (qaror #30, #45, #67): qarz to'lovida pul qabul qilinganini tasdiqlovchi chek majburiy (VMQ-943 1-ilova 30-band). `cash`/`card`/`uzqr`/`click`/`payme`/`uzum` usullaridagi qarz to'lovi **faqat POS orqali** shu voqea bilan qabul qilinadi — kassa, smena va `receipt_seq` bilan; chek shu kassa FM'ida chiqadi va shu kassaning 48 soat hisobiga kiradi (qaror #43). Bank o'tkazmasi (`method='bank'`) — faqat back-office §12.3, kassasiz, chek yo'q. **Bitta to'lov = bitta chek**: har bir `debt_payment.created` uchun **bitta** `fiscal_receipts` yozuvi, `kind='debt_settlement'`, summasi = olingan pul (`amount`). Chek qatorlarini qurilma lokal keshdagi `open_debt_docs[]` (`16-offline-sync.md` §1) va yagona allokatsiya funksiyasi bilan hisoblaydi (`fiscal_lines[]`):
-- har allokatsiya qilingan sotuv uchun `ratio = alloc_amount / sales.total_amount`; `amt_i = ROUND_HALF_UP(line_total_i × ratio, 2)`, lekin `amt_i ≤ line_total_i − settled_amount_i`; yaxlitlash qoldig'i eng katta `line_total` qatoriga (teng bo'lsa — eng katta `line_no`);
-- sotuvni **to'liq yopuvchi** to'lovda `amt_i = line_total_i − settled_amount_i` (kumulyativ aniq), `qty_i` — qolgan miqdor; aks holda `qty_i = ROUND_HALF_UP(qty_i × ratio, 3)` (kamida `0.001`);
+- qaytarilgan qism chiqariladi (`16-offline-sync.md` §1 `returned_qty`/`returned_amount`): `eff_total_i = max(line_total_i − returned_amount_i, 0)`, `eff_qty_i = qty_i − returned_qty_i`; `eff_total_i = 0` qator chekka kirmaydi; qator xonasi `room_i = max(eff_total_i − settled_amount_i, 0)`, sotuv jami `total = Σ eff_total_i`; quyidagi barcha formulalar `line_total`/`qty` o'rniga `eff_total`/`eff_qty` bilan;
+- har allokatsiya qilingan sotuv uchun `goods = min(alloc_amount, Σ room_i)`, `ratio = goods / total`; `amt_i = ROUND_HALF_UP(eff_total_i × ratio, 2)`, lekin `amt_i ≤ room_i`; yaxlitlash qoldig'i eng katta `eff_total` qatoriga (teng bo'lsa — eng katta `line_no`);
+- sotuvni **to'liq yopuvchi** to'lovda (allokatsiya = `Σ room_i`) `amt_i = room_i` (kumulyativ aniq);
+- miqdor kumulyativ `settled_amount` bo'yicha teleskop qilinadi (`R3` — `ROUND_HALF_UP(…, 3)`): `qty_i = R3(eff_qty_i × (settled_amount_i + amt_i) / eff_total_i) − R3(eff_qty_i × settled_amount_i / eff_total_i)` (kamida `0.001`); qatorni yopuvchi chekda `qty_i = eff_qty_i − R3(eff_qty_i × settled_amount_i / eff_total_i)` — bitta qatorning barcha cheklaridagi miqdor yig'indisi aynan `eff_qty_i`;
 - `vat_i = ROUND_HALF_UP(amt_i × r / (100 + r), 2)` (qaror #26); markirovka kodi faqat sotuv qatorini to'liq yopuvchi chekda;
-- `debt_openings`/`debt_writeoffs` qismi — tovar qatorsiz bitta umumiy qator ("Qarz to'lovi (boshlang'ich qoldiq) / Погашение долга (начальный остаток)");
+- `debt_openings`/`debt_writeoffs` qismi, offline ortiqcha summa (`unallocated_amount`) va sotuvning fiskal xonasidan (`Σ room_i`) ortgan qism — tovar qatorsiz bitta umumiy qator (`sale_id`/`sale_line_id`/`product_id` = `null`, `qty="1.000"`, `vat_rate="0.00"`, "Qarz to'lovi (boshlang'ich qoldiq) / Погашение долга (начальный остаток)") — chek jami har doim olingan pulga teng;
 - server posting'da `sale_lines.settled_amount` ni kumulyativ yangilaydi.
 
 Zaxira sozlama `FiscalPolicy.debt_receipt_split` = `single` (standart) / `per_sale` (har yopilgan sotuvga alohida chek) — migratsiyasiz almashtiriladi. Chiqarilgan chek ikki tilda (§4.9), to'lov rekvizitlari bilan (§4.5). `FiscalPort.register_sale(kind='debt_settlement')` (`21-integratsiyalar.md` §1) shu oqimni amalga oshiradi; fiskal bloklar — §4.10. Daromad va QQS bu yerda **qayta tan olinmaydi** — ular sotuv kuni yozilgan (§4.5, `13-provodka-qoidalari.md` §2.14); to'lov kuni faqat pul harakati va fiskal chek.
@@ -720,7 +724,7 @@ Zaxira sozlama `FiscalPolicy.debt_receipt_split` = `single` (standart) / `per_sa
 | `branch_id`, `cash_register_id`, `shift_id` | UUID | ha | `shift_id` — `status=open`, shu `device_id` |
 | `receipt_seq` | integer | ha | Qurilma beradi, shu smena ichida `sale.created`/`return.created` bilan umumiy ketma-ketlikda (qaror #12); takror — §4.6 `RECEIPT_SEQ_CONFLICT` qoidasi |
 | `is_offline` | boolean | ha | Qurilma hisoblaydi |
-| `amount` | Money | ha | > `"0.00"`. Online (`is_offline=false`) — `≤ receivable_balance + Σ written_off_open` (hisobdan chiqarilgan ochiq qarz ham to'lanadi), oshsa `422 VALIDATION_ERROR` (`message_key=debt_payment_exceeds_balance`, `params: {balance, requested}`; qaror #45) — kassir qaytimni naqd beradi. `is_offline=true` — rad etilmaydi: chegaragacha allokatsiya, qolgani `debt_payments.unallocated_amount` (`Kt 6310` — olingan bo'nak), `sync_exceptions(kind='debt_overpayment_offline')` + M18 Egasiga (qaror #67) |
+| `amount` | Money | ha | > `"0.00"`. Online (`is_offline=false`) — `≤ Σ moslashtirilgan ochiq (sales + debt_openings) + Σ written_off_open` (`= max(receivable_balance, 0) + Σ written_off_open`, `13-provodka-qoidalari.md` §2.14; hisobdan chiqarilgan ochiq qarz ham to'lanadi), oshsa `422 VALIDATION_ERROR` (`message_key=debt_payment_exceeds_balance`, `params: {balance, requested}`; qaror #45) — kassir qaytimni naqd beradi. `is_offline=true` — rad etilmaydi: chegaragacha allokatsiya, qolgani `debt_payments.unallocated_amount` (`Kt 6310` — olingan bo'nak), `sync_exceptions(kind='debt_overpayment_offline')` + M18 Egasiga (qaror #67) |
 | `method` | enum | ha | `cash`/`card`/`uzqr`/`click`/`payme`/`uzum` (`bank` — faqat §12.3) |
 | `terminal_ref` | string\|null | yo'q | `uzqr`+`qr_type=static`da ixtiyoriy to'lov raqami; `method=card`da qurilma yubormaydi (`integrated`da server `card_result.tid`dan, `manual`da `null`) |
 | `card_type`, `card_mask`, `rrn` | — | yo'q | §4.1 `payments[]` bilan bir xil: qurilma yubormaydi — `integrated`da server `card_result`dan oladi, `manual`da `null` (berilsa `VALIDATION_ERROR`) |
@@ -733,9 +737,10 @@ Zaxira sozlama `FiscalPolicy.debt_receipt_split` = `single` (standart) / `per_sa
 | `allocations[]` | array | ha | Qurilma hisoblagan allokatsiya: `[{target_doc_type: "sales"\|"debt_openings"\|"debt_writeoffs", target_doc_id, amount}]` |
 | `fiscal_lines[]` | array | ha, ≥1 | Chek qatorlari (yuqoridagi formula): `[{sale_id\|null, sale_line_id\|null, product_id\|null, qty, amount, vat_rate, vat_amount, marking_code\|null}]` |
 | `fiscal_result` | object\|null | shartli | §4.1 bilan bir xil — lokal ko'prik rejimida chek FM'da imzolangan bo'lsa majburiy (qaror #68) |
+| `offline_since` | ISO vaqt\|null | yo'q | §4.1 bilan bir xil (`fiscal_receipts.offline_since`); berilmasa `is_offline=true`da voqea vaqti |
 
-**Allokatsiya** — yagona funksiya (`shared/lib/debt-allocation` (TS) va `app/shared/debt_allocation.py`, umumiy test-vektorlar `shared/debt-allocation-vectors.json`) tartibi bilan: avval `sales` + `debt_openings` ochiq qoldiqlari `ORDER BY COALESCE(due_date, doc_date), doc_date, doc_id`; keyin `debt_writeoffs` (hisobdan chiqarilgan, eng eskisi birinchi — bu qism `Kt 9390`, `13-provodka-qoidalari.md` §2.14). Qurilma hisoblaydi, server postingda DB holatidan qayta hisoblaydi: registrlar (`debt_payment_allocations`, `debt_moves`, `settled_amount`) **server** allokatsiyasi bo'yicha yoziladi; fiskal chek payload'i qurilma yuborgan ko'rinishda saqlanadi (FM imzolagan — o'zgarmaydi). Farq bo'lsa voqea rad etilmaydi — `sync_exceptions(kind='debt_allocation_mismatch', details:{device, server})`.
-**Offline ortiqcha summa** (qaror #67): provodka `Dt 5010/5710 / Kt 6310` (analitika `counterparty_id`); hal qilish BO-06 da (Buxgalter/Egasi): (a) qaytarish — `cash_movements` `reason='other'`, `direction='out'`, `account='6310'`, `counterparty_id` (§13.1); (b) keyingi qarzga hisoblash — `ledger_adjustments` `Dt 6310 / Kt 4010` (`analytics.counterparty_id`).
+**Allokatsiya** — yagona funksiya (`shared/lib/debt-allocation` (TS) va `app/shared/debt_allocation.py`, umumiy test-vektorlar `shared/debt-allocation-vectors.json`) tartibi bilan: avval `sales` + `debt_openings` ochiq qoldiqlari `ORDER BY COALESCE(due_date, doc_date), doc_date, doc_id`; keyin `debt_writeoffs` (hisobdan chiqarilgan, eng eskisi birinchi — bu qism `Kt 9390`, `13-provodka-qoidalari.md` §2.14). Qurilma hisoblaydi, server postingda DB holatidan qayta hisoblaydi: registrlar (`debt_payment_allocations`, `debt_moves`, `settled_amount`) **server** allokatsiyasi bo'yicha yoziladi. Chek qatorlari: chekni server fiskallasa (`fiscal_result` yo'q) — `items` server allokatsiyasining `fiscal_lines`idan quriladi; `fiscal_result` bo'lsa (FM imzolagan — o'zgarmaydi) — qurilma qatorlari imzolangan ko'rinishda saqlanadi, server rejasida yo'q `sale_line_id` ham `debt_allocation_mismatch` beradi; qatorlardagi sotuvlar faqat shu kontragent sotuvlari ichidan qidiriladi. Farq bo'lsa voqea rad etilmaydi — `sync_exceptions(kind='debt_allocation_mismatch', details:{device, server})`. `fiscal_lines[]` jami = `amount` va har qatorda `vat_amount = ROUND_HALF_UP(amount × r / (100 + r), 2)` bo'lishi shart (aks holda `VALIDATION_ERROR`: `validation.fiscal_lines_total_mismatch` / `validation.vat_amount_mismatch`); `Σ allocations[].amount ≤ amount` (`validation.allocations_exceed_amount`).
+**Offline ortiqcha summa** (qaror #67): provodka `Dt 5010/5710 / Kt 6310` (analitika `counterparty_id`); Egasiga M18 — bildirishnoma turi `over_limit_action` (`payload.reason='debt_overpayment_offline'`); hal qilish BO-06 da (Buxgalter/Egasi): (a) qaytarish — `cash_movements` `reason='other'`, `direction='out'`, `account='6310'`, `counterparty_id` (§13.1); (b) keyingi qarzga hisoblash — `ledger_adjustments` `Dt 6310 / Kt 4010` (`analytics.counterparty_id`).
 **Javob**: `{id, allocations: [{target_doc_type, target_doc_id, amount}], unallocated_amount, remaining_balance, fiscal: {status: "pending"|"fiscalized"}}` (`allocations` — server natijasi, `debt_payment_allocations` ustunlari bilan bir xil).
 **Xatolar**: `VALIDATION_ERROR` (`debt_payment_exceeds_balance` — faqat online, va boshqa shartlar), `CARD_MANUAL_NOT_ALLOWED`, `CARD_MANUAL_APPROVAL_REQUIRED`, `CARD_TRANSACTION_MISMATCH` (`warnings[]`), `SHIFT_NOT_OPEN`, `RECEIPT_SEQ_CONFLICT` (§4.6 qoidasi), `PAYMENT_NOT_CONFIRMED` (§16.1), `DEPENDENCY_NOT_SYNCED` (`retryable:true`), `FISCAL_OFFLINE_48H_BLOCKED`, `FISCAL_DEVICE_LOCKED` (§4.10), `NOT_FOUND`.
 **Idempotentlik**: `client_event_id`.
@@ -754,15 +759,15 @@ Zaxira sozlama `FiscalPolicy.debt_receipt_split` = `single` (standart) / `per_sa
 
 **Maqsad**: eski qog'oz daftardagi qarzlarni ko'chirish (US-M08-07).
 **Ruxsat**: `stock.opening.manage` yoki `debts.limit.manage`.
-**So'rov**: `{counterparty_id yoki {name, phone}, amount, direction: "receivable"|"payable", due_date|null}` — bir martalik yoki `import_jobs` orqali Excel (`11-malumotlar-modeli.md` §10, alohida import endpoint M04 hujjatida).
+**So'rov**: `{counterparty_id | counterparty: {name, phone, kind?}, amount, direction: "receivable"|"payable" (standart receivable), due_date|null, doc_date? (standart bugun), branch_id? (standart `X-Branch-Id`, so'ng asosiy filial), comment?}` — `counterparty` berilsa shu qatordan tezkor mijoz (`receivable`) yoki yetkazib beruvchi (`payable`) yaratiladi (§11.2 qoidalari); bir martalik yoki `import_jobs` orqali Excel (`11-malumotlar-modeli.md` §10, alohida import endpoint M04 hujjatida). `post`: `tenants.go_live_date` bo'lmasa `422 VALIDATION_ERROR` (`validation.go_live_date_missing`); provodka `13-provodka-qoidalari.md` §2.13 (`entry_date = go_live_date − 1`), `debt_moves(+amount, due_date)`.
 
 ### 12.5 `POST /api/v1/debt-writeoffs` → `POST /{id}/post`
 
 **Maqsad**: qarzni kechish.
 **Ruxsat**: `debts.forgive` — **faqat Egasi**.
-**So'rov**: `{counterparty_id, amount, reason, account_choice}` (`reason` majburiy; `account_choice` — standart `"9430"`, muqobil `"4910"`, ixtiyoriy, `13-provodka-qoidalari.md` §2.15).
+**So'rov**: `{counterparty_id, amount, reason, account_choice, tax_writeoff_basis?, doc_date?, branch_id?, comment?}` (`reason` majburiy; `account_choice` — standart `"9430"`, muqobil `"4910"`, ixtiyoriy, `13-provodka-qoidalari.md` §2.15). `post`da kechirilgan summa ochiq `sales`/`debt_openings` qoldiqlariga qarz to'lovi tartibida taqsimlanadi (`debt_writeoff_allocations`, `12-db-sxema.md` §2.6), `approved_by` = Egasi; provodka har hujjat bo'yicha `Dt 9430|4910 / Kt 4010`.
 Audit — majburiy (`15-xavfsizlik-va-audit.md` §6.1).
-**Xatolar**: `DEBT_ALREADY_PAID` (mijozning ochiq qarzi 0), `VALIDATION_ERROR`.
+**Xatolar**: `DEBT_ALREADY_PAID` (mijozning ochiq qarzi 0), `VALIDATION_ERROR` (`amount` ochiq qarzdan katta — `validation.debt_writeoff_exceeds_balance`, `params.balance`; `account_choice='4910'` va shu kontragent bo'yicha 4910 qoldig'i yetmaydi — `validation.reserve_4910_insufficient`, `params.reserve`).
 
 ### 12.5a Qarz hujjatlari — ko'rish va bekor qilish
 
@@ -776,15 +781,15 @@ Audit — majburiy (`15-xavfsizlik-va-audit.md` §6.1).
 | `POST /api/v1/debt-writeoffs/{id}/cancel` | `debts.forgive` |
 
 **Ro'yxat so'rovi**: `?counterparty_id=&branch_id=&status=&doc_date__gte=&doc_date__lte=&cursor=&limit=` → `{items, next_cursor}`.
-**Bekor qilish**: tana `{reason}` (majburiy); `posted` hujjat — storno joriy ochiq davr sanasida (`13-provodka-qoidalari.md` §5.2), yopilgan davrdagi hujjat ham bekor qilinadi; `draft` — registrsiz `cancelled`. POS `debt_payment.created` bilan yaratilgan to'lovning fiskal cheki bekor qilinmaydi — pulni qaytarish alohida kassa chiqimi bilan.
-**Xatolar**: `DOC_INVALID_STATE` (allaqachon `cancelled`), `VALIDATION_ERROR`.
+**Bekor qilish**: tana `{reason}` (majburiy); `posted` hujjat — storno joriy ochiq davr sanasida (`13-provodka-qoidalari.md` §5.2), yopilgan davrdagi hujjat ham bekor qilinadi; `draft` — registrsiz `cancelled`. POS `debt_payment.created` bilan yaratilgan to'lov (kassa, `debt_settlement` cheki chiqqan) bekor qilinmaydi — `409 DOC_INVALID_STATE` (`params.reason="pos_fiscal_receipt"`). Xato olingan POS qarz to'lovini qaytarish yo'li yo'q: 4010 bo'yicha kassa chiqimi faqat mijozning 4010 krediti doirasida (§13.1), shuning uchun qaytarilgan pul smena kamomadi bo'lib ko'rinadi (26 #180). Offline ortiqcha summa (`6310`) — §12.2 tartibida `account='6310'` chiqim bilan qaytariladi. To'lov yoki kechish tushgan boshlang'ich qarz/kechish hujjati bekor qilinmaydi — `409 DOC_INVALID_STATE` (`params.reason="has_allocations"`; `payable` boshlang'ich qarzga yetkazib beruvchiga to'lov tushgan bo'lsa — `"supplier_payment_allocated"`) — avval keyingi hujjat bekor qilinadi.
+**Xatolar**: `DOC_INVALID_STATE` (allaqachon `cancelled` va yuqoridagi holatlar), `VALIDATION_ERROR`.
 **Idempotentlik**: `Idempotency-Key` majburiy.
 
 ### 12.6 Shubhali qarz belgisi
 
 #### `POST /api/v1/debt-doubtful-flags`
 
-**So'rov**: `{counterparty_id, reason}` (majburiy). **Ruxsat**: `debts.forgive` — **faqat Egasi**; boshqa rol — `403 DOUBTFUL_FLAG_REQUIRES_OWNER`. Bu provodka yaratmaydi, faqat belgi/ko'rinish.
+**So'rov**: `{counterparty_id, reason}` (majburiy). **Ruxsat**: `debts.forgive` — **faqat Egasi**; boshqa rol — `403 DOUBTFUL_FLAG_REQUIRES_OWNER`. Bu provodka yaratmaydi, faqat belgi/ko'rinish. Faol belgi bor mijozga ikkinchisi — `409 DOC_INVALID_STATE` (`params.reason="already_flagged"`). **Javob**: `201 {id, counterparty_id, reason, flagged_by, flagged_at, unflagged_at, active}`; faol belgi `id`si qarz daftarida (§12.1 `counterparty.doubtful_flag`) va eskirish hisobotida (`rows[].doubtful_flag_id`) ko'rinadi.
 
 #### `POST /api/v1/debt-doubtful-flags/{id}/unflag`
 
@@ -817,7 +822,7 @@ Qarz eskirishi hisoboti — **yagona manba `20-api-moliya-admin.md` #21, `GET /a
 | `cash_register_id`, `shift_id` | UUID | ha | `shift_id.status=open` |
 | `direction` | enum | ha | `in`/`out`; `reason` bilan juftlik: `collection`, `owner_withdrawal` → faqat `out`; `deposit` → faqat `in`; `other` → ikkalasi; buzilsa `422 VALIDATION_ERROR` |
 | `reason` | enum | ha | `collection`/`deposit`/`owner_withdrawal`/`other` (POS xarajati — alohida `expense.created` voqeasi, §13.2) |
-| `account` | string\|null | yo'q | Faqat `reason=other`: `9430`/`9390`/`6310`/`4010`/`4730` (Buxgalter/Egasi tanlaydi); standart — `other/out` → `9430` (`Dt account / Kt 5010`), `other/in` → `9390` (`Dt 5010 / Kt account`) (`13-provodka-qoidalari.md` §2.18); boshqa `reason` da `null` |
+| `account` | string\|null | yo'q | Faqat `reason=other`: `9430`/`9390`/`6310`/`4010`/`4730` (Buxgalter/Egasi tanlaydi); standart — `other/out` → `9430` (`Dt account / Kt 5010`), `other/in` → `9390` (`Dt 5010 / Kt account`) (`13-provodka-qoidalari.md` §2.18); boshqa `reason` da `null`. `4010` + `in` — taqiqlangan (qarz faqat §12.2 orqali, `validation.cash_movement_debt_repayment`); `4010` + `out` — `amount ≤` mijozning 4010 krediti (`validation.cash_movement_exceeds_customer_credit`, `params.available`) |
 | `counterparty_id` | UUID\|null | shartli | `reason=owner_withdrawal` va `tenants.legal_form ≠ sole_proprietor` bo'lsa majburiy (`counterparties.is_founder=true` — ta'sischi); `reason=other` va `account ∈ {6310, 4010}` bo'lsa majburiy; aks holda `null` |
 | `employee_id` | UUID\|null | shartli | `reason=other` va `account=4730` bo'lsa majburiy (`users.id`); aks holda `null` |
 | `amount` | Money | ha | > `"0.00"` |
@@ -825,7 +830,7 @@ Qarz eskirishi hisoboti — **yagona manba `20-api-moliya-admin.md` #21, `GET /a
 | `approval` | `ApprovalRef`\|null | shartli | `direction=out` va summa `cash.withdraw.limit_value` (standart 50 000 so'm)dan oshsa majburiy |
 
 **Javob**: `{id}`.
-**Xatolar**: `CASH_WITHDRAW_LIMIT_EXCEEDED`, `APPROVAL_INVALID`, `SHIFT_NOT_OPEN`, `DEPENDENCY_NOT_SYNCED` (smena serverda hali yo'q, `retryable:true`), `VALIDATION_ERROR` (`reason↔direction` juftligi, `account`/`counterparty_id`/`employee_id` shartlari). Yopilgan smenaga kech kelgan harakat — §3.2 «Kech kelgan hujjat» qoidasi. Online `local_pin` tasdiqlovchisi qurilma sessiyasiga PIN bilan bog'lanmagan bo'lsa — qabul qilinadi, `sync_exceptions(kind='actor_unverified')` (`15-xavfsizlik-va-audit.md` §2.3a).
+**Xatolar**: `CASH_WITHDRAW_LIMIT_EXCEEDED`, `APPROVAL_INVALID`, `SHIFT_NOT_OPEN`, `DEPENDENCY_NOT_SYNCED` (smena serverda hali yo'q, `retryable:true`), `VALIDATION_ERROR` (`reason↔direction` juftligi, `account`/`counterparty_id`/`employee_id` shartlari, 4010 cheklovi — `field=account` / `field=amount`). Yopilgan smenaga kech kelgan harakat — §3.2 «Kech kelgan hujjat» qoidasi. Online `local_pin` tasdiqlovchisi qurilma sessiyasiga PIN bilan bog'lanmagan bo'lsa — qabul qilinadi, `sync_exceptions(kind='actor_unverified')` (`15-xavfsizlik-va-audit.md` §2.3a).
 **Offline**: to'liq ishlaydi (`local_pin` yo'li bilan — Menejer jismonan); masofadan (`remote_request`) — faqat online, chunki jismoniy pul darhol topshiriladi, aks holda kassir jismonan kutadi.
 **Bog'liq**: US-M16-01, POS-14.
 
@@ -839,12 +844,12 @@ Qarz eskirishi hisoboti — **yagona manba `20-api-moliya-admin.md` #21, `GET /a
 | Maydon | Tur | Majburiy | Validatsiya |
 |---|---|---|---|
 | `id` | UUIDv7 | ha | Qurilma beradi — `expenses.id` |
-| `doc_date` | ISO sana | ha | Toshkent kuni |
+| `doc_date` | ISO sana | ha | Toshkent kuni; server hujjat sanasini `business_date(created_at)` dan oladi (kassa harakati va qarz to'lovi bilan bir xil), payload qiymati e'tiborga olinmaydi (26 #187) |
 | `branch_id`, `cash_register_id`, `shift_id` | UUID | ha | `shift_id.status=open`, shu `device_id` |
 | `category_id` | UUID | ha | `expense_categories`, arxivlanmagan |
 | `amount` | Money | ha | > `"0.00"` |
 | `comment` | string\|null | yo'q | — |
-| `tax_type` | enum\|null | yo'q | #42 bilan bir xil |
+| `tax_type` | enum\|null | yo'q | #42 bilan bir xil: 6410 (`tax_payment`) toifasida faqat `vat`/`turnover`, boshqasi — `validation.tax_type_not_accrued` |
 | `approval` | `ApprovalRef`\|null | shartli | `amount` `cash.withdraw.limit_value`dan oshsa va `actor_user_id` limiti yetmasa majburiy (`approval_requests.kind='cash_withdrawal_over_limit'`) |
 
 **Posting**: server `ExpensePostingService` bilan darhol `posted` — `expenses` + `cash_moves` (`13-provodka-qoidalari.md` §2.17).

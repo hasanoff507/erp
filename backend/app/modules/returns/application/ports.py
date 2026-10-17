@@ -62,7 +62,13 @@ class ReturnsRepository(Protocol):
         """The sale with its lines locked ``FOR UPDATE`` (two returns of one line serialise)."""
         ...
 
-    async def open_debt_of_sale(self, s: AsyncSession, sale_id: UUID) -> Decimal: ...
+    async def open_debt_of_sale(self, s: AsyncSession, sale_id: UUID) -> Decimal:
+        """Read under the customer's ``debt_balances`` lock (23 §2.1, SYNC-01)."""
+        ...
+
+    async def written_off_of_sale(self, s: AsyncSession, sale_id: UUID) -> Decimal:
+        """Σ posted ``debt_writeoff_allocations`` on the sale (ACC-04)."""
+        ...
 
     async def fiscal_room(self, s: AsyncSession, sale_id: UUID) -> Decimal:
         """``fiscalized_amount(sale) − already_fiscally_refunded(sale)`` (18 §7.1)."""

@@ -77,6 +77,9 @@ def _invalid(field: str, key: str) -> AppError:
     return AppError(ErrorCode.VALIDATION_ERROR, details=[ErrorDetail(field=field, message_key=key)])
 
 
+invalid_field = _invalid
+
+
 def _denied(code: str) -> AppError:
     return AppError(ErrorCode.PERMISSION_DENIED, params={"permission": code})
 

@@ -221,6 +221,33 @@ class Settings(BaseSettings):
     # pull waits this long for a row's transaction to settle (late commits never skip a cursor position)
     sync_pull_settle_s: float = Field(default=2.0, ge=0, le=60)
     # --- Bosqich 3 settings: print slice ---
+    # --- Bosqich 4 settings: debts slice ---
+    # --- Bosqich 4 settings: supplier-tax slice ---
+    # --- Bosqich 4 settings: expenses slice ---
+    # --- Bosqich 4 settings: bank slice ---
+    # --- Bosqich 4 settings: reports slice ---
+    # --- Bosqich 4 settings: telegram slice ---
+    # M18 bot (21 §11; same bot/token as the OTP channel above): deep link t.me/<username>?start=<code>
+    telegram_bot_username: str = "erp_local_bot"
+    # Telegram webhook X-Telegram-Bot-Api-Secret-Token (setWebhook secret_token); unset → webhook refused
+    telegram_webhook_secret: SecretStr | None = None
+    telegram_link_code_ttl_s: int = Field(default=600, ge=60, le=3600)  # link_code 10 min (qaror #54)
+    # ERP_TELEGRAM_FAKE: in-process FakeTelegram instead of the Bot API — local/test/staging only (qaror #34)
+    telegram_fake: bool = False
+
+    @model_validator(mode="after")
+    def _guard_telegram(self) -> Self:
+        if self.environment == "prod" and self.telegram_fake:
+            raise ValueError("prod'da ERP_TELEGRAM_FAKE ruxsat etilmaydi (qaror #34)")
+        if self.environment in _HARDENED_ENVIRONMENTS and self.telegram_bot_token is not None:
+            secret = self.telegram_webhook_secret.get_secret_value() if self.telegram_webhook_secret else ""
+            if len(secret) < _MIN_SECRET_LENGTH or self.telegram_bot_username == "erp_local_bot":
+                raise ValueError(
+                    f"{self.environment}'da ERP_TELEGRAM_BOT_USERNAME va ERP_TELEGRAM_WEBHOOK_SECRET "
+                    f"(kamida {_MIN_SECRET_LENGTH} belgi) shart (21 §11)"
+                )
+        return self
+
     # --- telemetry (23 §8, 25 §5; app/core/telemetry.py) — all off by default ---
     metrics_enabled: bool = False  # GET /metrics + HTTP metrics middleware
     # Prometheus scrape bearer token; mandatory in staging/prod when metrics are on

@@ -45,7 +45,7 @@
 |---|---|---|---|---|---|---|---|---|---|
 | US-M03-01 | Kassir chegirma (limit ichida) | Must | BP-02 "?" | POS-02, BO-16 | voqea `sale.created` (chegirma qatorida, §8.1); limitdan oshsa `POST /approval-requests` | `app.sale_lines` (discount), `app.approval_requests` | §2.1–2.4 | `discount.give` | 3 |
 | US-M03-02 | Avtomatik chegirma qoidalari | Keyin (post-MVP) | BP-02 "?" | BO-05 | `GET/POST /api/v1/discount-rules`, `PATCH /{id}`, `POST /{id}/archive` (§8.2) | `app.discount_rules` | — (registrga ta'siri yo'q, qoida o'zi) | `discount.rule.manage` | MVP'dan keyin |
-| US-M03-03 | Chegirmalarning margin'ga ta'sirini hisobotda ko'rish | Could | **— (gap, BP yo'q)** | **— (GAP: hech qaysi ekranda yo'q)** | `GET /api/v1/reports/sales` "?" (aniq margin-hisobot endpointi yo'q) | `app.sale_lines`, `app.vat_moves` | — | `reports.sales.view` "?" | 4 |
+| US-M03-03 | Chegirmalarning margin'ga ta'sirini hisobotda ko'rish | Could | **— (gap, BP yo'q)** | BO-09 | `GET /api/v1/reports/discounts` (20 #19a) | `app.sale_lines`, `app.return_lines` | §2.1a (9050) | `reports.finance.view` | 4 |
 
 ### M04 — Ombor qoldig'i
 
@@ -155,7 +155,7 @@
 
 | US-id | Qisqa nomi | MVP | BP | Ekran(lar) | API | Jadvallar | Provodka | Ruxsat | Bosqich |
 |---|---|---|---|---|---|---|---|---|---|
-| US-M14-01 | Barcha filiallar bo'yicha konsolidatsiyalangan ko'rinish | Should | BP-09 "?" | BO-12 | `GET /reports/stock?branch_id=` (bo'sh = konsolidatsiya) | `app.stock_balances`, `app.branches` | — | `stock.view` | 4 |
+| US-M14-01 | Barcha filiallar bo'yicha konsolidatsiyalangan ko'rinish | Should | BP-09 "?" | BO-02, BO-03, BO-12 | `GET /reports/dashboard` (20 #17, `by_branch` + jami), `GET /reports/stock?branch_id=` (bo'sh = konsolidatsiya) | `app.sales`, `app.ledger_entries`, `app.stock_balances`, `app.branches` | §5.4 | `reports.sales.view`, `stock.view` | 4 |
 | US-M14-02 | Filialdan filialga narx/chegirma siyosatini nusxalash | Keyin (post-MVP) | **— (gap)** | **— (GAP: ekran yo'q)** | `POST /branches/{id}/copy-pricing` (20 #36) | `app.product_prices`, `app.discount_rules` | — | `prices.edit` | MVP'dan keyin |
 | US-M14-03 | Yangi filial (do'kon) qo'shish | Must | BP-09 "?" | BO-12 | `POST /branches` (20 #31); kassalar — `cash-registers` (20 #38–40) | `app.branches`, `app.warehouses` (`inventory_account` — do'kon 2920, ombor 2910), `app.cash_registers` (`tax_registered_at`, `outlet_address_snapshot`, `txkm_contract_ref`, `fm_state`) | — | `settings.branches`; kassa — `cash_register.manage` | 1 |
 | US-M14-04 | Filial uchun "aholi punkti toifasi"ni belgilash (aylanma solig'i) | Must | BP-09 "?" | BO-12 | `GET/POST /branches/{id}/tax-settings` (20 #34–35) | `app.branch_tax_settings` | — | `settings.branches` | 1 |
@@ -275,7 +275,7 @@ Manba: `07-ekran-tafsilotlari.md` har bir ekrandagi **"Bog'liq US"** qatori (so'
 | UX-INSTALL (`/install`) | — (41 ekran ro'yxatiga kirmaydi; yordamchi route) |
 | ADM-01 | US-M13-08, US-M17-04 |
 
-**US→Ekran bo'shliqlari** (quyidagi US'larning hech bir ekranning "Bog'liq US" qatorida yo'qligi tasdiqlandi): **US-M03-03, US-M08-08, US-M14-02, US-M17-05** — batafsil §3da.
+**US→Ekran bo'shliqlari** (quyidagi US'larning hech bir ekranning "Bog'liq US" qatorida yo'qligi tasdiqlandi): **US-M08-08, US-M14-02, US-M17-05** — batafsil §3da.
 
 ### 2b. Endpoint → US
 
@@ -378,9 +378,10 @@ Har bir fayl o'zining endpoint indeksidagi tartib raqami bilan berilgan (`18-api
 | 10, 10a, 10b | `ledger-adjustments` guruhi | infratuzilma/admin (qo'lda buxgalteriya tuzatishi; qaror #58 b) |
 | 11–13 | `trial-balance`, `profit-and-loss`, `balance-sheet` | US-M11-02, US-M15-03 |
 | 14–16 | `period-closings` guruhi | US-M11-02 |
-| 17 | `GET /reports/dashboard` | US-M12-01, US-M11-03 |
+| 17 | `GET /reports/dashboard` | US-M12-01, US-M11-03, US-M14-01, US-M15-03 |
 | 18 | `GET /reports/sales` | US-M12-01 |
 | 19 | `GET /reports/top-products` | US-M12-02 |
+| 19a | `GET /reports/discounts` | US-M03-03 |
 | 20 | `GET /reports/stock` | US-M04-03, US-M14-01 |
 | 21 | `GET /reports/debts-aging` | US-M08-10, US-M08-11 |
 | 22–23 | `reports/{report-kod}/export`, `reports/export-jobs/{job_id}` | US-M12-03 |
@@ -546,7 +547,7 @@ Bo'shliq yo'q (qaror #58 b, 26 #164 (OQ-099)): `27-backlog.md` har bosqichida an
 
 ### C. US stories — ekran yo'q
 
-US-M03-03 (Could, lekin ekran umuman yo'q), US-M08-08, US-M14-02, US-M17-05 (uchalasi ham post-MVP, shuning uchun past ustuvorlik, lekin baribir ekran mavjud emas) — **4 ta**. **Tavsiya:** `07-ekran-tafsilotlari.md`ga margin-hisobot (US-M03-03) uchun BO-09 ichiga qo'shimcha blok, qolgan uchtasi uchun MVP'dan keyin bosqichida ekran loyihalash.
+US-M08-08, US-M14-02, US-M17-05 (uchalasi ham post-MVP, shuning uchun past ustuvorlik, lekin baribir ekran mavjud emas) — **3 ta**. US-M03-03 — BO-09 «Chegirmalar va marja» (`GET /reports/discounts`, 20 #19a). **Tavsiya:** qolgan uchtasi uchun MVP'dan keyin bosqichida ekran loyihalash.
 
 ### D. Biznes jarayon (BP) qamrovi
 
@@ -592,4 +593,4 @@ Tekshirildi: barcha "Must" tegidagi US (05'da ro'yxatlangan 62 ta) `27-backlog.m
 - **1C jadvallari:** 18 ta `app.onec_*` + `auth.onec_device_authorizations` — barchasi W/A endpointlari yoki `onec_*` job'lari orqali yoziladi (§2c).
 - **Sinxron voqea turlari:** `16-offline-sync.md` §2 ro'yxati — barchasi §1 va §2b'da US/endpoint bilan bog'langan.
 
-**Bo'shliqlar soni turlar bo'yicha:** A) MVP tier yo'q — 0; B) Bosqich yo'q — 0; C) Ekran yo'q — 4 (US-M03-03; post-MVP US-M08-08, US-M14-02, US-M17-05); D) BP qamrovi — bo'shliq emas (qaror #58 b); E) Endpoint→US yo'q — 2 mahsulot funksiyasi (qarzni kechish, shubhali qarz belgisi), qolganlari infratuzilma/admin; F) Ekran→US yo'q — 0; G) Jadval→yozuvchi yo'q — 0; H) Ruxsat kod nomuvofiqligi — 0; I) Must→bosqich yo'q — 0.
+**Bo'shliqlar soni turlar bo'yicha:** A) MVP tier yo'q — 0; B) Bosqich yo'q — 0; C) Ekran yo'q — 3 (post-MVP US-M08-08, US-M14-02, US-M17-05); D) BP qamrovi — bo'shliq emas (qaror #58 b); E) Endpoint→US yo'q — 2 mahsulot funksiyasi (qarzni kechish, shubhali qarz belgisi), qolganlari infratuzilma/admin; F) Ekran→US yo'q — 0; G) Jadval→yozuvchi yo'q — 0; H) Ruxsat kod nomuvofiqligi — 0; I) Must→bosqich yo'q — 0.

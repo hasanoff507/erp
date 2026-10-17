@@ -2,10 +2,11 @@
  * BO-03 — Ombor qoldig'i (+ Ko'chirishlar, Inventarizatsiyalar) — 07, route /app/warehouse/stock,
  * `stock.view`. Bosqich 2: «Qoldiq» (KPI, banner, filters, balances / expiring lots), «Ko'chirishlar»
  * (US-M06-03, B2-T11), «Inventarizatsiyalar» (review → post), actions «Hisobdan chiqarish»,
- * «Inventarizatsiya», «Ko'chirish». The current branch only: «Barchasi» (consolidation) needs
- * `GET /reports/stock` (Bosqich 4); «Eksport» (`reports.export`) is Bosqich 4; e-TTN signing /
- * manual registration are Bosqich 5. Offline: view only, writes disabled (qaror #54).
- * useEffect only fires pageMounted (24 §2).
+ * «Inventarizatsiya», «Ko'chirish». Bosqich 4: rows and KPI from `GET /reports/stock` (WEB-10);
+ * «Barcha filiallar» in the topbar = consolidated stock (US-M04-03: every branch and the total; writes
+ * need one branch). Alert links `?lowStockOnly=1` / `?expiringWithinDays=7` open the filtered view.
+ * «Eksport» (`reports.export`) is a later stage; e-TTN signing / manual registration are Bosqich 5.
+ * Offline: view only, writes disabled (qaror #54). useEffect only fires pageMounted (24 §2).
  */
 import { useUnit } from "effector-react";
 import { ArrowLeftRight, ClipboardList, Info, Trash2, WifiOff } from "lucide-react";
@@ -41,8 +42,10 @@ import {
   $transit,
   $warehouse,
   isStockTab,
+  lowOnlyToggled,
   pageMounted,
   tabChanged,
+  viewChanged,
   type Lot,
 } from "../../model/index.ts";
 import { BalancesTab } from "../balances/BalancesTab.tsx";
@@ -74,6 +77,7 @@ function StockPage() {
   const canCreatePo = useCan({ permission: "purchases.create" });
   const canListStaff = useCan({ permission: "settings.users" });
   const online = useOnline();
+  const [onLow, onView] = useUnit([lowOnlyToggled, viewChanged]);
   const [mounted, tab, onTab, error, warehouse, branchId, branches, loaded, transit, review, requestLots] =
     useUnit([
       pageMounted,
@@ -98,6 +102,9 @@ function StockPage() {
     mounted({ today: dayjs().format("YYYY-MM-DD"), canListStaff });
     const initial = params.get("tab");
     if (isStockTab(initial)) onTab(initial);
+    // Dashboard / bell alert links (20 §17 alert routes).
+    if (params.get("lowStockOnly") === "1") onLow(true);
+    if (params.get("expiringWithinDays")) onView("expiring");
     // Only on entry (24 §2) — the tab is then driven by the model.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted, canView, canListStaff]);
@@ -159,7 +166,8 @@ function StockPage() {
         <Banner tone="info" icon={Info}>
           {t("stock.allBranches")}
         </Banner>
-      ) : loaded && warehouse === null ? (
+      ) : null}
+      {branchId !== null && loaded && warehouse === null ? (
         <Banner tone="warning" icon={Info}>
           {t("stock.noWarehouse")}
         </Banner>
@@ -179,9 +187,19 @@ function StockPage() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="balances" className="flex flex-col gap-[18px]">
-          {warehouse ? (
+          {branchId === null ? (
             <>
-              <Kpis branchName={branchId ? branchName(branchId) : ""} />
+              <Kpis branchName="" consolidated />
+              <BalancesTab
+                canWriteOff={false}
+                canCreatePo={false}
+                online={online}
+                onWriteOffLot={openWriteOff}
+              />
+            </>
+          ) : warehouse ? (
+            <>
+              <Kpis branchName={branchName(branchId)} consolidated={false} />
               <BalancesTab
                 canWriteOff={canWriteOff}
                 canCreatePo={canCreatePo}

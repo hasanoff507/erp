@@ -122,6 +122,10 @@ def test_create_app_registers_the_limit_for_import_uploads() -> None:
     entries = [m for m in app.user_middleware if m.cls is BodyLimitMiddleware]
     assert len(entries) == 1
     kwargs = entries[0].kwargs
-    assert kwargs["upload_paths"] == {
-        f"{settings.api_prefix}/import-jobs": settings.import_max_bytes + MULTIPART_MARGIN
-    }
+    paths = kwargs["upload_paths"]
+    assert paths[f"{settings.api_prefix}/import-jobs"] == settings.import_max_bytes + MULTIPART_MARGIN
+    # B4 bank: 20 #55g statement import (multipart, same limit as /import-jobs)
+    assert (
+        paths[f"{settings.api_prefix}/bank-settlements/imports"]
+        == settings.import_max_bytes + MULTIPART_MARGIN
+    )

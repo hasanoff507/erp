@@ -7,6 +7,7 @@
 import { META } from "../db/meta.ts";
 import type { PosDb } from "../db/schema.ts";
 import { searchTokens } from "../lib/search.ts";
+import { nowIso } from "../runtime.ts";
 import type {
   CustomerRow,
   FiscalReceiptRow,
@@ -56,6 +57,11 @@ export function toCustomerRow(row: Row): CustomerRow {
     id: String(row.id),
     name,
     phone,
+    open_debt_docs: Array.isArray(row.open_debt_docs)
+      ? (row.open_debt_docs as CustomerRow["open_debt_docs"])
+      : [],
+    // B4 (w-debts): outbox results after this moment are not reflected in the row yet (repos/debts.ts)
+    _pulled_at: nowIso(),
     tokens: searchTokens(name, digits, digits && digits.length > 9 ? digits.slice(-9) : null, str(row.stir)),
   };
 }

@@ -6,7 +6,19 @@ import { render } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@shared/ui";
+import { setNonce } from "get-nonce";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@shared/ui";
 
 import { CSP_NONCE_PLACEHOLDER, cspDirectives, securityHeaders, serializeCsp } from "./csp.ts";
 import {
@@ -14,6 +26,7 @@ import {
   runtimeStyleHashes,
   SCROLL_LOCK_MAX_GAP,
   scrollLockCss,
+  SELECT_VIEWPORT_CSS,
   sha256Source,
 } from "./csp-hashes.ts";
 import { staticHostHeaders } from "./deploy/render.ts";
@@ -42,6 +55,24 @@ function radixRuntimeStyles(gap: number): string[] {
   return styles;
 }
 
+/** Opens a real Radix (shadcn) Select; returns its viewport <style> elements (text + nonce). */
+function radixSelectStyles(): { css: string; nonce: string | null }[] {
+  const { unmount } = render(
+    createElement(
+      Select,
+      { open: true, value: "a" },
+      createElement(SelectTrigger, { "aria-label": "Tanlov" }, createElement(SelectValue)),
+      createElement(SelectContent, null, createElement(SelectItem, { value: "a" }, "A")),
+    ),
+  );
+  const styles = Array.from(document.querySelectorAll("style"), (el) => ({
+    css: el.textContent ?? "",
+    nonce: el.getAttribute("nonce"),
+  })).filter((s) => s.css.includes("data-radix-select-viewport"));
+  unmount();
+  return styles;
+}
+
 afterEach(() => {
   Reflect.deleteProperty(document.documentElement, "clientWidth");
 });
@@ -57,12 +88,26 @@ describe("CSP sha256 fallback for static hosts — 24 §4.4", () => {
 
   it("every runtime <style> a Radix modal injects is covered by a hash", () => {
     const hashes = runtimeStyleHashes();
-    expect(hashes).toHaveLength(SCROLL_LOCK_MAX_GAP + 1);
+    expect(hashes).toHaveLength(SCROLL_LOCK_MAX_GAP + 2);
     expect(new Set(hashes).size).toBe(hashes.length);
     for (const gap of [0, 12, 17, 34]) {
       const styles = radixRuntimeStyles(gap);
       expect(styles.length).toBeGreaterThan(0);
       for (const css of styles) expect(hashes, `gap ${gap}`).toContain(sha256Source(css));
+    }
+  });
+
+  it("test_web08_select_viewport_style_allowed", () => {
+    // hash mode: the Select viewport <style> Radix renders is byte-identical to SELECT_VIEWPORT_CSS and hashed
+    const styles = radixSelectStyles();
+    expect(styles.map((s) => s.css)).toEqual([SELECT_VIEWPORT_CSS]);
+    expect(runtimeStyleHashes()).toContain(sha256Source(styles[0]?.css ?? ""));
+    // nonce mode: the per-response nonce (main.tsx → get-nonce) is stamped on the viewport <style>
+    setNonce("n0nce-web08");
+    try {
+      expect(radixSelectStyles().map((s) => s.nonce)).toEqual(["n0nce-web08"]);
+    } finally {
+      setNonce("");
     }
   });
 

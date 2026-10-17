@@ -9,7 +9,7 @@ import { Check, Clock, X } from "lucide-react";
 import { useId, useState } from "react";
 
 import { serverErrorText, useTranslation } from "@shared/i18n";
-import { formatDateTime, formatMoney, formatPercent } from "@shared/lib/format";
+import { formatDate, formatDateTime, formatMoney, formatPercent } from "@shared/lib/format";
 import { Button, Card, Icon, Input, StatusChip, Textarea, cn, type Tone } from "@shared/ui";
 
 import {
@@ -86,6 +86,16 @@ export function RequestCard({ request: r, branchName, own, online }: RequestCard
         return t(`approvals.enum.manualReason.${line.value}`);
       case "lines":
         return t("approvals.linesCount", { count: line.count });
+      case "source":
+        return t(`approvals.enum.source.${line.value}`);
+      case "docDate":
+        return formatDate(line.value);
+      case "creditLimit":
+      case "currentDebt":
+        return formatMoney(line.value);
+      case "category":
+      case "customer":
+        return line.value;
       default:
         return `«${line.value}»`;
     }

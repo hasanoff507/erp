@@ -1,11 +1,18 @@
 import "./connections/index.ts";
 
 export {
+  $balances,
+  $consolidated,
   $expiryDays,
+  $filtered,
+  $hasMore,
   $lastUpdated,
   $lotsMoreLoading,
-  $moreLoading,
   $pageTotal,
+  $scope,
+  $summary,
+  $summaryError,
+  $units,
 } from "./connections/index.ts";
 export * from "./events/index.ts";
 export * from "./effects/index.ts";

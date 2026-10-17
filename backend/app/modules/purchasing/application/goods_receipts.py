@@ -6,7 +6,9 @@ VAT / payable (:func:`app.modules.purchasing.domain.receipts.receipt_posting`), 
 refreshes the linked purchase order — all in ONE transaction. ``cancel``: a draft just becomes
 ``cancelled``; a posted receipt is reversed (13 §5.2): ``409 LOT_ALREADY_CONSUMED`` when any of its lots
 was touched (sold, returned to the supplier, blocked), else storno of the stock moves, ledger, VAT and
-debt rows, and the PO status is recomputed.
+debt rows, and the PO status is recomputed. A receipt that a posted supplier payment is allocated to
+is refused (``409 DOC_INVALID_STATE``, ``params.reason='supplier_payment_allocated'``) — cancel the
+payments first.
 
 Lock order (23 §2.1): receipt row → purchase order row → ``stock_balances`` (one ``lock`` call with
 every key) → ``debt_balances``.
@@ -401,6 +403,17 @@ class GoodsReceiptService:
                 txn = await self._stock.lock(
                     s, actor.tenant_id, [(gr.warehouse_id, ln.product_id) for ln in gr.lines]
                 )
+                # supplier payments allocate under this lock (13 §2.16): cancel those payments first
+                await self._debts.lock(s, actor.tenant_id, [(gr.supplier_id, PAYABLE)])
+                paying = await self._repo.paying_supplier_payments(s, gr.id)
+                if paying:
+                    raise AppError(
+                        ErrorCode.DOC_INVALID_STATE,
+                        params={
+                            "reason": "supplier_payment_allocated",
+                            "supplier_payment_ids": [str(p) for p in paying],
+                        },
+                    )
                 await txn.reverse_receipt(DOC_TYPE, gr.id)  # 409 LOT_ALREADY_CONSUMED
                 await self._poster.reverse_document(s, actor.tenant_id, DOC_TYPE, gr.id)
                 await self._debts.reverse(s, actor.tenant_id, DOC_TYPE, gr.id)

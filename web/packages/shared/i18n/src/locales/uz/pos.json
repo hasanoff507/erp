@@ -37,7 +37,8 @@
       "cashMovement": "Kassa puli",
       "shiftClose": "Smenani yopish",
       "sync": "Sinxronlash holati",
-      "equipment": "Uskunalar"
+      "equipment": "Uskunalar",
+      "debts": "Qarz daftari"
     },
     "revokedCardBlocked": "Qurilmada natijasi aniqlanmagan karta to'lovi bor. Avval uni hal qiling (ochilgan oynada), so'ng ma'lumotlarni o'chiring."
   },
@@ -1085,7 +1086,6 @@
       "out": "Pul olish",
       "expense": "Xarajat"
     },
-    "expenseLater": "«Xarajat» (kassadan xarajat to'lash) keyingi bosqichda (Bosqich 4) qo'shiladi.",
     "amount": "Summa",
     "som": "so'm",
     "backspace": "Oxirgi raqamni o'chirish",
@@ -1094,7 +1094,8 @@
       "owner_withdrawal": "Egasi oldi",
       "collection": "Inkasso",
       "deposit": "Qo'yish",
-      "other": "Boshqa"
+      "other": "Boshqa",
+      "expense": "Xarajat"
     },
     "founderBackOffice": "MChJ uchun ta'sischiga pul berish ta'sischi tanlashni talab qiladi — buni back-office (Kassa) orqali bajaring.",
     "comment": "Izoh",
@@ -1108,6 +1109,7 @@
       "opening": "Boshlang'ich qoldiq",
       "cashSales": "Naqd sotuv",
       "cashReturns": "Naqd qaytarish",
+      "debtCashIn": "Qarz to'lovlari (naqd)",
       "in": "Qo'yilgan",
       "out": "Olingan",
       "now": "Hozir",
@@ -1144,5 +1146,112 @@
     "note": "Izoh",
     "noteRequired": "Farq izohsiz saqlanmaydi — sababini yozing.",
     "continue": "Davom etish (Z-hisobot)"
+  },
+  "posExpense": {
+    "amount": "Summa",
+    "category": "Xarajat toifasi",
+    "taxType": "Soliq turi",
+    "comment": "Izoh",
+    "loading": "Toifalar yuklanmoqda…",
+    "noCategories": "Xarajat toifalari qurilmada yo'q — internet bilan bir marta oching (toifalar saqlanadi).",
+    "cached": "Internet yo'q — toifalar qurilmadagi nusxadan. Xarajat navbatga yoziladi va internet tiklanganda yuboriladi.",
+    "overLimit": "{{limit}} dan ortiq xarajat — tasdiqlovchi PIN kerak.",
+    "submit": "Tasdiqlash — {{amount}} xarajat",
+    "done": "Xarajat yozildi: {{amount}}.",
+    "note": "Kassadan to'langan xarajat darhol o'tkaziladi (kassa kamayadi), offlayn ham ishlaydi; bank yoki karta orqali xarajat — back-office «Xarajatlar».",
+    "errors": {
+      "amount": "Summa 0 dan katta bo'lsin.",
+      "category": "Xarajat toifasini tanlang.",
+      "taxType": "Soliq turini tanlang.",
+      "comment": "Izoh 1000 belgigacha."
+    },
+    "taxTypes": {
+      "vat": "QQS",
+      "turnover": "Aylanma solig'i"
+    }
+  },
+  "debts": {
+    "bookButton": "Qarz daftari",
+    "bookTitle": "Qarz daftari",
+    "newCustomer": "+ Yangi mijoz",
+    "newCustomerHint": "Ism va telefon — 2–3 soniyada, internetsiz ham. Mijoz keyin serverga yuboriladi.",
+    "customerName": "Ism",
+    "customerPhone": "Telefon",
+    "quickSave": "Saqlash va tanlash",
+    "quickFailed": "Mijoz yozilmadi — qayta urinib ko'ring",
+    "notSynced": "sinxronlanmagan",
+    "current": "Joriy qarz",
+    "thisSale": "Shu sotuv",
+    "afterSale": "Sotuvdan keyin",
+    "limit": "Kredit limiti {{amount}}",
+    "left": "qoladi {{amount}}",
+    "noLimit": "Limit belgilanmagan — tekshiruv o'tkazilmaydi",
+    "unsyncedNote": "Qoldiq oxirgi sinxron ma'lumot va shu kassaning yuborilmagan hujjatlari bo'yicha.",
+    "overLimitConfirm": "Limitdan oshganini bilaman — baribir nasiyaga yozilsin",
+    "creditTitle": "Nasiyaga sotish",
+    "creditHint": "Mijozni tanlang yoki yangisini yozing, va'da sanasini belgilang.",
+    "comment": "Izoh",
+    "onCredit": "Nasiyaga",
+    "noReceiptNow": "Fiskal chek hozir chiqmaydi.",
+    "noReceiptWhy": "Chek mijoz qarzni to'laganda beriladi. Daromad va QQS bugungi sotuv sifatida hisoblanadi.",
+    "creditConfirm": "Nasiyaga rasmiylashtirish",
+    "searchPlaceholder": "Ism yoki telefon",
+    "debtorsTotal": "{{n}} ta qarzdor · jami {{amount}}",
+    "debtors": "Qarzdorlar",
+    "noDebtors": "Qarzdor topilmadi",
+    "chip": {
+      "overdue": "muddati o'tgan",
+      "today": "va'da bugun"
+    },
+    "limitShort": "limit {{amount}}",
+    "pickTitle": "Mijozni tanlang",
+    "pickHint": "Chapdan qarzdorni tanlang yoki ism/telefon bo'yicha qidiring.",
+    "quickDebt": "Tezkor qarz yozish",
+    "quickDebtHint": "Yangi qarz faqat tovar bilan yoziladi: sotish ekrani shu mijoz tanlangan holda ochiladi, fiskal chek to'lovgacha kechiktiriladi.",
+    "limitFree": "Limit · bo'sh",
+    "noLimitShort": "Limitsiz",
+    "promise": "To'lash va'dasi",
+    "pendingPayments": "Yuborilmagan to'lovlar: {{amount}} — server qabul qilgach qarzdan ayriladi.",
+    "ledgerTitle": "Qarz daftari",
+    "col": {
+      "date": "Sana",
+      "doc": "Hujjat",
+      "amount": "Summa",
+      "balance": "Qoldiq"
+    },
+    "kind": {
+      "debt": "Qarz",
+      "payment": "To'lov",
+      "credit": "Tuzatish"
+    },
+    "doc": {
+      "sales": "Sotuv",
+      "debt_openings": "Boshlang'ich qarz",
+      "debt_writeoffs": "Kechilgan qarz"
+    },
+    "offlineLedger": "Internet yo'q — qurilmadagi ochiq hujjatlar ko'rsatilmoqda.",
+    "payTitle": "To'lov qabul qilish",
+    "offlinePay": "Offline: to'lov qabul qilinadi, qarzdan ortig'i bo'nak sifatida yoziladi.",
+    "noPayRight": "To'lov qabul qilish huquqi yo'q (debts.payment.accept).",
+    "amount": "To'lov summasi",
+    "amountHint": "Joriy qarzdan oshmasligi kerak ({{amount}})",
+    "closes": "To'lov yopadigan sotuvlar",
+    "closesFull": "to'liq yopiladi",
+    "closesPart": "qisman · qoldiq {{amount}}",
+    "exceedsOnline": "To'lov joriy qarzdan oshmasligi kerak ({{amount}}). Ortig'ini naqd qaytaring.",
+    "overpayOffline": "Qarzdan ortiq {{amount}} — bo'nak (6310) sifatida yoziladi, Egasiga xabar boradi.",
+    "afterPayment": "To'lovdan keyin qarz",
+    "newPromise": "Yangi va'da sanasi",
+    "receiptNote": "To'langan {{amount}} ga fiskal chek chiqariladi",
+    "accept": "To'lovni qabul qilish",
+    "paidTitle": "To'lov qabul qilindi",
+    "paidText": "{{name}} — {{amount}}",
+    "printing": "Chek chop etilmoqda…",
+    "printed": "Chek chop etildi",
+    "printFailed": "Printer ishlamadi — to'lov saqlangan, chekni qayta chop eting yoki uskunalarni sozlang.",
+    "fiscalOffline": "Offline: fiskal belgi internet qaytganda keladi.",
+    "fiscalPending": "Fiskal belgi kutilmoqda.",
+    "printAgain": "Qayta chop etish",
+    "next": "Keyingi mijoz"
   }
 }

@@ -60,6 +60,8 @@ from app.modules.cash.domain.movements import (
     signed,
     validate,
 )
+from app.modules.debts.application.register import DebtRegister
+from app.modules.debts.domain.register import DebtMoveInput
 from app.modules.sync.application.handlers import EventContext, SyncExceptionRow
 
 DOC_TYPE = "cash_movements"
@@ -100,6 +102,9 @@ def _right(direction: str) -> str:
     return "cash.deposit" if direction == "in" else "cash.withdraw"
 
 
+RECEIVABLE = "4010"
+
+
 class CashMovementService:
     def __init__(
         self,
@@ -110,8 +115,11 @@ class CashMovementService:
         guard: ShiftGuardService,
         notifications: Any | None = None,
         approval_ttl_minutes: int = APPROVAL_TTL_MINUTES,
+        debts: DebtRegister | None = None,
     ) -> None:
         self._ttl = approval_ttl_minutes  # settings.approval_ttl_minutes (ACC-06)
+        # B4: account 4010 against a customer moves debt_balances too (debt book = 4010 ledger, 13 §2.18)
+        self._debts = debts
         self._sf = session_factory
         self._repo = repo
         self._poster = poster
@@ -213,6 +221,7 @@ class CashMovementService:
             await self._poster.assert_period_open(s, doc_date)
             await self._check_refs(s, m)
             movement_id = uuid7()
+            await self._check_customer_credit(s, actor.tenant_id, m)
             await self._insert(
                 s, actor.tenant_id, movement_id, shift.branch_id, doc_date, m, actor.user_id, None, None
             )
@@ -324,6 +333,8 @@ class CashMovementService:
                         },
                     )
                 await self._poster.reverse_document(s, actor.tenant_id, DOC_TYPE, row.id)
+                if self._debts is not None:
+                    await self._debts.reverse(s, actor.tenant_id, DOC_TYPE, row.id)
             await self._repo.mark_cancelled(s, row.id, actor.user_id, reason)
             await record_audit(
                 s,
@@ -403,6 +414,26 @@ class CashMovementService:
         if m.employee_id is not None and not await self._repo.is_member(s, m.employee_id):
             raise AppError(ErrorCode.NOT_FOUND, params={"resource": "employee"})
 
+    async def _check_customer_credit(self, s: AsyncSession, tenant_id: UUID, m: MovementInput) -> None:
+        """ACC-02 (13 §2.18): a 4010 ``out`` only pays back the customer's 4010 credit — under the
+        ``debt_balances`` lock, ``amount ≤ max(−receivable, 0)``; never a receivable without a document."""
+        if effective_account(m) != RECEIVABLE or m.direction != "out" or m.counterparty_id is None:
+            return
+        if self._debts is None:
+            return
+        balances = await self._debts.lock(s, tenant_id, [(m.counterparty_id, "receivable")])
+        available = max(-balances.get((m.counterparty_id, "receivable"), Decimal(0)), Decimal(0))
+        if m.amount > available:
+            raise AppError(
+                ErrorCode.VALIDATION_ERROR,
+                params={"available": m2(available)},
+                details=[
+                    ErrorDetail(
+                        field="amount", message_key="validation.cash_movement_exceeds_customer_credit"
+                    )
+                ],
+            )
+
     async def _insert(
         self,
         s: AsyncSession,
@@ -449,6 +480,7 @@ class CashMovementService:
         *,
         rest: bool = False,
     ) -> SyncExceptionRow | None:
+        await self._check_customer_credit(s, tenant_id, m)
         legal_form, configured = await self._repo.tenant_legal(s)
         entry = ledger_entry(m, owner_acct=owner_account(legal_form, configured), branch_id=branch_id)
         late: SyncExceptionRow | None = None
@@ -471,6 +503,19 @@ class CashMovementService:
             movement_id,
             [LedgerLine(entry_date, branch_id, entry.account_dt, entry.account_kt, m.amount, analytics)],
         )
+        if (
+            self._debts is not None
+            and m.counterparty_id is not None
+            and RECEIVABLE
+            in (
+                entry.account_dt,
+                entry.account_kt,
+            )
+        ):
+            delta = m.amount if entry.account_dt == RECEIVABLE else -m.amount
+            await self._debts.post(
+                s, tenant_id, [DebtMoveInput(m.counterparty_id, "receivable", delta, DOC_TYPE, movement_id)]
+            )
         await self._repo.insert_cash_move(
             s,
             {

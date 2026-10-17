@@ -170,6 +170,22 @@ def _assign_codes(rows: Sequence[Any], codes: Sequence[tuple[UUID, str]]) -> lis
     return out
 
 
+async def advance_balance(s: AsyncSession, supplier_id: UUID) -> Decimal:
+    """Debit balance of 4310 (advances paid) for the supplier: Σ Dt 4310 − Σ Kt 4310 (13 §2.16). The one
+    query behind the receipt's advance offset (13 §2.6) and the supplier-payment cancel guard (ACC-03)."""
+    value = (
+        await s.execute(
+            text(
+                "SELECT COALESCE(sum(CASE WHEN account_dt = '4310' THEN amount ELSE -amount END), 0) "
+                "FROM app.ledger_entries WHERE (account_dt = '4310' OR account_kt = '4310') "
+                "AND analytics->>'counterparty_id' = :cp"
+            ),
+            {"cp": str(supplier_id)},
+        )
+    ).scalar_one()
+    return Decimal(value) if value else ZERO
+
+
 class SqlGoodsReceiptRepository:
     async def get(self, s: AsyncSession, receipt_id: UUID, *, lock: bool = False) -> GoodsReceipt | None:
         if lock:
@@ -296,18 +312,7 @@ class SqlGoodsReceiptRepository:
         return "turnover" if found == "turnover" else "vat"
 
     async def advance_balance(self, s: AsyncSession, supplier_id: UUID) -> Decimal:
-        """Debit balance of 4310 (advances paid) for the supplier: Σ Dt 4310 − Σ Kt 4310 (13 §2.16)."""
-        value = (
-            await s.execute(
-                text(
-                    "SELECT COALESCE(sum(CASE WHEN account_dt = '4310' THEN amount ELSE -amount END), 0) "
-                    "FROM app.ledger_entries WHERE (account_dt = '4310' OR account_kt = '4310') "
-                    "AND analytics->>'counterparty_id' = :cp"
-                ),
-                {"cp": str(supplier_id)},
-            )
-        ).scalar_one()
-        return Decimal(value) if value else ZERO
+        return await advance_balance(s, supplier_id)
 
     async def poa_number(self, s: AsyncSession, poa_id: UUID) -> tuple[bool, str | None]:
         row = (
@@ -371,6 +376,20 @@ class SqlGoodsReceiptRepository:
             ),
             {"id": receipt_id},
         )
+
+    async def paying_supplier_payments(self, s: AsyncSession, receipt_id: UUID) -> list[UUID]:
+        """Posted supplier payments allocated to the receipt (19 §8 cancel guard, 13 §2.16)."""
+        rows = await s.execute(
+            text(
+                "SELECT DISTINCT p.id FROM app.supplier_payment_allocations a "
+                "JOIN app.supplier_payments p ON p.id = a.supplier_payment_id "
+                "WHERE a.target_doc_type = 'goods_receipts' AND a.target_doc_id = :id "
+                "AND p.status = 'posted' "
+                "ORDER BY p.id"
+            ),
+            {"id": receipt_id},
+        )
+        return [r[0] for r in rows]
 
 
 class SqlSupplierReturnRepository:

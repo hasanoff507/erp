@@ -39,6 +39,8 @@
     "@shared/lib": "workspace:*",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
+    "cmdk": "catalog:",
+    "get-nonce": "catalog:",
     "lucide-react": "catalog:",
     "react-hook-form": "catalog:",
     "tailwind-merge": "catalog:",

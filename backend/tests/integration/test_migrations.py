@@ -24,10 +24,10 @@ from tests.support.bootstrap import MIGRATOR_PASSWORD, bootstrap_database, downg
 pytestmark = pytest.mark.db
 
 
-async def test_head_is_0027a(migrated_db: MigratedDb, migrator_engine: AsyncEngine) -> None:
+async def test_head_is_0027b(migrated_db: MigratedDb, migrator_engine: AsyncEngine) -> None:
     async with migrator_engine.connect() as conn:
         version = (await conn.execute(text("SELECT version_num FROM public.alembic_version"))).scalar()
-    assert version == alembic_head() == "0027a"
+    assert version == alembic_head() == "0027b"
 
 
 async def test_every_tenant_table_has_forced_rls_and_a_policy(migrator_engine: AsyncEngine) -> None:

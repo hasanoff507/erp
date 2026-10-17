@@ -14,6 +14,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.money import money_str, percent_str, price_str, qty_str
+from app.modules.debts.wiring import open_debt_docs
 from app.modules.sync.application.ports import PullContext, StreamRow
 from app.modules.sync.domain.cursor import Position
 
@@ -271,6 +272,11 @@ class SqlPullReader:
             ),
             params,
         )
+        found = list(rows)
+        # 16 §1 open_debt_docs[] (B4, b4-debts): customers with an open debt document (receivable_balance > 0
+        # or an open written-off debt) — the same documents the server re-allocates on debt_payment.created
+        live = [r.id for r in found if r.archived_at is None and r.is_customer]
+        docs = await open_debt_docs(s, live) if live else {}
         return [
             StreamRow(
                 {
@@ -286,12 +292,12 @@ class SqlPullReader:
                     "archived_at": _ts(r.archived_at),
                     "version": r.version,
                     "updated_at": _ts(r.ts),
-                    "open_debt_docs": [],
+                    "open_debt_docs": docs.get(r.id, []),
                     "deleted": r.archived_at is not None or not r.is_customer,
                 },
                 Position(r.ts, str(r.id)),
             )
-            for r in rows
+            for r in found
         ]
 
     # --- stock ------------------------------------------------------------------------------------

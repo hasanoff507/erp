@@ -127,7 +127,11 @@ def test_red_einvoice_advance_offset_covers_gross() -> None:
     plan = _plan([_line("100.000", "10000.0000")], risk_flag="red", advance=D("1200000.00"))
     rows = [(x.account_dt, x.account_kt, x.amount) for x in plan.ledger]
     assert rows[-1] == ("6010", "4310", D("1120000.00"))
-    assert plan.advance_offset == D("1120000.00") and plan.payable == D("1120000.00") and plan.vat == []
+    assert plan.advance_offset == D("1120000.00") and plan.payable == D("1120000.00")
+    # ACC-05: the offset fully covers the receipt → the whole deferred credit is released at posting
+    assert [(v.kind, v.base_amount, v.vat_amount) for v in plan.vat] == [
+        ("input", D("1000000.00"), D("120000.00"))
+    ]
 
 
 def test_2_7_zero_rate_lines_and_mixed_base() -> None:

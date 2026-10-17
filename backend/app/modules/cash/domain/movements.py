@@ -3,7 +3,8 @@
 * ``reason ↔ direction``: ``collection``/``owner_withdrawal`` → only ``out``; ``deposit`` → only ``in``;
   ``other`` → both;
 * ``account`` only for ``other`` — ``9430``/``9390``/``6310``/``4010``/``4730``; default ``out`` → ``9430``,
-  ``in`` → ``9390``; ``6310``/``4010`` need ``counterparty_id``, ``4730`` needs ``employee_id``;
+  ``in`` → ``9390``; ``6310``/``4010`` need ``counterparty_id``, ``4730`` needs ``employee_id``; ``4010`` is
+  ``out`` only (money back from the customer's credit — the service caps it by that credit, ACC-02);
 * ``owner_withdrawal`` — ``counterparty_id`` (a founder) is mandatory unless ``legal_form =
   sole_proprietor``; debit = ``tenants.settings.owner_withdrawal_account`` (default from ``legal_form``:
   ``4890``, YaTT ``8720``);
@@ -82,6 +83,10 @@ def validate(m: MovementInput, *, sole_proprietor: bool) -> list[Violation]:
         out.append(Violation("account", "validation.enum"))
     if not (m.comment or "").strip():
         out.append(Violation("comment", "validation.required"))
+    if account == "4010" and m.direction == "in":
+        # ACC-02 (13 §2.18, qaror #45/#67): a customer repays debt only through debt_payments (POS
+        # debt_settlement receipt or bank) — never a cash movement on 4010
+        out.append(Violation("account", "validation.cash_movement_debt_repayment"))
     if account in ("6310", "4010"):
         if m.counterparty_id is None:
             out.append(Violation("counterparty_id", "validation.required"))

@@ -7,7 +7,7 @@
 
 ## Asosiy xulosalar
 
-1. **107 ta indeks qatori** 12 guruhda (+ `/platform/*` havolasi): M10 QQS (13: hisobot/registr 2, davlat hisoboti 7, `tax-settlements` 4 ta), M11 Buxgalteriya (8 + `ledger-adjustments` 2 ta — jami 10), M12 Hisobotlar (7), M13 Huquqlar (8: rol/ruxsat 6 + tenant qurilmalari 2 — BO-11 «Qurilmalar» tabi; foydalanuvchi CRUD'i `14-autentifikatsiya-oauth2.md`da), M14 Filiallar (13: filial 7, ombor 2, kassa 4), M13a/M14 Tenant sozlamalari (8: sozlamalar, soliq rejimi, integratsiya kalitlari, sinxron istisnolari, AI rozilik), M15 Xarajatlar (11), M16 Kassa pul harakati (4), M11/M16 Bank tushumi tasdig'i (8, `/bank-settlements` + ko'chirma importi), M17 Obuna (10 + `/billing/export-my-data` (65a) + platforma admin havolasi), M18 Bildirishnomalar (6), AI (8). M19 «1C integratsiyasi» (55 endpoint, W-01…W-55) — bu faylda **takrorlanmaydi**, faqat havola bo'limi (`33-1c-integratsiya.md` §10).
+1. **108 ta indeks qatori** 12 guruhda (+ `/platform/*` havolasi): M10 QQS (13: hisobot/registr 2, davlat hisoboti 7, `tax-settlements` 4 ta), M11 Buxgalteriya (8 + `ledger-adjustments` 2 ta — jami 10), M12 Hisobotlar (8), M13 Huquqlar (8: rol/ruxsat 6 + tenant qurilmalari 2 — BO-11 «Qurilmalar» tabi; foydalanuvchi CRUD'i `14-autentifikatsiya-oauth2.md`da), M14 Filiallar (13: filial 7, ombor 2, kassa 4), M13a/M14 Tenant sozlamalari (8: sozlamalar, soliq rejimi, integratsiya kalitlari, sinxron istisnolari, AI rozilik), M15 Xarajatlar (11), M16 Kassa pul harakati (4), M11/M16 Bank tushumi tasdig'i (8, `/bank-settlements` + ko'chirma importi), M17 Obuna (10 + `/billing/export-my-data` (65a) + platforma admin havolasi), M18 Bildirishnomalar (6), AI (8). M19 «1C integratsiyasi» (55 endpoint, W-01…W-55) — bu faylda **takrorlanmaydi**, faqat havola bo'limi (`33-1c-integratsiya.md` §10).
 2. Hujjat turidagi resurslar `17-api-umumiy.md` §9 naqshiga rioya qiladi: `expenses`, `bank-settlements`, `tax-settlements` — uch bosqichli (`draft → post → cancel`); `cash-movements`, `ledger-adjustments`, `supplier-payments` — bir bosqichli (yaratilganda `posted`, keyin faqat `cancel`); faqat sof o'qish/sozlama resurslari (`roles`, `branches`, `notification-settings`) CRUD (`GET`/`POST`/`PATCH`) shaklida.
 3. M17 platforma admin endpoint'lari (`/platform/*`) **allaqachon** `14-autentifikatsiya-oauth2.md` §18.1'da to'liq yozilgan — bu faylda faqat ro'yxat ko'rinishida qayta ko'rsatiladi (to'liq sxema u yerda), ikki marta yozilmaydi.
 4. Excel/PDF eksport (M12, M10 hisobotlari) — `17-api-umumiy.md` §13dagi asinxron job naqshi; Click/Payme (M17) — §14dagi webhook naqshi.
@@ -45,6 +45,7 @@
 | 17 | `GET /reports/dashboard` | M12 | Egasi/Menejer dashboard ma'lumoti | `reports.sales.view` |
 | 18 | `GET /reports/sales` | M12 | Savdo hisoboti (filial/davr) | `reports.sales.view` |
 | 19 | `GET /reports/top-products` | M12 | Eng ko'p/kam sotilgan tovarlar | `reports.sales.view` |
+| 19a | `GET /reports/discounts` | M12 | Chegirmalar summasi va ularning marjaga ta'siri (US-M03-03) | `reports.finance.view` |
 | 20 | `GET /reports/stock` | M12 | Qoldiq hisoboti | `stock.view` |
 | 21 | `GET /reports/debts-aging` | M12 | Qarzdorlik "yosh" guruhlari (0-30/31-60/60+) | `reports.finance.view` yoki `debts.approve` |
 | 22 | `POST /reports/{report-kod}/export` | M12 | Hisobotni Excel/PDF eksport qilish (job) | `reports.export` |
@@ -140,7 +141,7 @@
 | Maqsad | Davr bo'yicha ichki QQS (yoki aylanma solig'i, tenant rejimiga qarab) hisob-kitobi — `vat_moves`dan agregatlangan: `output − input` (`13-provodka-qoidalari.md` §4.2) |
 | Ruxsat | `tax.vat.view` |
 | So'rov | `?period=2026-10` (majburiy, `YYYY-MM`), `?branch_id=` (ixtiyoriy). Filial cheklovi (`15-xavfsizlik-va-audit.md` §2.4): filialga cheklangan foydalanuvchi faqat o'z filialini so'raydi (boshqasi — `403 PERMISSION_DENIED`), `branch_id` siz aylanma faqat uning filiallari bo'yicha yig'iladi; QQS rejimi (tenant ko'rsatkichi) faqat cheklanmagan foydalanuvchiga |
-| Javob | `{period, regime: "vat"\|"turnover", output_vat, input_vat, net_vat, pending_credit_red_invoices, pending_credit_pct, turnover_base, turnover_rate_pct, turnover_amount, tax_settlement_id}` — `regime` davr oxirgi kunida amaldagi `tenant_tax_regimes` qatoridan (qator yo'q — `vat`); boshqa rejim maydonlari `null`. `regime=vat`: QQS tenant ko'rsatkichi (qaror #31), `branch_id` uni toraytirmaydi; `pending_credit_red_invoices` — davrdagi kiruvchi e-fakturalar (`risk_flag IN ('red','unknown')`, QQS > 0, krediti hali `vat_moves`ga yozilmagan, 13 §2.8) soni, `pending_credit_pct` = shu fakturalar QQSi ÷ (`input_vat` + shu QQS) × 100 (BO-07, US-M10-03). `regime=turnover`: filial bo'yicha `turnover_base` (13 §4.3 formulasi, `ledger_entries` davr oborotlari), tamaki ulushi `tobacco` stavkasida, qolgani filial stavkasida; `turnover_rate_pct` — bitta filial tamakisiz bo'lsa filial stavkasi, aks holda samarali stavka (`turnover_amount ÷ turnover_base × 100`); `tax_settlement_id` — shu davr uchun `posted` `tax_settlements` hujjati (yo'q bo'lsa `null`, 8a–8d) |
+| Javob | `{period, regime: "vat"\|"turnover", output_vat, input_vat, net_vat, pending_credit_red_invoices, pending_credit_pct, turnover_base, turnover_rate_pct, turnover_amount, tax_settlement_id}` — `regime` davr oxirgi kunida amaldagi `tenant_tax_regimes` qatoridan (qator yo'q — `vat`); boshqa rejim maydonlari `null`. `regime=vat`: QQS tenant ko'rsatkichi (qaror #31), `branch_id` uni toraytirmaydi; `pending_credit_red_invoices` — davrdagi kiruvchi e-fakturalar (`risk_flag IN ('red','unknown')`, QQS > 0, krediti hali `vat_moves`ga yozilmagan, 13 §2.8) soni, `pending_credit_pct` = shu fakturalar QQSi ÷ (`input_vat` + shu QQS) × 100 (BO-07, US-M10-03). `regime=turnover`: filial bo'yicha `turnover_base` (13 §4.3 formulasi, `ledger_entries` davr oborotlari; rejim almashgan oyda faqat `turnover` amal qilgan kunlar), tamaki ulushi `tobacco` stavkasida, qolgani filial stavkasida; `turnover_rate_pct` — bitta filial tamakisiz bo'lsa filial stavkasi, aks holda samarali stavka (`turnover_amount ÷ turnover_base × 100`); `tax_settlement_id` — shu davr uchun `posted` `tax_settlements` hujjati (yo'q bo'lsa `null`, 8a–8d) |
 | Xatolar | `VALIDATION_ERROR` (noto'g'ri `period` format) |
 | Idempotency-Key | Kerak emas (`GET`) |
 | Offline | Ishlamaydi — faqat online (server tomonida hisoblanadi, M10 offline xatti-harakati bo'yicha) |
@@ -262,8 +263,8 @@
 |---|---|
 | Maqsad | Soliq hisob-kitobi hujjatlari ro'yxati (BO-07) |
 | Ruxsat | `tax.vat.view` |
-| So'rov | Cursor; filtr `?tax_kind=&period=&status=&branch_id=` |
-| Javob | `{items: [TaxSettlement], next_cursor}` |
+| So'rov | Cursor; filtr `?tax_kind=&period=&status=&branch_id=` (filialga cheklangan foydalanuvchi — faqat o'z filiallari) |
+| Javob | `{items: [TaxSettlement], next_cursor}` (yangisi birinchi); bitta hujjat — `GET /tax-settlements/{id}` (`TaxSettlement`, `tax.vat.view`) |
 | Xatolar | `VALIDATION_ERROR`, `BRANCH_SCOPE_DENIED` |
 | Idempotency-Key | Kerak emas |
 | Offline | Faqat ko'rish |
@@ -275,9 +276,9 @@
 |---|---|
 | Maqsad | Davr uchun qoralama — summani **server hisoblaydi**: `vat_offset` — `base_amount`/`amount` = davr `vat_moves` (`kind=input`, hisobga olinadigan, `pending_credit_*` dan tashqari); `turnover_tax` — `base_amount` = `turnover_base`, `rate` = `turnover_rate_pct`, `amount = base_amount × rate / 100` (`GET /reports/vat-summary` bilan bir xil hisob) |
 | Ruxsat | `accounting.post` |
-| So'rov | `{tax_kind: "vat_offset"\|"turnover_tax" (majburiy, tenant rejimiga mos), period: "YYYY-MM" (majburiy), branch_id: UUID (faqat `tax_kind='turnover_tax'` da majburiy — aylanma solig'i filial bo'yicha, SK 468-modda 2-qism; `vat_offset` da yuborilmaydi — server `branches.is_default = true` filialini yozadi), doc_date: date (standart — davrning oxirgi kuni), comment?: string}` — summa maydonlari tanadan qabul qilinmaydi. `vat_offset` — (tenant, davr) bo'yicha, `vat_moves` tenant bo'yicha yig'iladi (qaror #31 — 1 tenant = 1 STIR) |
+| So'rov | `{tax_kind: "vat_offset"\|"turnover_tax" (majburiy, tenant rejimiga mos), period: "YYYY-MM" (majburiy), branch_id: UUID (faqat `tax_kind='turnover_tax'` da majburiy — aylanma solig'i filial bo'yicha, SK 468-modda 2-qism; `vat_offset` da yuborilmaydi — server `branches.is_default = true` filialini yozadi), doc_date: date (standart — davrning oxirgi kuni; davr ichida va ≤ bugun bo'lishi shart — `validation.doc_date_outside_period` / `validation.doc_date_in_future`), comment?: string}` — summa maydonlari tanadan qabul qilinmaydi. `turnover_tax` da `rate` — filial stavkasi (tamaki ulushi bo'lsa samarali stavka, `amount` guruhlar bo'yicha aniq yig'indi). `vat_offset` — tenant ko'rsatkichi, faqat filialga cheklanmagan foydalanuvchi yaratadi/o'tkazadi/bekor qiladi (aks holda `PERMISSION_DENIED`). `vat_offset` — (tenant, davr) bo'yicha, `vat_moves` tenant bo'yicha yig'iladi (qaror #31 — 1 tenant = 1 STIR) |
 | Javob | `201 TaxSettlement` (`status="draft"`) |
-| Xatolar | `VALIDATION_ERROR` (`tax_kind` davrdagi `tenant_tax_regimes`ga mos emas; `vat_offset` — (tenant, davr), `turnover_tax` — (filial, davr) uchun `draft`/`posted` hujjat allaqachon bor — `params.existing_id`; `vat_offset` da `branch_id` yuborilgan), `PERIOD_CLOSED`, `BRANCH_SCOPE_DENIED` |
+| Xatolar | `VALIDATION_ERROR` (`tax_kind` davrdagi `tenant_tax_regimes`ga mos emas — davrning birorta kunida ham shu rejim amalda bo'lmagan (rejim almashgan oyda `turnover_tax` ham, `vat_offset` ham qabul qilinadi, `13-provodka-qoidalari.md` §2.26) — `validation.tax_kind_regime_mismatch`; `vat_offset` — (tenant, davr), `turnover_tax` — (filial, davr) uchun `draft`/`posted` hujjat allaqachon bor — `validation.tax_settlement_exists`, `params.existing_id`; `vat_offset` da `branch_id` yuborilgan — `validation.branch_not_allowed_for_vat_offset`), `PERIOD_CLOSED`, `BRANCH_SCOPE_DENIED`, `PERMISSION_DENIED` |
 | Idempotency-Key | Majburiy |
 | Offline | Yo'q |
 | Bog'langan | US-M10-01; BO-07; audit |
@@ -385,9 +386,9 @@
 |---|---|
 | Maqsad | Foyda-zarar hisoboti (daromad − COGS − xarajat, M15 bilan birga, US-M15-03) |
 | Ruxsat | `reports.finance.view` |
-| So'rov | `?period=2026-10&branch_id=` |
-| Javob | `{period, revenue, returns, discounts, cogs, gross_profit, expenses_by_category: [{category, amount}], net_profit}` — `revenue` = `Kt 9020` aylanmasi; `returns` = `Dt 9040`; `discounts` = `Dt 9050` (`discount_posting='net'` rejimida — Σ `sale_lines.discount_amount` QQSsiz); `cogs` = `Dt 9120` (`13-provodka-qoidalari.md` §1) |
-| Xatolar | `VALIDATION_ERROR` |
+| So'rov | `?period=2026-10&branch_id=` yoki `?date_from=&date_to=&branch_id=` (≤ 366 kun); ikkalasi ham bo'lmasa — joriy oy (Asia/Tashkent). `branch_id` bo'lmasa — foydalanuvchi filiallari (cheklanmagan foydalanuvchida konsolidatsiya, `13-provodka-qoidalari.md` §5.4); boshqa filial `branch_id` → `403 BRANCH_SCOPE_DENIED` |
+| Javob | `{period, date_from, date_to, branch_id, discount_posting, revenue, returns, discounts, net_revenue, cogs, gross_profit, gross_margin_pct, other_income, expenses_by_category: [{category_id, category, account, source, amount}], expenses_total, net_profit, by_branch: [{branch_id, name, …shu ko'rsatkichlar}], unsynced_devices, data_complete}` — `ledger_entries` (`entry_date` davrda) aylanmalari, storno bilan sof: `revenue` = `Kt−Dt 9020`; `returns` = `Dt−Kt 9040`; `discounts` = `Dt−Kt 9050` (`discount_posting='net'` rejimida — Σ `sale_lines.discount_amount` QQSsiz, faqat ma'lumot uchun: 9020 allaqachon chegirmali); `net_revenue = revenue − returns − (Dt−Kt 9050)`; `cogs` = `Dt−Kt 9120` (qaytarishda tannarx qaytadi); `gross_profit = net_revenue − cogs`; `other_income` = `Kt−Dt 9390` (ortiqcha, hisobdan chiqarilgan qarz qaytishi va h.k.); `expenses_by_category` — `Dt−Kt 9410/9420/9430/9820`: `expenses` hujjatlari toifa bo'yicha (`source='expenses'`), qolganlari (hisobdan chiqarish, qarzni kechish, komissiya, aylanma solig'i) toifasiz, `source` = `doc_type`; `net_profit = gross_profit − expenses_total + other_income` (`13-provodka-qoidalari.md` §1, §5.1); soliq to'lovi (`tax_payment`, 6410) xarajat emas — kirmaydi; `by_branch` — faqat konsolidatsiyada (bir nechta filial); `data_complete=false` — sinxronlanmagan POS qurilmalari bor (§18) |
+| Xatolar | `VALIDATION_ERROR` (`validation.period_format`, `validation.date_range`, `validation.date_range_too_long`), `BRANCH_SCOPE_DENIED` |
 | Idempotency-Key | Kerak emas |
 | Offline | Faqat kesh |
 | Bog'langan | US-M11-03, US-M15-03; BO-02, BO-09 |
@@ -438,7 +439,7 @@
 | Maqsad | Davrni yopishdan oldin tekshiruv (`23-backend-arxitekturasi.md` §2.4) |
 | Ruxsat | `accounting.post` |
 | So'rov | — (`period` path parametri `YYYY-MM`) |
-| Javob | `{period, ready: bool, blockers: ["recost_pending"\|"fiscal_pending"\|"devices_unsynced"], warnings: ["tax_settlement_missing"\|"opening_0000_nonzero"\|"open_shifts"\|"drafts_in_period"\|"devices_not_synced_after_period_end"], pending_recost_jobs: int, pending_fiscal_receipts: int, unsynced_devices: [{device_id, cash_register_name, outbox_pending_count, outbox_oldest_pending_at}], opening_balance_unresolved: bool}` — `ready = (blockers = [])`. Shartlar: `recost_pending` (bloker) — `recost_jobs.status IN ('queued','running','failed') AND from_date ≤ period_end`; `fiscal_pending` (bloker) — davr cheklari `fiscal_receipts.status IN ('pending','sent','failed')`; `devices_unsynced` (bloker) — `devices.kind IN ('web','android') AND revoked_at IS NULL AND outbox_pending_count > 0 AND outbox_oldest_pending_at < period_end + 1 kun` (hal qilish — sinxronlash yoki qurilmani bekor qilish, `confirm_pending_loss`, `16-offline-sync.md` §9); `devices_not_synced_after_period_end` (ogohlantirish) — faol qurilmaning `last_sync_at < period_end + 1 kun`. Yopilgan davrga kech kelgan POS voqealari rad etilmaydi — registr yozuvlari birinchi ochiq davrda (`16-offline-sync.md` §3.4, qaror #69) |
+| Javob | `{period, ready: bool, blockers: ["recost_pending"\|"fiscal_pending"\|"devices_unsynced"], warnings: ["tax_settlement_missing"\|"tax_settlement_stale"\|"opening_0000_nonzero"\|"open_shifts"\|"drafts_in_period"\|"devices_not_synced_after_period_end"], pending_recost_jobs: int, pending_fiscal_receipts: int, unsynced_devices: [{device_id, cash_register_name, outbox_pending_count, outbox_oldest_pending_at}], opening_balance_unresolved: bool}` — `ready = (blockers = [])`. Shartlar: `recost_pending` (bloker) — `recost_jobs.status IN ('queued','running','failed') AND from_date ≤ period_end`; `fiscal_pending` (bloker) — davr cheklari `fiscal_receipts.status IN ('pending','sent','failed')`; `devices_unsynced` (bloker) — `devices.kind IN ('web','android') AND revoked_at IS NULL AND outbox_pending_count > 0 AND outbox_oldest_pending_at < period_end + 1 kun` (hal qilish — sinxronlash yoki qurilmani bekor qilish, `confirm_pending_loss`, `16-offline-sync.md` §9); `devices_not_synced_after_period_end` (ogohlantirish) — faol qurilmaning `last_sync_at < period_end + 1 kun`; `tax_settlement_stale` (ogohlantirish) — davrning `posted` `tax_settlements.amount` joriy figuradan farq qiladi (`13-provodka-qoidalari.md` §5.1). Yopilgan davrga kech kelgan POS voqealari rad etilmaydi — registr yozuvlari birinchi ochiq davrda (`16-offline-sync.md` §3.4, qaror #69) |
 | Xatolar | `VALIDATION_ERROR` |
 | Idempotency-Key | Kerak emas |
 | Offline | Yo'q |
@@ -454,9 +455,9 @@
 |---|---|
 | Maqsad | Egasi/Menejer dashboard (BO-02): savdo grafigi, top mahsulot, kassa holati, ogohlantirishlar |
 | Ruxsat | `reports.sales.view` |
-| So'rov | `?period=today\|week\|month&branch_id=` |
-| Javob | `{period, total_sales, receipt_count, avg_receipt, net_profit, by_branch: [{branch_id, sales, profit}], top_products: [{product_id, name, qty}], alerts: [{type, message_key, severity}]}` |
-| Xatolar | — |
+| So'rov | `?period=today\|week\|month&branch_id=` — `today` (standart); `week` — joriy kalendar hafta dushanbadan bugungacha; `month` — oyning 1-sanasidan bugungacha (Asia/Tashkent). `branch_id` bo'lmasa — foydalanuvchi filiallari (bir nechta filialga kirishi bo'lsa «Barchasi», US-M14-01); boshqa filial → `403 BRANCH_SCOPE_DENIED` |
+| Javob | `{period, date_from, date_to, branch_id, total_sales, gross_sales, returns_total, receipt_count, avg_receipt, previous_total_sales, net_profit, cash_on_hand, by_branch: [{branch_id, name, sales, receipt_count, avg_receipt, profit, cash_on_hand, low_stock_count}], top_products: [{product_id, name, unit_code, qty}], receivables: {total, debtors_count, overdue_count, overdue_amount}, stock: {value, positions, low_stock_count, expiring_lots}, alerts: [{type, message_key, severity, count, amount, route}], unsynced_devices, data_complete}` — savdo formulalari §18 bilan bir xil; `previous_total_sales` — shu uzunlikdagi oldingi davr («kecha bilan»); `net_profit`/`profit` = §12 `net_profit` (US-M15-03), `reports.finance.view` bo'lmasa `null`; `cash_on_hand` — davr oxirida kassadagi naqd (har kassaning oxirgi smenasi: yopilgan bo'lsa `counted_cash`, aks holda `opening_cash + Σ cash_moves(cash)`); `receivables` — ochiq debitorlik hujjatlari (allokatsiyalar va qaytarishlar hisobga olingan, `debt_balances` ga eng eskisidan moslashtirilgan, `13-provodka-qoidalari.md` §2.14); `overdue_*` va `alerts.overdue_debts` — muddati o'tganlikning yagona ta'rifi #21 bo'yicha (va'da sanasi hisobga olinmaydi), `debts.payment.accept` yoki `reports.finance.view` bo'lmasa `null`; `stock` — `stock.view` bo'lmasa `null`. `alerts[]` — BO-02 «Diqqat talab qiladi» va topbar qo'ng'irog'ining yagona manbai (`06-ekranlar-umumiy.md` §1.9), muhimlik tartibida, faqat `count > 0`: `fiscal_unacked` (critical; OFD tasdig'isiz 24 soatdan eski chekli kassalar soni) → `/app/settings/branches`; `state_report_diff` (critical; `tax.compare.review`\|`tax.vat.view`) → `/app/tax/reconciliation`; `unsynced_devices` (warning) → `/app/settings/users?tab=devices`; `cash_variance` (warning; davrda farq bilan yopilgan smenalar, `amount` = Σ\|farq\|) → `/app/reports?report=cash-history`; `overdue_debts` (warning; `debts.payment.accept`\|`reports.finance.view`) → `/app/debts`; `low_stock` (warning; `stock.view`; `qty ≤ min_stock`, US-M04-02) → `/app/warehouse/stock?lowStockOnly=1`; `expiring_lots` (warning; `stock.view`; `expiry_warning_days` ichida) → `/app/warehouse/stock?expiringWithinDays=7`; `sync_exceptions` (warning; `settings.tenant`\|`accounting.post`) → `/app/settings/tenant?tab=sync-exceptions`; `pending_approvals` (info; foydalanuvchi limiti yetadigan `permission_code`lar) → `/app/approvals`; `einvoices_awaiting_signature` (info; `einvoice.sign`) → `/app/einvoices`. `message_key` = `reports.alerts.<type>`. Filial o'lchovi yo'q (tenant bo'yicha) ogohlantirishlar faqat filial bilan cheklanmagan foydalanuvchiga ko'rsatiladi |
+| Xatolar | `BRANCH_SCOPE_DENIED` |
 | Idempotency-Key | Kerak emas |
 | Offline | Oxirgi sinxronlangan ma'lumot, `"N daqiqa oldin"` belgisi bilan (BO-02) |
 | Bog'langan | US-M12-01; BO-02 |
@@ -467,9 +468,9 @@
 |---|---|
 | Maqsad | Savdo hisoboti — filial/davr bo'yicha jami savdo, chek soni, o'rtacha chek. `total_sales = Σ sales.total_amount (posted) − Σ returns.total` |
 | Ruxsat | `reports.sales.view` |
-| So'rov | `?date_from=&date_to=&branch_id=&group_by=day\|branch\|cashier` |
-| Javob | `{rows: [{group_key, total_sales, receipt_count, avg_receipt}]}` |
-| Xatolar | `VALIDATION_ERROR` |
+| So'rov | `?date_from=&date_to=&branch_id=&group_by=day\|branch\|cashier` — sanalar standarti bugun (Asia/Tashkent, `doc_date`), davr ≤ 366 kun; `group_by` standarti `day` |
+| Javob | `{date_from, date_to, branch_id, group_by, rows: [{group_key, group_label, total_sales, gross_sales, returns_total, receipt_count, avg_receipt}], total: {…}, unsynced_devices, data_complete}` — `gross_sales` = Σ `sales.total_amount` (posted), `returns_total` = Σ `return_lines.line_total` (posted qaytarishlar, qaytarish sanasi bo'yicha), `total_sales = gross_sales − returns_total`, `receipt_count` — posted sotuvlar soni, `avg_receipt = gross_sales ÷ receipt_count` (o'rtacha chek — qaytarish uni kamaytirmaydi); `group_by=day` — davrning har kuni (savdosiz kun nol bilan), `branch` — `group_label` = filial nomi, `cashier` — `sales.created_by` (`group_label` = xodim ismi); `data_complete=false` va `unsynced_devices` — scope'dagi POS qurilmalarida yuborilmagan voqealar bor (`devices.outbox_pending_count > 0`, QT-M12-04 «faqat sinxronlangan ma'lumot») |
+| Xatolar | `VALIDATION_ERROR` (`validation.date_range`, `validation.date_range_too_long`), `BRANCH_SCOPE_DENIED` |
 | Idempotency-Key | Kerak emas |
 | Offline | Faqat kesh |
 | Bog'langan | US-M12-01; BO-02, BO-09 |
@@ -480,12 +481,25 @@
 |---|---|
 | Maqsad | Eng ko'p/kam sotiladigan tovarlar (US-M12-02) |
 | Ruxsat | `reports.sales.view` |
-| So'rov | `?date_from=&date_to=&branch_id=&order=top\|bottom&limit=20` |
-| Javob | `{items: [{product_id, name, qty_sold, revenue}]}` |
-| Xatolar | `VALIDATION_ERROR` |
+| So'rov | `?date_from=&date_to=&branch_id=&order=top\|bottom&limit=20` (`limit` 1–200; sanalar — §18 kabi) |
+| Javob | `{date_from, date_to, branch_id, order, items: [{product_id, name, unit_code, qty_sold, revenue}], unsynced_devices, data_complete}` — davrda sotilgan tovarlar, qaytarishlar ayirilgan: `qty_sold` = Σ `sale_lines.qty` − Σ `return_lines.qty`, `revenue` = Σ `line_total` (QQS bilan, chegirmadan keyin) − qaytarishlar; `top` — `qty_sold` kamayish tartibida (teng bo'lsa `revenue`, nom), `bottom` — o'sish tartibida |
+| Xatolar | `VALIDATION_ERROR`, `BRANCH_SCOPE_DENIED` |
 | Idempotency-Key | Kerak emas |
 | Offline | Faqat kesh |
 | Bog'langan | US-M12-02; BO-09 |
+
+### 19a. `GET /reports/discounts`
+
+| | |
+|---|---|
+| Maqsad | Berilgan chegirmalar summasi va ular tufayli kamaygan marja (US-M03-03, QT-M03-03) |
+| Ruxsat | `reports.finance.view` (tannarx va marja) |
+| So'rov | `?date_from=&date_to=&branch_id=&group_by=day\|branch\|cashier\|product` (sanalar — §18 kabi; `group_by` standarti `day`) |
+| Javob | `{date_from, date_to, branch_id, group_by, rows: [{group_key, group_label, sales_total, discount_total, discount_net, revenue_net, cost, margin, margin_without_discounts, margin_pct, margin_pct_without_discounts}], total: {…}, unsynced_devices, data_complete}` — posted sotuv qatorlari, qaytarishlar ayirilgan: `sales_total` = Σ `line_total`; `discount_total` = Σ `discount_amount` (QQS bilan; qaytarishda qaytarilgan miqdorga proporsional ulushi ayiriladi); `discount_net` — chegirma QQSsiz (`× 100/(100+stavka)`), chegirma tufayli yo'qotilgan marja (`gross_9050` rejimidagi `Dt 9050` bilan bir xil, `13-provodka-qoidalari.md` §2.1a); `revenue_net` = Σ (`line_total − vat_amount`); `cost` = Σ `cost_amount`; `margin = revenue_net − cost`; `margin_without_discounts = margin + discount_net`; foizlar — `margin ÷ revenue_net` va `margin_without_discounts ÷ (revenue_net + discount_net)` |
+| Xatolar | `VALIDATION_ERROR`, `BRANCH_SCOPE_DENIED` |
+| Idempotency-Key | Kerak emas |
+| Offline | Faqat kesh |
+| Bog'langan | US-M03-03; BO-09 |
 
 ### 20. `GET /reports/stock`
 
@@ -493,9 +507,9 @@
 |---|---|
 | Maqsad | Qoldiq hisoboti (ombor/filial bo'yicha, minimal daraja belgisi) |
 | Ruxsat | `stock.view` |
-| So'rov | `?branch_id=&warehouse_id=&below_min_only=true` |
-| Javob | `{items: [{product_id, name, qty, value, below_min: bool}]}` |
-| Xatolar | `VALIDATION_ERROR` |
+| So'rov | `?branch_id=&warehouse_id=&below_min_only=true&search=&category_id=` — `branch_id` bo'sh = foydalanuvchi filiallari bo'yicha konsolidatsiya (BO-03 «Barchasi», US-M04-03); `search` — nom/ruscha nom (qism) yoki shtrix-kod (aniq), ≤ 64 |
+| Javob | `{branch_id, consolidated, items: [{product_id, name, name_ru, unit_code, category_id, category_name, barcode, is_marked, is_weighed, min_stock, qty, value, avg_cost, below_min, by_branch: [{branch_id, branch_name, qty, value, below_min}]}], branches: [{branch_id, name, value, positions, below_min_count}], total: {value, positions, below_min_count}}` — `stock_balances` (ombor → filial) yig'indisi; qatorda birlik, kategoriya, asosiy shtrix-kod (EAN, keyin ichki) va markirovka belgisi bor — veb tovar kartalarini alohida so'ramaydi; `below_min` — `qty ≤ products.min_stock` (filial qatorida o'z omborlari bo'yicha, tovar qatorida — biror filialda); arxivlangan tovar nol qoldiq bilan chiqmaydi |
+| Xatolar | `VALIDATION_ERROR`, `BRANCH_SCOPE_DENIED` (boshqa filial yoki boshqa filial ombori) |
 | Idempotency-Key | Kerak emas |
 | Offline | Faqat ko'rish, IndexedDB'dagi oxirgi nusxa (BO-03) |
 | Bog'langan | US-M12-01; BO-03, BO-09 |
@@ -507,8 +521,8 @@
 | Maqsad | Qarzdorlik "yosh" guruhlari (0-30 / 31-60 / 60+ kun), BO-06/BO-09 uchun manba. **Yagona/kanonik endpoint** (`18-api-kassa.md` §12.8 shu yerga havola qiladi); BO-04 "Men qarzdorman" tabi ham `direction=payable` bilan shu yerdan foydalanadi |
 | Ruxsat | `reports.finance.view` **yoki** `debts.approve` |
 | So'rov | `?direction=receivable\|payable&as_of=2026-10-15&branch_id=&bucket=0-30\|31-60\|60+&limit_exceeded_offline=` |
-| Javob | `{rows: [{counterparty_id, name, balance, due_date, overdue_since, days_overdue, bucket: "0-30"\|"31-60"\|"60+", doubtful_flag: bool, limit_exceeded_offline: bool}]}` — `overdue_since = min(COALESCE(due_date, doc_date))` kontragentning ochiq hujjatlari bo'yicha; `due_date` — shu eng eski ochiq hujjat muddati (yo'q bo'lsa `null`); `days_overdue = max(0, as_of − overdue_since)`; `bucket` shundan |
-| Xatolar | `VALIDATION_ERROR` |
+| Javob | `{as_of, direction, summary: {total, count, buckets: [{bucket, count, amount}]}, rows: [{counterparty_id, name, phone, balance, credit_limit, due_date, overdue_since, days_overdue, bucket: "0-30"\|"31-60"\|"60+", promise_date, open_docs, doubtful_flag: bool, doubtful_flag_id, limit_exceeded_offline: bool, last_payment_amount, last_payment_date}]}` — qatorlar: balansi musbat kontragentlar (`days_overdue` kamayishi, so'ng `balance` bo'yicha); `overdue_since = min(COALESCE(due_date, doc_date))` kontragentning ochiq hujjatlari bo'yicha (`receivable` — `sales`/`debt_openings` ochiq qoldiqlari allokatsiyalardan, receivable balansiga moslashtirilgan — `13-provodka-qoidalari.md` §2.14; `payable` — balansni eng yangi kirimlar/boshlang'ich qarzlar tashkil qiladi deb, FIFO). **Muddati o'tganlik — tizim bo'yicha yagona ta'rif**: debitorlik hujjati `as_of` kuni muddati o'tgan, agar `COALESCE(due_date, doc_date) < as_of`; mijozning va'da sanasi (`counterparties.debt_due_date`) muddatni **surmaydi** (yosh guruhlari 60+ shubhali qarz ko'rigi va yil oxiri rezerv inventarizatsiyasiga xizmat qiladi; 26 #185). Dashboard (#17), `21-integratsiyalar.md` §11 Telegram kunlik hisoboti va `18-api-kassa.md` §12.1 shu ta'rifga havola qiladi; va'da sanasi faqat ko'rsatiladi va `debt_due_today` eslatmasini (`va'da ?? eng eski ochiq due_date ≤ bugun`) qo'zg'atadi; `due_date` — shu eng eski ochiq hujjat muddati (yo'q bo'lsa `null`); `days_overdue = max(0, as_of − overdue_since)`; `bucket` shundan; `as_of` (≤ bugun) — yosh hisoblanadigan sana, qoldiqlar joriy (`doc_date > as_of` hujjatlar olinmaydi); `branch_id` berilsa `balance` — shu filial ochiq hujjatlari yig'indisi; filialga cheklangan foydalanuvchi (`Scope`): `branch_id` ruxsat etilmagan filial bo'lsa — `403 BRANCH_SCOPE_DENIED`, `branch_id`siz — ochiq hujjatlar ruxsat etilgan filiallar bo'yicha filtrlanadi, `balance` = filtrlangan hujjatlar yig'indisi (`branch_id` filtri bilan bir xil yo'l); `summary` — `bucket`/`limit_exceeded_offline` filtrlaridan oldingi jami (tab hisoblagichlari); `promise_date` — `counterparties.debt_due_date` (faqat ko'rsatiladi) |
+| Xatolar | `VALIDATION_ERROR`, `BRANCH_SCOPE_DENIED` |
 | Idempotency-Key | Kerak emas |
 | Offline | Faqat ko'rish |
 | Bog'langan | US-M12-01; BO-06, BO-09 |
@@ -971,8 +985,8 @@
 |---|---|
 | Maqsad | Xarajatlar ro'yxati |
 | Ruxsat | `expenses.create` |
-| So'rov | Cursor; filtr `?category_id=&branch_id=&doc_date__gte=&doc_date__lte=&status=` |
-| Javob | `{items: [{id, category_id, amount, source, tax_type, cash_register_id, shift_id, attachment_id, status, doc_date}], next_cursor}` |
+| So'rov | Cursor (`doc_date`, `id` kamayish tartibida); filtr `?category_id=&branch_id=&source=&doc_date__gte=&doc_date__lte=&status=` |
+| Javob | `{items: [Expense], next_cursor, totals: {posted, draft}}` — `Expense` = `{id, number, branch_id, doc_date, status, category_id, category_name, account, amount, source, tax_type, cash_register_id, shift_id, attachment_id, recurring_rule_id, comment, created_by, created_at, posted_at, cancelled_at, cancel_reason, device_id, approval_request_id, approval_status}`; `account` — Dt hisobi (o'tkazilganda provodkadagi, qoralamada toifaning joriy `default_account`i); `approval_status` — oxirgi `expense_over_limit` so'rovi holati (BO-17 «Tasdiq kutmoqda»); `totals` — filtr bo'yicha `posted` va `draft` jamlari (bekor qilinganlar kirmaydi) |
 | Xatolar | — |
 | Idempotency-Key | Kerak emas |
 | Offline | Faqat ko'rish (BO-17) |
@@ -984,11 +998,11 @@
 |---|---|
 | Maqsad | Xarajat qoralamasi yaratish (10 soniyada, US-M15-01) |
 | Ruxsat | `expenses.create` |
-| So'rov | `{doc_date: date (majburiy, standart bugun), branch_id: UUID (majburiy, standart `X-Branch-Id`), category_id: UUID (majburiy), amount: string (majburiy, >0), source: "cash"\|"bank"\|"card" (majburiy), cash_register_id: UUID (source=cash bo'lsa majburiy), shift_id: UUID (source=cash bo'lsa majburiy), attachment_id: UUID (ixtiyoriy), comment: string (ixtiyoriy), recurring_rule_id: UUID (ixtiyoriy), tax_type: "vat"\|"turnover"\|"pit"\|"social"\|"property"\|"land"\|"other" (toifa `default_account="6410"` — soliq to'lovi — bo'lsa majburiy, aks holda yuborilmaydi)}` |
-| Javob | `201 {id, status: "draft", doc_date, amount, category_id, tax_type}` |
-| Xatolar | `VALIDATION_ERROR` (`tax_type` soliq toifasida yo'q yoki boshqa toifada berilgan) |
+| So'rov | `{doc_date: date (majburiy, standart bugun), branch_id: UUID (majburiy, standart `X-Branch-Id`), category_id: UUID (majburiy), amount: string (majburiy, >0), source: "cash"\|"bank"\|"card" (majburiy), cash_register_id: UUID (source=cash bo'lsa majburiy), shift_id: UUID (source=cash bo'lsa majburiy), attachment_id: UUID (ixtiyoriy), comment: string (ixtiyoriy), recurring_rule_id: UUID (ixtiyoriy), tax_type: "vat"\|"turnover"\|"pit"\|"social"\|"property"\|"land"\|"other" (toifa `default_account="6410"` — soliq to'lovi — bo'lsa majburiy, aks holda yuborilmaydi; MVP'da 6410 ga faqat `vat`/`turnover` hisoblanadi — boshqa qiymat rad etiladi, mol-mulk/yer/boshqa soliqlar `period_taxes` (9430), ijtimoiy soliq/JShDS — ish haqi toifalari, `13-provodka-qoidalari.md` §2.26)}` |
+| Javob | `201 Expense` (41-endpoint obyekti, `status: "draft"`) |
+| Xatolar | `VALIDATION_ERROR` (`tax_type` soliq toifasida yo'q — `validation.required`, boshqa toifada berilgan — `validation.must_be_null`, 6410 toifasida `vat`/`turnover` emas — `validation.tax_type_not_accrued` (yaratish, tahrir, `post`, takroriy xarajat, `expense.created`); `doc_date` kelajakda; toifa arxivlangan — `validation.archived`; `source=cash` da `cash_register_id`/`shift_id` yo'q yoki boshqa manbada berilgan), `NOT_FOUND` (`expense_category`), `SHIFT_NOT_OPEN`, `PERIOD_CLOSED` |
 | Idempotency-Key | Majburiy |
-| Offline | `source='cash'` — POS'dan `expense.created` voqeasi (`18-api-kassa.md` §13.2, POS-14 «Xarajat»; offline ham): payload maydonlari shu tana bilan bir xil + `{id, cash_register_id, shift_id, approval?}`; ruxsat `cash.withdraw` (limit) — Kassirda `expenses.create` yo'q; limitdan oshsa `approval` (`ApprovalRef`, `kind='cash_withdrawal_over_limit'`); server `ExpensePostingService` bilan `draft` yaratmasdan darhol `posted`. Boshqa manba (`bank`/`card`) — faqat shu endpoint, online |
+| Offline | `source='cash'` — POS'dan `expense.created` voqeasi (`18-api-kassa.md` §13.2, POS-14 «Xarajat»; offline ham): payload — `18-api-kassa.md` §13.2 maydonlari (`id`, `doc_date`, `branch_id`, `cash_register_id`, `shift_id`, `category_id`, `amount`, `comment?`, `tax_type?`, `approval?`; `source` yuborilmaydi — har doim `cash`, `attachment_id`/`recurring_rule_id` yo'q); ruxsat `cash.withdraw` (limit) — Kassirda `expenses.create` yo'q; limitdan oshsa `approval` (`ApprovalRef`, `kind='cash_withdrawal_over_limit'`); server `ExpensePostingService` bilan `draft` yaratmasdan darhol `posted`. Boshqa manba (`bank`/`card`) — faqat shu endpoint, online |
 | Bog'langan | US-M15-01; BO-17 |
 
 ### 43. `POST /expenses/{id}/post`
@@ -996,10 +1010,10 @@
 | | |
 |---|---|
 | Maqsad | Xarajatni o'tkazish — `ExpensePostingService` (`13-provodka-qoidalari.md` §2.17): `ledger_entries` (Dt = toifaning `default_account`: `9410`/`9420`/`9430`, soliq to'lovi — `6410` (`Dt 6410 / Kt 5110`)) + (agar `source=cash`) `cash_moves`; `source="bank"\|"card"` — Kt 5110 (MVP'da yagona bank hisobi, qaror #49) |
-| Ruxsat | `expenses.create` (limit) — katta summa `expenses.approve` talab qiladi (`15-xavfsizlik-va-audit.md` §2.1) |
+| Ruxsat | `expenses.create`; summa o'tkazuvchining `expenses.approve` `limit_value`idan oshsa tasdiq kerak (`15-xavfsizlik-va-audit.md` §2.1, §2.3; Egasi — limitsiz; `expenses.approve` kodi yo'q rol — har summada tasdiq) |
 | So'rov | Tana yo'q |
-| Javob | `200 {id, status: "posted", posted_at}` yoki limitdan oshsa `202 {status: "draft", approval_request_id}` (`APPROVAL_REQUIRED` — hujjat `draft`da qoladi, `pending_approval`ga o'tmaydi; `price_changes`dan farqli bu umumiy qoida) |
-| Xatolar | `DOC_NOT_DRAFT`, `EXPENSE_LIMIT_EXCEEDED`, `PERIOD_CLOSED` |
+| Javob | `200 {id, status: "posted", number, posted_at}` yoki limitdan oshsa `202 {id, status: "draft", approval_request_id}` (`APPROVAL_REQUIRED`, `approval_requests(kind='expense_over_limit', linked_doc_type='expenses')` + `over_limit_action` xabari — hujjat `draft`da qoladi, `pending_approval`ga o'tmaydi; `price_changes`dan farqli bu umumiy qoida). Kutilayotgan so'rov bo'lsa qayta `post` o'sha `approval_request_id`ni qaytaradi. BO-16 da tasdiqlanganda server qoralamani shu tranzaksiyada o'tkazadi (so'rov `consumed`, `doc_approvals(mode='remote_request')`); tasdiqlangan, hali ishlatilmagan so'rov bo'lsa keyingi `post` ham uni ishlatib o'tkazadi. Toifaning **o'tkazish paytidagi** `default_account`i va `tax_type` qoidasi qo'llanadi |
+| Xatolar | `DOC_NOT_DRAFT`, `PERIOD_CLOSED`, `SHIFT_NOT_OPEN` (`source=cash`, smena yopilgan), `VALIDATION_ERROR` (`tax_type`), `APPROVAL_REQUEST_ALREADY_RESOLVED` |
 | Idempotency-Key | Majburiy |
 | Offline | `source=cash` bo'lsa offline postinglanadi, sinxronlashda serverga tushadi |
 | Bog'langan | US-M15-01, US-M15-03; BO-17 |
@@ -1010,9 +1024,9 @@
 |---|---|
 | Maqsad | Xarajatni bekor qilish (teskari yozuv, `13-provodka-qoidalari.md` §5.2). Yopilgan davrdagi hujjat ham bekor qilinadi — storno joriy ochiq davr sanasida |
 | Ruxsat | `expenses.create` |
-| So'rov | `{reason: string (majburiy)}` |
-| Javob | `200 {id, status: "cancelled", cancelled_at}` |
-| Xatolar | `DOC_ALREADY_CANCELLED` |
+| So'rov | `{reason: string (majburiy, 3–500 belgi)}` |
+| Javob | `200 {id, status: "cancelled", cancelled_at}` — `draft` → `cancelled`; `posted` → ledger storno + (naqd) teskari `cash_moves` qatori (`reversal_of_id`); yozuv o'chirilmaydi |
+| Xatolar | `DOC_ALREADY_CANCELLED`; `DOC_INVALID_STATE` — `source=cash` xarajatining smenasi yopilgan (yopilgan smenaning kutilgan naqdi o'zgarmaydi, 54-endpoint bilan bir xil; tuzatish — ochiq smenada kassaga pul qo'yish) |
 | Idempotency-Key | Majburiy |
 | Offline | Yo'q (bekor qilish faqat online) |
 | Bog'langan | M15 chekka holat ("xarajat bekor qilinsa — teskari yozuv"); BO-17; audit majburiy |
@@ -1023,8 +1037,8 @@
 |---|---|
 | Maqsad | Xarajat toifalari ro'yxati (standart ro'yxat — `13-provodka-qoidalari.md` §2.17 seed xaritasi, 21 kod) |
 | Ruxsat | `—` |
-| So'rov | — |
-| Javob | `{items: [{id, code, name, default_account: "9410"\|"9420"\|"9430"\|"6410", source_ref, archived_at}]}` — `default_account` xarajat provodkasining Dt hisobi (43-endpoint); `6410` — «Soliq to'lovi (byudjetga)» (`tax_payment`, `expenses.tax_type` majburiy); `code`/`source_ref` — seed/import manbasi (tizim toifalarida to'ldirilgan) |
+| So'rov | `?include_archived=true\|false` (standart `true`; POS-14 keshi faqat arxivlanmaganlarni ishlatadi) |
+| Javob | `{items: [{id, code, name, default_account: "9410"\|"9420"\|"9430"\|"6410", source_ref, is_system, archived_at, version}]}` — `default_account` xarajat provodkasining Dt hisobi (43-endpoint); `6410` — «Soliq to'lovi (byudjetga)» (`tax_payment`, `expenses.tax_type` majburiy); `code`/`source_ref` — seed/import manbasi (tizim toifalarida to'ldirilgan) |
 | Xatolar | — |
 | Idempotency-Key | Kerak emas |
 | Offline | Oxirgi sinxronlangan (catalog scope) |
@@ -1037,8 +1051,8 @@
 | Maqsad | Yangi toifa qo'shish |
 | Ruxsat | `expenses.create` |
 | So'rov | `{name: string (majburiy, 1-50 belgi), default_account: "9410"\|"9420"\|"9430"\|"6410" (majburiy)}` |
-| Javob | `201 {id, code, name, default_account}` |
-| Xatolar | `VALIDATION_ERROR` |
+| Javob | `201 {id, code, name, default_account, source_ref, is_system, archived_at, version}` (`code`/`source_ref` = `null`, `is_system=false`) |
+| Xatolar | `VALIDATION_ERROR` (nom takrori — `validation.duplicate`, katta-kichik harf farqsiz) |
 | Idempotency-Key | Majburiy |
 | Offline | Yo'q |
 | Bog'langan | US-M15-01; BO-17 |
@@ -1049,8 +1063,8 @@
 |---|---|
 | Maqsad | Toifani tahrirlash/arxivlash |
 | Ruxsat | `expenses.create` |
-| So'rov | `{name?: string, default_account?: "9410"\|"9420"\|"9430"\|"6410", archived?: bool, version: int (majburiy)}` — `default_account` o'zgarishi faqat keyingi xarajatlarga ta'sir qiladi |
-| Javob | `200 {id, code, name, default_account, archived_at, version}` |
+| So'rov | `{name?: string, default_account?: "9410"\|"9420"\|"9430"\|"6410", archived?: bool, version: int (majburiy)}` — `default_account` o'zgarishi faqat keyingi xarajatlarga ta'sir qiladi; `default_account` xarajat hisobi (`94xx`) va `6410` (soliq to'lovi) orasida o'zgarmaydi (`422 validation.not_allowed` — `tax_type` ma'nosi o'zgarib qolmasligi uchun; tizim `tax_payment` toifasi har doim `6410`) |
+| Javob | `200 {id, code, name, default_account, source_ref, is_system, archived_at, version}` |
 | Xatolar | `VALIDATION_ERROR`, `VERSION_CONFLICT` |
 | Idempotency-Key | Majburiy |
 | Offline | Yo'q |
@@ -1062,8 +1076,8 @@
 |---|---|
 | Maqsad | Takrorlanuvchi xarajat qoidalari (US-M15-02, oylik ijara va h.k.) |
 | Ruxsat | `expenses.create` |
-| So'rov | Page pagination; `branch_id` — `X-Branch-Id` header orqali |
-| Javob | `{items: [{id, name, category_id, amount, day_of_month, period, source, cash_register_id, next_due_date, last_triggered_at, is_active}], total, page, size}` |
+| So'rov | Page pagination; `branch_id` — `X-Branch-Id` header orqali; `?is_active=` |
+| Javob | `{items: [{id, name, branch_id, category_id, amount, day_of_month, period, source, cash_register_id, next_due_date, last_triggered_at, is_active, is_due, version}], total, page, size}` — `is_due` = faol va `next_due_date ≤ bugun` (BO-17 eslatma banneri); `last_triggered_at` — oxirgi eslatma vaqti |
 | Xatolar | — |
 | Idempotency-Key | Kerak emas |
 | Offline | Faqat ko'rish |
@@ -1075,9 +1089,9 @@
 |---|---|
 | Maqsad | Yangi takrorlanuvchi qoida yaratish |
 | Ruxsat | `expenses.create` |
-| So'rov | `{name?: string (bo'sh bo'lsa UI toifa nomini ko'rsatadi), category_id: UUID (majburiy), amount: string (majburiy), day_of_month: int 1-28 (majburiy), period: "month"\|"quarter"\|"year" (majburiy), source: "cash"\|"bank"\|"card" (majburiy), cash_register_id?: UUID (`source="cash"` bo'lsa majburiy)}` |
-| Javob | `201 {id, name, category_id, amount, day_of_month, period, next_due_date, is_active: true}` |
-| Xatolar | `VALIDATION_ERROR` |
+| So'rov | `{name?: string (bo'sh bo'lsa UI toifa nomini ko'rsatadi), category_id: UUID (majburiy), amount: string (majburiy), day_of_month: int 1-28 (majburiy), period: "month"\|"quarter"\|"year" (majburiy), source: "cash"\|"bank"\|"card" (majburiy), cash_register_id?: UUID (`source="cash"` bo'lsa majburiy, boshqa manbada yuborilmaydi; qoida filialining kassasi), branch_id?: UUID (standart `X-Branch-Id`)}`. `next_due_date` — bugundan boshlab birinchi `day_of_month`. `6410` toifali (soliq to'lovi) qoida yaratilmaydi — soliq summasi har davr o'zgaradi, `tax_type` bilan oddiy xarajat sifatida yoziladi |
+| Javob | `201 {id, name, branch_id, category_id, amount, day_of_month, period, source, cash_register_id, next_due_date, last_triggered_at, is_active: true, is_due, version}` |
+| Xatolar | `VALIDATION_ERROR` (`6410` toifa — `validation.not_allowed`, arxivlangan toifa, kassa boshqa filialda), `NOT_FOUND` |
 | Idempotency-Key | Majburiy |
 | Offline | Yo'q |
 | Bog'langan | US-M15-02; BO-17 |
@@ -1088,8 +1102,8 @@
 |---|---|
 | Maqsad | Qoidani tahrirlash/o'chirish (faollikni o'chirish) |
 | Ruxsat | `expenses.create` |
-| So'rov | `{amount?, day_of_month?, is_active?: bool, version: int (majburiy)}` |
-| Javob | `200 {id, amount, day_of_month, is_active, version}` |
+| So'rov | `{name?, amount?, day_of_month?, is_active?: bool, version: int (majburiy)}` — `day_of_month` o'zgarsa joriy `next_due_date` shu davr ichida ko'chadi (muddati kelgan to'lov o'tkazib yuborilmaydi); qayta faollashtirilganda `next_due_date` bugungacha davrlar bo'yicha oldinga suriladi (to'xtatilgan davrlar uchun eslatma yo'q) |
+| Javob | `200` — 48-endpoint qoida obyekti |
 | Xatolar | `VALIDATION_ERROR`, `VERSION_CONFLICT` |
 | Idempotency-Key | Majburiy |
 | Offline | Yo'q |
@@ -1102,8 +1116,8 @@
 | Maqsad | Eslatma kelganda ("Ijara to'lash vaqti") bir bosishda tasdiqlab tegishli `expenses` qoralamasini yaratish+o'tkazish (US-M15-02 — **avtomatik to'lanmaydi**, har doim qo'lda tasdiq) |
 | Ruxsat | `expenses.create` |
 | So'rov | Tana yo'q (yoki `{amount_override?: string}` — bir martalik summa farqi bo'lsa) |
-| Javob | `201 {expense_id, status: "posted"}` yoki summa foydalanuvchining `expenses.create` limitidan oshsa `202 {expense_id, status: "draft", approval_request_id}` (`APPROVAL_REQUIRED` — `expenses.approve` egasi tasdiqlaydi, 43-endpoint bilan bir xil qoida) |
-| Xatolar | `VALIDATION_ERROR`, `SHIFT_NOT_OPEN` (`source="cash"` bo'lgan qoidada ochiq smena bo'lmasa), `EXPENSE_LIMIT_EXCEEDED` |
+| Javob | `201 {expense_id, status: "posted"}` yoki summa qoidani tasdiqlayotgan foydalanuvchining `expenses.approve` limitidan oshsa `202 {expense_id, status: "draft", approval_request_id}` (`APPROVAL_REQUIRED` — 43-endpoint bilan bir xil qoida). Xarajat: `doc_date` = bugun, qoida filiali/toifasi/manbasi, `recurring_rule_id`, `comment` = qoida nomi; `source="cash"` — kassaning ochiq smenasida. Qoidaning `next_due_date`i bir davr oldinga suriladi. Faqat muddati kelgan (`next_due_date ≤ bugun`) faol qoida tasdiqlanadi. Eslatma: kunlik cron (09:00 Toshkent) muddati kelgan har faol qoida uchun bir marta (qoida × muddat) `recurring_expense_due` bildirishnomasini yozadi (`text`: «Ijara to'lash vaqti: 3 000 000 so'm»), xarajat avtomatik yaratilmaydi |
+| Xatolar | `VALIDATION_ERROR` (`validation.recurring_expense_not_due`, `validation.recurring_expense_inactive`), `SHIFT_NOT_OPEN` (`source="cash"` bo'lgan qoidada ochiq smena bo'lmasa) |
 | Idempotency-Key | Majburiy |
 | Offline | Yo'q (eslatma M18 orqali keladi, tasdiq — online back-office) |
 | Bog'langan | US-M15-02; BO-17, M18 eslatma |
@@ -1133,7 +1147,7 @@
 | Ruxsat | `direction=in` → `cash.deposit`; `direction=out` → `cash.withdraw` (limit, standart 50 000 so'm, `15-xavfsizlik-va-audit.md` §2.3) |
 | So'rov | `{cash_register_id: UUID (majburiy), shift_id: UUID (majburiy, faol smena), direction: "in"\|"out" (majburiy), amount: string (majburiy, >0), reason: "collection"\|"deposit"\|"owner_withdrawal"\|"other" (majburiy), account?: "9430"\|"9390"\|"6310"\|"4010"\|"4730" (faqat `reason="other"`; standart `out` → `9430`, `in` → `9390`), employee_id?: UUID (`account="4730"` da majburiy), counterparty_id?: UUID (`reason="owner_withdrawal"` da — `tenants.legal_form ≠ sole_proprietor` bo'lsa majburiy, `counterparties.is_founder=true` bo'lgan ta'sischi, provodka Dt `tenants.settings.owner_withdrawal_account`; `reason="other"` va `account ∈ {6310, 4010}` da majburiy), comment: string (`reason="other"`da majburiy), doc_date: date (majburiy)}`. `reason↔direction` juftligi: `collection`, `owner_withdrawal` → faqat `out`; `deposit` → faqat `in`; `other` → ikkalasi. Provodka (`13-provodka-qoidalari.md` §2.18): `other/out` → `Dt account / Kt 5010`, `other/in` → `Dt 5010 / Kt account`. `reason="collection"` (inkassa) — kassadan 5710 ga (`payment_method="collection"`), bank tasdig'i — 55c–55h. `doc_date` kelajakda bo'lmaydi (`validation.doc_date_in_future`), yopilgan davrda — `409 PERIOD_CLOSED` |
 | Javob | `201 {id, status: "posted", amount, approval_request_id: null}` yoki limitdan oshsa `202 {id, status: "draft", amount, approval_request_id}` (`APPROVAL_REQUIRED` — `kind="cash_withdrawal_over_limit"`, BO-16; hujjat `draft` da, registrlarga yozilmaydi). So'rov BO-16 da tasdiqlanganda server qoralamani o'sha tranzaksiyada o'tkazadi (so'rov `consumed`, `doc_approvals(mode='remote_request')`; smena yopilgan bo'lsa tasdiqlash `409 SHIFT_NOT_OPEN`) |
-| Xatolar | `VALIDATION_ERROR` (`reason↔direction` juftligi buzilgan; `account` `reason≠other` da berilgan yoki ro'yxatda yo'q; `employee_id` yoki `counterparty_id` talab qilinganda yo'q; `owner_withdrawal` da kontragent ta'sischi emas), `CASH_WITHDRAW_LIMIT_EXCEEDED` |
+| Xatolar | `VALIDATION_ERROR` (`reason↔direction` juftligi buzilgan; `account` `reason≠other` da berilgan yoki ro'yxatda yo'q; `employee_id` yoki `counterparty_id` talab qilinganda yo'q; `owner_withdrawal` da kontragent ta'sischi emas; `direction=in` + `account=4010` — `field=account`, `validation.cash_movement_debt_repayment` (mijoz qarzi faqat qarz to'lovi orqali, `18-api-kassa.md` §12.2/§12.3); `direction=out` + `account=4010` va `amount` mijozning 4010 kreditidan (`max(−receivable_balance, 0)`, `debt_balances` qulfi ostida) katta — `field=amount`, `validation.cash_movement_exceeds_customer_credit`, `params.available`; `13-provodka-qoidalari.md` §2.18), `CASH_WITHDRAW_LIMIT_EXCEEDED` |
 | Idempotency-Key | Majburiy (back-office'dan); POS'dan — `/sync/push` orqali `cash_movement.created` voqeasi (`16-offline-sync.md` §2) |
 | Offline | To'liq offline (M01 bilan bir xil append-only, `03-modullar-talablari.md` M16) |
 | Bog'langan | US-M16-01; POS ekrani, BO-16 (limitdan oshganda) |
@@ -1189,10 +1203,10 @@
 
 | | |
 |---|---|
-| Maqsad | BO-24 «yo'ldagi pul qoldig'i» paneli: 5710 qoldig'i filial × to'lov usuli bo'yicha (`ledger_entries`, analitika `payment_method`) — 55c/55e dagi tekshiruv bilan bir xil hisob |
+| Maqsad | BO-24 «yo'ldagi pul qoldig'i» paneli: 5710 qoldig'i filial × to'lov usuli bo'yicha (`ledger_entries`: `account_dt='5710'` summalari minus `account_kt='5710'` summalari, `entry_date ≤ as_of`, guruhlash `branch_id` × `analytics.payment_method`; storno qatorlari ham kiradi) — 55c/55e dagi tekshiruv bilan bir xil hisob (5710 ga yozadigan har bir provodka `analytics.payment_method` ni to'ldiradi) |
 | Ruxsat | `bank_settlements.manage` |
 | So'rov | `?as_of=<date>` (standart — bugun, Toshkent), `?branch_id=` (ixtiyoriy) |
-| Javob | `{as_of, items: [{branch_id, method, balance, oldest_unsettled_date, card_breakdown}]}` — faqat `balance ≠ "0.00"` qatorlar; `oldest_unsettled_date` — FIFO bo'yicha yopilmagan eng eski tushum sanasi (ma'lumot uchun); `card_breakdown` — faqat `method="card"` da (boshqasida `null`): `{integrated, manual}` — `balance` ning integratsiyalangan (`card_entry_mode='integrated'`, `rrn` bo'yicha moslashtiriladi) va terminalsiz (`manual`, summa/sana va filial/merchant bo'yicha moslashtiriladi) qismlari, to'lov qatorlaridan hisoblanadi, ma'lumot uchun (BO-24 "Karta (terminalsiz)" qatori; `21` §9.2) |
+| Javob | `{as_of, items: [{branch_id, method, balance, oldest_unsettled_date, card_breakdown}]}` — faqat `balance ≠ "0.00"` qatorlar; `oldest_unsettled_date` — FIFO bo'yicha yopilmagan eng eski tushum sanasi (ma'lumot uchun); `card_breakdown` — faqat `method="card"` da (boshqasida `null`): `{integrated, manual}` — `balance` ning integratsiyalangan (`card_entry_mode='integrated'`, `rrn` bo'yicha moslashtiriladi) va terminalsiz (`manual`, summa/sana va filial/merchant bo'yicha moslashtiriladi) qismlari, ma'lumot uchun: `integrated` = 5710 `card` qatorlaridan `analytics.rrn` borlari (faqat integratsiyalangan to'lov provodkasida bo'ladi, `13` §2.2) sof yig'indisi minus `rrn` bo'yicha moslashtirilib `post` qilingan tranzaksiyalar `approved_amount`i, `[0, balance]` oralig'iga cheklangan; `manual = balance − integrated` (BO-24 "Karta (terminalsiz)" qatori; `21` §9.2) |
 | Xatolar | `BRANCH_SCOPE_DENIED` |
 | Idempotency-Key | Kerak emas |
 | Offline | Yo'q |
@@ -1206,7 +1220,7 @@
 | Ruxsat | `bank_settlements.manage` |
 | So'rov | `{branch_id: UUID (majburiy), doc_date: date (majburiy — bankka tushgan sana, provodka sanasi), method: "card"\|"uzqr"\|"click"\|"payme"\|"uzum"\|"collection" (majburiy), settled_from: date, settled_to: date (majburiy, settled_from ≤ settled_to ≤ doc_date), gross_amount: string (majburiy, > 0 — 5710 dan yopiladigan summa), commission_amount: string (standart "0.00", ≥ 0 va < gross_amount), variance_amount: string (standart "0.00"; faqat `method="collection"`; manfiy — kamomad, musbat — ortiqcha; `gross_amount − commission_amount + variance_amount > 0`), bank_ref: string (ixtiyoriy), attachment_id: UUID (ixtiyoriy, `attachments.kind='import'` — ko'chirma fayli, `17-api-umumiy.md` §12), comment: string (ixtiyoriy)}` |
 | Javob | `201 BankSettlement` (`status="draft"`, `number` — `BT-{filial}-{yil}-{ketma-ket}`, `11-malumotlar-modeli.md`) |
-| Xatolar | `VALIDATION_ERROR` (enum, sana tartibi, `commission_amount ≥ gross_amount`; `variance_amount ≠ 0` va `method ≠ "collection"`; `gross_amount` shu filial va usul bo'yicha `doc_date` holatidagi 5710 qoldig'idan katta — `details[].field="gross_amount"`, `details[].message_key="validation.bank_settlement_exceeds_in_transit"`, `params.available`), `PERIOD_CLOSED` (`doc_date` yopilgan davrda), `BRANCH_SCOPE_DENIED`, `NOT_FOUND` (`attachment_id`) |
+| Xatolar | `VALIDATION_ERROR` (enum, sana tartibi — `validation.date_range`, `doc_date` kelajakda — `validation.doc_date_in_future`, `commission_amount ≥ gross_amount` — `validation.bank_commission_ge_gross`; `variance_amount ≠ 0` va `method ≠ "collection"` — `validation.not_allowed`; `net_amount ≤ 0` — `validation.must_be_positive`; `gross_amount` shu filial va usul bo'yicha `doc_date` holatidagi 5710 qoldig'idan katta — `details[].field="gross_amount"`, `details[].message_key="validation.bank_settlement_exceeds_in_transit"`, `params.available`), `PERIOD_CLOSED` (`doc_date` yopilgan davrda), `BRANCH_SCOPE_DENIED`, `NOT_FOUND` (`attachment_id`) |
 | Idempotency-Key | Majburiy |
 | Offline | Yo'q |
 | Bog'langan | US-M11-04; BO-24 forma; BP-15; audit (`15-xavfsizlik-va-audit.md` §6.1) |
@@ -1232,7 +1246,7 @@
 | Ruxsat | `bank_settlements.manage` |
 | So'rov | `{}` |
 | Javob | `200 BankSettlement` (`status="posted"`, `posted_at`) |
-| Xatolar | `DOC_NOT_DRAFT`, `PERIOD_CLOSED`, `VALIDATION_ERROR` (`gross_amount` shu filial va usul bo'yicha `doc_date` holatidagi 5710 qoldig'idan oshadi — yakuniy tekshiruv `FOR UPDATE` ostida, `params.available`) |
+| Xatolar | `DOC_NOT_DRAFT`, `PERIOD_CLOSED`, `VALIDATION_ERROR` (`gross_amount` shu filial va usul bo'yicha `doc_date` holatidagi va joriy 5710 qoldig'ining kichigidan oshadi — yakuniy tekshiruv hujjat qatori `FOR UPDATE` va (filial, usul) tranzaksiya advisory qulfi ostida, `params.available`) |
 | Idempotency-Key | Majburiy |
 | Offline | Yo'q |
 | Bog'langan | US-M11-04; BO-24 «O'tkazish»; QT-M11-07 (`31-qabul-testlari.md`) |
@@ -1260,8 +1274,8 @@
 | Ruxsat | `bank_settlements.manage` |
 | So'rov | `multipart/form-data`: `file` (.txt, ≤ 10 MB, ≤ 20 000 qator — qaror #54), `branch_id` (UUID, ixtiyoriy — qator filialini to'lov maqsadidan aniqlab bo'lmasa ishlatiladi; tenantda bitta filial bo'lsa standart shu) |
 | Parser | **Kodlash**: sarlavhadagi `Кодировка=` (`Windows` → windows-1251, `UTF-8`/`UTF8` → UTF-8); sarlavha yo'q bo'lsa — avval qat'iy UTF-8 (BOM bilan ham), muvaffaqiyatsiz bo'lsa windows-1251. Birinchi qator `1CClientBankExchange` bo'lishi shart. **`СекцияРасчСчет`** … `КонецРасчСчет`: `РасчСчет`, `ДатаНачала`, `ДатаКонца`, `НачальныйОстаток`, `ВсегоПоступило`, `ВсегоСписано`, `КонечныйОстаток`. **`СекцияДокумент=<вид>`** … `КонецДокумента`: `Номер`, `Дата`, `Сумма`, `ПлательщикСчет`, `Плательщик`/`Плательщик1`, `ПлательщикИНН`, `ПолучательСчет`, `Получатель`/`Получатель1`, `ПолучательИНН`, `ДатаПоступило`, `ДатаСписано`, `НазначениеПлатежа`. Faqat **kirim** qatorlari (`ПолучательСчет` = tenant hisobi) qayta ishlanadi; chiqimlar `ignored_outgoing` da sanaladi. `Сумма` — o'nlik satrga (`17-api-umumiy.md` §3), sana — `ДатаПоступило`, bo'lmasa `Дата` |
-| Moslashtirish | Har kirim qatori uchun: (1) `method` — to'lovchi (ekvayer bank / Click / Payme / Uzum / inkassa) va `НазначениеПлатежа` kalit so'zlari bo'yicha; (2) filial — to'lov maqsadidagi terminal/merchant identifikatori bo'yicha, aks holda `branch_id`; (3) moslashtirish birligi — (filial, `method`, `entry_date`) kunlik 5710 debet yig'indisi; eng eski kundan boshlab `n` ta kun olinadi — `Σ ≥ kirim` va `(Σ − kirim) / Σ ≤ 5%` bo'lgan eng kichik `n`; har kun summasidan shu import ichida va ochiq `draft` larda allaqachon band qilingan summa ayiriladi (ikki marta band qilinmaydi); `gross_amount = Σ`, `settled_from`/`settled_to` — shu kunlar oralig'i, `doc_date` — kirim sanasi; karta (`method="card"`) kirimida moslashtirish summa va sana (filial/merchant) bo'yicha — ko'chirmada RRN yo'q; integratsiyalangan karta tushumining tranzaksiya darajasidagi `rrn` moslashtiruvi terminal settlement'i (`card_terminal_settlements.bank_settlement_id`, `21` §9.4) orqali, terminalsiz karta tushumi hech qachon RRN bo'yicha moslashtirilmaydi (`21` §9.2); (4) `commission_amount = gross_amount − kirim summasi`, `variance_amount = "0.00"` (inkassada kamomad/ortiqcha bo'lsa — Buxgalter qoralamani 55h bilan tahrirlaydi). `bank_ref` = `Номер`, `attachment_id` — yuklangan fayl (`attachments.kind='import'`). Mos tranzit topilmasa — qoralama yaratilmaydi, qator `unmatched_lines` ga tushadi (`reason:"no_transit_match"`); `commission_amount < 0` yoki `commission_amount ≥ gross_amount` — qoralama yaratilmaydi, `unmatched_lines` (`reason:"commission_invalid"`); Buxgalter 55c bilan qo'lda kiritadi |
-| Javob | `201 {import_id, file_sha256, account, period_from, period_to, drafts_created: int, draft_ids: [UUID], duplicates: int, ignored_outgoing: int, unmatched_lines: [{line_no, number, date, amount, payer_name, purpose, reason: "no_transit_match"\|"unknown_method"\|"branch_ambiguous"\|"commission_invalid"}]}` — `import_id` — import yozuvining `id`si (`bank_settlements.statement_import_id` shunga ishora qiladi); qolgan nomlar `bank_statement_imports` ustunlari bilan bir xil; `draft_ids` hosila (`bank_settlements.statement_import_id = import_id`); `duplicates`: `bank_ref` + `doc_date` + summa bo'yicha avval yaratilgan (bekor qilinmagan) `bank_settlements` bilan mos qatorlar |
+| Moslashtirish | Har kirim qatori uchun: (1) `method` — to'lovchi (ekvayer bank / Click / Payme / Uzum / inkassa) va `НазначениеПлатежа` kalit so'zlari bo'yicha; (2) filial — to'lov maqsadidagi terminal/merchant identifikatori bo'yicha, aks holda `branch_id`; (3) moslashtirish birligi — (filial, `method`, `entry_date`) kunlik 5710 sof kirimi (`bank_settlements` dan boshqa barcha hujjatlarning `Dt 5710 − Kt 5710` i: sotuv minus kartaga qaytarish va h.k.); har kun summasidan `posted` va ochiq `draft` `bank_settlements` (shu import ichida yaratilganlari ham) band qilgan summa ayiriladi — har hujjat avval o'z `settled_from`…`settled_to` kunlaridan (eskisidan), qolgani eng eski kunlardan (ikki marta band qilinmaydi); qolgan kunlardan eng eskisidan boshlab `n` ta kun olinadi — `Σ ≥ kirim` va `(Σ − kirim) / Σ ≤ 5%` bo'lgan eng kichik `n`; `gross_amount = Σ`, `settled_from`/`settled_to` — shu kunlar oralig'i, `doc_date` — kirim sanasi; karta (`method="card"`) kirimida: `НазначениеПлатежа` ekvayer reestrini bersa (`RRN` kalit so'zidan keyin vergul/bo'sh joy bilan ajratilgan RRN ro'yxati, masalan `RRN: 000000000001, 000000000002`) — shu filialning hali hech bir bank tushumi tasdig'iga bog'lanmagan `approved` integratsiyalangan xaridlari `card_terminal_transactions.rrn` bo'yicha moslashtiriladi (`gross_amount` = ularning `approved_amount` yig'indisi, `settled_from`/`settled_to` — ularning biznes kunlari; tranzaksiyalarga qoralama yaratilganda `card_terminal_transactions.bank_settlement_id` yoziladi, hujjat bekor qilinganda tozalanadi; shu kunlardagi reestrda yo'q integratsiyalangan xaridlar javobda `unmatched_card_transactions`), reestr bo'lmasa — summa va sana (filial/merchant) bo'yicha yuqoridagi qoida; `post` da shu filialning moslashtirilgan tranzaksiyalari partiyalari (reestrsiz — `settled_from`…`settled_to` dagi ochiq partiyalar) `card_terminal_settlements.bank_settlement_id` oladi (`21` §9.4); terminalsiz karta tushumi hech qachon RRN bo'yicha moslashtirilmaydi (`21` §9.2); (4) `commission_amount = gross_amount − kirim summasi`, `variance_amount = "0.00"` (inkassada kamomad/ortiqcha bo'lsa — Buxgalter qoralamani 55h bilan tahrirlaydi). `bank_ref` = `Номер`, `attachment_id` — yuklangan fayl (`attachments.kind='import'`). Mos tranzit topilmasa — qoralama yaratilmaydi, qator `unmatched_lines` ga tushadi (`reason:"no_transit_match"`); `commission_amount < 0` yoki `commission_amount ≥ gross_amount` — qoralama yaratilmaydi, `unmatched_lines` (`reason:"commission_invalid"`); Buxgalter 55c bilan qo'lda kiritadi |
+| Javob | `201 {import_id, file_sha256, account, period_from, period_to, drafts_created: int, draft_ids: [UUID], duplicates: int, ignored_outgoing: int, unmatched_lines: [{line_no, number, date, amount, payer_name, purpose, reason: "no_transit_match"\|"unknown_method"\|"branch_ambiguous"\|"commission_invalid"}], unmatched_card_transactions: [{card_terminal_transaction_id, rrn, amount, business_date}]}` — `import_id` — import yozuvining `id`si (`bank_settlements.statement_import_id` shunga ishora qiladi); qolgan nomlar `bank_statement_imports` ustunlari bilan bir xil; `draft_ids` hosila (`bank_settlements.statement_import_id = import_id`); `duplicates`: `bank_ref` (= `Номер`) + `doc_date` (= kirim sanasi) + `net_amount` (= kirim summasi) bo'yicha avval yaratilgan (bekor qilinmagan) `bank_settlements` bilan mos qatorlar; `unmatched_card_transactions` — RRN reestri bilan moslashtirilgan kunlardagi reestrda yo'q integratsiyalangan xaridlar (5710 da qoladi, ma'lumot uchun) |
 | Xatolar | `422 BANK_IMPORT_FILE_INVALID` (1CClientBankExchange sarlavhasi yo'q, kodlash aniqlanmadi, majburiy maydon yo'q yoki sintaksis xatosi — `params.line_no`), `422 BANK_IMPORT_ACCOUNT_MISMATCH` (`СекцияРасчСчет.РасчСчет` `tenants.settings.bank_account`ga teng emas, bir nechta hisob bor yoki tenant bank hisobi kiritilmagan — `params.file_account`), `409 BANK_IMPORT_DUPLICATE` (shu `file_sha256` bilan fayl allaqachon import qilingan — `params.import_id`), `FILE_TOO_LARGE`, `UNSUPPORTED_FILE_TYPE`, `BRANCH_SCOPE_DENIED` |
 | Idempotency-Key | Majburiy |
 | Offline | Yo'q |
@@ -1471,7 +1485,7 @@ Ruxsat — hammasi `platform.admin` (**faqat `platform_admins`**, majburiy TOTP,
 | Maqsad | Telegram ulash uchun bir martalik kod/havola generatsiya (US-M18-01); tugma — back-office **BO-20** ekranida (qaror #56) |
 | Ruxsat | `telegram.link` |
 | So'rov | Tana yo'q |
-| Javob | `201 {link_code, bot_url, expires_at}` — `link_code` muddati **10 daqiqa** (standart, sozlanadi — qaror #54) |
+| Javob | `201 {link_code, bot_url, expires_at}` — `link_code` muddati **10 daqiqa** (standart, sozlanadi — qaror #54), bir martalik; `bot_url` = `https://t.me/<bot>?start=<link_code>`; yangi kod shu foydalanuvchining oldingi ishlatilmagan kodini bekor qiladi. Bog'lash — botda `/start <link_code>` (Telegram webhook'i `POST /notifications/telegram/webhook`, `21-integratsiyalar.md` §11) |
 | Xatolar | — |
 | Idempotency-Key | Majburiy |
 | Offline | Yo'q |
@@ -1507,10 +1521,10 @@ Ruxsat — hammasi `platform.admin` (**faqat `platform_admins`**, majburiy TOTP,
 
 | | |
 |---|---|
-| Maqsad | Ogohlantirish turlari sozlamalari (US-M18-03: kam qoldiq, smena farqi, limitdan katta amal, davlat hisoboti farqi, offline 48 soat, obuna eslatmalari) |
+| Maqsad | Joriy foydalanuvchining ogohlantirish turlari sozlamalari (US-M18-03: kam qoldiq, smena farqi, limitdan katta amal, davlat hisoboti farqi, offline 48 soat, obuna eslatmalari) — sozlama har foydalanuvchiga alohida (`notification_settings (tenant_id, user_id, kind)`), yozuvi yo'q tur yoqilgan hisoblanadi |
 | Ruxsat | `notifications.manage` |
 | So'rov | — |
-| Javob | `{items: [{kind, enabled, time}]}` — `kind` ∈ `{daily_report, low_stock, cash_variance, over_limit_action, state_report_diff, offline_48h, subscription_due, subscription_grace, debt_due_today, debt_aging_60, debt_limit_exceeded_offline, expiry_soon, card_settlement_mismatch}` (to'liq ro'yxat: `subscription_due` — 3/1/0 kun oldin; `subscription_grace` — darhol/12s/2s; `debt_due_today` — US-M08-09; `debt_aging_60` — US-M08-10; `debt_limit_exceeded_offline` — Egasiga offline oshib ketgan qarz ogohlantirishi; `expiry_soon` — US-M04-06; `card_settlement_mismatch` — terminal settlement ↔ Z-hisobot farqi, `18-api-kassa.md` §16a.6, qaror #71) |
+| Javob | `{items: [{kind, enabled, time}]}` — `kind` ∈ `{daily_report, low_stock, cash_variance, over_limit_action, state_report_diff, offline_48h, subscription_due, subscription_grace, debt_due_today, debt_aging_60, debt_limit_exceeded_offline, expiry_soon, card_settlement_mismatch, recurring_expense_due}` — har doim barcha turlar; `time` faqat `daily_report` uchun (standart `"21:00"`, Toshkent vaqti), boshqa turlarda `null` (to'liq ro'yxat: `subscription_due` — 3/1/0 kun oldin; `subscription_grace` — darhol/12s/2s; `debt_due_today` — US-M08-09; `debt_aging_60` — US-M08-10; `debt_limit_exceeded_offline` — Egasiga offline oshib ketgan qarz ogohlantirishi; `expiry_soon` — US-M04-06; `card_settlement_mismatch` — terminal settlement ↔ Z-hisobot farqi, `18-api-kassa.md` §16a.6, qaror #71; `recurring_expense_due` — takroriy xarajat eslatmasi, US-M15-02) |
 | Xatolar | — |
 | Idempotency-Key | Kerak emas |
 | Offline | Oxirgi sinxronlangan |
@@ -1522,9 +1536,9 @@ Ruxsat — hammasi `platform.admin` (**faqat `platform_admins`**, majburiy TOTP,
 |---|---|
 | Maqsad | Sozlamalarni (yoqish/o'chirish, vaqt) yangilash |
 | Ruxsat | `notifications.manage` |
-| So'rov | `{items: [{kind: string, enabled: bool, time?: "HH:mm"}]}` |
-| Javob | `200 {items: [...]}` |
-| Xatolar | `VALIDATION_ERROR` |
+| So'rov | `{items: [{kind: string, enabled: bool, time?: "HH:mm"}]}` — faqat o'z sozlamalari; `time` yuborilmasa saqlangan vaqt o'zgarmaydi |
+| Javob | `200 {items: [...]}` (#69 dagi to'liq ro'yxat) |
+| Xatolar | `VALIDATION_ERROR` (`items[i].kind` — `validation.invalid_choice` / `validation.duplicate`; `items[i].time` — `validation.invalid_format`, `daily_report`dan boshqa turda — `validation.not_allowed`) |
 | Idempotency-Key | Majburiy |
 | Offline | Yo'q |
 | Bog'langan | US-M18-02, US-M18-03; BO-20 |

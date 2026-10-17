@@ -5,8 +5,15 @@
  * OpenAPI spec version: 0.1.0
  */
 import type {
+  EmptyBody,
   GetVatSummaryParams,
+  ListTaxSettlementsParams,
   ListVatMovesParams,
+  SettlementCancel,
+  SettlementIn,
+  SettlementOut,
+  SettlementPage,
+  SettlementPosted,
   VatMovePage,
   VatSummaryOut
 } from '@shared/models/generated';
@@ -41,5 +48,74 @@ export const listVatMoves = (
     },
       options);
     }
+  /**
+ * @summary List Tax Settlements
+ */
+export const listTaxSettlements = (
+    params?: ListTaxSettlementsParams,
+ options?: SecondParameter<typeof apiRequest<SettlementPage>>,) => {
+      return apiRequest<SettlementPage>(
+      {url: `/api/v1/tax-settlements`, method: 'GET',
+        params
+    },
+      options);
+    }
+  /**
+ * @summary Create Tax Settlement
+ */
+export const createTaxSettlement = (
+    settlementIn: SettlementIn,
+ options?: SecondParameter<typeof apiRequest<SettlementOut>>,) => {
+      return apiRequest<SettlementOut>(
+      {url: `/api/v1/tax-settlements`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: settlementIn
+    },
+      options);
+    }
+  /**
+ * @summary Get Tax Settlement
+ */
+export const getTaxSettlement = (
+    settlementId: string,
+ options?: SecondParameter<typeof apiRequest<SettlementOut>>,) => {
+      return apiRequest<SettlementOut>(
+      {url: `/api/v1/tax-settlements/${settlementId}`, method: 'GET'
+    },
+      options);
+    }
+  /**
+ * @summary Post Tax Settlement
+ */
+export const postTaxSettlement = (
+    settlementId: string,
+    emptyBodyNull?: EmptyBody | null,
+ options?: SecondParameter<typeof apiRequest<SettlementPosted>>,) => {
+      return apiRequest<SettlementPosted>(
+      {url: `/api/v1/tax-settlements/${settlementId}/post`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: emptyBodyNull
+    },
+      options);
+    }
+  /**
+ * @summary Cancel Tax Settlement
+ */
+export const cancelTaxSettlement = (
+    settlementId: string,
+    settlementCancel: SettlementCancel,
+ options?: SecondParameter<typeof apiRequest<SettlementOut>>,) => {
+      return apiRequest<SettlementOut>(
+      {url: `/api/v1/tax-settlements/${settlementId}/cancel`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: settlementCancel
+    },
+      options);
+    }
   export type GetVatSummaryResult = NonNullable<Awaited<ReturnType<typeof getVatSummary>>>
 export type ListVatMovesResult = NonNullable<Awaited<ReturnType<typeof listVatMoves>>>
+export type ListTaxSettlementsResult = NonNullable<Awaited<ReturnType<typeof listTaxSettlements>>>
+export type CreateTaxSettlementResult = NonNullable<Awaited<ReturnType<typeof createTaxSettlement>>>
+export type GetTaxSettlementResult = NonNullable<Awaited<ReturnType<typeof getTaxSettlement>>>
+export type PostTaxSettlementResult = NonNullable<Awaited<ReturnType<typeof postTaxSettlement>>>
+export type CancelTaxSettlementResult = NonNullable<Awaited<ReturnType<typeof cancelTaxSettlement>>>

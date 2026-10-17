@@ -41,6 +41,8 @@ HANDLER_MODULES: Final = (
     "app.modules.cash.wiring",
     "app.modules.sales.wiring",
     "app.modules.returns.wiring",
+    "app.modules.debts.wiring",  # B4: debt_payment.created, counterparty.created
+    "app.modules.expenses.wiring",  # B4: expense.created
 )
 
 __all__ = ["HANDLER_MODULES", "SyncModule", "build_sync_module", "collect_handlers"]

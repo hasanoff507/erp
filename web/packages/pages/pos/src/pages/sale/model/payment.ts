@@ -13,9 +13,10 @@ import type { Money } from "@shared/lib/money";
 import {
   $fiscalLadder,
   cardAttempts,
-  customers,
+  customerDebts,
   enqueueEvent,
   isOfflineError,
+  overCreditLimit,
   type CustomerRow,
 } from "@shared/offline";
 import { $isOnline } from "@shared/state/network";
@@ -75,6 +76,10 @@ export interface PaymentState {
   dueDate: string | null;
   debtApproval: ApprovalRef | null;
   uzqrRef: string;
+  /** B4 (POS-06): comment of the debt sale (18 §4.1 `comment`, ≤ 1000). */
+  comment: string;
+  /** B4 (POS-06, 16 §5): offline over-limit debt confirmed by the cashier (the server flags it). */
+  debtOverLimitConfirmed: boolean;
   /** Electronic receipt instead of the printed one (07 POS-04: printer failure / customer request). */
   electronic: DeliveryReason | null;
 }
@@ -109,6 +114,9 @@ export const mixedPartRemoved = createEvent<number>();
 export const dueDateChanged = createEvent<string | null>();
 export const debtApproved = createEvent<ApprovalRef | null>();
 export const uzqrRefChanged = createEvent<string>();
+// --- B4 debts (w-debts) ---
+export const commentChanged = createEvent<string>();
+export const debtOverLimitConfirmed = createEvent<boolean>();
 export const electronicChosen = createEvent<DeliveryReason | null>();
 /** "To'lov qabul qilindi" (static UzQR) / "TASDIQLASH". */
 export const confirmPressed = createEvent();
@@ -126,6 +134,8 @@ const fresh = (): PaymentState => ({
   dueDate: null,
   debtApproval: null,
   uzqrRef: "",
+  comment: "",
+  debtOverLimitConfirmed: false,
   electronic: null,
 });
 
@@ -200,6 +210,8 @@ $payment
   .on(dueDateChanged, (p, dueDate) => (p ? { ...p, dueDate } : p))
   .on(debtApproved, (p, debtApproval) => (p ? { ...p, debtApproval } : p))
   .on(uzqrRefChanged, (p, uzqrRef) => (p ? { ...p, uzqrRef: uzqrRef.slice(0, 40) } : p))
+  .on(commentChanged, (p, comment) => (p ? { ...p, comment: comment.slice(0, 1000) } : p))
+  .on(debtOverLimitConfirmed, (p, debtOverLimitConfirmed) => (p ? { ...p, debtOverLimitConfirmed } : p))
   .on(electronicChosen, (p, electronic) => (p ? { ...p, electronic } : p))
   .reset(paymentClosed);
 
@@ -326,12 +338,17 @@ export const completeSaleFx = createEffect(async (input: CompleteInput): Promise
   const seqOption = receiptSeqOption(parts, input.creditType === true, cashRegisterId, shift.id);
 
   const debt = debtAmount(parts);
-  const customer = draft.customerId ? await customers.get(draft.customerId) : undefined;
-  if (isPositive(debt) && input.online && debtOverLimit(customer, debt) && !p.debtApproval) {
-    throw new SaleError("DEBT_LIMIT_EXCEEDED", {
-      limit: customer?.credit_limit ?? null,
-      requested: sumMoney([customer?.receivable_balance ?? "0.00", debt]),
-    });
+  // B4 (16 §5): the last known balance + this device's unsynced debt sales — online an approval, offline the
+  // cashier's confirmation (the sale is never blocked offline; the server flags debt_limit_exceeded_offline)
+  const view = draft.customerId ? await customerDebts.view(draft.customerId) : undefined;
+  const customer = view?.customer;
+  if (isPositive(debt) && view && overCreditLimit(view, debt)) {
+    if ((input.online && !p.debtApproval) || (!input.online && !p.debtOverLimitConfirmed)) {
+      throw new SaleError("DEBT_LIMIT_EXCEEDED", {
+        limit: view.creditLimit,
+        requested: sumMoney([view.balance, debt]),
+      });
+    }
   }
 
   const tempNumber = await nextTempNumber(device.deviceId);
@@ -353,6 +370,7 @@ export const completeSaleFx = createEffect(async (input: CompleteInput): Promise
       offlineSince: input.online ? null : (input.offlineSince ?? new Date().toISOString()),
       delivery,
       deliveryReason: p.electronic,
+      comment: p.comment.trim() ? p.comment.trim() : null,
     },
   );
 

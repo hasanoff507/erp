@@ -71,6 +71,24 @@ class SqlReturnsRepository:
                     "  JOIN app.debt_payments p ON p.id = a.debt_payment_id "
                     "  WHERE a.target_doc_type = 'sales' AND a.target_doc_id = :id AND p.status = "
                     "'posted'), 0)"
+                    # B4: a posted write-off took this part of the sale's debt (12 §2.6)
+                    "- COALESCE((SELECT sum(a.amount) FROM app.debt_writeoff_allocations a "
+                    "  JOIN app.debt_writeoffs w ON w.id = a.debt_writeoff_id "
+                    "  WHERE a.target_doc_type = 'sales' AND a.target_doc_id = :id "
+                    "  AND w.status = 'posted'), 0)"
+                ),
+                {"id": sale_id},
+            )
+        ).scalar_one()
+        return Decimal(value)
+
+    async def written_off_of_sale(self, s: AsyncSession, sale_id: UUID) -> Decimal:
+        value = (
+            await s.execute(
+                text(
+                    "SELECT COALESCE(sum(a.amount), 0) FROM app.debt_writeoff_allocations a "
+                    "JOIN app.debt_writeoffs w ON w.id = a.debt_writeoff_id "
+                    "WHERE a.target_doc_type = 'sales' AND a.target_doc_id = :id AND w.status = 'posted'"
                 ),
                 {"id": sale_id},
             )

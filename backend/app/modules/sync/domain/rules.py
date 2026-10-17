@@ -20,8 +20,8 @@ EVENT_TYPES: Final = frozenset(
         "transfer.sent", "transfer.received", "stock_count.line_recorded", "expense.created",
     }
 )  # fmt: skip
-# 16 §2 types whose posting module is Bosqich 4 (27): refused, non-retryable, until a handler exists
-LATER_STAGE_TYPES: Final = frozenset({"debt_payment.created", "counterparty.created", "expense.created"})
+# 16 §2 types whose posting module is a later stage: refused, non-retryable, until a handler exists
+LATER_STAGE_TYPES: Final[frozenset[str]] = frozenset()
 
 # permission of the actor (who pressed the button, 16 §2) — None: the handler decides (e.g. deposit/withdraw)
 EVENT_PERMISSIONS: Final[dict[str, str | None]] = {
@@ -34,7 +34,7 @@ EVENT_PERMISSIONS: Final[dict[str, str | None]] = {
     "cash_movement.created": None,
     "debt_payment.created": "debts.payment.accept",
     "counterparty.created": "debts.create",
-    "expense.created": "expenses.create",
+    "expense.created": None,  # POS cash expense: the handler checks cash.withdraw + limit (18 §13.2)
     "transfer.sent": "transfer.create",
     "transfer.received": "transfer.receive",
     "stock_count.line_recorded": "stock.count.create",

@@ -443,7 +443,7 @@ Uchta `kind`: `products` (US-M04-04), `opening_stock` (US-M04-04), `opening_debt
 ### `POST /goods-receipts/{id}/cancel`
 
 **Ruxsat**: `purchases.post`.
-**So'rov**: `{reason: string}` (majburiy). Storno: `stock_moves`/`stock_lots.qty_left` teskari, kreditorlik qarzi teskari, QQS teskari (`13-provodka-qoidalari.md` §5.2). Agar partiyadan allaqachon chiqim bo'lgan bo'lsa (masalan sotilgan) — `409 {code:"LOT_ALREADY_CONSUMED"}` (bekor qilish taqiqlanadi, avval sotuvni ko'rib chiqish kerak). AVECO'da kirimdan keyin shu ombor+mahsulot bo'yicha tirik chiqim bo'lsa ham `409 LOT_ALREADY_CONSUMED` (`13` §3.1).
+**So'rov**: `{reason: string}` (majburiy). Storno: `stock_moves`/`stock_lots.qty_left` teskari, kreditorlik qarzi teskari, QQS teskari (`13-provodka-qoidalari.md` §5.2). Agar partiyadan allaqachon chiqim bo'lgan bo'lsa (masalan sotilgan) — `409 {code:"LOT_ALREADY_CONSUMED"}` (bekor qilish taqiqlanadi, avval sotuvni ko'rib chiqish kerak). AVECO'da kirimdan keyin shu ombor+mahsulot bo'yicha tirik chiqim bo'lsa ham `409 LOT_ALREADY_CONSUMED` (`13` §3.1). Kirimga o'tkazilgan (`posted`) yetkazib beruvchi to'lovi allokatsiyasi bo'lsa — `409 DOC_INVALID_STATE` (`params:{reason:"supplier_payment_allocated", supplier_payment_ids}`), avval to'lov(lar) bekor qilinadi (§11).
 **Offline**: **yo'q** — markirovkalangan tovar qabulida egalik o'zgaradi, shuning uchun kirim (offline o'z filiallari orasidagi `transfers`dan farqli) faqat online ruxsat etiladi (Asosiy xulosa 7, qaror #23 — tavsiya #5). Mobil skaner (POS-08) ham **shu REST endpoint'lardan online rejimda** foydalanadi — alohida offline outbox voqeasi yo'q. Omborchi `draft` yaratadi (`purchases.receive`), `post`ni Buxgalter/Egasi bajaradi (`purchases.post`) — qoldiq shu paytda oshadi; Egasi `purchases.post`ni Omborchiga bergan bo'lsa, Omborchi o'zi o'tkazadi (qaror #49).
 
 **Kiruvchi e-TTN** (qaror #63): e-TTN'ni **yuk jo'natuvchi (yetkazib beruvchi)** chiqaradi — odatda e-faktura bilan birlashtirilgan; do'kon (yuk oluvchi) tashish yakunida uni **elektron tasdiqlaydi yoki rad etadi** — birlashtirilgan shaklda §19 `accept`/`reject` bilan birga, alohida e-TTN bo'lsa §20 `accept`/`reject`. E-TTN'siz kirim bloklanmaydi, lekin `ettn_status="none"` BO-04/BO-15'da "E-TTN yo'q" belgisi bilan ko'rsatiladi.
@@ -611,23 +611,35 @@ Uchta `kind`: `products` (US-M04-04), `opening_stock` (US-M04-04), `opening_debt
 | `supplier_id` | UUID | ha | — |
 | `amount` | decimal(2dp) | ha | > 0; joriy kreditorlik qoldig'idan oshishi mumkin — `tenants.settings.supplier_overpay_policy` bo'yicha (pastga qarang, qaror #47) |
 | `method` | enum | ha | `cash`/`bank` |
-| `cash_register_id` | UUID | `method=cash` bo'lsa shart | — |
-| `shift_id` | UUID | `method=cash` bo'lsa shart | faol smena |
+| `cash_register_id` | UUID | `method=cash` bo'lsa shart (`bank`da yuborilmaydi — `validation.cash_fields_bank_payment`) | smenaning kassasi (`validation.cash_register_not_of_shift`) |
+| `shift_id` | UUID | `method=cash` bo'lsa shart | ochiq smena (`409 SHIFT_NOT_OPEN`); hujjat filiali — smena filiali |
+| `allocations` | massiv | yo'q | yuborilmasa server qarz qismini ochiq hujjatlarga **eng eskisidan** taqsimlaydi (`ORDER BY COALESCE(due_date, doc_date), doc_date, doc_id`, 13 §2.14 tartibi); yuborilsa Σ = qarz qismi (`min(amount, max(kreditorlik qoldig'i, 0))`, aks holda `validation.allocation_sum_mismatch`) |
 | `allocations[].target_doc_type` | string | ha | `"goods_receipts"`\|`"debt_openings"` (jadval nomi) |
-| `allocations[].target_doc_id` | UUID | ha | qaysi kirim hujjatini yoki boshlang'ich kreditorlik qarzini (`debt_openings`) yopadi |
-| `allocations[].amount` | decimal(2dp) | ha | — |
-| `doc_date` | date | ha | — |
+| `allocations[].target_doc_id` | UUID | ha | shu yetkazib beruvchining ochiq kirim hujjati yoki boshlang'ich kreditorlik qarzi (`debt_openings`) — aks holda `validation.allocation_target_invalid` |
+| `allocations[].amount` | decimal(2dp) | ha | > 0, ≤ hujjat qoldig'i (`validation.allocation_exceeds_outstanding`) |
+| `doc_date` | date | ha | ≤ bugun |
+| `comment` | string | yo'q | ≤ 1000 |
+
+Bank to'lovida hujjat filiali — `X-Branch-Id` (yo'q bo'lsa cheklanmagan foydalanuvchida standart filial, bitta filialli foydalanuvchida o'sha filial, aks holda `validation.branch_required`).
 
 **Qarzdan ortiq to'lov** (qaror #47): `tenants.settings.supplier_overpay_policy` — `'warn'` (standart) yoki `'block'`. `warn`da summa joriy kreditorlik qoldig'idan oshsa to'lov o'tkaziladi, ortiqcha qism yetkazib beruvchiga berilgan avans sifatida `4310`ga yoziladi (`13-provodka-qoidalari.md` 2.16) va javobda `warnings:[{code:"SUPPLIER_OVERPAY_ADVANCE", params:{debt, amount, advance}}]` qaytadi; `block`da — `422 SUPPLIER_OVERPAY_BLOCKED` (`params:{debt, amount}`), hujjat yaratilmaydi.
-**Javob**: `201 {id, status:"posted", number, vat_credit_unlocked: [{einvoice_id, vat_amount}], advance_amount, warnings:[]}` — agar `allocations` ichida "qizil" (yoki `risk_flag="unknown"`) fakturaga tegishli kirim bo'lsa, shu qismga mos `4410/6010` QQS yozuvi ham qo'shiladi va `vat_credit_unlocked`da ko'rsatiladi (qisman to'lovda allokatsiya summasiga proporsional, `13-provodka-qoidalari.md` 2.16); `advance_amount` — `4310`ga tushgan ortiqcha qism (`"0.00"` bo'lishi mumkin).
+**Javob**: `201 SupplierPayment` + `warnings` — `{id, number, status:"posted", doc_date, branch_id, supplier_id, supplier:{id, name, stir}, method, amount, cash_register_id, shift_id, allocations:[{target_doc_type, target_doc_id, target_number, target_doc_date, amount, vat_credit_unlocked}], advance_amount, vat_credit_unlocked: [{einvoice_id, vat_amount}], comment, created_by, created_by_name, created_at, posted_at, cancelled_at, cancel_reason, warnings:[]}` — agar `allocations` ichida "qizil" (yoki `risk_flag="unknown"`) fakturaga tegishli kirim bo'lsa, shu qismga mos kechiktirilgan QQS krediti ochiladi — faqat `vat_moves(kind=input)` yoziladi (`Dt 4410 / Kt 6010` kirimda `vat_credit='deferred'` bilan allaqachon yozilgan, qayta yozilmaydi) va `vat_credit_unlocked`da ko'rsatiladi (qisman to'lovda allokatsiya summasiga proporsional, `13-provodka-qoidalari.md` 2.16); `advance_amount` — `4310`ga tushgan ortiqcha qism (`amount − Σ allocations`, `"0.00"` bo'lishi mumkin). Naqd to'lov `cash_moves(−amount, method='cash', cash_register_id, shift_id)` ham yozadi.
 **Xatolar**: `422 VALIDATION_ERROR`, `422 SUPPLIER_OVERPAY_BLOCKED` (faqat `supplier_overpay_policy='block'`), `409 PERIOD_CLOSED`.
 
 ### `POST /supplier-payments/{id}/cancel`
 
-**Ruxsat**: `purchases.pay`. **So'rov**: `{reason}`. Storno: kreditorlik qarzi orqaga, QQS krediti ochilgan bo'lsa u ham storno.
+**Ruxsat**: `purchases.pay`. **So'rov**: `{reason}`. **Javob**: `200 SupplierPayment` (`status:"cancelled"`). Storno: kreditorlik qarzi orqaga, naqd bo'lsa `cash_moves` ham, QQS krediti ochilgan bo'lsa u ham storno. Naqd to'lov faqat smenasi ochiq turganda bekor qilinadi (pul o'sha kassaga qaytadi) — aks holda `409 DOC_INVALID_STATE` (`params.reason="shift_closed"`). To'lovning avans qismi (`amount − Σ allocations`) keyingi kirimda hisobga olingan bo'lsa (avans qismi > yetkazib beruvchining joriy 4310 qoldig'i, qisman ishlatilgan holda ham) — `409 DOC_INVALID_STATE` (`params={reason:"advance_consumed", advance, available}`); avval avansni ishlatgan kirim bekor qilinadi (`13-provodka-qoidalari.md` §2.16). **Xatolar**: `DOC_ALREADY_CANCELLED`, `DOC_INVALID_STATE` (`shift_closed`, `advance_consumed`).
 **Idempotentlik**: `Idempotency-Key` majburiy.
 **Offline**: yo'q.
 **Bog'liq**: US-M07-04, US-M10-03, BP-12, BO-04.
+
+### `GET /supplier-payments` · `GET /supplier-payments/{id}` <!-- 19#51a -->
+
+**Ruxsat**: `purchases.pay`. Ro'yxat — cursor pagination, filtr `?supplier_id=&status=posted|cancelled&method=cash|bank&from=&to=`, filial cheklovi bilan, yangisi birinchi; element — `SupplierPayment` (`warnings`siz).
+
+### `GET /supplier-payments/open-documents?supplier_id=` <!-- 19#51b -->
+
+**Maqsad**: BO-04 "To'lov qayd etish" taqsimot jadvali va "Men qarzdorman → To'lash" uchun yetkazib beruvchining ochiq kreditorlik hujjatlari (yozmaydi). **Ruxsat**: `purchases.pay`. **Javob**: `{supplier_id, payable_balance, advance_balance, items:[{target_doc_type, target_doc_id, number, doc_date, due_date, total, outstanding, einvoice_id, einvoice_risk_flag, vat_pending}]}` — `outstanding` = post paytidagi kreditorlik − qaytarishlar − avans hisobi (`Dt 6010 / Kt 4310`) − o'tkazilgan to'lov allokatsiyalari; `vat_pending` — hali ochilmagan kechiktirilgan QQS krediti; tartib — serverning avtomatik taqsimot tartibi.
 
 ---
 

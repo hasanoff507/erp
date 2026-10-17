@@ -448,13 +448,14 @@ test.describe("POS keyboard and touch (review UX-01 … UX-06, UX-09)", () => {
     await expect(page).toHaveURL(/\/pos\/lookup$/);
     // UX-04: on /pos every F-key has its browser default prevented (F1 help, F3 find, F5 reload …)
     const prevented = await page.evaluate(() =>
-      ["F1", "F3", "F5", "F7", "F10", "F11"].map((key) => {
+      // F7 is the global POS-13 key (07) — it would navigate, so it is not among the «unbound» keys here
+      ["F1", "F3", "F5", "F10", "F11"].map((key) => {
         const ev = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
         document.body.dispatchEvent(ev);
         return ev.defaultPrevented;
       }),
     );
-    expect(prevented).toEqual([true, true, true, true, true, true]);
+    expect(prevented).toEqual([true, true, true, true, true]);
     await page.keyboard.press("F12");
     await expect(page).toHaveURL(/\/pos\/sync$/);
     await page.keyboard.press("Escape");

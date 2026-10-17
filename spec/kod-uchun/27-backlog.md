@@ -191,6 +191,7 @@
 - [ ] Davr yopish (US-M11-02): yopilgan davrga kech POS voqealari, readiness `devices_unsynced`/`warnings`, `PERIOD_CLOSE_OUT_OF_ORDER` (qaror #69)
 - [ ] Qo'lda buxgalteriya tuzatishi: `ledger_adjustments` hujjat jadvali (`12` §2.6) + `ledger_entries.branch_id` (`12` §2.7); `POST /ledger-adjustments` (bir bosqichli, darhol `posted`), `POST /ledger-adjustments/{id}/cancel`, `GET /ledger-adjustments` — faqat joriy ochiq davrda (`13-provodka-qoidalari.md` §5.1)
 - [ ] Chiquvchi e-faktura (US-M01-06, BP-13/BP-03): `einvoice.create` ruxsati, `POST /api/v1/einvoices` (`direction=out`, B2B nasiya sotuvdan server avtomatik `draft`) va `POST /api/v1/einvoices/from-receipt` (BO-15 "Chek asosida e-faktura chiqarish" tugmasi); `einvoices.related_doc`, provodka yozilmaydi (`13-provodka-qoidalari.md` §2.22), `uq_einvoice_out_per_doc`
+- [ ] Readiness ogohlantirishi `tax_settlement_stale`: davrning `posted` `tax_settlements.amount` joriy figuradan (`vat_offset` — Σ input `vat_moves`, `turnover_tax` — joriy aylanma solig'i) farq qiladi; Buxgalter bekor qilib qayta yaratadi (`13-provodka-qoidalari.md` §5.1, §2.26; `20-api-moliya-admin.md` #16)
 
 **O'qiladigan spec fayllari:** `21-integratsiyalar.md`, `13-provodka-qoidalari.md` §2.14/§2.22/§5, `18-api-kassa.md` §4.5/§12.2/§14a, `12-db-sxema.md` §2.5a (`approval_requests`, `doc_approvals`), §2.6 (`ledger_adjustments`), §2.7 (`ledger_entries`), §2.8 (`fiscal_receipts`).
 
@@ -285,7 +286,7 @@ Javob kelmaguncha kod vaqtinchalik standart bilan yoziladi (26 Jadval B). Xatlar
 
 | Kim | Xat / so'rov | Nima so'raladi (26 #N) | Bloklaydigan bosqich |
 |---|---|---|---|
-| Asoschi | — | Yuridik shaxs va imzolovchi (#130); Didox (#167); qo'shimcha kassa narxi (#168) | #130 — Kod — yo'q; barcha xatlar (#71), Eskiz (#45), OV sertifikat (#105) shundan keyin; #167 — Bosqich 5 (e-faktura) — bloklamaydi; #168 — Yo'q (narx; Bosqich 6 oxirigacha) |
+| Asoschi | — | Yuridik shaxs va imzolovchi (#130); Didox (#167); qo'shimcha kassa narxi (#168); Bosqich 4 buxgalteriya/xavfsizlik qarorlari (#180–#188; #182, #183 — buxgalter bilan) | #130 — Kod — yo'q; barcha xatlar (#71), Eskiz (#45), OV sertifikat (#105) shundan keyin; #167 — Bosqich 5 (e-faktura) — bloklamaydi; #168 — Yo'q (narx; Bosqich 6 oxirigacha); #180–#188 — Yo'q |
 | Soliq qo'mitasi (DSQ) / OFD | Xat 1 | "Kredit" chek turi (#9); faqat-elektron chek (#112); VMQ-393 ikkilamchi tizim (#169); karta/UzQR integratsiyasi reyestr sharti (#170); VMQ-943 1-ilova 6-band 2-xatboshi talqini (#177); karta turi BIN manbasi (#176); terminalsiz karta to'lovining rekvizitsiz fiskal cheki (#178); reyestr narxi (#42) | #9 — Bosqich 5 — bloklamaydi; #112 — Bosqich 3 — bloklamaydi; #169 — Bosqich 5 — hamkor tanlovi oldidan; #170 — O'z reyestr arizasi (#25) — MVP kodini bloklamaydi; #176, #177, #178 — Yo'q; #42 — Yo'q (byudjet) — reyestr arizasi Bosqich 5 dan oldin |
 | "Yangi texnologiyalar" DUK | Xat 1 q4 / alohida | E-IMZO prod API-KEY (#118) | Bosqich 5 (e-faktura prod) |
 | Kiberxavfsizlik markazi | Xat 3 (ixtiyoriy) / narx so'rovi | Reyestr ekspertizasi narxi (#42) | Yo'q |
@@ -293,7 +294,7 @@ Javob kelmaguncha kod vaqtinchalik standart bilan yoziladi (26 Jadval B). Xatlar
 | Faktura.uz | Xat 4 | VM 830 xavf darajasi API'da (#47) | Bosqich 5 — bloklamaydi |
 | Didox | Xat 5 | Partner token (#167 qarori bo'lsa) | — |
 | Click / Payme / Uzum | Xat 6/7/8 | Test kredensiallari (hujjatlar ochiq — #43) | — |
-| Fiskal hamkor (Multikassa / E-POS) | Xat 9 | Lokal ko'prik ruxsati, bulut rejimi, auth, sertifikatlash, test FM, narx (#109, #168); holat kodlari (#89); PAX/Sunmi FM SDK (#63); terminalsiz karta to'lovida karta turi/niqob/RRN'siz chek maqbulligi (#178) | #109 — **Bosqich 5 — real fiskal adapter (BLOK)**; #168 — Yo'q (narx; Bosqich 6 oxirigacha); #89 — Bosqich 5 — yo'q (flag); #63 — MVP'dan keyin (Android POS); #178 — Yo'q |
+| Fiskal hamkor (Multikassa / E-POS) | Xat 9 | Lokal ko'prik ruxsati, bulut rejimi, auth, sertifikatlash, test FM, narx (#109, #168); holat kodlari (#89); PAX/Sunmi FM SDK (#63); terminalsiz karta to'lovida karta turi/niqob/RRN'siz chek maqbulligi (#178); qarz hisobiga qaytarilgan fiskallangan tovarga qaytarish cheki (#189) | #109 — **Bosqich 5 — real fiskal adapter (BLOK)**; #168 — Yo'q (narx; Bosqich 6 oxirigacha); #89 — Bosqich 5 — yo'q (flag); #63 — MVP'dan keyin (Android POS); #178 — Yo'q; #189 — Bosqich 5 (fiskal) — bloklamaydi |
 | DSQ (reyestr) | Xat 10 | O'z virtual kassamiz arizasi (#25, #42) | Yo'q (parallel) |
 | CBU MUNIS / ekvayer bank | Texnik so'rov | Dinamik UzQR POS API (#49) | Bosqich 5 — dinamik UzQR |
 | Karta terminali vendorlari — Rahmat, Humo (НМПЦ), Arca/ERA, MayaSoft | Hamkorlik so'rovi + NDA | Terminal API/ECR protokoli, test qurilma, narx (#172, #173, #174); SoftPOS SDK (#175); karta turi BIN ro'yxati (#176) | Yo'q (MVP — `FakeCardTerminalAdapter`); birinchi real drayver — o'z reyestr arizasidan (#25) oldin; #175 — MVP'dan keyin (Android POS) |

@@ -2226,6 +2226,44 @@ CREATE UNIQUE INDEX uq_tax_settlements_turnover ON app.tax_settlements (tenant_i
   WHERE tax_kind = 'turnover_tax' AND status <> 'cancelled';
 ```
 
+Bank tushumi tasdig'i (`0027b debts_finance`, append-only; `20-api-moliya-admin.md` 55a–55h): `bank_settlements.version` — qoralamani tahrirlash (55h) optimistik qulfi (`VERSION_CONFLICT`); `card_terminal_transactions.bank_settlement_id` — integratsiyalangan karta xaridi `rrn` bo'yicha moslashtirilgan bank tushumi tasdig'i (ko'chirma importi qoralamasi yaratilganda yoziladi — shu tranzaksiya boshqa qoralamaga ikkinchi marta olinmaydi; hujjat bekor qilinganda `NULL`ga qaytadi; `13-provodka-qoidalari.md` §2.18a, `21-integratsiyalar.md` §9.2).
+
+```sql
+-- 0027b debts_finance
+ALTER TABLE app.bank_settlements ADD COLUMN version INT NOT NULL DEFAULT 1;
+ALTER TABLE app.card_terminal_transactions ADD COLUMN bank_settlement_id UUID NULL REFERENCES app.bank_settlements(id);
+CREATE INDEX idx_ctt_bank_settlement ON app.card_terminal_transactions (bank_settlement_id)
+  WHERE bank_settlement_id IS NOT NULL;
+```
+
+```sql
+-- 0027b down
+ALTER TABLE app.card_terminal_transactions DROP COLUMN IF EXISTS bank_settlement_id;
+ALTER TABLE app.bank_settlements DROP COLUMN IF EXISTS version;
+```
+
+Qarzni kechish allokatsiyasi (`0027b debts_finance`, append-only; `13-provodka-qoidalari.md` §2.15, `18-api-kassa.md` §12.5): `debt_writeoffs` `post` qilinganda kechirilgan summa mijozning ochiq `sales`/`debt_openings` qoldiqlariga qarz to'lovi bilan bir xil tartibda (`COALESCE(due_date, doc_date), doc_date, doc_id`) taqsimlanadi va shu jadvalga yoziladi — hujjatning ochiq qoldig'i (`16-offline-sync.md` §1 `open_debt_docs[].open_amount`, qarz daftari holati) `debt_moves − debt_payment_allocations − debt_writeoff_allocations` (faqat `posted` hujjatlar) bo'yicha hisoblanadi; kechish bekor qilinsa (`cancelled`) uning qatorlari hisobga olinmaydi.
+
+```sql
+-- 0027b debts_finance
+CREATE TABLE app.debt_writeoff_allocations (
+  id               UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id        UUID NOT NULL REFERENCES app.tenants(id),
+  debt_writeoff_id UUID NOT NULL REFERENCES app.debt_writeoffs(id),
+  target_doc_type  TEXT NOT NULL CHECK (target_doc_type IN ('sales','debt_openings')),
+  target_doc_id    UUID NOT NULL,
+  amount           NUMERIC(18,2) NOT NULL CHECK (amount > 0),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_debt_writeoff_alloc_target ON app.debt_writeoff_allocations (tenant_id, target_doc_type, target_doc_id);
+CREATE INDEX idx_debt_payment_alloc_target ON app.debt_payment_allocations (tenant_id, target_doc_type, target_doc_id);
+ALTER TABLE app.debt_writeoff_allocations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE app.debt_writeoff_allocations FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation ON app.debt_writeoff_allocations
+  USING (tenant_id = app.current_tenant_id()) WITH CHECK (tenant_id = app.current_tenant_id());
+GRANT SELECT, INSERT ON app.debt_writeoff_allocations TO erp_app;
+```
+
 ### 2.7 Registrlar
 
 `stock_moves`, `debt_moves`, `cash_moves`, `ledger_entries`, `vat_moves` — **haqiqiy append-only** (3-bo'limda `REVOKE`+trigger bilan mahkamlanadi). `stock_lots`, `avg_costs`, `stock_balances`, `debt_balances` — "balans/ishchi" jadvallar: qiymatlari shu registrlardan hisoblanadi, lekin qatorlari FIFO/AVECO qulfi ostida **UPDATE** qilinadi (aniqlashtirish #2 — 11-model bu jadvallarni "Registrlar" sarlavhasi ostida bersa ham, `stock_lots.qty_left` jismonan mutatsiya qilinadi, `23-backend-arxitekturasi.md` §2.1).
@@ -5373,12 +5411,12 @@ INSERT INTO app.warehouses (tenant_id, branch_id, name, type, inventory_account)
 
 ### 6.1 Alembic revizion rejasi
 
-Revizionlardan oldin — DBA bootstrap (0-bo'lim: rollar, parollar, `GRANT erp_system TO erp_migrator`, `search_path`, `erp_migrator` egaligidagi baza); barcha revizionlar `erp_migrator` bilan ishlaydi. Revizionlar zanjiri chiziqli: `0001` → … → `0027` → `0027a` → `0028` → `0029`; `0027a web_pos` (Bosqich 3, veb-kassa) — **append-only** revizion: `0027` gacha qo'llangan bazaga faqat qo'shimcha o'zgarishlar (yangi ustun/jadval, funksiya imzosi); `0028 store_agent` ning `down_revision` — `0027a`.
+Revizionlardan oldin — DBA bootstrap (0-bo'lim: rollar, parollar, `GRANT erp_system TO erp_migrator`, `search_path`, `erp_migrator` egaligidagi baza); barcha revizionlar `erp_migrator` bilan ishlaydi. Revizionlar zanjiri chiziqli: `0001` → … → `0027` → `0027a` → `0027b` → `0028` → `0029`; `0027a web_pos` (Bosqich 3, veb-kassa) va `0027b debts_finance` (Bosqich 4: qarz daftari, xarajatlar, bank tushumi, hisobotlar, Telegram) — **append-only** revizionlar: oldingi revizionlar qo'llangan bazaga faqat qo'shimcha o'zgarishlar (yangi ustun/jadval, funksiya imzosi); `0028 store_agent` ning `down_revision` — `0027b`.
 
 **SQL fayllar shu hujjatdan generatsiya qilinadi** (`backend/scripts/gen_migration_sql.py` → `backend/alembic/sql/NNNN_<nom>.{up,down}.sql`; `--check` rejimi CI'da drift'ni ushlaydi). Har ` ```sql ` bloki revizionga quyidagi tartibda biriktiriladi:
 1. Blokning birinchi qatori — marker izoh: `-- NNNN <nom>` (masalan `-- 0015 registers`, `-- 0027 boshida`) — butun blok shu revizionga; `-- DBA bootstrap` — revizion emas (0-bo'lim, `initdb.sh`); `-- namuna` — DDL emas, misol.
 2. Markersiz blok — bo'lim sarlavhasi bo'yicha: 0, 1.1–1.4 → `0001`; 2.1–2.9 → har bayonot o'z jadvalining revizioniga (quyidagi jadval; jadvaldan keyin yozilgan kechiktirilgan FK/indeks — FK bog'langan eng kech jadval revizioniga), `app.next_doc_number()` → `0019`; 2.11 → `0028`/`0029`; 4.1–4.4 → `0026`; 4.5 → `0027`; 5 (seed) va 6.2 (CI) — revizion emas.
-3. `0027a` bloklari faqat marker bilan: `-- 0027a web_pos` (up) va `-- 0027a down` (down skriptiga so'zma-so'z — `DROP COLUMN`, funksiyaning oldingi tanasi va h.k., avtomatik chiqarib bo'lmaydigan teskari bayonotlar); har blok o'zgartirgan jadval bo'limida, `CREATE TABLE`dan keyin turadi.
+3. `0027a`/`0027b` bloklari faqat marker bilan: `-- 0027a web_pos` / `-- 0027b debts_finance` (up) va `-- 0027a down` / `-- 0027b down` (down skriptiga so'zma-so'z — `DROP COLUMN`, funksiyaning oldingi tanasi va h.k., avtomatik chiqarib bo'lmaydigan teskari bayonotlar); har blok o'zgartirgan jadval bo'limida, `CREATE TABLE`dan keyin turadi.
 4. `0028`/`0029` bloklari tegishli bosqichgacha generatsiya qilinmaydi.
 
 | № | Revizion | Mazmuni |
@@ -5411,6 +5449,7 @@ Revizionlardan oldin — DBA bootstrap (0-bo'lim: rollar, parollar, `GRANT erp_s
 | 0026 | `rls_policies` | 4.2–4.4-bo'limlardagi `DO` bloki + maxsus siyosatlar + GRANT/REVOKE (+`platform.label_templates`/`marking_product_groups`/`terms_versions`/`turnover_tax_rates`/`card_bin_rules` SELECT, `platform.fx_rates` SELECT/INSERT/UPDATE); sxema-GRANT'lardan keyin append-only `REVOKE`lar qayta qo'llanadi, `auth.login_attempts` uchun `erp_system`dan `UPDATE` (4.4) |
 | 0027 | `security_definer_functions` | 4.5-bo'limdagi 4 funksiya + `auth_consume_code`/`auth_rotate_refresh`/`auth_revoke_tenant`/`auth_suspend_tenant` + (`payments_checkout_by_provider_tx`, `payments_checkout_by_ref`, `billing_payment_by_id`, `public_statement_by_token`) + 17 ta AS yozuvchi/sessiya funksiyasi (`auth_issue_code` … `auth_telegram_chat_by_phone`, `auth_lookup_refresh`, `auth_revoke_refresh_family`, `auth_purge_login_attempts`) — jami 29; ular o'qiydigan `app` jadvallariga `erp_system` uchun nomma-nom `GRANT SELECT`; boshida `GRANT CREATE ON SCHEMA app TO erp_system`, oxirida `REVOKE` (egalik topshirish uchun vaqtincha, 4.5) |
 | 0027a | `web_pos` | Bosqich 3 (veb-kassa) — append-only o'zgarishlar: qurilmaga bog'langan login va POS uchun qo'shimchalar (blok markerlari `-- 0027a web_pos` / `-- 0027a down`, mazmuni — bloklarning o'zida) |
+| 0027b | `debts_finance` | Bosqich 4 (qarz daftari, xarajatlar, bank tushumi, hisobotlar, Telegram) — append-only o'zgarishlar (blok markerlari `-- 0027b debts_finance` / `-- 0027b down`, mazmuni — bloklarning o'zida) |
 | 0028 | `store_agent` | Do'kon agenti umumiy registri (2.11-bo'lim, qaror #66): `app.onec_agents` (+`capabilities`), `app.onec_agent_tasks` (1C ustunlari FK'siz; fiskal/printer/tarozi/karta terminali xizmat vazifalari — `card.status`, `card.settlement` (qaror #71), `purpose='device_service'`), `app.onec_task_results`, `auth.onec_device_authorizations`; `fk_cr_fiscal_agent` (`cash_registers.fiscal_agent_id` → `onec_agents`), `fk_ct_agent` (`card_terminals.agent_id` → `onec_agents`, qaror #71); `updated_at` trigger'lari (2.10, 2 jadval); RLS uchligi (4.2, 3 jadval); grantlar (4.4); 6 ta `SECURITY DEFINER` funksiya (`onec_device_auth_start/lookup/approve/poll/deny`, `onec_agent_credentials`; 4.5). `0002`/`0007` dagi `devices`, `signing_keys`, `cash_registers` ga bog'liq. Bosqich 5 |
 | 0029 | `onec_integration` | 1C integratsiyasi (2.11-bo'lim, `33-1c-integratsiya.md` §5): 15 ta `app.onec_*` jadval (FK tartibida: `onec_bases` → `onec_settings`, `onec_branch_bindings`, `onec_metadata_snapshots`, `onec_catalog_items`, `onec_mappings`, `onec_value_mappings`, `onec_ref_create_requests` → `onec_export_batches` → `onec_export_items` → `onec_export_item_sources`, `onec_object_refs` → `onec_reconciliations`, `onec_events`, `onec_agent_logs`); `onec_forbid_namespace_change` trigger'i; kechiktirilgan FK'lar, jumladan `onec_agent_tasks` ga `fk_oat_base`, `fk_oat_batch`, `fk_oat_item`, `fk_oat_ref_create`, `fk_oat_reconciliation`; `updated_at` trigger'lari (2.10, 11 jadval); RLS uchligi (4.2, 15 jadval); grantlar (4.4); `onec_tenants_due` (4.5). `onec_metadata_snapshots`/`onec_reconciliations`/`onec_events` `task_id` FK'lari `ON DELETE SET NULL` (o'qish vazifalari 30 kunda tozalanadi). `0018` dagi `attachments`ga bog'liq. Bosqich 7 |
 

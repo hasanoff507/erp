@@ -186,10 +186,43 @@
       "title": "Bu davrda QQS harakati yo'q",
       "description": "Sotuv yoki kirim o'tkazilgach summalar shu yerda ko'rinadi."
     },
-    "nextStage": "Keyingi bosqichda",
     "settlement": {
       "title": "Soliq hisob-kitobi (ST)",
-      "description": "Oy yakunida kiruvchi va chiquvchi QQSni hisobga olish (Dt 6410 / Kt 4410) yoki aylanma solig'i provodkasi — qoralama, o'tkazish va bekor qilish keyingi bosqichda qo'shiladi."
+      "kinds": {
+        "vat_offset": "QQS hisob-kitobi",
+        "turnover_tax": "Aylanma solig'i"
+      },
+      "vatHint": "Oy yakunida kiruvchi QQS chiquvchi QQS hisobiga olinadi: Dt 6410 / Kt 4410. Summani server hisoblaydi.",
+      "turnoverHint": "Oy yakunida aylanma solig'i hisoblanadi: Dt 9430 / Kt 6410 (har filial alohida). Summani server hisoblaydi.",
+      "monthOnly": "Soliq hisob-kitobi oy bo'yicha yuritiladi — davr sifatida oyni tanlang.",
+      "none": "{{period}} uchun hujjat yo'q. «Qoralama hisoblash» — server summani hisoblaydi, keyin ko'rib o'tkazasiz.",
+      "retry": "Qayta urinish",
+      "noNumber": "Qoralama (raqam o'tkazishda beriladi)",
+      "status": {
+        "draft": "Qoralama",
+        "posted": "O'tkazilgan",
+        "cancelled": "Bekor qilingan"
+      },
+      "period": "Davr",
+      "base": "Baza",
+      "rate": "Stavka",
+      "amount": "Summa",
+      "posting": "Provodka: Dt {{dt}} {{dtName}} / Kt {{kt}} {{ktName}}",
+      "cancelReason": "Bekor qilish sababi: «{{reason}}»",
+      "create": "Qoralama hisoblash",
+      "post": "O'tkazish",
+      "cancel": "Bekor qilish",
+      "branch": "Filial",
+      "branchPlaceholder": "Filialni tanlang",
+      "postTitle": "Soliq hisob-kitobini o'tkazasizmi?",
+      "postDescription": "{{period}} uchun {{amount}} provodka yoziladi. O'tkazishda summa qayta hisoblanadi.",
+      "posted": "Hujjat o'tkazildi: {{number}}.",
+      "recalculated": "Hujjat o'tkazildi: {{number}}. Qoralamadan keyin ma'lumot o'zgargani uchun summa qayta hisoblandi — {{amount}}.",
+      "cancelTitle": "Soliq hisob-kitobini bekor qilish",
+      "cancelPosted": "Storno yoziladi — 6410 qoldig'i avvalgi holatiga qaytadi.",
+      "back": "Orqaga",
+      "close": "Yopish",
+      "createKind": "Qoralama hisoblash — {{kind}}"
     },
     "moves": {
       "title": "QQS registri",
@@ -224,5 +257,319 @@
       "supplier_payments": "Yetkazib beruvchiga to'lov",
       "other": "Hujjat"
     }
+  },
+  "shared": {
+    "removeFile": "Faylni olib tashlash",
+    "uploading": "Fayl yuklanmoqda…",
+    "cancelDoc": "Bekor qilish",
+    "cancelReason": "Bekor qilish sababi",
+    "back": "Orqaga",
+    "save": "Saqlash",
+    "close": "Yopish"
+  },
+  "expenses": {
+    "title": "Xarajatlar",
+    "subtitle": "Operatsion xarajatlar (ijara, kommunal, transport) va takrorlanuvchi to'lovlar",
+    "add": "Xarajat qo'shish",
+    "offline": "Internet yo'q — faqat ko'rish. Kassadan to'langan xarajat kassada (POS) yoziladi.",
+    "tabs": {
+      "label": "Xarajatlar bo'limlari",
+      "expenses": "Xarajatlar",
+      "recurring": "Takrorlanuvchi ({{count}})",
+      "categories": "Toifalar"
+    },
+    "kpi": {
+      "posted": "O'tkazilgan",
+      "postedNote": "Tanlangan davr va filtr bo'yicha",
+      "pending": "Kutilmoqda",
+      "pendingNote": "Qoralama va tasdiq kutayotganlar",
+      "count": "Ko'rsatilgan xarajatlar",
+      "countNote": "Ro'yxatda yuklangan qatorlar"
+    },
+    "shares": {
+      "title": "Toifalar bo'yicha o'tkazilgan",
+      "subtitle": "so'm, ko'rsatilgan qatorlar bo'yicha",
+      "empty": "O'tkazilgan xarajat yo'q",
+      "total": "Jami",
+      "posNote": "Naqd xarajatlar kassada (POS) yoziladi va shu yerga avtomatik tushadi."
+    },
+    "filters": {
+      "from": "Sana (dan)",
+      "to": "Sana (gacha)",
+      "category": "Toifa",
+      "allCategories": "Barcha toifalar",
+      "source": "Manba",
+      "allSources": "Barcha manbalar",
+      "status": "Holat",
+      "allStatuses": "Barcha holatlar"
+    },
+    "list": {
+      "title": "Xarajatlar ro'yxati",
+      "columns": {
+        "date": "Sana",
+        "category": "Toifa",
+        "account": "Hisob",
+        "branch": "Filial",
+        "source": "Manba",
+        "amount": "Summa",
+        "status": "Holat"
+      },
+      "empty": "Bu davrda xarajat yo'q",
+      "emptyHint": "«Xarajat qo'shish» bilan yangi xarajat yozing yoki filtrlarni o'zgartiring.",
+      "cancelledNote": "Bekor qilinganlar jamiga kirmaydi.",
+      "totals": "Xarajatlar jami",
+      "totalPosted": "O'tkazilgan:",
+      "totalPending": "Kutilmoqda:"
+    },
+    "sources": {
+      "bank": "Bank",
+      "card": "Karta",
+      "cash": "Kassa (POS)"
+    },
+    "formSources": {
+      "bank": "Bank hisobi",
+      "card": "Korporativ karta"
+    },
+    "status": {
+      "posted": "O'tkazilgan",
+      "draft": "Qoralama",
+      "awaiting": "Tasdiq kutmoqda",
+      "cancelled": "Bekor qilingan"
+    },
+    "actions": {
+      "post": "O'tkazish",
+      "cancel": "Bekor qilish"
+    },
+    "cancel": {
+      "title": "Xarajatni bekor qilish",
+      "description": "{{category}} — {{amount}}. O'tkazilgan xarajat storno bilan qaytariladi, yozuv saqlanadi."
+    },
+    "notice": {
+      "posted": "Xarajat o'tkazildi.",
+      "postedNumber": "Xarajat o'tkazildi: {{number}}.",
+      "approval": "Summa limitingizdan oshdi — Egasi tasdig'iga yuborildi. Tasdiqlangach xarajat o'tkaziladi.",
+      "draft": "Qoralama saqlandi.",
+      "cancelled": "Xarajat bekor qilindi.",
+      "ruleCreated": "Takrorlanuvchi xarajat qo'shildi."
+    },
+    "form": {
+      "title": "Yangi xarajat",
+      "amount": "Summa",
+      "category": "Toifa",
+      "categoryPlaceholder": "Toifani tanlang",
+      "accountHint": "Buxgalteriya hisobi: {{code}} — {{name}} (toifadan avtomatik)",
+      "taxType": "Soliq turi",
+      "taxTypePlaceholder": "Soliq turini tanlang",
+      "date": "Sana",
+      "branch": "Filial",
+      "branchPlaceholder": "Filialni tanlang",
+      "source": "To'lov manbai",
+      "cashHint": "Naqd xarajat kassada yoziladi: Kassa (POS) → Kassa puli → Xarajat",
+      "comment": "Izoh",
+      "photo": "Hujjat fotosi",
+      "photoHint": "JPEG, PNG yoki PDF, 10 MB gacha",
+      "period": "Takrorlanish davri",
+      "dayOfMonth": "Oyning kuni",
+      "recurringHint": "Har davrning {{day}}-kunida «to'lash vaqti» eslatmasi chiqadi — bir bosishda yoziladi.",
+      "limitHint": "Summa rolingiz xarajat limitidan oshsa — o'tkazishda Egasi tasdig'iga yuboriladi.",
+      "saveDraft": "Qoralama",
+      "savePost": "Saqlash va o'tkazish"
+    },
+    "taxTypes": {
+      "vat": "QQS",
+      "turnover": "Aylanma solig'i"
+    },
+    "periods": {
+      "none": "Takrorlanmaydi",
+      "month": "Har oy",
+      "quarter": "Har chorak",
+      "year": "Har yil"
+    },
+    "reminders": {
+      "label": "To'lash vaqti kelgan xarajatlar",
+      "title": "{{name}} to'lash vaqti — {{amount}}",
+      "meta": "Takrorlanuvchi xarajat · {{period}}, {{day}}-kun · {{source}} · {{branch}}",
+      "later": "Keyinroq",
+      "confirm": "Tasdiqlash va yozish"
+    },
+    "recurring": {
+      "title": "Takrorlanuvchi xarajatlar",
+      "columns": {
+        "name": "Nomi",
+        "amount": "Summa",
+        "period": "Davr",
+        "source": "Manba",
+        "next": "Keyingi to'lov",
+        "active": "Faol",
+        "action": "Amal"
+      },
+      "every": "{{period}}, {{day}}-kun",
+      "due": "To'lash vaqti keldi",
+      "toggle": "{{name}} — faol",
+      "empty": "Takrorlanuvchi xarajat yo'q",
+      "emptyHint": "«Yangi xarajat» formasida takrorlanish davrini tanlang."
+    },
+    "categories": {
+      "title": "Xarajat toifalari",
+      "subtitle": "Toifa buxgalteriya hisobini belgilaydi: 9410 — sotish, 9420 — ma'muriy, 9430 — boshqa operatsion xarajatlar, 6410 — byudjetga to'lov.",
+      "columns": {
+        "name": "Toifa",
+        "account": "Hisob",
+        "state": "Belgi"
+      },
+      "system": "Tizim toifasi",
+      "archived": "Arxivda",
+      "create": "Yangi toifa",
+      "createTitle": "Yangi xarajat toifasi",
+      "renameTitle": "Toifa nomini o'zgartirish",
+      "rename": "Nomini o'zgartirish",
+      "archive": "Arxivlash",
+      "restore": "Arxivdan qaytarish",
+      "name": "Nomi",
+      "account": "Buxgalteriya hisobi",
+      "empty": "Toifa yo'q"
+    }
+  },
+  "bank": {
+    "title": "Bank tushumi tasdig'i",
+    "subtitle": "Yo'ldagi pul (5710) → bank hisobi (5110), komissiya → xarajat · Hujjat kodi BT",
+    "offline": "Internet yo'q — faqat ko'rish. Yaratish, import va o'tkazish internet bilan ishlaydi.",
+    "filters": {
+      "branch": "Filial",
+      "allBranches": "Barcha filiallar",
+      "method": "Usul",
+      "status": "Holat",
+      "all": "Hammasi",
+      "from": "Davr (dan)",
+      "to": "Davr (gacha)"
+    },
+    "actions": {
+      "import": "Ko'chirmani yuklash",
+      "new": "Yangi",
+      "save": "Saqlash",
+      "post": "O'tkazish",
+      "cancel": "Bekor qilish"
+    },
+    "methods": {
+      "card": "Karta",
+      "uzqr": "UzQR",
+      "click": "Click",
+      "payme": "Payme",
+      "uzum": "Uzum",
+      "collection": "Inkassa"
+    },
+    "transitRows": {
+      "card": "Karta",
+      "card_integrated": "Karta (integratsiyalangan)",
+      "card_manual": "Karta (terminalsiz)",
+      "uzqr": "UzQR",
+      "click": "Click",
+      "payme": "Payme",
+      "uzum": "Uzum",
+      "collection": "Inkassa"
+    },
+    "status": {
+      "draft": "Qoralama",
+      "posted": "O'tkazilgan",
+      "cancelled": "Bekor qilingan"
+    },
+    "transit": {
+      "title": "Yo'ldagi pul — bankka o'tmagan (5710)",
+      "subtitle": "so'm",
+      "asOf": "{{date}} holatiga · so'm",
+      "method": "To'lov usuli",
+      "total": "Jami",
+      "oldest": "eng eskisi {{date}}",
+      "empty": "Yo'ldagi pul yo'q — hamma tushum bankka o'tgan",
+      "error": "Yo'ldagi pul qoldig'ini yuklab bo'lmadi"
+    },
+    "list": {
+      "title": "Bank tushumi hujjatlari",
+      "formula": "Sof = Yalpi − Komissiya + Farq",
+      "columns": {
+        "date": "Sana",
+        "number": "Raqam",
+        "method": "Usul · filial",
+        "period": "Davr",
+        "gross": "Yalpi",
+        "commission": "Komissiya",
+        "variance": "Farq",
+        "net": "Sof",
+        "status": "Holat"
+      },
+      "noNumber": "raqamsiz",
+      "imported": "Importdan",
+      "empty": "Hujjat yo'q",
+      "emptyHint": "Bank ko'chirmasi kelganda yangi hujjat yarating yoki ko'chirmani yuklang.",
+      "postedTotal": "O'tkazilgan jami",
+      "postedTotalCount": "O'tkazilgan jami · {{count}} ta hujjat"
+    },
+    "form": {
+      "newTitle": "Yangi bank tushumi",
+      "numberOnPost": "Raqam o'tkazilganda beriladi: BT-…",
+      "branch": "Filial",
+      "branchPlaceholder": "Filialni tanlang",
+      "docDate": "Bankka tushgan sana",
+      "method": "To'lov usuli",
+      "methodPlaceholder": "Usulni tanlang",
+      "bankRef": "Bank hujjati raqami",
+      "settledFrom": "Davr boshi",
+      "settledTo": "Davr oxiri",
+      "gross": "Yalpi summa (yo'ldagi puldan yopiladi)",
+      "available": "Yo'ldagi pul qoldig'i: {{amount}}",
+      "useAvailable": "Qoldiqni qo'yish",
+      "exceedsTransit": "Summa yo'ldagi pul qoldig'idan katta — mavjud: {{amount}}",
+      "commission": "Komissiya ({{account}})",
+      "commissionPct": "Yalpidan {{pct}}%",
+      "variance": "Farq (inkassa)",
+      "varianceHint": "Faqat Inkassa usulida: manfiy — kamomad, musbat — ortiqcha",
+      "net": "Bankka tushgan (sof)",
+      "netFormula": "{{gross}} − {{commission}} + {{variance}}",
+      "attachment": "Ko'chirma fayli",
+      "attachmentHint": "PDF, XLSX, CSV, TXT, JPEG yoki PNG, 10 MB gacha",
+      "comment": "Izoh",
+      "preview": "Provodkalar (oldindan ko'rish)",
+      "lines": "Provodkalar",
+      "amount": "Summa",
+      "storno": "Storno",
+      "postedAt": "O'tkazilgan",
+      "cancelledAt": "Bekor qilingan",
+      "cancelReason": "Bekor qilish sababi"
+    },
+    "post": {
+      "title": "Hujjatni o'tkazasizmi?",
+      "description": "Bank hisobiga {{net}} o'tkaziladi, komissiya {{commission}} xarajatga yoziladi."
+    },
+    "cancel": {
+      "title": "Bank tushumini bekor qilish",
+      "draft": "Qoralama bekor qilinadi.",
+      "posted": "Storno yoziladi — yo'ldagi pul qoldig'i qaytadi."
+    },
+    "import": {
+      "title": "Bank ko'chirmasini yuklash",
+      "description": "1CClientBankExchange formatidagi .txt fayl. Kirim qatorlaridan qoralamalar taklif qilinadi — o'tkazish odatdagidek qo'lda.",
+      "drop": "Ko'chirma faylini shu yerga tashlang",
+      "submit": "Yuklash",
+      "fileRequired": "Faylni tanlang",
+      "invalidFile": "Fayl 1CClientBankExchange formatida emas ({{line}}-qator).",
+      "branch": "Filial",
+      "branchHint": "Fayldan aniqlanmasa shu filial olinadi",
+      "branchAuto": "Fayldan aniqlash",
+      "summary": "Ko'chirma yuklandi: {{drafts}} ta qoralama yaratildi · {{duplicates}} ta dublikat o'tkazib yuborildi · {{unmatched}} ta qator mos kelmadi · {{ignored}} ta chiqim qatori e'tiborsiz qoldirildi",
+      "showDrafts": "Qoralamalarni ko'rish",
+      "showUnmatched": "Mos kelmaganlar ({{count}})",
+      "unmatchedTitle": "Mos kelmagan qatorlar ({{count}})",
+      "cardTitle": "Ekvayer reyestrida topilmagan karta to'lovlari ({{count}})",
+      "unmatchedHint": "Bu qatorlar qoralama yaratmadi — kerak bo'lsa qo'lda «Yangi» bilan kiriting.",
+      "reasons": {
+        "no_transit_match": "Yo'ldagi pulda mos tushum topilmadi",
+        "unknown_method": "To'lovchi (usul) aniqlanmadi",
+        "branch_ambiguous": "Filial aniqlanmadi",
+        "commission_invalid": "Komissiya noto'g'ri chiqdi"
+      }
+    }
+  },
+  "reasons": {
+    "shift_closed": "Smena yopilgan — naqd hujjatni bekor qilib bo'lmaydi"
   }
 }

@@ -326,6 +326,11 @@ def parse_endpoints() -> list[Ep]:
             ps = paths_in(" ".join(re.findall(r"`([^`]*)`", content[:800])))[:2]
         if not ps:
             continue
+        explicit = re.search(r"<!--\s*19#(\d+[a-z])\s*-->", h)  # later additions keep the numbering stable
+        if explicit:
+            title = re.sub(r"\s*<!--.*?-->", "", h[4:])
+            eps.append(Ep(f"19#{explicit.group(1)}", clean(title, 90), ps, [], f"19 §{sec}"))
+            continue
         n += 1
         eps.append(Ep(f"19#{n}", clean(h[4:], 90), ps, [], f"19 §{sec}"))
 
@@ -520,8 +525,7 @@ MANUAL: dict[str, tuple[str, str]] = {
     "B0-DoD-11": (BLOCKED, "protsedura tayyor: `backend/ops/backup/staging-restore.sh`, `verify-restore.sql`, `RUNBOOK-backup-restore.md` (staging restore bo'limi); bajarish UzCloud hisobi, bucket'lar va kalitlardan keyin — asoschi (G-09)"),
     # ekranlar
     "B0-SCR-BO-01": (DONE, "`web/apps/shell/src/pages/login/` + AS sahifasi `backend/app/modules/auth/api/login_page.py` (BO-01 maketi va 07 ga moslandi: aria-invalid, 'Parolni unutdim?', ro'yxatdan o'tish havolasi, logo — G-06); test: `e2e/login.spec.ts`, `e2e/session.spec.ts`, `tests/unit/test_login_page.py::test_bo01_fields_and_links`, `::test_error_marks_fields_invalid_without_revealing_which`"),
-    "B4-SCR-BO-02": (PART, "maket-skelet `web/packages/pages/reports/src/pages/dashboard/` (qiymatlar '—'), test `model.test.ts`; `GET /reports/dashboard` yo'q"),
-    "B5-SCR-BO-02": (PART, "skelet bor (B4 qatoriga qarang)"),
+    "B5-SCR-BO-02": (PART, "B4 da `/reports/dashboard` bilan qurilgan (B4 qatoriga qarang); B5 ulushi — fiskal/e-faktura ogohlantirishlari"),
     # endpointlar (14 §20 — yo'l bo'yicha kalit)
     "B0-EP-14:/oauth/revoke": (DONE, "kod: `auth/api/oauth.py`, `auth/application/revocation.py` (refresh → oila + jonli access tokenlar, access → `jti`); test: `test_oauth.py::test_revoke_and_introspect`, `test_auth_revocation_and_switch.py::test_oauth_revoke_refresh_kills_live_access_token_of_its_family`, `::test_oauth_revoke_access_token_by_jti_keeps_the_family`, `::test_oauth_revoke_reuse_detection_kills_every_access_token_of_the_family`"),
     "B0-EP-14:/oauth/authorize": (DONE, "kod: `auth/api/oauth.py`, `auth/api/login_page.py`; test: `test_oauth.py`, `tests/unit/test_login_page.py` (BO-01 ko'rinishi — G-06)"),
@@ -689,6 +693,83 @@ MANUAL: dict[str, tuple[str, str]] = {
     "B3-TBL-app.card_terminal_settlements": (DONE, "DDL 0018; kod `integrations/card_terminal/application/settlements.py`, `infrastructure/sql.py`, smena yopishda `cash/application/shifts.py`; test (API orqali): `test_card_terminals.py::test_qt_m16_08_settlement_mismatch_and_matched`, `test_shifts_events.py::test_qt_m16_05_*`"),
     "B3-QT-PERM-07": (DONE, "test: `backend/tests/integration/test_approvals_requests.py` :: `test_approve_pin_step_up_and_qt_perm_07_single_use` (tasdiqlangan so'rov hujjatda bir marta ishlatiladi)"),
     "B5-QT-M01-13": (PART, "B3 qismi — posting tomoni: `test_sales_posting.py::test_qt_m01_13_dynamic_uzqr_needs_confirmed_checkout` (`PAYMENT_NOT_CONFIRMED`, tasdiqlangan checkout bir marta `consumed`); qolgani — `/payments/checkouts`, webhook `provider_tx_id` idempotentligi, POS «to'lov kutilmoqda» holati (B5, D4)"),
+    # ---- Bosqich 4 (Opus: 6 backend + 3 veb agent; R1 buxgalteriya / R2 xavfsizlik-offline / R3 veb → qabul agenti → tuzatishlar)
+    "B4-T01": (DONE, "`debts/` (`application/{payments,quick_customer,documents,ledger,daily_check,open_docs}.py`, `api/debt_docs.py`), `app/shared/debt_allocation.py` + TS `@shared/lib/debt-allocation` + `shared/debt-allocation-vectors.json` (17 vektor), `sync/infrastructure/pull_sql.py` `customers.open_debt_docs[]`, `@shared/offline` `repos/debts.ts`; veb BO-06, POS-06/13; test: `test_debt_{payments,documents,ledger,sync,sales,week_scenario,crosschecks}.py`, `test_b4fix_debts.py`, `tests/unit/test_debt_allocation.py`, `debt-allocation.test.ts`, `debts.test.ts`, e2e `debts-*.spec.ts`"),
+    "B4-T02": (DONE, "`debts/application/documents.py` (hisobdan chiqarish 9430/4910, `debt_writeoff_allocations`, shubhali belgisi — provodkasiz, faqat Egasi); test: `test_debt_documents.py::test_qt_m08_13_*`, `::test_writeoff_4910_*`, `::test_writeoff_cancel_*`, `::test_doubtful_flag_owner_only_no_posting`; veb BO-06 `features/{debt-writeoff,doubtful-flag}`"),
+    "B4-T03": (DONE, "`purchasing/{domain,application,infrastructure,api}/supplier_payments*` (bank `Kt 5110`, kassadan naqd `Kt 5010` + `cash_moves`, eng eskisidan allokatsiya, qizil faktura QQS krediti to'lovda, avans 4310); test: `test_supplier_payments.py` (QT-M07-05, QT-M08-11/14, ACC-03/05), `tests/unit/test_supplier_payments_domain.py`, `test_b4fix_supplier_tax.py`; veb BO-04 «Yetkazib beruvchiga to'lov» + «Men qarzdorman», e2e `fin-supplier-payments.spec.ts`, `debts-payables.spec.ts`"),
+    "B4-T04": (DONE, "`expenses/` (xarajat, toifa, takrorlanuvchi qoida + 09:00 eslatma, `expense.created`, `expenses.approve` limiti → BO-16), `attachments/` (`POST/GET /attachments`, imzoli yuklab olish); sof foyda — `reports/` P&L; test: `test_expenses.py`, `test_expense_categories.py`, `test_recurring_expenses.py`, `test_attachments.py`, `tests/unit/test_expense_domain.py`; veb BO-17, POS-14 «Xarajat», e2e `fin-expenses.spec.ts`, `fin-pos-expense.spec.ts`"),
+    "B4-T05": (DONE, "`cash/application/bank_settlements.py` (`BankSettlementPostingService`, 5710 → 5110 + komissiya 9430/inkassa 9410, kamomad 5910/ortiqcha 9390, filial × usul qoldig'i chegarasi), `BT` raqami; test: `test_bank_settlements.py::test_qt_m11_07_*`, `::test_qt_m11_13_*`, `::test_qt_m11_15_*`, `tests/unit/test_bank_domain.py::test_13_2_18a_card_example_lines`; veb BO-24, e2e `fin-bank.spec.ts`"),
+    "B4-T06": (DONE, "`cash/domain/bank_statement.py` (1CClientBankExchange, cp1251/UTF-8), `application/bank_import.py` (qoralamalar, `source='statement_import'`, rrn/summa-sana moslashtirish, tenant advisory lock), `transit-balances`; test: `test_bank_settlements.py::test_qt_m11_09/10/11_*`, `::test_sync04_concurrent_imports_serialize`, `tests/unit/test_bank_domain.py::test_parse_*`; namuna — sintetik `tests/fixtures/bank/` (pilot buxgalter namunasi — asoschi)"),
+    "B4-T07": (DONE, "`vat/application/tax_settlements.py` (`ST`, `vat_offset` = Σ input `vat_moves`, aylanma solig'i 9430/9820, rejim almashgan oy), `vat.turnover_figure`; test: `test_tax_settlements.py` (QT-M10-07, `test_13_2_26_*`, `test_13_4_3_*`, `test_acc06_*`); veb BO-07 «Soliq hisob-kitobi (ST)», e2e `fin-tax-settlement.spec.ts`"),
+    "B4-T08": (DONE, "mijoz: `debts/application/payments.py` (online/REST ortiqcha → `debt_payment_exceeds_balance`, hisobdan chiqarilgan qarzga to'lov `Kt 9390`, offline ortiqcha `Kt 6310`); yetkazib beruvchi: `supplier_overpay_policy` (qaror #47) — `warn` → 4310, `block` → 422; test: `test_debt_payments.py::test_qt_m08_15_*`, `::test_qt_m08_18_*`, `test_debt_documents.py::test_b4_t08_payment_of_written_off_debt_goes_to_9390`, `test_supplier_payments.py::test_qaror_47_overpay_blocked_by_policy`, `::test_13_2_16_overpay_becomes_advance_and_offsets_next_receipt`"),
+    "B4-T09": (DONE, "`reports/` (o'qish moduli: dashboard, sales, top-products, stock, profit-and-loss, discounts, `daily_summary()`); test: `test_reports_{sales,finance,stock,daily_summary,alerts}.py`, `tests/unit/test_reports_domain.py`; veb BO-02/BO-09, e2e `rep-dashboard.spec.ts`, `rep-center.spec.ts`"),
+    "B4-T10": (DONE, "`notifications/` (`TelegramPort` + httpx bot + fake, Redis bir martalik kod, webhook `secret_token`, sozlamalar, jurnal, outbox yuboruvchi — backoff/qayta urinish, kunlik hisobot, M18 ogohlantirishlari, yaroqlilik muddati), auth bloklash hook; test: `test_telegram_links.py`, `test_telegram_notifications.py`, `tests/unit/test_notifications_telegram.py`; veb BO-20, e2e `rep-telegram.spec.ts`"),
+    "B4-T11": (DONE, "filial + jami: `/reports/dashboard` `by_branch`, `/reports/stock` filial ustunlari (WEB-10), `/reports/sales`; kam qoldiq — inventar kunlik hodisasi + Telegram yetkazish; test: `test_reports_stock.py::test_qt_m04_03_*`, `test_reports_sales.py::test_qt_m14_01_*`, `test_reports_alerts.py::test_low_stock_dashboard_alert_follows_min_stock`, `test_telegram_notifications.py::test_qt_m18_06_and_qt_m04_02_*`; veb BO-02/BO-03 «Barchasi», e2e `warehouse-stock.spec.ts`, `rep-dashboard.spec.ts`"),
+    "B4-DoD-01": (DONE, "QT-M08-01…18 — `test_debt_*.py`, `test_b4fix_debts.py`, `test_supplier_payments.py::test_qt_m08_14_*` va `test_debt_ledger.py::test_qt_m08_14_payable_ledger_men_qarzdorman` (pastdagi QT qatorlari)"),
+    "B4-DoD-02": (BLOCKED, "avtomatlashtirilgan qismi ✅: `test_debt_week_scenario.py::test_b4_dod_02_one_week_debt_book` (demo tenant, 7 kun, har kun Σ`debt_balances` = 4010, ochiq hujjatlar = balans); staging'da ichki demo-tenant bilan bir haftalik real ssenariy — asoschi (staging muhiti)"),
+    "B4-DoD-03": (DONE, "`test_bank_settlements.py::test_b4_dod_03_fixture_statement_closes_transit_to_zero` (karta va inkassa 5710 → 0) — sintetik anonimlashtirilgan namuna `tests/fixtures/bank/`; pilot buxgalterning haqiqiy namunasi bilan qayta tekshirish — asoschi"),
+    "B4-DoD-04": (DONE, "QT-M08-03 `test_debt_sales.py`, QT-M08-16/17 `test_debt_payments.py`, ochiq hujjatlarni balansga moslashtirish `test_b4fix_debts.py::test_acc02_*`, qurilma tomoni `@shared/offline` `debts.test.ts`"),
+    "B4-DoD-05": (DONE, "`test_tax_settlements.py::test_qt_m10_07_vat_offset_then_tax_payment` (6410/4410 84000, soliq to'lovi 6410/5110 36000 → 6410 = 0)"),
+    "B4-DoD-06": (DONE, "§2.13 `test_qt_m08_10_*`, `test_13_2_13_payable_opening_and_cancel`; §2.14 `test_qt_m08_06/07/17_*`; §2.15/2.15a `test_qt_m08_13_*`, `test_writeoff_4910_*`; §2.16 `test_13_2_16_*`, `test_qt_m07_05_*`; §2.17 `test_13_2_17_*`, `test_qt_m15_01/06_*`; §2.18a `test_13_2_18a_card_example_lines`, `test_qt_m11_07/13_*`; §2.26 `test_qt_m10_07_*`, `test_13_2_26_*`; §4.3 `test_13_4_3_*`, `test_acc06_*`"),
+    "B4-US-M03-03": (DONE, "`GET /reports/discounts` (20 §19a); test: `test_reports_finance.py::test_qt_m03_03_discounts_and_lost_margin`; veb BO-09 «Chegirmalar va marja», e2e `rep-center.spec.ts`"),
+    "B4-US-M04-02": (DONE, "voqea — inventar kunlik `low_stock` (B2), yetkazish — Telegram yuboruvchi (Menejerga, sozlama bo'yicha); test: `test_inventory_notifications.py::test_qt_m04_02_*`, `test_telegram_notifications.py::test_qt_m18_06_and_qt_m04_02_low_stock_toggle_and_manager_delivery`, dashboard `test_low_stock_dashboard_alert_follows_min_stock`"),
+    "B4-US-M04-03": (DONE, "`GET /reports/stock` (filial × jami); test: `test_reports_stock.py::test_qt_m04_03_*`; veb BO-03 «Barcha filiallar», e2e `warehouse-stock.spec.ts`, `rep-center.spec.ts`"),
+    "B4-US-M07-04": (DONE, "`POST /supplier-payments` (bank/naqd, QQS krediti to'lovda); test: `test_supplier_payments.py::test_qt_m07_05_*`; veb BO-04, e2e `fin-supplier-payments.spec.ts`"),
+    "B4-US-M08-01": (DONE, "nasiya sotuv limit bilan (B3 `sale_posting._check_credit`) + POS-06/POS-03 nasiya paneli; test: `test_debt_sales.py` (QT-M08-01/02/03), `debt-book/model/model.test.ts`, e2e `debts-pos-credit.spec.ts`"),
+    "B4-US-M08-02": (DONE, "limit o'zgarishi darhol va pull delta orqali kassalarga; test: `test_debt_sync.py::test_pull_customers_open_debt_docs_and_qt_m08_04_limit_delta`, `test_counterparties.py`; veb BO-06 «Mijoz kartasi»"),
+    "B4-US-M08-04": (DONE, "POS `debt_payment.created` (naqd/karta/UzQR, `debt_settlement` cheki, eng eskisidan), back-office faqat `bank`; test: `test_debt_payments.py` (QT-M08-06/07/11/15/16/17/18), `test_b4fix_debts.py::test_acc01_*`, `::test_sync03_*`; veb POS-13, BO-06 bank to'lovi, e2e `debts-pos-book.spec.ts`, `debts-bo06.spec.ts`"),
+    "B4-US-M08-05": (DONE, "tezkor mijoz `counterparty.created` (offline) + nasiya bir push'da; test: `test_debt_sync.py::test_qt_m08_08_quick_customer_and_debt_sale_in_one_push`, `debts.test.ts` «QT-M08-08», e2e `debts-pos-credit.spec.ts`"),
+    "B4-US-M08-06": (DONE, "`GET /counterparties/{id}/debt-ledger` (qog'oz daftar ko'rinishi, ikki yo'nalish, filial doirasi); test: `test_debt_ledger.py::test_qt_m08_09_*`, `test_b4fix_debts.py::test_sec01_*`; veb BO-06 daftar, POS-13 qatorlari"),
+    "B4-US-M08-07": (DONE, "`/debt-openings` (yangi mijoz bilan ham), BO-21 ④ jadval/Excel; test: `test_debt_documents.py` (QT-M08-10, `test_13_2_13_*`), `billing/features/opening-debts` vitest (`test_web04_dot_thousands_paste`), e2e `debts-bo06.spec.ts`"),
+    "B4-US-M08-09": (DONE, "va'da sanasi + kunlik `debt_due_today` (shablon eslatma, odam tasdiqlaydi; AI-06 — B6); test: `test_debt_ledger.py` (QT-M08-05), `test_debt_week_scenario.py`; veb BO-06 «Bugun/o'tgan va'da»"),
+    "B4-US-M08-10": (DONE, "`GET /reports/debts-aging` (0-30/31-60/60+, yagona «muddati o'tgan» ta'rifi — 20 #21); test: `test_debt_ledger.py::test_us_m08_10_*`, `::test_aging_limit_exceeded_offline_rows`, QT-M08-12; veb BO-06 KPI/tablar, BO-09"),
+    "B4-US-M08-11": (DONE, "«Men qarzdorman» — payable daftar va yosh guruhlari; test: `test_debt_ledger.py::test_qt_m08_14_payable_ledger_men_qarzdorman`, `test_supplier_payments.py::test_qt_m08_14_*`; veb BO-04 «Men qarzdorman», e2e `debts-payables.spec.ts`"),
+    "B4-US-M11-04": (DONE, "BO-24 + `/bank-settlements` (B4-T05/T06); test: `test_bank_settlements.py` (QT-M11-07…15), e2e `fin-bank.spec.ts`"),
+    "B4-US-M12-01": (DONE, "`GET /reports/sales` (filial/kun/kassir); test: `test_reports_sales.py::test_qt_m12_01_*`, `::test_qt_m12_04_*`; veb BO-09, e2e `rep-center.spec.ts`"),
+    "B4-US-M12-02": (DONE, "`GET /reports/top-products`; test: `test_reports_sales.py::test_qt_m12_02_*`; veb BO-09"),
+    "B4-US-M14-01": (DONE, "`GET /reports/dashboard` `by_branch` + jami; test: `test_reports_sales.py::test_qt_m14_01_dashboard_each_branch_and_total`; veb BO-02, e2e `rep-dashboard.spec.ts`"),
+    "B4-US-M15-01": (DONE, "BO-17 + POS-14 «Xarajat» + chek surati (`/attachments`); test: `test_expenses.py` (QT-M15-01/04/05/06), `test_attachments.py`; e2e `fin-expenses.spec.ts`, `fin-pos-expense.spec.ts`"),
+    "B4-US-M15-02": (DONE, "takrorlanuvchi qoidalar + eslatma + bir bosishda tasdiq; test: `test_recurring_expenses.py::test_qt_m15_02_*`; veb BO-17 «Takrorlanuvchi»"),
+    "B4-US-M15-03": (DONE, "`GET /reports/profit-and-loss`, dashboard sof foyda; test: `test_reports_finance.py::test_qt_m15_03_*`; veb BO-02/BO-09"),
+    "B4-US-M18-01": (DONE, "`/notifications/telegram/link-start|status|link`, webhook; test: `test_telegram_links.py::test_qt_m18_01_*`, `::test_qt_m18_05_*`; veb BO-20, e2e `rep-telegram.spec.ts`"),
+    "B4-US-M18-02": (DONE, "kunlik hisobot (foydalanuvchi vaqti, standart 21:00, `reports.daily_summary`); test: `test_telegram_notifications.py::test_qt_m18_02_*`"),
+    "B4-US-M18-03": (DONE, "darhol ogohlantirishlar (kassa farqi, limit, 48 soat …) sozlama va filial doirasi bilan; test: `test_telegram_notifications.py::test_qt_m18_03_*`, `::test_qt_m18_06_*`, `tests/unit/test_notifications_telegram.py`"),
+    # endpointlar (avtomatik topilmaganlari: voqealar va f-string yo'llar)
+    "B4-EP-18#18": (DONE, "voqea: `debts/application/quick_customer.py` (`debts.wiring.sync_handlers`); test: `test_debt_sync.py::test_qt_m08_08_quick_customer_and_debt_sale_in_one_push`"),
+    "B4-EP-18#21": (DONE, "voqea: `debts/application/payments.py::DebtPaymentHandler`; test: `test_debt_payments.py`, `test_debt_sync.py::test_debt_payment_validation_rules`, `test_b4fix_debts.py::test_sync03_*`"),
+    "B4-EP-18#29": (DONE, "kod: `debts/api/debt_docs.py` (`reports_router`); test: `test_debt_ledger.py::test_us_m08_10_*`, `test_b4fix_debts.py::test_sec01_aging_and_ledger_respect_branch_scope`"),
+    "B4-EP-18#31": (DONE, "voqea: `expenses/application/sync_events.py`; test: `test_expenses.py::test_18_13_2_*`, `::test_18_31_expense_created_handler_is_registered_with_sync`, `::test_sync02_*`"),
+    "B4-EP-19#51": (DONE, "kod: `purchasing/api/supplier_payments.py`; test: `test_supplier_payments.py::test_cash_payment_cancel_in_open_shift_storno`, `::test_acc03_cancel_refused_when_advance_consumed_by_receipt`"),
+    "B4-EP-19#51b": (DONE, "kod: `purchasing/api/supplier_payments.py`; test: `test_supplier_payments.py::test_qt_m08_11_payment_allocated_oldest_first` (`/open-documents`)"),
+    "B4-EP-20#8c": (DONE, "kod: `vat/api/tax_settlements.py`; test: `test_tax_settlements.py::test_qt_m10_07_*`, `::test_13_4_3_*`"),
+    "B4-EP-20#8d": (DONE, "kod: `vat/api/tax_settlements.py`; test: `test_tax_settlements.py::test_vat_offset_unique_per_period_and_cancel_storno`"),
+    "B4-EP-20#21": (DONE, "kod: `debts/api/debt_docs.py` (`reports_get_debts_aging`); test: `test_debt_ledger.py::test_us_m08_10_*`, `test_b4fix_debts.py::test_acc02_ledger_and_aging_show_reconciled_open_amounts`"),
+    "B4-EP-20#47": (DONE, "kod: `expenses/api/router.py`; test: `test_expense_categories.py` (PATCH versiya, arxiv, 94xx ↔ 6410 taqiq)"),
+    "B4-EP-20#50": (DONE, "kod: `expenses/api/router.py`; test: `test_recurring_expenses.py::test_rule_validation_patch_and_inactive`"),
+    "B4-EP-20#55b": (DONE, "kod: `cash/api/bank_settlements.py`; test: `test_bank_settlements.py::test_qt_m11_09_transit_balances`"),
+    "B4-EP-20#55e": (DONE, "kod: `cash/api/bank_settlements.py`; test: `test_bank_settlements.py::test_qt_m11_07_*`, `::test_qt_m11_13_*`, `::test_qt_m11_15_*`"),
+    "B4-EP-20#55f": (DONE, "kod: `cash/api/bank_settlements.py`; test: `test_bank_settlements.py::test_qt_m11_07_*` (storno), `::test_qt_m11_15_*`"),
+    # ekranlar
+    "B4-SCR-BO-02": (DONE, "`pages/reports/src/pages/dashboard` (`/reports/dashboard`: KPI, 7 kunlik grafik — recharts, «Diqqat talab qiladi», filial + jami, sinxronlanmagan ogohlantirish); test: `dashboard/model/model.test.ts`, e2e `rep-dashboard.spec.ts`"),
+    "B4-SCR-BO-03": (DONE, "B4 qismi: «Barcha filiallar» konsolidatsiyasi va qatorlar `GET /reports/stock` dan (WEB-10 — mahsulot kartalari so'ralmaydi); test: `pages/stock/model/*.test.ts`, e2e `warehouse-stock.spec.ts`. Eksport — Bosqich 6 (20 #22/#23)"),
+    "B4-SCR-BO-04": (DONE, "B4 qismi: «Yetkazib beruvchiga to'lov» (`warehouse/features/supplier-payments`) va «Men qarzdorman» (`features/payables`); test: vitest, e2e `fin-supplier-payments.spec.ts`, `debts-payables.spec.ts`"),
+    "B4-SCR-BO-06": (DONE, "`pages/debts` (yosh guruhlari, tablar, daftar, bank to'lovi, boshlang'ich qarz, hisobdan chiqarish, shubhali, ortiqcha to'lovlar — «Qaytarish» 6310; `?counterparty=`); test: `debtors/model/model.test.ts`, `features/overpayments/model/model.test.ts`, e2e `debts-bo06.spec.ts`. «Keyingi qarzga hisoblash» — B5 (`ledger_adjustments`)"),
+    "B4-SCR-BO-09": (DONE, "`pages/reports/src/pages/center` (savdo, top-tovarlar, qoldiq, P&L, chegirmalar va marja, qarz yoshi + B3 kassa/QQS); test: `center/model/model.test.ts`, e2e `rep-center.spec.ts`. PDF/Excel eksport — Bosqich 6"),
+    "B4-SCR-BO-12": (DONE, "07 BO-12 da B4 ga xos ko'rsatkich yo'q; filial bo'yicha konsolidatsiya (US-M14-01) BO-02/BO-03/BO-09 da — `test_qt_m14_01_*`, e2e `rep-dashboard.spec.ts`; B3 qismi — B3 qatorida"),
+    "B4-SCR-BO-16": (DONE, "B4 qismi: `expense_over_limit` va qarz turlari kartalari (toifa, manba, sana, sabab), tasdiq BO-16 da xarajatni o'tkazadi; test: `approvals` model testlari, `test_expenses.py::test_accountant_without_expenses_approve_needs_approval_bo16_approve_posts`"),
+    "B4-SCR-BO-17": (DONE, "`pages/finance/src/pages/expenses` (ro'yxat + KPI, «Yangi xarajat» — chek surati, soliq turi `vat|turnover`, 202 tasdiq, bekor qilish, takrorlanuvchi, toifalar); test: vitest (9), e2e `fin-expenses.spec.ts`. «Oylar kesimida» grafigi — Bosqich 6"),
+    "B4-SCR-BO-20": (DONE, "`pages/settings/src/pages/telegram` (ulash kodi + holat, uzish, tur bo'yicha sozlamalar, kunlik hisobot vaqti, jurnal); test: `telegram/model/model.test.ts`, e2e `rep-telegram.spec.ts`"),
+    "B4-SCR-BO-21": (DONE, "B4 qismi — ④ «Boshlang'ich qarzlar» (`billing/features/opening-debts`: jadval/Excel paste → `/debt-openings`); test: `opening-debts` vitest (paste, `test_web04_dot_thousands_paste`, create→post, `go_live_date_missing`)"),
+    "B4-SCR-BO-24": (DONE, "`pages/finance/src/pages/bank-settlements` (5710 tranzit filial × usul, ro'yxat, qoralama/PATCH versiya, o'tkazish, bekor qilish, ko'chirma importi va moslanmagan qatorlar); test: vitest (7), e2e `fin-bank.spec.ts`"),
+    "B4-SCR-POS-03": (DONE, "B4 qismi — nasiya paneli (`DebtSalePanel`: tezkor mijoz, limit — oxirgi sinxron balans + yuborilmagan nasiya, offline tasdiq); test: `debt-book/model/model.test.ts`, `sale/ui/touch-size.test.tsx`, e2e `debts-pos-credit.spec.ts`"),
+    "B4-SCR-POS-06": (DONE, "`/pos/sale/credit` (`CreditSaleDialog`, `features/debt-customer`); test: vitest, e2e `debts-pos-credit.spec.ts`"),
+    "B4-SCR-POS-13": (DONE, "`pages/pos/src/pages/debt-book` (offline allokatsiya `@shared/lib/debt-allocation`, chek qatorlari, ortiqcha to'lov, naqd/karta/UzQR, F-tugmalar karta urinishida qulf); test: `debt-book/model/model.test.ts`, e2e `debts-pos-book.spec.ts`, `pos-debt-card-keys.spec.ts`. Click/Payme/Uzum — B5 (dinamik checkout)"),
+    "B4-SCR-POS-14": (DONE, "B4 qismi — «Xarajat» rejimi (`expense.created`, `cash.withdraw` limiti → PIN tasdiq, offline toifalar keshi) va «Qarz to'lovlari (naqd)» qatori (`localShiftTotals`); test: vitest, `localShiftTotals.debt-payment.test.ts`, e2e `fin-pos-expense.spec.ts`, `pos-ops-cash.spec.ts`"),
+    # jadvallar (test fayllari jadval nomini to'g'ridan-to'g'ri ishlatmaydi)
+    "B4-TBL-app.debt_writeoffs": (DONE, "DDL 0017; kod `debts/infrastructure/docs_sql.py`; test: `test_debt_documents.py::test_qt_m08_13_*`, `test_returns_posting.py::test_acc04_*`"),
+    "B4-TBL-app.debt_writeoff_allocations": (DONE, "DDL 0027b (12 §2.6, RLS); kod `debts/infrastructure/docs_sql.py`, `returns_sql.written_off_of_sale`; test: `test_debt_documents.py`, `test_debt_crosschecks.py`, `test_returns_posting.py::test_acc04_return_of_written_off_sale_refused`"),
+    "B4-TBL-app.tax_settlements": (DONE, "DDL 0018; kod `vat/infrastructure/tax_settlements_sql.py`; test: `test_tax_settlements.py`"),
+    "B4-TBL-app.notification_settings": (DONE, "DDL 0023; kod `notifications/infrastructure/notifications_sql.py`; test: `test_telegram_links.py::test_ep_69_70_settings_defaults_update_and_validation`, `test_telegram_notifications.py::test_qt_m18_06_*`"),
 }
 
 # Endpoint → bosqich: matn bo'yicha topilmaganlar yoki spec matni noaniq bo'lganlar (manba ko'rsatilgan).
@@ -785,6 +866,7 @@ TBL_STAGE_OVERRIDE: dict[str, tuple[str, str]] = {
     "app.products": ("1", "27 B1: M09 tovarlar"),
     "app.einvoices": ("5", "27 B5: e-faktura (B2 dagi `factura_type` — faqat ustun)"),
     "app.tax_settlements": ("4", "27 B4: `tax_settlements`"),
+    "app.debt_writeoff_allocations": ("4", "27 B4: `debt_writeoffs` (hisobdan chiqarish allokatsiyasi, 0027b)"),
     "app.product_categories": ("1", "27 B1: M09 katalog"),
     "app.counterparties": ("2", "27 B2: yetkazib beruvchilar (M07); mijozlar — B4"),
     "app.debt_doubtful_flags": ("4", "27 B4: `debt-doubtful-flags`"),
@@ -881,8 +963,8 @@ DEFERRED = [
 DEFERRED_B2 = [
     ("ACC-07", "Kirim qatori summasi 4 kasrli birlik narxdan qayta hisoblanadi — katta miqdorda EHF qator summasi/QQS tiyingacha mos kelmasligi mumkin", "5", "`from-einvoice` bilan qator `net_amount`/`vat_amount` asosiy qilib qabul qilinadi"),
     ("ACC-09", "`moved_at = posted_at`, `entry_date = doc_date`: o'tgan sanali kirim davr oxiridagi qoldiq hisobotida ko'rinmaydi", "5", "davr yopish tayyorligi: GL `inv_acct` ↔ Σ `stock_balances.value` tekshiruvi va `doc_date` bo'yicha qoldiq hisoboti"),
-    ("WEB-10", "Qoldiq qatorlari uchun mahsulot kartalari alohida so'raladi (veb qismida cheklov va navbat qo'yildi)", "4", "`/stock-balances` ga birlik/kategoriya/shtrix-kod/markirovka maydonlari — `GET /reports/stock` bilan"),
-    ("—", "BO-03 «Barchasi» (konsolidatsiya), eksport", "4", "`/reports/stock`, eksport ishlari — M12"),
+    ("WEB-10", "Qoldiq qatorlari uchun mahsulot kartalari alohida so'raladi (veb qismida cheklov va navbat qo'yildi)", "4 — ✅ yopildi", "B4: `GET /reports/stock` qatorlarida birlik/kategoriya/shtrix-kod/markirovka; BO-03 kartalarni so'ramaydi — `test_reports_stock.py`, e2e `warehouse-stock.spec.ts`"),
+    ("—", "BO-03 «Barchasi» (konsolidatsiya), eksport", "4 ✅ / 6", "B4: «Barcha filiallar» — `/reports/stock` (`test_qt_m04_03_*`); eksport ishlari (20 #22/#23) — Bosqich 6"),
     ("—", "e-TTN imzolash, qo'lda ro'yxatga olish, qabul tomonda tasdiqlash", "5", "E-IMZO va real operator (19 §20)"),
 ]
 
@@ -891,10 +973,22 @@ DEFERRED_B3 = [
     ("SYNC-05", "Voqea rejimida `CardResult`ni yumshoq tahlil qilish (noto'g'ri RRN/mask/TID → `VALIDATION_ERROR` o'rniga xom `terminal_response` + `card_result_mismatch{reason:'malformed_result'}`)", "5", "B3 da POS-16 faqat fake terminalni bog'laydi (sxemaga mos natija); haqiqiy agent/bank adapterlari bilan"),
     ("—", "Bulut printer server qismi (`POST /print-jobs`, `/print/cloudprnt`, `/print/epson-sdp`, BO-14 bulut printerlar ro'yxati)", "5", "27 B5 vazifasi; B3 da klient `CloudPrintApi` adapteri (`cloud_unavailable` → elektron chek)"),
     ("—", "Markirovka online tekshiruvi (`/marking-codes/verify`, `MARKING_PRECHECK`)", "5", "CRPT integratsiyasi — B5; B3 da `warn` davom etadi, `block` online rad etadi, lokal takror-kod tekshiruvi bor"),
-    ("WEB-12", "Topbar qo'ng'iroq va qidiruv palitrasi", "4", "bildirishnomalar (M18) — B4; B3 da tasdiqlar belgisi va «Tez orada» qo'ng'iroq"),
-    ("—", "BO-24 bank tushumi tasdig'i", "4", "`bank_settlements` — 27 B4-T05 (`STAGE_MOVE`); B3 karta bo'linishi BO-09 Z panelida"),
+    ("WEB-12", "Topbar qo'ng'iroq va qidiruv palitrasi", "4 — ✅ yopildi", "B4: qo'ng'iroq — `/reports/dashboard` `alerts[]` (`apps/shell/src/features/notifications-bell`), `Ctrl+K` — cmdk (`features/command-palette`, ruxsat bo'yicha); test: model testlari, e2e `rep-dashboard.spec.ts`, `rep-palette.spec.ts`"),
+    ("—", "BO-24 bank tushumi tasdig'i", "4 — ✅ yopildi", "B4-T05/T06, B4-SCR-BO-24 — `test_bank_settlements.py`, e2e `fin-bank.spec.ts`"),
     ("—", "Offline litsenziya tokeni (14 §17, `license.jti` tekshiruvi)", "6", "27 B6; `app.license_tokens` — B6"),
-    ("—", "MChJ ta'sischisining pul olishi POS'da (POS-14)", "4+", "ta'sischilar ro'yxati POS'ga sinxronlanmaydi — hozir faqat back-office; asoschi qarori bilan pull scope'ga qo'shish"),
+    ("—", "MChJ ta'sischisining pul olishi POS'da (POS-14)", "asoschi", "B4 da o'zgarmadi: ta'sischilar POS'ga sinxronlanmaydi, faqat back-office; pull scope'ga qo'shish — asoschi qarori («B3 MChJ ta'sischisi»)"),
+]
+
+# Bosqich 4 tekshiruvi (Opus: R1 buxgalteriya — 12, R2 xavfsizlik/offline — 7, R3 veb — 10 → qabul agenti): keyingi bosqichga.
+DEFERRED_B4 = [
+    ("ACC-09", "Davr `tax_settlements` posted bo'lgach o'sha davrga keyin kiritilgan QQS/aylanma `tax_settlement_stale` bo'ladi — ogohlantirish yo'q", "5", "davr yopish tayyorligi (13 §5.1 `tax_settlement_stale`, 27 B5-T16)"),
+    ("WEB-07", "BO-03 / BO-09 PDF/Excel eksport", "6", "eksport ishlari 20 #22/#23 — B6-EP-20#22/#23; 07 da «(Bosqich 6)» belgisi"),
+    ("WEB-10", "BO-17 «Oylar kesimida» grafigi", "6", "oylik xarajat seriyasi hisobot API'si — 07 da «(Bosqich 6)»"),
+    ("WEB-10", "BO-07 ST kartasida «o'tkazishdan keyingi 6410 qoldig'i»", "5", "hisob qoldig'i endpointi (davr yopish / M11 hisobotlari)"),
+    ("WEB-10", "POS-13 Click/Payme/Uzum bilan qarz to'lovi", "5", "dinamik checkout (`/payments/checkouts`, B5-EP-18#37–39); hozir naqd/karta/statik UzQR"),
+    ("—", "BO-06 «Keyingi qarzga hisoblash» (`Dt 6310 / Kt 4010`)", "5", "`ledger_adjustments` — B5-T14; tugma o'chiq, «Qaytarish» (6310 kassa harakati) ishlaydi"),
+    ("ACC-10 (QQS qismi)", "Qisman qarz to'lovlari cheklarida QQS yig'indisi 0.01 farq qilishi mumkin", "rad etildi", "qaror #26 — QQS har chekda yaxlitlanadi; miqdor qismi tuzatildi"),
+    ("F10 (26 #189)", "Avval fiskallashgan, keyin `debt_part` bilan qaytarilgan tovar uchun qaytarish cheki yo'q", "5", "fiskal hamkor bilan (26 #9 bilan birga); chek summalari olingan pulga teng"),
 ]
 
 FOUNDER = [
@@ -936,6 +1030,26 @@ FOUNDER = [
     ("B3 offline qoidalari", "Hisoblagichlar logout'dan keyin saqlanadi (`erp-device`); bitta kursor `scope=all`; 401 → bitta jim `/auth/session`; xotiradagi qidiruv nusxasi; `card_manual_fallback` standart `manager_approval`; rad etilgan voqealar `sync_receipts`da saqlanmaydi; Redis ishlamasa sync rate limiter ochiq; bir sanash — bir qurilma; arxivlangan tovar ko'chirishda qabul", "⛔ tasdiqlash kerak", "`@shared/offline`, `backend/app/modules/sync/`"),
     ("B3 karta qoidalari", "Xarid hech qachon qayta yuborilmaydi (javob yo'qolsa → `unknown`); bekor qilingandan keyin void xatosi sotuvni saqlaydi; B3 da bulut/agent adapteri yo'q (POS-16 faqat fake); `card_settlement_sweep` — B5; `manual_reason` registrga mos bo'lishi shart; karta refund — faqat refund (void emas)", "⛔ tasdiqlash kerak", "`integrations/card_terminal/`, `features/card-payment`"),
     ("B3 MChJ ta'sischisi", "MChJ ta'sischisining pul olishi faqat back-office'da (ta'sischilar POS'ga sinxronlanmaydi)", "⛔ tasdiqlash kerak", "POS-14; keyin pull scope'ga qo'shish mumkin"),
+    # ---- Bosqich 4 (reja D1–D4, qabul agenti F1–F10 = 26 #180–#189, agent hisobotlari)
+    ("B4 D1", "B4 DDL — bitta append-only revizion `0027b debts_finance` (`debt_writeoff_allocations`, `bank_settlements.version`, `card_terminal_transactions.bank_settlement_id`); 0028 `down_revision = 0027b`", "⛔ tasdiqlash kerak", "`backend/alembic/sql/0027b_debts_finance.*`, 12 §6.1"),
+    ("B4 D2", "Telegram Bot API — httpx `TelegramPort` (aiogram yo'q), bir martalik kod Redis'da (SHA-256, 10 daq), webhook `secret_token` ≥32", "⛔ tasdiqlash kerak", "`notifications/infrastructure/{telegram_bot,link_codes}.py`; deploy'da `setWebhook`"),
+    ("B4 D3", "Back-office qarz to'lovi faqat `bank`; boshqa usullar faqat POS `debt_payment.created` (qaror #67)", "✅ qabul qilingan", "`debts/application/payments.py`"),
+    ("B4 D4", "Hisobotlar — registrlar ustida o'qish SQL (materiallashtirilgan jadval yo'q)", "⛔ tasdiqlash kerak", "`reports/infrastructure/reports_sql.py`"),
+    ("26 #180 (F1)", "Xato qabul qilingan POS qarz to'lovini qaytarish yo'li yo'q (fiskal chek chiqqan — bekor qilinmaydi; 4010 `in` kassa harakati taqiqlangan)", "⛔ kutilmoqda", "13 §2.18; muqobil — Buxgalter bekor qilishi + fiskal qaytarish cheki"),
+    ("26 #181 (F2)", "Qarzi kechirilgan sotuvni ochiq qismidan ortiq qaytarish rad (`validation.sale_debt_written_off`)", "⛔ tasdiqlash kerak", "`returns/application/return_posting.py`"),
+    ("26 #182 (F3)", "Undirilgan hisobdan chiqarilgan qarz (9390) aylanma solig'i bazasida qoladi — buxgalter tasdig'i", "⛔ kutilmoqda", "13 §4.3; `vat.turnover_figure`"),
+    ("26 #183 (F4)", "Karta qaytarishidan keyin bank tushumi `min(doc_date qoldig'i, joriy qoldiq)` chegarasi", "⛔ tasdiqlash kerak", "13 §2.18a"),
+    ("26 #184 (F5)", "`tax_payment` faqat `vat|turnover` (hisoblanmagan soliqlar — 94xx toifalar orqali)", "⛔ tasdiqlash kerak", "`expenses/domain/expenses.py`"),
+    ("26 #185 (F6)", "Yagona «muddati o'tgan» ta'rifi `COALESCE(due_date, doc_date) < as_of`; va'da faqat eslatma", "⛔ tasdiqlash kerak", "20 #21; `reports/domain/debts.py`, `debts/application/ledger.py`"),
+    ("26 #186 (F7)", "Filialga cheklangan foydalanuvchiga tenant bo'yicha qarz eslatmalari yuborilmaydi", "⛔ tasdiqlash kerak", "`notifications/application/sender.py` `TENANT_WIDE_KINDS`"),
+    ("26 #187 (F8)", "POS xarajat sanasi serverda `created_at` biznes kunidan (qurilma `doc_date` e'tiborsiz)", "⛔ tasdiqlash kerak", "`expenses/application/sync_events.py`"),
+    ("26 #188 (F9)", "Tezkor mijoz (`counterparty.created`) — `debts.create` ruxsati", "⛔ tasdiqlash kerak", "18 §11.1; POS-06 tugmasi ruxsatsiz yashirin"),
+    ("26 #189 (F10)", "Fiskallashgan qarz qismini qaytarishda qaytarish cheki — fiskal hamkor bilan", "⛔ kutilmoqda", "B5 (26 #9)"),
+    ("B4 qarz qoidalari", "Yozib bo'lingan qarzni yopishda tovar qatori yo'q qismi (boshlang'ich/kechirilgan/ortiqcha) — QQS 0.00 umumiy qator; POS qarz to'lovi bekor qilinmaydi; offline tezkor mijozlar telefon bo'yicha birlashtirilmaydi; payable yosh — FIFO; offline limit — oxirgi sinxron balans + yuborilmagan nasiya, kassir tasdig'i", "⛔ tasdiqlash kerak", "`app/shared/debt_allocation.py`, `@shared/offline` `repos/debts.ts`, 16 §5"),
+    ("B4 xarajat qoidalari", "BO posting limiti — o'z `expenses.approve` limit_value (Menejer/Buxgalterda yo'q → Egasi tasdig'i); naqd xarajat faqat ochiq smenada bekor qilinadi; BO-17 formasi — bank/korporativ karta (naqd — POS)", "⛔ tasdiqlash kerak", "`expenses/`, 07 BO-17"),
+    ("B4 yetkazib beruvchi/soliq", "`vat_offset` = Σ input `vat_moves` (input > output → 6410 debet); qo'lda allokatsiya qarz qismiga teng; avans iste'mol qilingan to'lov bekor qilinmaydi (`advance_consumed`); `ST` raqami post'da", "⛔ tasdiqlash kerak", "`purchasing/`, `vat/`, 13 §2.16/§2.26"),
+    ("B4 bank tushumi", "RRN moslashtirish faqat to'lov maqsadidagi `RRN:` ro'yxati bilan (1C formatida RRN maydoni yo'q); `BT` raqami qoralamada; import hech qachon avtomatik o'tkazmaydi", "⛔ tasdiqlash kerak", "`cash/domain/bank_matching.py`; pilot buxgalterdan haqiqiy ko'chirma namunasi"),
+    ("B4 hisobot/Telegram", "Sof foyda + boshqa daromad (9390); o'rtacha chek — qaytarishsiz; sozlamalar foydalanuvchi bo'yicha; 24 soatdan eski voqealar yuborilmaydi; QR yo'q — havola + kod", "⛔ tasdiqlash kerak", "`reports/`, `notifications/`, 07 BO-20"),
 ]
 
 
@@ -1275,7 +1389,7 @@ def render(stages, items, unassigned, eps, tables, qts, matrix, screens, code) -
     w("")
     w(f"**Qoida: band faqat kod va test ikkalasi mavjud bo'lsagina {DONE} bo'ladi.** Test bor-yo'qligi — repo'dagi test fayllari (pytest/vitest/Playwright); \"yashil\" ekanini CI tasdiqlaydi.")
     w("")
-    w("- **ID sxemasi:** `B<bosqich>-<tur>-<manba>` — `B1-T03` (27 dagi 3-vazifa), `B1-DoD-02` (Tayyor ta'rifining 2-bandi), `B1-US-M13-04`, `B1-EP-20#28` (20 indeksi #28), `B1-EP-19#31` (19 dagi 31-endpoint sarlavhasi, tartib bo'yicha), `B0-EP-14#6` (14 §20 dagi 6-qator), `B1-EP-14§18.2#2`, `B0-EP-17#1`, `B5-EP-33W-01`, `B3-SCR-POS-02`, `B3-TBL-app.sales`, `B0-QT-RLS-01`; `BK-…` — MVP'dan keyin.")
+    w("- **ID sxemasi:** `B<bosqich>-<tur>-<manba>` — `B1-T03` (27 dagi 3-vazifa), `B1-DoD-02` (Tayyor ta'rifining 2-bandi), `B1-US-M13-04`, `B1-EP-20#28` (20 indeksi #28), `B1-EP-19#31` (19 dagi 31-endpoint sarlavhasi, tartib bo'yicha; keyin qo'shilgan sarlavha raqamni siljitmaydi — sarlavhadagi `<!-- 19#51a -->` belgisi), `B0-EP-14#6` (14 §20 dagi 6-qator), `B1-EP-14§18.2#2`, `B0-EP-17#1`, `B5-EP-33W-01`, `B3-SCR-POS-02`, `B3-TBL-app.sales`, `B0-QT-RLS-01`; `BK-…` — MVP'dan keyin.")
     w("- **Bosqichga biriktirish** mexanik: vazifa/hikoya — `27`; endpoint — `27` vazifa matnidagi yo'l → `30` dagi US API ustuni → katalog raqami → resurs nomi (eng aniq moslik, keyin eng erta bosqich; \"Manba\" ustunida ko'rsatilgan); ekran — bosqich vazifasi va hikoyalarining ekranlari (bir ekran bir necha bosqichda bo'lishi mumkin — har bosqich o'z qismini quradi); jadval — birinchi tilga olingan bosqich (0028 → B5, 0029 → B7, tilga olinmagani → B0 infratuzilma); QT — `27` dagi aniq havola → `31` US ustuni → kross-kesma qoidalar (`_scripts/gen_holat.py` `QT_STAGE_RULES`).")
     w("- **Jadval qatori:** ✅ = DDL migratsiyada + ilova kodida ishlatiladi + testda bor; 🟡 = DDL bor, modul kodi/testi hali yo'q.")
     w("- **Qayta generatsiya:** `python spec/implementatsiya/_scripts/gen_holat.py` (repo ildizidan; `--check` — CI uchun, `--pytest` — dalilga `pytest --collect-only` qo'shadi). Skript route'larni, test nomlarini (`test_qt_…`) va jadval ishlatilishini o'zi topadi; qo'lda qo'yilgan holat/dalil (shu fayldagi) avtomatik ✅ topilmaguncha saqlanadi. Bosqich 0–3 ning qo'lda tekshirilgan holatlari — skriptdagi `MANUAL`; boshqa bosqichga ko'chirilganlar — `STAGE_MOVE` (sabab \"Manba\" ustunida).")
@@ -1347,6 +1461,16 @@ def render(stages, items, unassigned, eps, tables, qts, matrix, screens, code) -
     w("| Topilma | Tafsilot | Bosqich | Sabab |")
     w("|---|---|---|---|")
     for d in DEFERRED_B3:
+        w(f"| {d[0]} | {d[1]} | {d[2]} | {d[3]} |")
+    w("")
+
+    w("## Bosqich 4 tekshiruvi: keyingi bosqichlarga o'tkazilgan topilmalar")
+    w("")
+    w("Bosqich 4 3 ta Opus tekshiruvchidan (R1 buxgalteriya — 12, R2 xavfsizlik/RLS/offline — 7, R3 veb 07/08 — 10 = 29 topilma) va Opus qabul agentidan o'tdi: 25 tasi qabul qilindi va tuzatildi (kod va/yoki spec; har biriga avval yiqiladigan test), 2 tasi faqat asoschi qarori (ACC-07 → 26 #182, ACC-11 → 26 #183), 2 tasi kechiktirildi (ACC-09 → B5, WEB-07 → B6), ACC-10 ning QQS qismi rad etildi (qaror #26). Asoschi bandlari 26 #180–#189. Quyidagilar — keyingi bosqichga.")
+    w("")
+    w("| Topilma | Tafsilot | Bosqich | Sabab |")
+    w("|---|---|---|---|")
+    for d in DEFERRED_B4:
         w(f"| {d[0]} | {d[1]} | {d[2]} | {d[3]} |")
     w("")
 

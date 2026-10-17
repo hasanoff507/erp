@@ -28,13 +28,21 @@ from app.modules.access.wiring import (
 )
 from app.modules.accounting.wiring import ledger_poster
 from app.modules.auth.wiring import pin_verifier
+from app.modules.cash.application.bank_import import BankStatementImportService, ImportLimits
+from app.modules.cash.application.bank_settlements import BankSettlementService
 from app.modules.cash.application.contracts import OpenShift, ShiftGuard
 from app.modules.cash.application.module import CashModule
 from app.modules.cash.application.movements import CashMovementService
 from app.modules.cash.application.shift_guard import ShiftGuardService
 from app.modules.cash.application.shifts import ShiftService
 from app.modules.cash.application.sync_events import CashSyncHandlers
+from app.modules.cash.infrastructure.bank_settlements_sql import (
+    BankStatementFileStore,
+    SqlBankSettlementRepository,
+)
 from app.modules.cash.infrastructure.cash_sql import SqlCashRepository
+from app.modules.debts.wiring import debt_register
+from app.modules.expenses.wiring import approval_hook as expense_approval_hook
 from app.modules.integrations.card_terminal.wiring import card_payments
 from app.modules.integrations.fiscal.wiring import fiscal_service
 from app.modules.notifications.wiring import event_recorder
@@ -73,13 +81,31 @@ def _services(settings: Settings, db: Database) -> tuple[ShiftService, CashMovem
         ShiftGuardService(repo, ledger_poster()),
         event_recorder(),
         approval_ttl_minutes=settings.approval_ttl_minutes,
+        debts=debt_register(),
     )
     return shifts, movements
 
 
 def build_cash_module(settings: Settings, db: Database) -> CashModule:
     shifts, movements = _services(settings, db)
-    return CashModule(shifts=shifts, movements=movements)
+    bank, imports = _bank_services(settings, db)
+    return CashModule(shifts=shifts, movements=movements, bank_settlements=bank, bank_imports=imports)
+
+
+def _bank_services(
+    settings: Settings, db: Database
+) -> tuple[BankSettlementService, BankStatementImportService]:
+    """BO-24 bank settlements (qaror #42): REST service + 1CClientBankExchange import (20 #55a–#55h)."""
+    repo = SqlBankSettlementRepository()
+    bank = BankSettlementService(db.session_factory, repo, ledger_poster())
+    imports = BankStatementImportService(
+        db.session_factory,
+        repo,
+        bank,
+        BankStatementFileStore(settings.file_storage_dir),
+        ImportLimits(max_bytes=settings.import_max_bytes, max_lines=settings.import_max_rows),
+    )
+    return bank, imports
 
 
 def sync_handlers(settings: Settings, db: Database) -> Mapping[str, Any]:
@@ -131,7 +157,11 @@ def build_approvals(
         if decision == "approved" and row.linked_doc_id is not None and tenant_id is not None:
             await cash.movements.post_approved(s, tenant_id, row.linked_doc_id, row.id)
 
-    hooks: dict[str, Any] = {"cash_movements": cash_hook, "price_changes": price_hook}
+    hooks: dict[str, Any] = {
+        "cash_movements": cash_hook,
+        "price_changes": price_hook,
+        "expenses": expense_approval_hook(settings, db),  # B4: expense_over_limit (20 #43)
+    }
     return approval_request_service(
         db,
         pins,

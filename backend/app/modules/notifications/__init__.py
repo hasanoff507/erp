@@ -1,1 +1,1 @@
-"""M18 notifications (Bosqich 2: telegram events recorded to ``outbox_jobs``; sending — Bosqich 4)."""
+"""M18 notifications: recorded events (``outbox_jobs``), Telegram linking, settings, sender."""

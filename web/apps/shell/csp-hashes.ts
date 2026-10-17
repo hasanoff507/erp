@@ -6,13 +6,13 @@
  * app can inject at runtime instead of `'nonce-…'`, the `csp-nonce` meta is dropped, and a
  * `_headers` file carries the same policy as an HTTP header (vite.config.ts → cspHashMode()).
  *
- * The only runtime <style> is Radix's modal scroll lock (react-remove-scroll-bar via
- * react-style-singleton). Its text depends on the scrollbar gap (integer CSS px: 0 on overlay /
+ * Runtime <style>s: Radix's modal scroll lock (react-remove-scroll-bar via react-style-singleton)
+ * and the fixed Radix Select viewport style (`SELECT_VIEWPORT_CSS`). The scroll-lock text depends on the scrollbar gap (integer CSS px: 0 on overlay /
  * mobile scrollbars, ~15–17 on desktop at 100 % zoom, larger when zoomed out) and on the body
  * margins (0 — Tailwind preflight). Every gap in 0…SCROLL_LOCK_MAX_GAP is hashed; beyond that
  * (browser zoom < ~30 %) the style is blocked, which only means the page behind a modal can scroll.
- * csp-hashes.test.ts renders a real Radix Dialog and fails when the library's text drifts from
- * `scrollLockCss()`; the build guard (`inlineCspViolations`) fails the build on any inline
+ * csp-hashes.test.ts renders a real Radix Dialog and Select and fails when the library's text drifts
+ * from `scrollLockCss()` / `SELECT_VIEWPORT_CSS`; the build guard (`inlineCspViolations`) fails the build on any inline
  * script/style in index.html that the policy does not allow.
  */
 import { createHash } from "node:crypto";
@@ -48,9 +48,21 @@ export function scrollLockCss(gap: number): string {
   );
 }
 
-/** Hash-sources of every runtime <style> the app injects (Radix scroll lock, gaps 0…max). */
+/**
+ * The <style> @radix-ui/react-select 2.x renders inside `SelectPrimitive.Viewport` (hides the
+ * viewport scrollbar) — byte for byte (checked by csp-hashes.test.ts). In nonce mode it carries the
+ * nonce through `nonce={getNonce()}` (@shared/ui select.tsx).
+ */
+export const SELECT_VIEWPORT_CSS =
+  "[data-radix-select-viewport]{scrollbar-width:none;-ms-overflow-style:none;-webkit-overflow-scrolling:touch;}" +
+  "[data-radix-select-viewport]::-webkit-scrollbar{display:none}";
+
+/** Hash-sources of every runtime <style> the app injects (Radix scroll lock, gaps 0…max; Select viewport). */
 export function runtimeStyleHashes(maxGap = SCROLL_LOCK_MAX_GAP): string[] {
-  return Array.from({ length: maxGap + 1 }, (_, gap) => sha256Source(scrollLockCss(gap)));
+  return [
+    ...Array.from({ length: maxGap + 1 }, (_, gap) => sha256Source(scrollLockCss(gap))),
+    sha256Source(SELECT_VIEWPORT_CSS),
+  ];
 }
 
 const INLINE_ELEMENT = /<(script|style)\b([^>]*)>([\s\S]*?)<\/\1\s*>/gi;

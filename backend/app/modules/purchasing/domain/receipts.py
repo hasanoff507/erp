@@ -17,7 +17,8 @@ Posting (:func:`receipt_posting`), ``credit`` = ``6010`` (credit purchase) or ``
   no 4410, no ``vat_moves``.
 * Credit purchase: ``debt_moves`` payable ``+ Σ (net + vat)`` (= the Kt 6010 of this posting, also while
   the VAT credit is deferred); supplier advance (4310 debit balance, 13 §2.6/§2.16, qaror #47):
-  ``Dt 6010 / Kt 4310 = min(advance, Σ Kt 6010 of this posting)``.
+  ``Dt 6010 / Kt 4310 = min(advance, Σ Kt 6010 of this posting)``. The offset is a payment: while the VAT
+  credit is deferred it releases ``vat_moves(input)`` proportional to ``offset / Σ Kt 6010`` (ACC-05).
 """
 
 from __future__ import annotations
@@ -187,6 +188,8 @@ def receipt_posting(
 
     credit = BANK if paid_immediately else SUPPLIERS
     vat_lines: list[VatMove] = []
+    deferred_vat = ZERO
+    deferred_base = ZERO
     if regime == "turnover":
         for line, lot_id in lines:
             ledger.append(stock_line(line, lot_id, credit, line.total))
@@ -202,8 +205,10 @@ def receipt_posting(
             if deferred:
                 analytics["vat_credit"] = "deferred"
             ledger.append(LedgerLine(entry_date, branch_id, INPUT_VAT, credit, vat_total, analytics))
-            if not deferred:
-                base = money(sum((ln.net for ln, _ in lines if ln.vat_amount > 0), ZERO))
+            base = money(sum((ln.net for ln, _ in lines if ln.vat_amount > 0), ZERO))
+            if deferred:
+                deferred_vat, deferred_base = vat_total, base
+            else:
                 vat_lines.append(VatMove(entry_date, "input", base, vat_total, einvoice_id))
     if paid_immediately:
         return ReceiptPosting(ledger, vat_lines, ZERO, ZERO)
@@ -214,7 +219,30 @@ def receipt_posting(
         ledger.append(
             LedgerLine(entry_date, branch_id, SUPPLIERS, ADVANCES, offset, {"counterparty_id": supplier})
         )
+        if deferred_vat > 0:  # ACC-05: the advance offset is a payment — it releases its share of the credit
+            vat_lines.append(
+                advance_vat_release(entry_date, deferred_base, deferred_vat, offset, credited, einvoice_id)
+            )
     return ReceiptPosting(ledger, vat_lines, gross, offset)
+
+
+def advance_vat_release(
+    entry_date: date,
+    base: Decimal,
+    vat: Decimal,
+    offset: Decimal,
+    credited: Decimal,
+    einvoice_id: UUID | None,
+) -> VatMove:
+    """13 §2.6/§2.16 (ACC-05): the deferred input-VAT credit released by the advance offset —
+    ``vat_i = ROUND_HALF_UP(vat × offset / credited, 2)`` (base likewise); a fully covered receipt
+    (``offset == credited``) releases the whole credit. Later payments release the rest (they subtract the
+    ``vat_moves`` already written for the e-invoice)."""
+    if offset >= credited:
+        return VatMove(entry_date, "input", base, vat, einvoice_id)
+    return VatMove(
+        entry_date, "input", money(base * offset / credited), money(vat * offset / credited), einvoice_id
+    )
 
 
 def remaining_by_product(ordered: dict[UUID, Decimal], received: dict[UUID, Decimal]) -> dict[UUID, Decimal]:

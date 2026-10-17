@@ -9,27 +9,64 @@
       "month": "Oy"
     },
     "kpi": {
-      "sales": "Bugungi savdo",
+      "sales": {
+        "today": "Bugungi savdo",
+        "week": "Haftalik savdo",
+        "month": "Oylik savdo"
+      },
       "receipts": "Cheklar",
       "customerDebt": "Mijozlar qarzi",
-      "stockValue": "Ombor qiymati"
+      "stockValue": "Ombor qiymati",
+      "label": "Asosiy ko'rsatkichlar",
+      "change": {
+        "today": "{{sign}} {{value}} kecha bilan",
+        "week": "{{sign}} {{value}} o'tgan hafta bilan",
+        "month": "{{sign}} {{value}} o'tgan oy bilan"
+      },
+      "noPrevious": {
+        "today": "Kecha savdo bo'lmagan",
+        "week": "O'tgan haftada savdo bo'lmagan",
+        "month": "O'tgan oyda savdo bo'lmagan"
+      },
+      "avgReceipt": "O'rtacha chek {{amount}}",
+      "debtNote": "{{debtors}} ta qarzdor · {{overdue}} ta muddati o'tgan",
+      "stockNote": "{{low}} ta tovar kam qolgan",
+      "netProfit": "Sof foyda",
+      "netProfitNote": "Tushum − tannarx − xarajatlar"
     },
     "salesChart": {
       "title": "Savdo — oxirgi 7 kun",
-      "unit": "mln so'm"
+      "unit": "mln so'm",
+      "error": "Grafikni yuklab bo'lmadi"
     },
     "alerts": {
-      "title": "Diqqat talab qiladi"
+      "title": "Diqqat talab qiladi",
+      "empty": "Hozircha diqqat talab qiladigan narsa yo'q"
     },
     "topProducts": {
-      "title": "Eng ko'p sotilgan"
+      "title": "Eng ko'p sotilgan",
+      "empty": "Bu davrda sotuv yo'q"
     },
     "ai": {
       "title": "AI yordamchi",
       "placeholder": "Savolingizni yozing…",
-      "ask": "So'rash"
+      "ask": "So'rash",
+      "pending": "AI yordamchi keyingi bosqichda ulanadi."
     },
-    "pending": "Ma'lumotlar hisobot moduli ulanganda ko'rinadi."
+    "branches": {
+      "title": "Filiallar bo'yicha",
+      "branch": "Filial",
+      "sales": "Savdo",
+      "receipts": "Cheklar",
+      "avgReceipt": "O'rtacha chek",
+      "profit": "Sof foyda",
+      "cash": "Naqd kassada",
+      "lowStock": "Kam qoldiq",
+      "total": "Jami"
+    },
+    "offline": "Internet yo'q — oxirgi yangilanish: {{minutes}} daqiqa oldin",
+    "offlineNoData": "Internet yo'q — ma'lumotlar internet qaytganda yuklanadi",
+    "error": "Ko'rsatkichlarni hisoblab bo'lmadi"
   },
   "center": {
     "title": "Hisobotlar markazi",
@@ -62,7 +99,7 @@
       },
       "stock": {
         "title": "Ombor qoldig'i",
-        "description": "Tovar qoldig'i va tannarx bo'yicha qiymat"
+        "description": "Har filial alohida va jami — qoldiq va tannarx bo'yicha qiymat"
       },
       "stock-moves": {
         "title": "Tovar harakati",
@@ -107,6 +144,10 @@
       "financial-form": {
         "title": "Moliyaviy hisobot (MEF №181)",
         "description": "1- va 2-ilova tayyorlovi"
+      },
+      "discounts": {
+        "title": "Chegirmalar va marja",
+        "description": "Berilgan chegirmalar va ular kamaytirgan marja"
       }
     }
   },
@@ -117,7 +158,8 @@
     "quick": {
       "today": "Bugun",
       "week": "Hafta",
-      "month": "Oy"
+      "month": "Oy",
+      "quarter": "Chorak"
     },
     "from": "Dan",
     "to": "Gacha",
@@ -205,6 +247,194 @@
       "kind": "Turi",
       "base": "Baza",
       "vat": "QQS"
+    }
+  },
+  "incomplete": "Faqat sinxronlangan ma'lumot: {{count}} ta qurilma hali sinxronlanmagan — raqamlar to'liq emas.",
+  "alertTitles": {
+    "fiscal_unacked": "Fiskal cheklar tasdiqlanmagan",
+    "state_report_diff": "Davlat hisobotida farq",
+    "unsynced_devices": "Sinxronlanmagan qurilmalar",
+    "cash_variance": "Kassa farqi",
+    "overdue_debts": "Muddati o'tgan qarzlar",
+    "low_stock": "Kam qolgan tovarlar",
+    "expiring_lots": "Yaroqlilik muddati yaqin",
+    "sync_exceptions": "Sinxronlash istisnolari",
+    "pending_approvals": "Tasdiqlash so'rovlari",
+    "einvoices_awaiting_signature": "E-fakturalar imzo kutmoqda",
+    "other": "Ogohlantirish"
+  },
+  "alerts": {
+    "fiscal_unacked": "{{count}} ta kassada 24 soatdan ortiq OFD tasdig'isiz cheklar bor",
+    "state_report_diff": "{{count}} ta davlat hisobotida ichki hisob bilan farq topildi",
+    "unsynced_devices": "{{count}} ta qurilmada serverga yuborilmagan ma'lumot bor",
+    "cash_variance": "{{count}} ta smenada kassa farqi — jami {{amount}}",
+    "overdue_debts": "{{count}} ta mijozning qarz muddati o'tgan — jami {{amount}}",
+    "low_stock": "{{count}} ta tovar minimal darajadan kam qoldi",
+    "expiring_lots": "{{count}} ta partiyaning yaroqlilik muddati 7 kun ichida tugaydi",
+    "sync_exceptions": "{{count}} ta sinxronlash istisnosi ko'rib chiqilishini kutmoqda",
+    "pending_approvals": "{{count}} ta so'rov tasdiq kutmoqda",
+    "einvoices_awaiting_signature": "{{count}} ta e-faktura imzolanishi kerak"
+  },
+  "alertTexts": {
+    "other": "{{count}} ta holat e'tibor talab qiladi"
+  },
+  "filters": {
+    "branch": "Filial",
+    "allBranches": "Barcha filiallar",
+    "asOf": "Sana holatiga",
+    "period": "Davr",
+    "quick": {
+      "today": "Bugun",
+      "week": "Hafta",
+      "month": "Oy",
+      "quarter": "Chorak"
+    },
+    "from": "Dan",
+    "to": "Gacha",
+    "rangeInvalid": "«Dan» «Gacha» dan keyin bo'lmasin"
+  },
+  "report": {
+    "total": "Jami",
+    "kpiLabel": "Hisobot ko'rsatkichlari",
+    "error": "Hisobotni yuklab bo'lmadi"
+  },
+  "sales": {
+    "columns": {
+      "day": "Kun",
+      "cashier": "Kassir",
+      "gross": "Sotuv",
+      "returns": "Qaytarishlar",
+      "total": "Sof savdo",
+      "receipts": "Cheklar",
+      "avg": "O'rtacha chek"
+    },
+    "kpi": {
+      "total": "Sof savdo",
+      "receipts": "Cheklar",
+      "avg": "O'rtacha chek",
+      "returns": "Qaytarishlar"
+    },
+    "chart": "Kunlar bo'yicha savdo",
+    "chartUnit": "mln so'm",
+    "empty": "Bu davrda savdo yo'q",
+    "unknownCashier": "Noma'lum kassir"
+  },
+  "top": {
+    "columns": {
+      "product": "Tovar",
+      "qty": "Sotilgan miqdor",
+      "revenue": "Tushum"
+    },
+    "empty": "Bu davrda sotuv yo'q",
+    "order": {
+      "label": "Tartib",
+      "top": "Eng ko'p sotilgan",
+      "bottom": "Eng kam sotilgan"
+    }
+  },
+  "stock": {
+    "columns": {
+      "branch": "Filial",
+      "positions": "Pozitsiyalar",
+      "belowMin": "Kam qoldiq",
+      "value": "Qiymat (tannarxda)",
+      "product": "Tovar",
+      "qtyTotal": "Jami qoldiq",
+      "qty": "Qoldiq",
+      "min": "Min.",
+      "status": "Holat"
+    },
+    "byBranch": "Filiallar bo'yicha qoldiq",
+    "marked": "markirovka",
+    "low": "Kam qoldi",
+    "ok": "Yetarli",
+    "kpi": {
+      "value": "Ombor qiymati",
+      "positions": "{{count}} pozitsiya",
+      "low": "Kam qolgan tovarlar"
+    },
+    "tableLabel": "Tovarlar qoldig'i",
+    "empty": "Tovar topilmadi",
+    "search": "Qidirish",
+    "searchPlaceholder": "Tovar nomi yoki shtrix-kodi"
+  },
+  "pnl": {
+    "statement": "Foyda va zarar hisoboti",
+    "revenue": "Sotuv tushumi (QQSsiz)",
+    "returns": "Qaytarishlar",
+    "discounts": "Chegirmalar",
+    "netRevenue": "Sof tushum",
+    "cogs": "Sotilgan tovar tannarxi",
+    "grossProfit": "Yalpi foyda",
+    "otherIncome": "Boshqa daromadlar",
+    "expensesTotal": "Xarajatlar jami",
+    "netProfit": "Sof foyda",
+    "formula": "Sof tushum − tannarx − xarajatlar + boshqa daromad",
+    "margin": "Yalpi marja {{value}}",
+    "byBranch": "Filiallar bo'yicha foyda",
+    "columns": {
+      "branch": "Filial"
+    },
+    "sources": {
+      "expenses": "Xarajatlar (toifasiz)",
+      "write_offs": "Hisobdan chiqarilgan tovarlar",
+      "debt_writeoffs": "Kechilgan qarzlar",
+      "bank_settlements": "Bank komissiyalari",
+      "tax_settlements": "Soliqlar",
+      "other": "Boshqa xarajatlar ({{account}})"
+    }
+  },
+  "discounts": {
+    "groupBy": {
+      "label": "Guruhlash",
+      "day": "Kun",
+      "branch": "Filial",
+      "cashier": "Kassir",
+      "product": "Tovar"
+    },
+    "columns": {
+      "sales": "Sotuv",
+      "discount": "Chegirma",
+      "revenue": "Sof tushum",
+      "cost": "Tannarx",
+      "margin": "Marja",
+      "marginWithout": "Chegirmasiz marja",
+      "lost": "Yo'qotilgan marja",
+      "marginPct": "Marja % (chegirma bilan / siz)"
+    },
+    "kpi": {
+      "discounts": "Berilgan chegirmalar",
+      "margin": "Marja",
+      "marginWithout": "Chegirmasiz: {{amount}}",
+      "lost": "Chegirma tufayli kamaygan marja"
+    },
+    "empty": "Bu davrda sotuv yo'q"
+  },
+  "aging": {
+    "columns": {
+      "counterparty": "Kontragent",
+      "balance": "Qarz",
+      "due": "Muddat",
+      "days": "Kechikkan kun",
+      "bucket": "Guruh",
+      "promise": "Va'da sanasi",
+      "lastPayment": "Oxirgi to'lov"
+    },
+    "buckets": {
+      "0-30": "0–30 kun",
+      "31-60": "31–60 kun",
+      "60+": "60+ kun"
+    },
+    "total": {
+      "receivable": "Mijozlar qarzi",
+      "payable": "Mening qarzim"
+    },
+    "count": "{{count}} ta kontragent",
+    "empty": "Qarz yo'q",
+    "direction": {
+      "label": "Yo'nalish",
+      "receivable": "Mijozlar qarzi",
+      "payable": "Men qarzdorman"
     }
   }
 }

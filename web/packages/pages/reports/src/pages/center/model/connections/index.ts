@@ -1,21 +1,45 @@
 /** BO-09 wiring — sample() only (24 §2). */
 import { combine, sample } from "effector";
 
-import { listRegistersFx, listVatReturnsFx, loadHistoryFx, loadShiftFx } from "../effects/index.ts";
 import {
+  listRegistersFx,
+  listVatReturnsFx,
+  loadHistoryFx,
+  loadReportFx,
+  loadShiftFx,
+} from "../effects/index.ts";
+import {
+  agingDirectionChanged,
+  branchFilterChanged,
+  discountsGroupByChanged,
   historyReloadRequested,
   pageMounted,
   rangeChanged,
   registerChanged,
   reportOpened,
+  reportReloadRequested,
   shiftReloadRequested,
   shiftSelected,
+  stockSearchChanged,
+  topOrderChanged,
   vatMoreRequested,
   vatPeriodChanged,
   vatReloadRequested,
 } from "../events/index.ts";
-import { historyTotals, isRangeValid, quickRange, sameRange } from "../lib/index.ts";
 import {
+  historyTotals,
+  isRangeValid,
+  quickRange,
+  reportRequest,
+  requestKey,
+  sameRange,
+} from "../lib/index.ts";
+import {
+  $branchFilter,
+  $options,
+  $reportError,
+  $reportResult,
+  $reportStatus,
   $history,
   $historyError,
   $historyStatus,
@@ -36,7 +60,7 @@ import {
   $vatPeriod,
   $vatStatus,
 } from "../stores/index.ts";
-import type { HistoryRequest } from "../types/index.ts";
+import type { HistoryRequest, ReportRequest, ReportResult } from "../types/index.ts";
 
 export const $historyTotals = $history.map(historyTotals);
 export const $rangeInvalid = $range.map((r) => !isRangeValid(r));
@@ -165,3 +189,52 @@ $vatStatus
   .on(vatLoaded, () => "idle")
   .on(listVatReturnsFx.fail, (status, { params }) => (params.cursor === null ? "error" : status));
 $vatError.on(listVatReturnsFx.failData, (_, e) => e).reset(listVatReturnsFx);
+
+// --- Bosqich 4 reports (`/reports/*`) ------------------------------------------------------------------
+$branchFilter.on(pageMounted, (_, { branchId }) => branchId ?? null).on(branchFilterChanged, (_, id) => id);
+$options
+  .on(topOrderChanged, (o, topOrder) => ({ ...o, topOrder }))
+  .on(discountsGroupByChanged, (o, discountsGroupBy) => ({ ...o, discountsGroupBy }))
+  .on(agingDirectionChanged, (o, agingDirection) => ({ ...o, agingDirection }))
+  .on(stockSearchChanged, (o, stockSearch) => ({ ...o, stockSearch }));
+
+export const $reportRequest = combine($report, $range, $branchFilter, $options, reportRequest);
+/** The answer shown belongs to the current filters (an older one is hidden, not mixed in). */
+export const $reportData = combine($reportResult, $reportRequest, (res, req) =>
+  res !== null && res.key === requestKey(req) ? res.result : null,
+);
+
+sample({
+  clock: [
+    reportOpened,
+    rangeChanged,
+    branchFilterChanged,
+    topOrderChanged,
+    discountsGroupByChanged,
+    agingDirectionChanged,
+    stockSearchChanged,
+    reportReloadRequested,
+  ],
+  source: $reportRequest,
+  filter: (req): req is ReportRequest => req !== null,
+  target: loadReportFx,
+});
+
+const reportLoaded = sample({
+  clock: loadReportFx.done,
+  source: $reportRequest,
+  filter: (current, { params }) => requestKey(current) === requestKey(params),
+  fn: (_, { params, result }): ReportResult => ({ key: requestKey(params), result }),
+});
+const reportFailed = sample({
+  clock: loadReportFx.fail,
+  source: $reportRequest,
+  filter: (current, { params }) => requestKey(current) === requestKey(params),
+  fn: (_, { error }) => error,
+});
+$reportResult.on(reportLoaded, (_, r) => r);
+$reportStatus
+  .on(loadReportFx, () => "loading")
+  .on(reportLoaded, () => "idle")
+  .on(reportFailed, () => "error");
+$reportError.on(reportFailed, (_, e) => e).reset(loadReportFx);

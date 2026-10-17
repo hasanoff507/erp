@@ -1,16 +1,18 @@
 /**
- * BO-21 ④ opening debts (Bosqich 4 → visible, optional, skip only), ⑤ OFD / e-invoice guidance with
+ * BO-21 ④ opening debts (B4: the table / Excel paste of features/opening-debts → posted openings; optional), ⑤ OFD / e-invoice guidance with
  * the Telegram bot link (BO-20 comes later; `connectNow` only reveals the steps), ⑥ device install —
  * `<InstallGuide embedded />` (the same component as /install, UX-INSTALL).
  */
 import { useUnit } from "effector-react";
-import { Info, Send, Users } from "lucide-react";
+import { Send, Users } from "lucide-react";
 
 import { useTranslation } from "@shared/i18n";
 import { telegramBotLink } from "@shared/lib/runtime-config";
-import { Banner, Button, Card, CardTitle, Icon, StatusChip, Switch } from "@shared/ui";
+import { $isOnline } from "@shared/state/network";
+import { Button, Card, CardTitle, Icon, StatusChip, Switch } from "@shared/ui";
 
 import { InstallGuide } from "#/features/install-guide/ui/InstallGuide.tsx";
+import { OpeningDebtsForm } from "#/features/opening-debts/ui/OpeningDebtsForm.tsx";
 
 import {
   $connectNow,
@@ -24,7 +26,7 @@ import { StepFooter } from "../footer/StepFooter.tsx";
 
 export function DebtsStep() {
   const { t } = useTranslation("onboarding");
-  const [back, skip, next] = useUnit([backClicked, skipClicked, nextClicked]);
+  const [back, skip, next, online] = useUnit([backClicked, skipClicked, nextClicked, $isOnline]);
   return (
     <div className="flex flex-col gap-4">
       <p className="text-[14px] text-foreground-secondary">{t("debts.intro")}</p>
@@ -34,14 +36,7 @@ export function DebtsStep() {
           <CardTitle className="grow">{t("wizard.headings.debts")}</CardTitle>
           <StatusChip tone="neutral">{t("debts.badge")}</StatusChip>
         </div>
-        <div className="grid grid-cols-3 gap-2 rounded-lg bg-accent px-3 py-2 text-[12px] font-bold text-muted-foreground">
-          <span>{t("debts.columns.name")}</span>
-          <span>{t("debts.columns.phone")}</span>
-          <span className="text-right">{t("debts.columns.amount")}</span>
-        </div>
-        <Banner tone="info" icon={Info}>
-          {t("debts.later")}
-        </Banner>
+        <OpeningDebtsForm disabled={!online} />
       </Card>
       <StepFooter
         onBack={() => back()}

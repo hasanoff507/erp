@@ -62,6 +62,7 @@ export function usePosHeader(): PosHeader {
 /** Screen shortcuts of the cashier menu (07: F6 returns, F8 shift close — global keys; cash in/out; POS-16). */
 export const MENU_LINKS = [
   { to: "/pos/returns", key: "returns", kbd: "F6" },
+  { to: "/pos/debts", key: "debts", kbd: "F7" },
   { to: "/pos/cash-movement", key: "cashMovement", kbd: null },
   { to: "/pos/shift/close", key: "shiftClose", kbd: "F8" },
   { to: "/pos/sync", key: "sync", kbd: "F12" },

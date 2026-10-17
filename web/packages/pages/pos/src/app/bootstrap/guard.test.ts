@@ -48,8 +48,9 @@ describe("warehouse + equipment routes (contracts/pos-wh-routes.md)", () => {
   });
 
   it("global keys: F9 stays with the warehouse screens; overlays own the keyboard", () => {
-    expect(globalKeysFor("/pos/sale").map(([k]) => k)).toEqual(["F6", "F8", "F9", "F12"]);
-    expect(globalKeysFor("/pos/warehouse/stocktake").map(([k]) => k)).toEqual(["F6", "F8", "F12"]);
+    expect(globalKeysFor("/pos/sale").map(([k]) => k)).toEqual(["F6", "F7", "F8", "F9", "F12"]);
+    expect(globalKeysFor("/pos/warehouse/stocktake").map(([k]) => k)).toEqual(["F6", "F7", "F8", "F12"]);
+    expect(globalKeysFor("/pos/sale/credit")).toEqual([]);
     expect(globalKeysFor("/pos/sale/payment")).toEqual([]);
   });
 });

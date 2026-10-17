@@ -218,6 +218,8 @@ describe("payment validation (07 POS-03)", () => {
         dueDate: null,
         debtApproval: null,
         uzqrRef: "",
+        comment: "",
+        debtOverLimitConfirmed: false,
         electronic: null,
       },
       draft: { ref: "r", lines: draftLines, selectedLineId: null, customerId: null, discount: null },

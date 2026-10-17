@@ -1,7 +1,7 @@
 /** BO-03 wiring — sample() only (24 §2). */
 import { combine, createEvent, sample } from "effector";
 
-import { productsRequested, refsRequested } from "#/entities/refs/index.ts";
+import { refsRequested } from "#/entities/refs/index.ts";
 import {
   cancelCountFx,
   countsOpened,
@@ -20,12 +20,11 @@ import {
 import { repostWriteOffFx, submitWriteOffFx } from "#/features/write-off/index.ts";
 
 import {
-  listBalancesFx,
   listExpiringLotsFx,
   loadDigestFx,
   loadExpiringFx,
   loadReviewCountFx,
-  loadSummaryFx,
+  loadStockFx,
   loadTransitFx,
 } from "../effects/index.ts";
 import {
@@ -39,11 +38,17 @@ import {
   tabChanged,
   viewChanged,
 } from "../events/index.ts";
-import { digestFrom, expiryByProduct, lastUpdated, pageTotal, sameFilters } from "../lib/index.ts";
 import {
-  $balances,
+  digestFrom,
+  expiryByProduct,
+  filterItems,
+  pageTotal,
+  stockScope,
+  summarize,
+  unitsOf,
+} from "../lib/index.ts";
+import {
   $branchId,
-  $cursor,
   $digest,
   $digestError,
   $error,
@@ -57,29 +62,43 @@ import {
   $mounted,
   $refreshQueued,
   $reviewCount,
+  $shown,
   $status,
-  $summary,
-  $summaryError,
+  $stock,
   $tab,
   $today,
   $transit,
   $view,
   $warehouseId,
 } from "../stores/index.ts";
+import { BALANCE_PAGE_SIZE } from "../types/index.ts";
 
+/** The report scope: the branch's warehouse, or «Barcha filiallar» (consolidated). */
+export const $scope = combine($branchId, $warehouseId, stockScope);
+/** Rows after the search / «Faqat kam qoldiq» filters (client side — the report is complete). */
+export const $filtered = combine($stock, $filters, (stock, filters) =>
+  stock ? filterItems(stock.items, filters) : [],
+);
+/** Rows shown («Yana yuklash» adds a page). */
+export const $balances = combine($filtered, $shown, (rows, shown) => rows.slice(0, shown));
+export const $hasMore = combine($filtered, $shown, (rows, shown) => rows.length > shown);
+export const $summary = $stock.map((s) => (s ? summarize(s) : null));
+/** The KPI could not be read (WEB-06) — the cards show it with «Qayta urinish». */
+export const $summaryError = combine($stock, $error, (s, e) => (s ? null : e));
+export const $consolidated = $stock.map((s) => s?.consolidated ?? false);
+export const $units = $stock.map(unitsOf);
 export const $pageTotal = $balances.map(pageTotal);
-export const $lastUpdated = combine($balances, $loadedAt, (rows, at) => lastUpdated(rows) ?? at);
+export const $lastUpdated = $loadedAt;
 export const $expiryDays = combine($expiring, $today, (e, today) =>
   e ? expiryByProduct(e.lots, today) : {},
 );
-export const $moreLoading = combine(listBalancesFx.pending, $status, (p, s) => p && s !== "loading");
 export const $lotsMoreLoading = combine(
   listExpiringLotsFx.pending,
   $lotsStatus,
   (p, s) => p && s !== "loading",
 );
 
-// --- mount / warehouse -------------------------------------------------------------------------------
+// --- mount / scope ---------------------------------------------------------------------------------------
 $mounted.on(pageMounted, () => true);
 $today.on(pageMounted, (_, { today }) => today);
 sample({
@@ -88,73 +107,105 @@ sample({
   target: refsRequested,
 });
 
-/** The warehouse is known (mount with cached refs, or refs answered / branch changed after mount). */
-const warehouseReady = sample({
+/** The scope is known (mount, or refs answered / branch changed after mount). */
+const scopeReady = sample({
   clock: [
-    sample({ clock: pageMounted, source: $warehouseId }),
+    sample({ clock: pageMounted, source: $scope }),
     sample({
-      clock: $warehouseId.updates,
+      clock: $scope.updates,
       source: $mounted,
-      fn: (_, id) => id,
+      fn: (_, scope) => scope,
       filter: (mounted) => mounted,
     }),
   ],
+  filter: (scope): scope is string => scope !== null,
+});
+/** A branch's warehouse is known — lots, badges and the digest are per warehouse / branch. */
+const warehouseReady = sample({
+  clock: scopeReady,
+  source: $warehouseId,
   filter: (id): id is string => id !== null,
 });
 
-// --- balances ------------------------------------------------------------------------------------------
+// --- the stock report (rows + KPI), one run at a time (WEB-10) -----------------------------------------
 $filters
   .on(searchChanged, (f, search) => ({ ...f, search }))
   .on(lowOnlyToggled, (f, lowOnly) => ({ ...f, lowOnly }));
+$shown.on(moreRequested, (n) => n + BALANCE_PAGE_SIZE).reset(searchChanged, lowOnlyToggled, $scope.updates);
 
-sample({
+/** A write changed the stock, or «Yangilash» / «Qayta urinish» — re-read the report. */
+const refreshWanted = sample({
   clock: [
-    warehouseReady,
-    searchChanged,
-    lowOnlyToggled,
+    summaryRefreshRequested,
     reloadRequested,
-    // a write changed the stock
     createTransferFx.done,
+    postTransferFx.done,
     sendTransferFx.done,
     receiveTransferFx.done,
     cancelTransferFx.done,
+    createCountFx.done,
+    submitCountFx.done,
     postCountFx.done,
     cancelCountFx.done,
     submitWriteOffFx.done,
     repostWriteOffFx.done,
   ],
-  source: { warehouseId: $warehouseId, filters: $filters },
-  filter: ({ warehouseId }) => warehouseId !== null,
-  fn: ({ warehouseId, filters }) => ({ warehouseId: warehouseId ?? "", filters, cursor: null }),
-  target: listBalancesFx,
+  fn: () => undefined,
+});
+const refreshRun = createEvent();
+// A new scope is read at once; other refreshes wait for the running read, then run once.
+sample({ clock: scopeReady, fn: () => undefined, target: refreshRun });
+sample({
+  clock: refreshWanted,
+  source: loadStockFx.pending,
+  filter: (pending) => !pending,
+  fn: () => undefined,
+  target: refreshRun,
+});
+$refreshQueued
+  .on(sample({ clock: refreshWanted, source: loadStockFx.pending, filter: (pending) => pending }), () => true)
+  .reset(refreshRun);
+sample({
+  clock: loadStockFx.finally,
+  source: $refreshQueued,
+  filter: (queued) => queued,
+  fn: () => undefined,
+  target: refreshRun,
+});
+
+const refresh = sample({
+  clock: refreshRun,
+  source: { scope: $scope, warehouseId: $warehouseId, branchId: $branchId, today: $today },
 });
 sample({
-  clock: moreRequested,
-  source: { warehouseId: $warehouseId, filters: $filters, cursor: $cursor, pending: listBalancesFx.pending },
-  filter: ({ warehouseId, cursor, pending }) => warehouseId !== null && cursor !== null && !pending,
-  fn: ({ warehouseId, filters, cursor }) => ({ warehouseId: warehouseId ?? "", filters, cursor }),
-  target: listBalancesFx,
+  clock: refresh,
+  filter: ({ scope }) => scope !== null,
+  fn: ({ scope }) => scope ?? "",
+  target: loadStockFx,
 });
-// An answer for filters / a warehouse that are no longer current is dropped.
-const balancesLoaded = sample({
-  clock: listBalancesFx.done,
-  source: { filters: $filters, warehouseId: $warehouseId },
-  filter: (current, { params }) =>
-    current.warehouseId === params.warehouseId && sameFilters(current.filters, params.filters),
-  fn: (_, payload) => payload,
-});
-$balances.on(balancesLoaded, (list, { params, result }) =>
-  params.cursor ? [...list, ...result.items] : result.items,
-);
-$cursor.on(balancesLoaded, (_, { result }) => result.next_cursor);
-$loadedAt.on(balancesLoaded, () => new Date().toISOString());
-$status
-  .on(listBalancesFx, (s, { cursor }) => (cursor === null ? "loading" : s))
-  .on(balancesLoaded, () => "idle")
-  .on(listBalancesFx.fail, (s, { params }) => (params.cursor === null ? "error" : s));
-$error.on(listBalancesFx.failData, (_, e) => e).reset(listBalancesFx);
 
-// --- expiring lots view ----------------------------------------------------------------------------------
+// Answers for a scope that is no longer current are dropped (WEB-05).
+const stockLoaded = sample({
+  clock: loadStockFx.done,
+  source: $scope,
+  filter: (current, { params }) => current === params,
+  fn: (_, { result }) => result,
+});
+const stockFailed = sample({
+  clock: loadStockFx.fail,
+  source: $scope,
+  filter: (current, { params }) => current === params,
+  fn: (_, { error }) => error,
+});
+$stock.on(stockLoaded, (_, s) => s);
+$loadedAt.on(stockLoaded, () => new Date().toISOString());
+$status
+  .on(sample({ clock: loadStockFx, source: $stock, filter: (s) => s === null }), () => "loading")
+  .on(stockLoaded, () => "idle")
+  .on(stockFailed, () => "error");
+$error.on(stockFailed, (_, e) => e).reset(stockLoaded);
+
+// --- expiring lots view (one warehouse) ------------------------------------------------------------------
 $view.on(viewChanged, (_, v) => v);
 sample({
   clock: [
@@ -194,90 +245,22 @@ $lotsStatus
   .on(listExpiringLotsFx.fail, (s, { params }) => (params.cursor === null ? "error" : s));
 $lotsError.on(listExpiringLotsFx.failData, (_, e) => e).reset(listExpiringLotsFx);
 
-// Product cards (barcode, unit, category, marking) of the rows shown.
+// --- per-warehouse KPI / badges -----------------------------------------------------------------------------
+const warehouseRefresh = sample({
+  clock: refresh,
+  filter: (s): s is { scope: string; warehouseId: string; branchId: string | null; today: string } =>
+    s.warehouseId !== null && s.branchId !== null,
+});
+sample({ clock: warehouseRefresh, fn: ({ warehouseId }) => warehouseId, target: loadExpiringFx });
+sample({ clock: warehouseRefresh, fn: ({ warehouseId }) => warehouseId, target: loadReviewCountFx });
+sample({ clock: warehouseRefresh, fn: ({ branchId }) => branchId ?? "", target: loadTransitFx });
 sample({
-  clock: [listBalancesFx.doneData, listExpiringLotsFx.doneData],
-  fn: (page) => page.items.map((r) => r.product_id),
-  target: productsRequested,
-});
-
-// --- KPI / badges ----------------------------------------------------------------------------------------
-/** A write changed the stock, or «Yangilash» — re-read the KPI (one at a time, WEB-10). */
-const refreshWanted = sample({
-  clock: [
-    summaryRefreshRequested,
-    createTransferFx.done,
-    postTransferFx.done,
-    sendTransferFx.done,
-    receiveTransferFx.done,
-    cancelTransferFx.done,
-    createCountFx.done,
-    submitCountFx.done,
-    postCountFx.done,
-    cancelCountFx.done,
-    submitWriteOffFx.done,
-    repostWriteOffFx.done,
-  ],
-  fn: () => undefined,
-});
-const refreshRun = createEvent();
-// A new warehouse is read at once; other refreshes wait for the running summary, then run once.
-sample({ clock: warehouseReady, fn: () => undefined, target: refreshRun });
-sample({
-  clock: refreshWanted,
-  source: loadSummaryFx.pending,
-  filter: (pending) => !pending,
-  fn: () => undefined,
-  target: refreshRun,
-});
-$refreshQueued
-  .on(
-    sample({ clock: refreshWanted, source: loadSummaryFx.pending, filter: (pending) => pending }),
-    () => true,
-  )
-  .reset(refreshRun);
-sample({
-  clock: loadSummaryFx.finally,
-  source: $refreshQueued,
-  filter: (queued) => queued,
-  fn: () => undefined,
-  target: refreshRun,
-});
-
-const refreshSummary = sample({
-  clock: refreshRun,
-  source: { warehouseId: $warehouseId, branchId: $branchId, today: $today },
-  filter: (s): s is { warehouseId: string; branchId: string | null; today: string } => s.warehouseId !== null,
-});
-sample({ clock: refreshSummary, fn: ({ warehouseId }) => warehouseId, target: loadSummaryFx });
-sample({ clock: refreshSummary, fn: ({ warehouseId }) => warehouseId, target: loadExpiringFx });
-sample({ clock: refreshSummary, fn: ({ warehouseId }) => warehouseId, target: loadReviewCountFx });
-const branchRefresh = sample({
-  clock: refreshSummary,
-  filter: (s): s is { warehouseId: string; branchId: string; today: string } => s.branchId !== null,
-});
-sample({ clock: branchRefresh, fn: ({ branchId }) => branchId, target: loadTransitFx });
-sample({
-  clock: branchRefresh,
-  fn: ({ branchId, today }) => ({ branchId, from: digestFrom(today) }),
+  clock: warehouseRefresh,
+  fn: ({ branchId, today }) => ({ branchId: branchId ?? "", from: digestFrom(today) }),
   target: loadDigestFx,
 });
 
 // Answers for a warehouse / branch that is no longer current are dropped (WEB-05).
-sample({
-  clock: loadSummaryFx.done,
-  source: $warehouseId,
-  filter: (current, { params }) => current === params,
-  fn: (_, { result }) => result,
-  target: $summary,
-});
-sample({
-  clock: loadSummaryFx.fail,
-  source: $warehouseId,
-  filter: (current, { params }) => current === params,
-  fn: (_, { error }) => error,
-  target: $summaryError,
-});
 sample({
   clock: loadExpiringFx.done,
   source: $warehouseId,
@@ -313,12 +296,12 @@ sample({
   fn: (_, { error }) => error,
   target: $digestError,
 });
-$summaryError.reset(loadSummaryFx);
 $digestError.reset(loadDigestFx);
-for (const store of [$summary, $expiring, $transit, $reviewCount, $digest, $summaryError, $digestError]) {
-  store.reset($warehouseId.updates);
+for (const store of [$stock, $expiring, $transit, $reviewCount, $digest, $digestError]) {
+  store.reset($scope.updates);
 }
-$refreshQueued.reset($warehouseId.updates);
+$error.reset($scope.updates);
+$refreshQueued.reset($scope.updates);
 
 // --- tabs ----------------------------------------------------------------------------------------------
 $tab.on(tabChanged, (_, tab) => tab).on(createCountFx.done, () => "counts");

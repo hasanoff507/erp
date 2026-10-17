@@ -224,7 +224,7 @@ describe("BO-16 lib", () => {
     ).toBeNull();
   });
 
-  it("context lines: cash reason enum, manual card reason enum, free text, lines; ids are not shown", () => {
+  it("context lines: cash reason enum, manual card reason enum, free text, lines, B4 expense/debt details; ids are not shown", () => {
     expect(
       contextLines(
         req("a", {
@@ -241,6 +241,52 @@ describe("BO-16 lib", () => {
     ).toEqual([{ key: "comment", value: "Muddati o'tgan" }]);
     expect(contextLines(req("d", { kind: "price_change", context: { lines: [{}, {}] } }))).toEqual([
       { key: "lines", count: 2 },
+    ]);
+    // B4: expense_over_limit (20 #43 context), POS-14 cash expense, debt over the credit limit
+    expect(
+      contextLines(
+        req("e", {
+          kind: "expense_over_limit",
+          context: {
+            amount: "1850000.00",
+            category_id: "c-1",
+            category_name: "Ta'mirlash",
+            source: "bank",
+            doc_date: "2026-10-14",
+          },
+        }),
+      ),
+    ).toEqual([
+      { key: "category", value: "Ta'mirlash" },
+      { key: "source", value: "bank" },
+      { key: "docDate", value: "2026-10-14" },
+    ]);
+    expect(
+      contextLines(
+        req("f", {
+          kind: "cash_withdrawal_over_limit",
+          context: { amount: "60000.00", reason: "expense", category_name: "Transport" },
+        }),
+      ),
+    ).toEqual([
+      { key: "reason", value: "expense" },
+      { key: "category", value: "Transport" },
+    ]);
+    expect(
+      contextLines(
+        req("g", {
+          kind: "debt_over_limit",
+          context: {
+            amount: "1.00",
+            counterparty_id: "cp-1",
+            counterparty_name: "Aziz",
+            credit_limit: "500000.00",
+          },
+        }),
+      ),
+    ).toEqual([
+      { key: "customer", value: "Aziz" },
+      { key: "creditLimit", value: "500000.00" },
     ]);
     expect(docTypeKey("cash_movements")).toBe("cash_movements");
     expect(docTypeKey("something_else")).toBe("other");

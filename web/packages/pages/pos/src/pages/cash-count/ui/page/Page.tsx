@@ -220,6 +220,10 @@ function CashCountPage() {
               <dd className="text-right tabular-nums">+{formatMoney(snapshot.totals.cashSales)}</dd>
               <dt>{t("cashMovement.calc.cashReturns")}</dt>
               <dd className="text-right tabular-nums">−{formatMoney(snapshot.totals.cashReturns)}</dd>
+              <dt>{t("cashMovement.calc.debtCashIn")}</dt>
+              <dd className="text-right tabular-nums" data-testid="debt-cash-in">
+                +{formatMoney(snapshot.totals.debtCashIn)}
+              </dd>
               <dt>{t("cashMovement.calc.in")}</dt>
               <dd className="text-right tabular-nums">+{formatMoney(snapshot.totals.cashIn)}</dd>
               <dt>{t("cashMovement.calc.out")}</dt>

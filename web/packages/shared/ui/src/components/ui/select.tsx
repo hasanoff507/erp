@@ -6,6 +6,7 @@
  *   <SimpleSelect options={[{value:"llc", label:"MChJ"}]} value={v} onValueChange={setV} aria-label="…" />
  */
 import * as SelectPrimitive from "@radix-ui/react-select";
+import { getNonce } from "get-nonce";
 import { Check, ChevronDown } from "lucide-react";
 import type { ComponentProps, Ref } from "react";
 
@@ -61,7 +62,10 @@ export function SelectContent({
         )}
         {...props}
       >
-        <SelectPrimitive.Viewport className="p-1">{children}</SelectPrimitive.Viewport>
+        {/* 24 §4.4: Radix renders a <style> in the viewport; the CSP nonce (main.tsx → get-nonce) allows it */}
+        <SelectPrimitive.Viewport className="p-1" nonce={getNonce()}>
+          {children}
+        </SelectPrimitive.Viewport>
       </SelectPrimitive.Content>
     </SelectPrimitive.Portal>
   );

@@ -1,6 +1,12 @@
 import "./connections/index.ts";
 
-export { $historyTotals, $rangeInvalid, $vatMoreLoading } from "./connections/index.ts";
+export {
+  $historyTotals,
+  $rangeInvalid,
+  $reportData,
+  $reportRequest,
+  $vatMoreLoading,
+} from "./connections/index.ts";
 export * from "./events/index.ts";
 export * from "./effects/index.ts";
 export * from "./lib/index.ts";

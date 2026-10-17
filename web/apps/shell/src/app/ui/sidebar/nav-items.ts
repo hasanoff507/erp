@@ -64,6 +64,24 @@ export interface NavGroup {
   items: readonly NavItem[];
 }
 
+/** BO-06 «Qarzdorlar» — the same rights as the page guard (`debts-aging`: reports.finance.view | debts.approve). */
+export const DEBTS_SCREEN = ["reports.finance.view", "debts.approve"] as const;
+/** GET /counterparties — one of these (20 §M08 list). */
+export const COUNTERPARTY_READ = ["sales.create", "debts.create", "stock.view", "purchases.create"] as const;
+
+/**
+ * Ctrl+K palette search rights (08 §9): products need stock.view (GET /products, 19 §1); counterparties
+ * need a counterparty read right AND the BO-06 screen they open in (`/app/debts?counterparty=`).
+ */
+export function paletteSearchRights(granted: GrantedAccess): { products: boolean; counterparties: boolean } {
+  return {
+    products: hasPermissions(granted, { permission: "stock.view" }),
+    counterparties:
+      hasPermissions(granted, { anyOf: COUNTERPARTY_READ }) &&
+      hasPermissions(granted, { anyOf: DEBTS_SCREEN }),
+  };
+}
+
 export const NAV_GROUPS: readonly NavGroup[] = [
   {
     key: "main",
@@ -110,7 +128,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         key: "debtors",
         to: "/app/debts",
         icon: Users,
-        requires: { anyOf: ["debts.payment.accept", "reports.finance.view"] },
+        requires: { anyOf: DEBTS_SCREEN },
       },
       {
         key: "catalogPrices",

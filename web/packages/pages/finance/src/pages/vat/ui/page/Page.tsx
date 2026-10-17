@@ -3,8 +3,8 @@
  * of the «QQS va davlat hisoboti» section (06 §1.9; the neighbouring «Davlat hisoboti bilan solishtirish»
  * tab is BO-10). Bosqich 3 part: period (month or quarter, summed on the client), tax-regime chip,
  * KPI cards from `GET /reports/vat-summary` (20 #1) and the «QQS registri» from `GET /vat-moves` (20 #2).
- * The «Soliq hisob-kitobi (ST)» card, risky inbound e-invoices and the BO-10 difference banner are later
- * stages (tax settlements, e-invoices, state reports) — shown as a disabled section.
+ * Bosqich 4: the «Soliq hisob-kitobi (ST)» card (tax-settlement/, 20 #8a–#8d). Risky inbound e-invoices and
+ * the BO-10 difference banner are later stages (e-invoices, state reports).
  * Offline: view only. useEffect only fires pageMounted (24 §2).
  */
 import { useUnit } from "effector-react";
@@ -45,6 +45,7 @@ import {
 } from "../../model/index.ts";
 import { SummaryCards } from "../kpis/SummaryCards.tsx";
 import { MovesTable } from "../moves/MovesTable.tsx";
+import { TaxSettlementCard } from "../../tax-settlement/ui/TaxSettlementCard.tsx";
 
 const MONTH_KEYS = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"] as const;
 
@@ -160,15 +161,7 @@ function VatPage() {
         </>
       )}
 
-      <Card className="flex flex-col gap-2 opacity-80" aria-disabled="true">
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-[15px] font-bold">{t("vat.settlement.title")}</h2>
-          <StatusChip tone="neutral" icon={Hourglass}>
-            {t("vat.nextStage")}
-          </StatusChip>
-        </div>
-        <p className="text-small text-foreground-secondary">{t("vat.settlement.description")}</p>
-      </Card>
+      <TaxSettlementCard monthLabel={monthLabel} />
 
       <Card>
         <MovesTable />

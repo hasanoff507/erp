@@ -193,14 +193,57 @@ export interface PriceRow {
   [extra: string]: unknown;
 }
 
+/** 16 §1 `open_debt_docs[].lines[]` (contracts b4/customers-pull.md) — input of `@shared/lib/debt-allocation`. */
+export interface OpenDebtDocLine {
+  sale_line_id: string;
+  line_no?: number;
+  product_id: string | null;
+  name?: string;
+  name_ru?: string | null;
+  mxik_code?: string | null;
+  package_code?: string | null;
+  unit_code?: string;
+  barcode?: string | null;
+  qty: string;
+  price?: string;
+  line_total: string;
+  vat_rate: string;
+  vat_exemption_code?: string | null;
+  settled_amount: string;
+  marking_code: string | null;
+  [extra: string]: unknown;
+}
+
+/** 16 §1 `customers[].open_debt_docs[]`. `local` = a debt sale of this device not on the server yet. */
+export interface OpenDebtDocRow {
+  doc_type: "sales" | "debt_openings" | "debt_writeoffs";
+  doc_id: string;
+  number?: string | null;
+  doc_date: string;
+  due_date: string | null;
+  open_amount: string;
+  lines?: OpenDebtDocLine[];
+  local?: boolean;
+  [extra: string]: unknown;
+}
+
 export interface CustomerRow {
   id: string;
   name: string;
   phone?: string | null;
+  kind?: string;
+  stir?: string | null;
   receivable_balance?: string;
   credit_limit?: string | null;
+  standing_discount_pct?: string | null;
+  /** Current promise date (`counterparties.debt_due_date`). */
+  debt_due_date?: string | null;
   version?: number;
-  open_debt_docs?: unknown[];
+  open_debt_docs?: OpenDebtDocRow[];
+  /** When this row was written by a pull (device clock, ISO) — outbox results after it are not in it yet. */
+  _pulled_at?: string;
+  /** Quick customer created on this device (`counterparty.created`), not pulled yet. */
+  _local?: boolean;
   tokens: string[];
   [extra: string]: unknown;
 }

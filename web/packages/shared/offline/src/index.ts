@@ -81,6 +81,25 @@ export {
   stock,
 } from "./repos/reference.ts";
 export { cardAttempts } from "./repos/card-attempts.ts";
+// --- B4 debt book (w-debts) ---
+export {
+  allocateOnDevice,
+  createQuickCustomer,
+  customerDebtView,
+  customerDebts,
+  debtPaymentPayload,
+  enqueueDebtPayment,
+  fiscalShares,
+  localSaleDoc,
+  overCreditLimit,
+  quickCustomerPayload,
+  saleDebtPart,
+  unreflected,
+  type CustomerDebtView,
+  type DebtPaymentInput,
+  type DebtPaymentMethod,
+  type QuickCustomerInput,
+} from "./repos/debts.ts";
 
 export {
   PIN_LOCK_STEPS_MIN,

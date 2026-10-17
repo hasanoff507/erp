@@ -775,21 +775,27 @@ Sozlamalar: `sms.sender="4546"`, `ERP_ESKIZ_TEST_MODE=true` (faqat ruxsat etilga
 
 **API holati**: Telegram Bot API — **to'liq ochiq, rasmiy, bepul** (`core.telegram.org/bots/api`); tadqiqot fayllarida alohida tekshirilmagan, chunki bu global, keng tanilgan API (davlat tizimi emas). Test uchun alohida bot yaratish bepul va cheklovsiz.
 
-**Adapter interfeysi**:
+**Adapter interfeysi** (Bot API `httpx` orqali, bot freymvorksiz; OTP kanali bilan bir xil bot va `ERP_TELEGRAM_BOT_TOKEN`):
 ```python
-class TelegramAdapter(Protocol):
-    async def send_message(self, chat_id: str, text: str, buttons: list[Button] | None = None) -> TelegramSendResult: ...
-    async def handle_update(self, update: TelegramUpdate) -> None: ...
-    async def link_account(self, one_time_code: str, chat_id: str) -> LinkResult: ...
+class TelegramPort(Protocol):   # adapterlar: TelegramBotAdapter, FakeTelegram (ERP_TELEGRAM_FAKE, prod'da rad etiladi)
+    async def send_message(self, chat_id: str, text: str) -> TelegramSendResult: ...
+    # TelegramSendResult{ok, error_kind: transient|blocked|invalid|auth, retry_after_s}
 ```
+Matn — oddiy matn (`parse_mode`siz), foydalanuvchining `users.locale` tilida (uz/ru).
+
+**Ulash va webhook** (US-M18-01): BO-20 «Telegram ulash» → `link-start` (20 #66) bir martalik `link_code` beradi (10 daqiqa, qaror #54; Redis'da faqat SHA-256 xeshi saqlanadi, `GETDEL` bilan bir marta olinadi; yangi kod oldingisini bekor qiladi) → `https://t.me/<bot>?start=<code>` → bot `POST /api/v1/notifications/telegram/webhook` ga `/start <code>` yuboradi. Webhook faqat `X-Telegram-Bot-Api-Secret-Token` = `ERP_TELEGRAM_WEBHOOK_SECRET` (`setWebhook secret_token`) bo'lsa qabul qilinadi, aks holda `403 WEBHOOK_SIGNATURE_INVALID`; faqat shaxsiy chat. Kod olingach shu tenant tranzaksiyasida a'zolik `active` va `telegram.link` qayta tekshiriladi, `telegram_links (tenant_id, user_id) ← chat_id` yoziladi (qayta ulashda `chat_id` yangilanadi, `revoked_at = NULL`) va `telegram_linked` audit qilinadi. Bot javobi webhook javobining o'zida qaytadi (`{"method":"sendMessage",...}`) — webhook tashqi tizimni kutmaydi.
+
+**Qabul qiluvchilar**: faol `telegram_links` + faol a'zolik + `telegram.link` + turning auditoriya huquqi (`low_stock`, `expiry_soon` — `stock.view`; `daily_report`, `cash_variance`, `over_limit_action`, `card_settlement_mismatch`, `debt_due_today`, `debt_aging_60`, `debt_limit_exceeded_offline` — `reports.finance.view`; `offline_48h` — `reports.sales.view`; `state_report_diff` — `tax.compare.review`; `subscription_due`, `subscription_grace` — `billing.manage`; `recurring_expense_due` — `expenses.create`) + o'z `notification_settings`ida tur yoqilgan (yozuv yo'q — yoqilgan); voqeada `branch_id` (yoki `cash_register_id`) bo'lsa — faqat shu filialni ko'radigan a'zolar (`memberships.branch_ids` bo'sh yoki shu filialni o'z ichiga oladi). Tenant bo'yicha qarz voqealari (`debt_due_today`, `debt_aging_60` — payload'da barcha filiallar qarzdorlari) filialga cheklangan a'zoga (`branch_ids` bo'sh emas) yuborilmaydi (26 #186). Voqea (`payload.event`) worker'da har qabul qiluvchiga alohida yetkazish job'iga (`payload.deliver_to`) tarqatiladi; yuborishdan oldin shartlar qayta tekshiriladi — bloklangan/uzilgan foydalanuvchiga yoki o'chirilgan turga hech narsa yuborilmaydi. Birinchi ishlov paytida 24 soatdan eski voqea yuborilmaydi (`done`, «stale»). Har yakuniy natija `notifications_log`ga (`template` = tur, `recipient` = `chat_id`, `status` `sent`/`failed`).
+
+**Kunlik hisobot** (US-M18-02): cron har 5 daqiqada; qabul qiluvchining `daily_report.time`i (standart 21:00, Toshkent) kelgach o'sha kun uchun bitta xabar — `reports.daily_summary()` (qabul qiluvchining filial doirasi) natijasi job payload'iga muhrlanadi; smenalar yopilmagan bo'lsa ham shu vaqtgacha bo'lgan savdo. "Muddati o'tgan qarz" — yagona ta'rif `20-api-moliya-admin.md` #21 (`COALESCE(due_date, doc_date) < bugun`, va'da sanasi muddatni surmaydi; ochiq qoldiqlar balansga moslashtirilgan).
 
 **Ma'lumot moslashtirish**: `telegram_links(tenant_id, user_id, chat_id, linked_at)`, `notification_settings(tenant_id, user_id, kind, enabled, time)`, `notifications_log(channel=telegram, ...)` (`11-malumotlar-modeli.md`, 10-bo'lim).
 
-**Idempotentlik kaliti**: `chat_id + template + period` (kunlik hisobot bir kunda bir marta); `update_id` (Telegram'ning o'zi beradi) — takroriy webhook'ni rad etish uchun.
+**Idempotentlik kaliti**: `outbox_jobs.idempotency_key` — kunlik hisobot `daily_report:<user_id>:<sana>` (bir kunda bir marta), voqea yetkazish `<voqea kaliti>><user_id>`; `update_id` (Telegram'ning o'zi beradi, 24 soat saqlanadi) — takroriy webhook'ni rad etish uchun.
 
-**Qayta urinish/backoff**: `base=10s, factor=2, cap=5 daqiqa, max_attempts=10` (Telegram API odatda barqaror, lekin rate-limit bo'lishi mumkin).
+**Qayta urinish/backoff**: `base=10s, factor=2, cap=5 daqiqa, max_attempts=10` + 0–10 % jitter; `429` javobidagi `retry_after` uzunroq bo'lsa shunisi (Telegram API odatda barqaror, lekin rate-limit bo'lishi mumkin). Telegram kanali sozlanmagan bo'lsa (token ham, fake ham yo'q) job'lar navbatda kutadi, o'lik xatga tushmaydi.
 
-**Xato UX**: xabar yetib bormasa (bot bloklangan, chat o'chirilgan) — `telegram_links` holati `inactive` belgilanadi, Egasi UI'da qayta ulash so'raladi.
+**Xato UX**: xabar yetib bormasa (bot bloklangan — `403`, chat topilmadi) — shu tenantdagi shu `chat_id`li `telegram_links` yozuvlariga `revoked_at = now()` yoziladi (nofaol), job `failed`; BO-20 holatni «ulanmagan» ko'rsatadi va qayta ulash taklif qiladi.
 
 **Offline**: server tomonida ishlaydi; kassa offline bo'lsa, ma'lumotlar sinxronlangach xabarlar yangilanadi (M18 chekka holat).
 

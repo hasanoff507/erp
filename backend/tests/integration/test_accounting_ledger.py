@@ -37,6 +37,15 @@ pytestmark = [pytest.mark.db, pytest.mark.redis]
 __all__ = ["catalog_env_fixture"]
 
 TODAY = business_today()
+
+
+@pytest.fixture(autouse=True)
+def _fresh_business_day() -> None:
+    """The suite can cross midnight (Asia/Tashkent): take the business day when each test starts."""
+    global TODAY
+    TODAY = business_today()
+
+
 LAST_MONTH = (TODAY.replace(day=1) - timedelta(days=1)).replace(day=1)
 
 

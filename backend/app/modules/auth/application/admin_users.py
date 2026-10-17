@@ -170,7 +170,9 @@ class AdminUsersService:
         forget_profile: Callable[[UUID, UUID], Awaitable[None]],
         claims: ClaimsStaleMarker,
         otp: OtpSender,
+        on_blocked: Callable[[AsyncSession, UUID, UUID], Awaitable[object]] | None = None,
     ) -> None:
+        self._on_blocked = on_blocked  # M18: revoke the Telegram link in the same transaction (QT-M18-05)
         self._sf = session_factory
         self._repo = repo
         self._revocation = revocation
@@ -307,6 +309,8 @@ class AdminUsersService:
             if status == "blocked":
                 sids = await self._repo.session_ids(s, user_id, tenant)
                 revoked = await self._repo.revoke_user(s, user_id, tenant, REVOKE_REASON_BLOCKED)
+                if self._on_blocked is not None:
+                    await self._on_blocked(s, tenant, user_id)
                 await record_audit(
                     s, tenant_id=tenant, user_id=actor.user_id, action="all_sessions_revoked",
                     entity="users", entity_id=user_id, ip=ip,

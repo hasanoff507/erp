@@ -1,4 +1,8 @@
-/** BO-03 KPI cards (07, mockup Bo03Ombor): ombor qiymati, kam qoldiq, muddati yaqin partiyalar, yo'ldagi ko'chirishlar. */
+/**
+ * BO-03 KPI cards (07, mockup Bo03Ombor): ombor qiymati, kam qoldiq, muddati yaqin partiyalar,
+ * yo'ldagi ko'chirishlar. «Barcha filiallar» (consolidated): value and low stock over every branch —
+ * lots and transfers are per warehouse.
+ */
 import { useUnit } from "effector-react";
 import { CalendarClock, Package, Truck, TriangleAlert } from "lucide-react";
 
@@ -17,7 +21,7 @@ import {
   summaryRefreshRequested,
 } from "../../model/index.ts";
 
-export function Kpis({ branchName }: { branchName: string }) {
+export function Kpis({ branchName, consolidated }: { branchName: string; consolidated: boolean }) {
   const { t } = useTranslation("warehouse");
   const [summary, summaryError, expiring, transit, retry] = useUnit([
     $summary,
@@ -53,8 +57,8 @@ export function Kpis({ branchName }: { branchName: string }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" role="group" aria-label={t("kpi.label")}>
       <KpiCard
-        label={t("kpi.value", { branch: branchName })}
-        value={`${summary.capped ? "≥ " : ""}${formatMoney(summary.value, { withCurrency: false })}`}
+        label={consolidated ? t("kpi.valueAll") : t("kpi.value", { branch: branchName })}
+        value={formatMoney(summary.value, { withCurrency: false })}
         icon={Package}
         tone="primary"
         note={t("kpi.valueNote", { count: summary.positions })}
@@ -67,26 +71,30 @@ export function Kpis({ branchName }: { branchName: string }) {
         note={t("kpi.lowNote")}
         noteTone={summary.low > 0 ? "destructive" : "neutral"}
       />
-      <KpiCard
-        label={t("kpi.expiring")}
-        value={String(lots.length)}
-        icon={CalendarClock}
-        tone="warning"
-        note={
-          lots.length > 0
-            ? t("kpi.expiringNote", { days: EXPIRY_DAYS, names: lotNames })
-            : t("kpi.expiringNone", { days: EXPIRY_DAYS })
-        }
-        noteTone="warning"
-      />
-      <KpiCard
-        label={t("kpi.transit")}
-        value={String(transit?.inTransit ?? 0)}
-        icon={Truck}
-        tone="info"
-        note={t("kpi.transitNote", { overdue: transit?.overdue ?? 0, ettn: transit?.waitingEttn ?? 0 })}
-        noteTone="info"
-      />
+      {consolidated ? null : (
+        <>
+          <KpiCard
+            label={t("kpi.expiring")}
+            value={String(lots.length)}
+            icon={CalendarClock}
+            tone="warning"
+            note={
+              lots.length > 0
+                ? t("kpi.expiringNote", { days: EXPIRY_DAYS, names: lotNames })
+                : t("kpi.expiringNone", { days: EXPIRY_DAYS })
+            }
+            noteTone="warning"
+          />
+          <KpiCard
+            label={t("kpi.transit")}
+            value={String(transit?.inTransit ?? 0)}
+            icon={Truck}
+            tone="info"
+            note={t("kpi.transitNote", { overdue: transit?.overdue ?? 0, ettn: transit?.waitingEttn ?? 0 })}
+            noteTone="info"
+          />
+        </>
+      )}
     </div>
   );
 }

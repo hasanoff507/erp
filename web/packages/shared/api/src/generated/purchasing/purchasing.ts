@@ -8,7 +8,15 @@ import type {
   EmptyBody,
   ListGoodsReceiptsParams,
   ListPurchaseOrdersParams,
+  ListSupplierOpenDocumentsParams,
+  ListSupplierPaymentsParams,
   ListSupplierReturnsParams,
+  OpenDocsOut,
+  PaymentCancel,
+  PaymentCreated,
+  PaymentIn,
+  PaymentOut,
+  PaymentPage,
   PoCancel,
   PoCreate,
   PoOut,
@@ -251,6 +259,68 @@ export const cancelSupplierReturn = (
     },
       options);
     }
+  /**
+ * @summary List Open Documents
+ */
+export const listSupplierOpenDocuments = (
+    params: ListSupplierOpenDocumentsParams,
+ options?: SecondParameter<typeof apiRequest<OpenDocsOut>>,) => {
+      return apiRequest<OpenDocsOut>(
+      {url: `/api/v1/supplier-payments/open-documents`, method: 'GET',
+        params
+    },
+      options);
+    }
+  /**
+ * @summary List Supplier Payments
+ */
+export const listSupplierPayments = (
+    params?: ListSupplierPaymentsParams,
+ options?: SecondParameter<typeof apiRequest<PaymentPage>>,) => {
+      return apiRequest<PaymentPage>(
+      {url: `/api/v1/supplier-payments`, method: 'GET',
+        params
+    },
+      options);
+    }
+  /**
+ * @summary Create Supplier Payment
+ */
+export const createSupplierPayment = (
+    paymentIn: PaymentIn,
+ options?: SecondParameter<typeof apiRequest<PaymentCreated>>,) => {
+      return apiRequest<PaymentCreated>(
+      {url: `/api/v1/supplier-payments`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: paymentIn
+    },
+      options);
+    }
+  /**
+ * @summary Get Supplier Payment
+ */
+export const getSupplierPayment = (
+    paymentId: string,
+ options?: SecondParameter<typeof apiRequest<PaymentOut>>,) => {
+      return apiRequest<PaymentOut>(
+      {url: `/api/v1/supplier-payments/${paymentId}`, method: 'GET'
+    },
+      options);
+    }
+  /**
+ * @summary Cancel Supplier Payment
+ */
+export const cancelSupplierPayment = (
+    paymentId: string,
+    paymentCancel: PaymentCancel,
+ options?: SecondParameter<typeof apiRequest<PaymentOut>>,) => {
+      return apiRequest<PaymentOut>(
+      {url: `/api/v1/supplier-payments/${paymentId}/cancel`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: paymentCancel
+    },
+      options);
+    }
   export type ListPurchaseOrdersResult = NonNullable<Awaited<ReturnType<typeof listPurchaseOrders>>>
 export type CreatePurchaseOrderResult = NonNullable<Awaited<ReturnType<typeof createPurchaseOrder>>>
 export type GetPurchaseOrderResult = NonNullable<Awaited<ReturnType<typeof getPurchaseOrder>>>
@@ -268,3 +338,8 @@ export type CreateSupplierReturnResult = NonNullable<Awaited<ReturnType<typeof c
 export type GetSupplierReturnResult = NonNullable<Awaited<ReturnType<typeof getSupplierReturn>>>
 export type PostSupplierReturnResult = NonNullable<Awaited<ReturnType<typeof postSupplierReturn>>>
 export type CancelSupplierReturnResult = NonNullable<Awaited<ReturnType<typeof cancelSupplierReturn>>>
+export type ListSupplierOpenDocumentsResult = NonNullable<Awaited<ReturnType<typeof listSupplierOpenDocuments>>>
+export type ListSupplierPaymentsResult = NonNullable<Awaited<ReturnType<typeof listSupplierPayments>>>
+export type CreateSupplierPaymentResult = NonNullable<Awaited<ReturnType<typeof createSupplierPayment>>>
+export type GetSupplierPaymentResult = NonNullable<Awaited<ReturnType<typeof getSupplierPayment>>>
+export type CancelSupplierPaymentResult = NonNullable<Awaited<ReturnType<typeof cancelSupplierPayment>>>

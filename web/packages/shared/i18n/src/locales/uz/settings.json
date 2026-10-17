@@ -838,20 +838,32 @@
       "manualReason": "Sabab",
       "comment": "Izoh",
       "lines": "Qatorlar",
-      "direction": "Yo'nalish"
+      "direction": "Yo'nalish",
+      "category": "Xarajat toifasi",
+      "source": "To'lov manbai",
+      "docDate": "Hujjat sanasi",
+      "customer": "Mijoz",
+      "creditLimit": "Kredit limiti",
+      "currentDebt": "Joriy qarz"
     },
     "enum": {
       "reason": {
         "collection": "Inkassatsiya",
         "deposit": "Kassaga qo'yish",
         "owner_withdrawal": "Ta'sischi oldi",
-        "other": "Boshqa"
+        "other": "Boshqa",
+        "expense": "Kassadan xarajat"
       },
       "manualReason": {
         "standalone_terminal": "Kassaga terminal bog'lanmagan",
         "terminal_offline": "Terminal ulanmagan",
         "terminal_error": "Terminal xatosi",
         "unknown_result": "Terminal natijasi noma'lum"
+      },
+      "source": {
+        "cash": "Kassa (naqd)",
+        "bank": "Bank hisobi",
+        "card": "Korporativ karta"
       }
     },
     "linesCount": "{{count}} ta qator",
@@ -1029,6 +1041,142 @@
       "prefix_duplicate": "Prefiks takrorlanmasin",
       "prefix_required": "Kamida bitta prefiks kiriting",
       "range": "0 dan 365 gacha"
+    }
+  },
+  "telegram": {
+    "title": "Telegram va bildirishnomalar",
+    "description": "Telegram akkauntini ulash, ogohlantirish turlari va kunlik hisobot vaqti. Har foydalanuvchi o'z akkaunti va sozlamalarini boshqaradi.",
+    "save": "Saqlash",
+    "cancel": "Bekor qilish",
+    "saved": "Saqlandi",
+    "offline": "Telegram sozlamalari internet bilan ishlaydi — ulanish qaytganda oching.",
+    "account": {
+      "title": "Telegram akkaunt",
+      "hint": "Ogohlantirishlar va kunlik hisobot shu akkauntga keladi. Har foydalanuvchi faqat o'z akkauntini ulaydi.",
+      "linked": "Ulangan",
+      "notLinked": "Ulanmagan",
+      "since": "Ulangan sana",
+      "lastMessage": "Oxirgi xabar",
+      "lastMessageValue": "{{at}} · «{{kind}}»",
+      "noMessages": "Hali xabar yuborilmagan",
+      "thisMonth": "Bu oy yuborildi",
+      "thisMonthValue": "{{count}}{{more}} ta xabar",
+      "link": "Telegramni ulash",
+      "linkOther": "Boshqa akkauntni ulash",
+      "unlink": "Uzish",
+      "unlinkTitle": "Telegram akkauntini uzasizmi?",
+      "unlinkDescription": "Ogohlantirishlar va kunlik hisobot bu akkauntga boshqa yuborilmaydi.",
+      "linkTitle": "Botni oching va «Start» ni bosing",
+      "linkHint": "Havolani Telegramda oching — bot akkauntingizni do'konga bir martalik kod bilan ulaydi.",
+      "code": "Bir martalik kod:",
+      "validUntil": "Havola 10 daqiqa amal qiladi · {{time}} gacha",
+      "waiting": "Botda «Start» bosilishini kutyapmiz…",
+      "copy": "Nusxa olish",
+      "copied": "Havola nusxalandi",
+      "copyFailed": "Nusxa olib bo'lmadi — havolani qo'lda belgilang",
+      "newLink": "Yangi havola",
+      "retry": "Qayta urinish",
+      "expired": "Bot ulanmadi — havola muddati o'tgan yoki botda «Start» bosilmagan."
+    },
+    "alerts": {
+      "title": "Ogohlantirishlar",
+      "enabled": "{{on}} / {{all}} yoqilgan"
+    },
+    "groups": {
+      "sales": "KASSA VA SAVDO",
+      "stock": "OMBOR",
+      "debts": "QARZLAR",
+      "system": "SOLIQ, MOLIYA VA TIZIM",
+      "other": "BOSHQA"
+    },
+    "daily": {
+      "title": "Kunlik hisobot",
+      "toggle": "Kunlik hisobotni Telegramga yuborish",
+      "toggleHint": "Kun yakuni: savdo, cheklar, to'lov usullari, kecha bilan farq",
+      "time": "Kunlik hisobot vaqti",
+      "timeHint": "Toshkent vaqti. Smenalar yopilmagan bo'lsa ham shu vaqtgacha bo'lgan savdo yuboriladi.",
+      "preview": "Xabar ko'rinishi (namuna)",
+      "sample": {
+        "head": "Do'kon · bugungi hisobot",
+        "sales": "Savdo: 4 250 000 so'm",
+        "receipts": "Cheklar: 86 ta",
+        "avg": "O'rtacha chek: 49 419 so'm",
+        "methods": "Naqd 2 100 000 · Karta 1 500 000 · Nasiya 650 000",
+        "change": "Kecha bilan: ↑ 11,8%",
+        "attention": "Diqqat: Kassa 2 offline 26 soat · 11 tovar kam qolgan"
+      }
+    },
+    "log": {
+      "title": "Yuborilgan xabarlar",
+      "empty": "Hali xabar yuborilmagan",
+      "columns": {
+        "at": "Vaqt",
+        "template": "Xabar turi",
+        "recipient": "Chat",
+        "status": "Holat"
+      },
+      "status": {
+        "sent": "Yuborildi",
+        "failed": "Yuborilmadi"
+      }
+    },
+    "kinds": {
+      "daily_report": {
+        "title": "Kunlik hisobot",
+        "description": "Kun yakuni: savdo, cheklar, to'lov usullari, kecha bilan farq"
+      },
+      "cash_variance": {
+        "title": "Kassa farqi",
+        "description": "Smena yopilganda naqd pul farqi topilsa — darhol"
+      },
+      "over_limit_action": {
+        "title": "Limitdan oshgan amal",
+        "description": "Chegirma, qaytarish yoki pul olish rol limitidan oshdi"
+      },
+      "offline_48h": {
+        "title": "Offline 40/48 soat",
+        "description": "OFD tasdig'isiz chek 40 soatdan eski — 48 soatda kassa bloklanadi"
+      },
+      "card_settlement_mismatch": {
+        "title": "Terminal yakuni farqi",
+        "description": "Karta terminali yakuni kassa hisobi bilan mos emas"
+      },
+      "low_stock": {
+        "title": "Kam qolgan tovar",
+        "description": "Qoldiq minimal darajadan pastga tushganda, kuniga 1 marta"
+      },
+      "expiry_soon": {
+        "title": "Yaroqlilik muddati yaqin",
+        "description": "Muddati tugashiga oz qolgan tovarlar"
+      },
+      "debt_due_today": {
+        "title": "Qarz muddati bugun",
+        "description": "Bugun to'lanishi kerak bo'lgan mijoz qarzlari"
+      },
+      "debt_aging_60": {
+        "title": "60 kundan oshgan qarz",
+        "description": "Muddati 60 kundan o'tgan qarzdorlar"
+      },
+      "debt_limit_exceeded_offline": {
+        "title": "Offline qarz limiti oshdi",
+        "description": "Kassa offline paytida mijoz qarz limitidan oshib ketdi"
+      },
+      "state_report_diff": {
+        "title": "Davlat hisoboti farqi",
+        "description": "QQS ichki hisob va davlat hisoboti o'rtasida farq"
+      },
+      "subscription_due": {
+        "title": "Obuna eslatmasi",
+        "description": "Muddat tugashidan 3, 1 va 0 kun oldin"
+      },
+      "subscription_grace": {
+        "title": "Obuna imtiyozli davri",
+        "description": "Obuna to'lanmagan — imtiyozli davr boshlandi"
+      },
+      "recurring_expense_due": {
+        "title": "Takroriy xarajat muddati",
+        "description": "Doimiy xarajatni to'lash vaqti keldi"
+      }
     }
   }
 }

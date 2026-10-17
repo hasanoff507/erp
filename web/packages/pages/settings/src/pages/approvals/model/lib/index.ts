@@ -5,6 +5,7 @@ import {
   APPROVAL_KINDS,
   CASH_REASONS,
   DOC_TYPES,
+  EXPENSE_SOURCES,
   MANUAL_REASONS,
   PAGE_SIZE,
   PERCENT_KINDS,
@@ -84,6 +85,20 @@ export function contextLines(r: Pick<ApprovalRequest, "kind" | "context">): Cont
   const comment = str(c.comment) ?? str(c.note);
   if (comment !== null) lines.push({ key: "comment", value: comment });
   if (Array.isArray(c.lines) && c.lines.length > 0) lines.push({ key: "lines", count: c.lines.length });
+  // B4: a big expense (20 #43 context) / a POS cash expense; a debt over the credit limit (18 §2.4).
+  const category = str(c.category_name);
+  if (category !== null) lines.push({ key: "category", value: category });
+  const source = str(c.source);
+  if (r.kind === "expense_over_limit" && oneOf(EXPENSE_SOURCES, source))
+    lines.push({ key: "source", value: source });
+  const docDate = str(c.doc_date);
+  if (docDate !== null && /^\d{4}-\d{2}-\d{2}$/.test(docDate)) lines.push({ key: "docDate", value: docDate });
+  const customer = str(c.counterparty_name) ?? str(c.customer_name);
+  if (customer !== null) lines.push({ key: "customer", value: customer });
+  const creditLimit = str(c.credit_limit);
+  if (creditLimit !== null) lines.push({ key: "creditLimit", value: creditLimit });
+  const currentDebt = str(c.receivable_balance) ?? str(c.current_debt);
+  if (currentDebt !== null) lines.push({ key: "currentDebt", value: currentDebt });
   return lines;
 }
 

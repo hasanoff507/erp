@@ -61,7 +61,9 @@ describe("BO-04 purchases page model", () => {
     expect(s.getState($tab)).toBe("returns");
     expect(s.getState($createOpen)).toBe(true);
     expect(isPurchasesTab("suppliers")).toBe(true);
-    expect(isPurchasesTab("payments")).toBe(false);
+    // B4: «Yetkazib beruvchiga to'lov» is a tab now; «Men qarzdorman» is not (debts page).
+    expect(isPurchasesTab("payments")).toBe(true);
+    expect(isPurchasesTab("payable")).toBe(false);
   });
 
   it("the order sheet flag: opened by the page / a ?new=1 link, closed on a new visit", async () => {

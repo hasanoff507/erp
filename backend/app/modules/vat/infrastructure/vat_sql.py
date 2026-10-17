@@ -10,7 +10,7 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.vat.application.vat import BranchBase, VatMoveRow
+from app.modules.vat.application.vat import BranchBase, RegimeRange, VatMoveRow, split_regimes
 
 ZERO = Decimal("0.00")
 _BASE_ACCOUNTS = "('9020','9040','9050','9390','8530')"
@@ -33,6 +33,17 @@ class SqlVatRepository:
             )
         ).scalar()
         return "turnover" if regime == "turnover" else "vat"
+
+    async def regime_ranges(self, s: AsyncSession, start: date, end: date) -> list[RegimeRange]:
+        """``[start, end]`` split by the ``tenant_tax_regimes`` in force (ACC-06; no row → ``vat``)."""
+        rows = await s.execute(
+            text(
+                "SELECT valid_from, regime FROM app.tenant_tax_regimes WHERE valid_from <= :e "
+                "ORDER BY valid_from"
+            ),
+            {"e": end},
+        )
+        return split_regimes([(r[0], r[1]) for r in rows], start, end)
 
     async def legal_form(self, s: AsyncSession) -> str:
         return str((await s.execute(text("SELECT legal_form FROM app.tenants LIMIT 1"))).scalar_one())
@@ -113,8 +124,8 @@ class SqlVatRepository:
                     "SELECT id FROM app.tax_settlements WHERE period = :p AND tax_kind = :k AND status = "
                     "'posted' "
                     "AND (CAST(:b AS uuid) IS NULL OR branch_id = :b) "
-                    # no app writer yet (id may be the DB uuidv7()): timestamp, id as the tiebreak
-                    "ORDER BY created_at DESC, id DESC LIMIT 1"
+                    # ids are UUIDv7 written by the tax-settlement service (monotonic): latest first
+                    "ORDER BY id DESC LIMIT 1"
                 ),
                 {"p": period, "k": kind, "b": branch_id},
             )

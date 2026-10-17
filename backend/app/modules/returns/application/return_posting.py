@@ -125,19 +125,9 @@ class ReturnPostingHandler:
         counterparty_id = await self._counterparty(s, p, sale)
         if p.refund_method == "debt_adjustment" and counterparty_id is None:
             raise invalid("counterparty_id", "validation.required")
-        open_debt = await self._r.open_debt_of_sale(s, sale.id) if sale else ZERO
-        split = split_refund(return_amount, open_debt, p.refund_method)
-        if split.debt_part > 0 and counterparty_id is None:
-            raise invalid("counterparty_id", "validation.required")
-        issues_receipt = split.money_part > 0
-        self._check_receipt_fields(p, issues_receipt)
-        if issues_receipt and sale is not None and split.money_part > await self._r.fiscal_room(s, sale.id):
-            raise invalid("lines", "validation.fiscal_refund_exceeds_sale")
         approved_by, approved_at = await self._approve(
             s, ctx, p, return_amount, any(ln.expired for ln in lines), out
         )
-        if issues_receipt:
-            await d.fiscal.assert_can_issue(s, cash_register_id=p.cash_register_id, at=at)
 
         # --- registers -----------------------------------------------------------------------------
         doc_date = business_date(at)
@@ -149,6 +139,28 @@ class ReturnPostingHandler:
                 "late_in_closed_period", p.id, period=period_label(doc_date), doc_date=doc_date.isoformat()
             )
         txn = await d.stock.lock(s, ctx.tenant_id, [(warehouse_id, ln.product.id) for ln in lines])
+        # SYNC-01 (23 §2.1: stock → debt): the sale's open debt, the split and the fiscal room are read under
+        # the customer's debt_balances lock, so a concurrent payment/write-off cannot be counted twice
+        if counterparty_id is not None:
+            await d.debts.lock(s, ctx.tenant_id, [(counterparty_id, "receivable")])
+        open_debt = await self._r.open_debt_of_sale(s, sale.id) if sale else ZERO
+        # ACC-04 (13 §2.5, §2.15): a written-off part of the sale is not on 4010 any more — the return may
+        # only shrink the still-open part; the Owner cancels the write-off first (FOUNDER F2)
+        if (
+            sale is not None
+            and return_amount > open_debt
+            and await self._r.written_off_of_sale(s, sale.id) > 0
+        ):
+            raise invalid("sale_id", "validation.sale_debt_written_off")
+        split = split_refund(return_amount, open_debt, p.refund_method)
+        if split.debt_part > 0 and counterparty_id is None:
+            raise invalid("counterparty_id", "validation.required")
+        issues_receipt = split.money_part > 0
+        self._check_receipt_fields(p, issues_receipt)
+        if issues_receipt and sale is not None and split.money_part > await self._r.fiscal_room(s, sale.id):
+            raise invalid("lines", "validation.fiscal_refund_exceeds_sale")
+        if issues_receipt:
+            await d.fiscal.assert_can_issue(s, cash_register_id=p.cash_register_id, at=at)
         number = await next_doc_number(
             s, tenant_id=ctx.tenant_id, branch_id=p.branch_id, table=DOC_TYPE, year=doc_date.year
         )

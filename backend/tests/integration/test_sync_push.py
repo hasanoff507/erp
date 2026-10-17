@@ -169,14 +169,14 @@ async def test_outbox_state_and_heartbeat_update_the_device_in_one_transaction(e
     rejected_at = datetime.now(UTC) - timedelta(days=3)
     results = await push_ok(
         env, pos,
-        [event(pos, ECHO, {}), event(pos, "debt_payment.created", {}, created_at=rejected_at),
+        [event(pos, ECHO, {}), event(pos, "no.such.event", {}, created_at=rejected_at),
          event(pos, "no.such.type", {})],
         pending=7, oldest=oldest_unsent,
     )  # fmt: skip
     assert [r["status"] for r in results] == ["accepted", "rejected", "rejected"]
     later = results[1]
     assert (later["error_code"], later["retryable"]) == ("VALIDATION_ERROR", False)
-    assert later["details"] == [{"field": "type", "message_key": "validation.event_type_not_supported"}]
+    assert later["details"] == [{"field": "type", "message_key": "validation.event_type_unknown"}]
     assert results[2]["details"] == [{"field": "type", "message_key": "validation.event_type_unknown"}]
     dev = (await rows(env.db, shop.tenant_id, "SELECT * FROM app.devices WHERE id = :d", d=pos.device_id))[0]
     assert dev["outbox_pending_count"] == 9  # 7 not sent + 2 rejected in this request

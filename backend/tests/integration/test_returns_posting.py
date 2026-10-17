@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import timedelta
 from typing import Any
 
 import pytest
+from sqlalchemy import text
 
+from app.core.db.base import uuid7
+from app.core.db.session import tenant_transaction
 from app.modules.accounting.wiring import business_today
+from tests.support.debts import customer, debt_sale, item, set_go_live
 from tests.support.inventory import receive, set_method
 from tests.support.sales import (
     D,
@@ -420,3 +425,122 @@ async def test_acc_04_last_return_takes_the_vat_rest(env: Env) -> None:
     entries = [e for i in [sale_id, *ids] for e in await ledger_rows(env, pos, i)]
     vat_net = sum(e[2] for e in entries if e[1] == "6410") - sum(e[2] for e in entries if e[0] == "6410")
     assert vat_net == D("0.00")
+
+
+async def _receivable(env: Env, pos: Pos, cid: Any) -> D:
+    value = await one(env.db, pos.tenant_id, "SELECT COALESCE(sum(balance), 0) FROM app.debt_balances "
+                      "WHERE counterparty_id = :c AND direction = 'receivable'", c=cid)  # fmt: skip
+    return D(value)
+
+
+async def _ledger_4010(env: Env, pos: Pos, cid: Any) -> D:
+    value = await one(
+        env.db, pos.tenant_id,
+        "SELECT COALESCE(sum(CASE WHEN account_dt = '4010' THEN amount ELSE -amount END), 0) FROM "
+        "app.ledger_entries WHERE '4010' IN (account_dt, account_kt) AND analytics->>'counterparty_id' = :c",
+        c=str(cid),
+    )  # fmt: skip
+    return D(value)
+
+
+async def test_acc04_return_of_written_off_sale_refused(env: Env) -> None:
+    """ACC-04 (13 §2.5, §2.15; FOUNDER F2): a return may only shrink the still-open part of a sale whose debt
+    was partly written off — beyond it the return is refused for every ``refund_method``."""
+    pos = await make_pos(env, account="2910")
+    await set_go_live(env, pos, business_today().replace(day=1))
+    cid = await customer(env, pos)
+    product = await item(env, pos, "12000.0000")
+    sale = await debt_sale(env, pos, cid, [(product, "2.000", "12000.0000")])
+    created = await env.client.post(
+        "/api/v1/debt-writeoffs", json={"counterparty_id": str(cid), "amount": "12000.00", "reason": "umidsiz"},
+        headers=pos.shop.h("owner"),
+    )  # fmt: skip
+    assert created.status_code in (200, 201), created.text
+    posted = await env.client.post(
+        f"/api/v1/debt-writeoffs/{created.json()['id']}/post", headers=pos.shop.h("owner")
+    )
+    assert posted.status_code == 200, posted.text
+    assert await _receivable(env, pos, cid) == D("12000.00")
+    lines = await sold_lines(env, pos, sale["id"])
+    # inside the still-open part (24000 − 12000 written off): unaffected, the debt part takes it
+    fits = return_payload(pos, [return_line(product, sale_line_id=lines[0]["id"])], sale_id=sale["id"],
+                          receipt_seq=None)  # fmt: skip
+    ok = await deliver(env, pos, "return.created", fits, actor="owner")
+    assert ok.error is None, (ok.code, ok.keys)
+    assert ok.server["debt_part"] == "12000.00" and ok.server["money_part"] == "0.00"
+    assert await _receivable(env, pos, cid) == D("0.00")
+    # the rest of the sale was written off: refused whatever the refund method
+    for method, seq in (("cash", "auto"), ("debt_adjustment", None)):
+        over = return_payload(pos, [return_line(product, sale_line_id=lines[0]["id"])], sale_id=sale["id"],
+                              refund_method=method, receipt_seq=seq)  # fmt: skip
+        res = await deliver(env, pos, "return.created", over, actor="owner")
+        assert res.code == "VALIDATION_ERROR", (method, res.code, res.keys)
+        assert res.fields == ["sale_id"] and res.keys == ["validation.sale_debt_written_off"], method
+    assert await _receivable(env, pos, cid) == D("0.00")
+    assert await _receivable(env, pos, cid) == await _ledger_4010(env, pos, cid)
+    assert await one(env.db, pos.tenant_id, "SELECT count(*) FROM app.returns WHERE sale_id = :s",
+                     s=sale["id"]) == 1  # fmt: skip
+
+
+async def _lock_waiters(env: Env, pos: Pos) -> int:
+    found = await one(env.db, pos.tenant_id, "SELECT count(*) FROM pg_stat_activity "
+                      "WHERE datname = current_database() AND wait_event_type = 'Lock'")  # fmt: skip
+    return int(found)
+
+
+async def test_sync01_return_reads_sale_debt_under_debt_lock(env: Env) -> None:
+    """SYNC-01 (23 §2.1: stock → debt): a second transaction holds the customer's ``debt_balances`` row and
+    closes the sale's debt by a bank payment while the return is delivered. The return must read the sale's
+    open debt only after that commit: ``debt_part = 0`` and the balance never goes negative."""
+    pos = await make_pos(env)
+    product = await new_item(env, pos, stock="5.000")
+    cid = await add_customer(env, pos)
+    sale_id, lines = await _sold(
+        env, pos, product, qty="2.000",
+        payments=[{"method": "cash", "amount": "20000.00"}, {"method": "debt", "amount": "4000.00"}],
+        counterparty_id=str(cid),
+    )  # fmt: skip
+    assert await _receivable(env, pos, cid) == D("4000.00")
+    owner = pos.shop.user_ids["owner"]
+    payment_id = uuid7()
+    payload = return_payload(pos, [return_line(product, sale_line_id=lines[0]["id"])], sale_id=sale_id)
+    async with env.db.session_factory() as s, tenant_transaction(s, pos.tenant_id, user_id=owner):
+        await s.execute(
+            text("SELECT balance FROM app.debt_balances WHERE counterparty_id = :c "
+                 "AND direction = 'receivable' FOR UPDATE"), {"c": cid},
+        )  # fmt: skip
+        returning = asyncio.create_task(deliver(env, pos, "return.created", payload))
+        for _ in range(200):  # the return reaches the debt lock and waits on it
+            if returning.done() or await _lock_waiters(env, pos) > 0:
+                break
+            await asyncio.sleep(0.05)
+        assert not returning.done(), returning.result().code
+        # the concurrent bank payment closes the sale's debt (the rows DebtPaymentService writes, 13 §2.14)
+        await s.execute(
+            text("INSERT INTO app.debt_payments (id, tenant_id, branch_id, doc_date, status, counterparty_id, "
+                 "method, amount, created_by, posted_at) VALUES (:id, :t, :b, :d, 'posted', :c, 'bank', 4000, "
+                 ":u, now())"),
+            {"id": payment_id, "t": pos.tenant_id, "b": pos.branch_id, "d": business_today(), "c": cid,
+             "u": owner},
+        )  # fmt: skip
+        await s.execute(
+            text("INSERT INTO app.debt_payment_allocations (tenant_id, debt_payment_id, target_doc_type, "
+                 "target_doc_id, amount) VALUES (:t, :p, 'sales', :s, 4000)"),
+            {"t": pos.tenant_id, "p": payment_id, "s": sale_id},
+        )  # fmt: skip
+        await s.execute(
+            text("INSERT INTO app.debt_moves (tenant_id, counterparty_id, direction, amount, doc_type, doc_id) "
+                 "VALUES (:t, :c, 'receivable', -4000, 'debt_payments', :p)"),
+            {"t": pos.tenant_id, "c": cid, "p": payment_id},
+        )  # fmt: skip
+        await s.execute(
+            text("UPDATE app.debt_balances SET balance = balance - 4000 WHERE counterparty_id = :c "
+                 "AND direction = 'receivable'"), {"c": cid},
+        )  # fmt: skip
+    res = await asyncio.wait_for(returning, timeout=30)
+    assert res.error is None, (res.code, res.keys)
+    assert res.server["debt_part"] == "0.00" and res.server["money_part"] == "12000.00"
+    assert await _receivable(env, pos, cid) == D("0.00")
+    moves = await one(env.db, pos.tenant_id, "SELECT COALESCE(sum(amount), 0) FROM app.debt_moves "
+                      "WHERE counterparty_id = :c", c=cid)  # fmt: skip
+    assert moves == D("0.00")

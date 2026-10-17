@@ -1,14 +1,14 @@
-import type {
-  StockBalanceOut,
-  StockBalancePage,
-  StockLotOut,
-  StockLotPage,
-  TransferOut,
-} from "@shared/models";
+import type { StockLotOut, StockLotPage, StockReportOut, TransferOut } from "@shared/models";
 
-export type Balance = StockBalanceOut;
+/**
+ * «Qoldiq» rows and KPI come from `GET /reports/stock` (20 §20, WEB-10): one answer per warehouse —
+ * or over «Barcha filiallar» (consolidated, US-M04-03) — with the product card fields (unit,
+ * category, barcode, marking) on every row, so no per-row product request is needed.
+ */
+export type StockReport = StockReportOut;
+export type Balance = StockReportOut["items"][number];
 export type Lot = StockLotOut;
-export type { StockBalancePage, StockLotPage };
+export type { StockLotPage };
 
 /** 07 BO-03 tabs. */
 export type StockTab = "balances" | "transfers" | "counts";
@@ -21,17 +21,14 @@ export type LoadStatus = "idle" | "loading" | "error";
 
 /** US-M04-06 default: 7 days (19 §7 `expiring_within_days=7`). */
 export const EXPIRY_DAYS = 7;
+/** Rows shown per «Yana yuklash» (the report has no server paging, 20 §20). */
 export const BALANCE_PAGE_SIZE = 50;
+/** The stock scope key of «Barcha filiallar» (no `warehouse_id` / `branch_id`). */
+export const ALL_STOCK = "*";
 
 export interface BalanceFilters {
   search: string;
   lowOnly: boolean;
-}
-
-export interface BalancesRequest {
-  warehouseId: string;
-  filters: BalanceFilters;
-  cursor: string | null;
 }
 
 export interface LotsRequest {
@@ -39,11 +36,7 @@ export interface LotsRequest {
   cursor: string | null;
 }
 
-/**
- * KPI cards of 07 BO-03. There is no aggregate endpoint in Bosqich 2 (`GET /reports/stock` is
- * Bosqich 4), so the figures are summed from every balance page of the warehouse (`capped` = the
- * page budget ran out — the figures are a lower bound).
- */
+/** KPI cards of 07 BO-03 (from the report totals). */
 export interface StockSummary {
   /** Σ value at cost (2 dp). */
   value: string;
@@ -52,7 +45,6 @@ export interface StockSummary {
   /** First names of low-stock products (banner «Choy ko'k 100 g, … va yana N ta»). */
   lowNames: string[];
   negative: number;
-  capped: boolean;
 }
 
 export interface ExpiringSummary {

@@ -331,6 +331,10 @@ function ShiftClosePage() {
                   <dd className="text-right tabular-nums">+{formatMoney(totals.cashSales)}</dd>
                   <dt>{t("cashMovement.calc.cashReturns")}</dt>
                   <dd className="text-right tabular-nums">−{formatMoney(totals.cashReturns)}</dd>
+                  <dt>{t("cashMovement.calc.debtCashIn")}</dt>
+                  <dd className="text-right tabular-nums" data-testid="debt-cash-in">
+                    +{formatMoney(totals.debtCashIn)}
+                  </dd>
                   <dt>{t("cashMovement.calc.in")}</dt>
                   <dd className="text-right tabular-nums">+{formatMoney(totals.cashIn)}</dd>
                   <dt>{t("cashMovement.calc.out")}</dt>

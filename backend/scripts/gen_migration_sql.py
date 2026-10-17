@@ -9,9 +9,10 @@ from a ```sql block of 12. Each block is routed by the rule in 12 §6.1:
    in the table sections (2.1–2.9) each statement follows its table
    (``TABLES`` mirrors the 12 §6.1 plan).
 
-Revision 0027a (web_pos, Bosqich 3) is append-only: its blocks carry the marker
-``-- 0027a web_pos`` (up) or ``-- 0027a down`` (verbatim down statements — ALTER/DROP
-COLUMN, previous function bodies — that cannot be derived). Revisions 0028
+Revisions 0027a (web_pos, Bosqich 3) and 0027b (debts_finance, Bosqich 4) are append-only:
+their blocks carry the marker ``-- 0027a web_pos`` / ``-- 0027b debts_finance`` (up) or
+``-- 0027a down`` / ``-- 0027b down`` (verbatim down statements — ALTER/DROP COLUMN, previous
+function bodies — that cannot be derived). Revisions 0028
 (store_agent, Bosqich 5) and 0029 (onec_integration, Bosqich 7) are not generated
 yet. Other ``down`` scripts are derived from what ``up`` creates.
 
@@ -61,6 +62,7 @@ REVISIONS: dict[str, str] = {
     "0026": "rls_policies",
     "0027": "security_definer_functions",
     "0027a": "web_pos",  # Bosqich 3 — append-only (27 B3: device-bound login, POS deltas)
+    "0027b": "debts_finance",  # Bosqich 4 — append-only (27 B4: debts, expenses, bank, reports, Telegram)
 }
 LATER_REVISIONS = frozenset({"0028", "0029"})  # Bosqich 5 / 7
 

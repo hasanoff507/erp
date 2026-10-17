@@ -2,7 +2,7 @@ import { allSettled, createEvent, fork, sample, scopeBind } from "effector";
 import { describe, expect, it } from "vitest";
 
 import type { TransferOut } from "@shared/models";
-import { $activeBranchId, $session } from "@shared/state/session";
+import { $activeBranchId, $session, ALL_BRANCHES } from "@shared/state/session";
 
 import { $warehouses, loadProductsFx, loadWarehousesFx } from "#/entities/refs/index.ts";
 import { listCountsFx } from "#/features/stock-counts/model/index.ts";
@@ -10,6 +10,8 @@ import { listTransfersFx } from "#/features/transfers/model/index.ts";
 
 import {
   $balances,
+  $consolidated,
+  $hasMore,
   $digest,
   $expiring,
   $expiryDays,
@@ -25,12 +27,12 @@ import {
   digestFrom,
   digestOf,
   expiryByProduct,
-  listBalancesFx,
+  filterItems,
   listExpiringLotsFx,
   loadDigestFx,
   loadExpiringFx,
   loadReviewCountFx,
-  loadSummaryFx,
+  loadStockFx,
   loadTransitFx,
   lowOnlyToggled,
   moreRequested,
@@ -40,12 +42,10 @@ import {
   summarize,
   summaryRefreshRequested,
   tabChanged,
-  toBalancesQuery,
   viewChanged,
   type Balance,
-  type BalancesRequest,
   type Lot,
-  type StockSummary,
+  type StockReport,
 } from "./index.ts";
 
 const TODAY = "2026-10-16";
@@ -53,15 +53,37 @@ const TODAY = "2026-10-16";
 function balance(id: string, patch: Partial<Balance> = {}): Balance {
   return {
     product_id: id,
-    product_name: `Tovar ${id}`,
-    warehouse_id: "w-1",
+    name: `Tovar ${id}`,
+    name_ru: null,
+    unit_code: "pcs",
+    category_id: null,
+    category_name: "Ichimliklar",
+    barcode: `478000${id}`,
+    is_marked: false,
+    is_weighed: false,
+    min_stock: "5.000",
     qty: "10.000",
     value: "100000.00",
     avg_cost: "10000.0000",
-    min_stock: "5.000",
-    is_low: false,
-    is_negative: false,
-    updated_at: "2026-10-16T09:32:00Z",
+    below_min: false,
+    by_branch: [
+      { branch_id: "b-1", branch_name: "Chilonzor-3", qty: "10.000", value: "100000.00", below_min: false },
+    ],
+    ...patch,
+  };
+}
+
+function report(items: Balance[], patch: Partial<StockReport> = {}): StockReport {
+  return {
+    branch_id: null,
+    consolidated: false,
+    items,
+    branches: [],
+    total: {
+      value: "200000.00",
+      positions: items.length,
+      below_min_count: items.filter((i) => i.below_min).length,
+    },
     ...patch,
   };
 }
@@ -96,48 +118,91 @@ const session = {
   access_expires_at: 0,
 };
 
-function scope() {
-  const calls: BalancesRequest[] = [];
+const W1 = {
+  id: "w-1",
+  branch_id: "b-1",
+  name: "Asosiy",
+  type: "store",
+  inventory_account: "2920",
+  version: 1,
+};
+const W2 = {
+  id: "w-2",
+  branch_id: "b-2",
+  name: "Yunusobod",
+  type: "store",
+  inventory_account: "2920",
+  version: 1,
+};
+
+function scope(branch: string = "b-1", branches = session.branches) {
+  const calls: string[] = [];
+  const productCalls: unknown[] = [];
   const s = fork({
     values: [
-      [$session, session],
-      [$activeBranchId, "b-1"],
+      [$session, { ...session, branches }],
+      [$activeBranchId, branch],
     ],
     handlers: [
+      [loadWarehousesFx, () => [W1, W2]],
       [
-        loadWarehousesFx,
-        () => [
-          {
-            id: "w-1",
-            branch_id: "b-1",
-            name: "Asosiy",
-            type: "store",
-            inventory_account: "2920",
-            version: 1,
-          },
-          {
-            id: "w-2",
-            branch_id: "b-2",
-            name: "Yunusobod",
-            type: "store",
-            inventory_account: "2920",
-            version: 1,
-          },
-        ],
-      ],
-      [
-        listBalancesFx,
-        (req: BalancesRequest) => {
-          calls.push(req);
-          if (req.cursor === "c2") return { items: [balance("p-3", { value: "0.50" })], next_cursor: null };
-          return {
-            items: [balance("p-1"), balance("p-2", { is_low: true, value: "250.25" })],
-            next_cursor: "c2",
-          };
+        loadStockFx,
+        (scopeKey: string) => {
+          calls.push(scopeKey);
+          if (scopeKey === "*") {
+            return report(
+              [
+                balance("p-1", {
+                  qty: "15.000",
+                  value: "150000.00",
+                  by_branch: [
+                    {
+                      branch_id: "b-1",
+                      branch_name: "Chilonzor-3",
+                      qty: "10.000",
+                      value: "100000.00",
+                      below_min: false,
+                    },
+                    {
+                      branch_id: "b-2",
+                      branch_name: "Yunusobod-1",
+                      qty: "5.000",
+                      value: "50000.00",
+                      below_min: false,
+                    },
+                  ],
+                }),
+              ],
+              {
+                consolidated: true,
+                branches: [
+                  {
+                    branch_id: "b-1",
+                    name: "Chilonzor-3",
+                    value: "100000.00",
+                    positions: 1,
+                    below_min_count: 0,
+                  },
+                  {
+                    branch_id: "b-2",
+                    name: "Yunusobod-1",
+                    value: "50000.00",
+                    positions: 1,
+                    below_min_count: 0,
+                  },
+                ],
+                total: { value: "150000.00", positions: 1, below_min_count: 0 },
+              },
+            );
+          }
+          return report([
+            balance("p-1"),
+            balance("p-2", { below_min: true, value: "250.25", name: "Sut Oltin", barcode: "4780001" }),
+            ...Array.from({ length: 60 }, (_, i) => balance(`x-${i}`, { value: "1.00" })),
+          ]);
         },
       ],
       [listExpiringLotsFx, () => ({ items: [lot("l-1", "p-1", "2026-10-19")], next_cursor: null })],
-      [loadSummaryFx, () => summarize([balance("p-1"), balance("p-2", { is_low: true })], false)],
       [
         loadExpiringFx,
         () => ({ lots: [lot("l-1", "p-1", "2026-10-19"), lot("l-2", "p-1", "2026-10-21")], capped: false }),
@@ -145,10 +210,16 @@ function scope() {
       [loadTransitFx, () => ({ inTransit: 2, overdue: 1, waitingEttn: 1 })],
       [loadReviewCountFx, () => 3],
       [loadDigestFx, () => []],
-      [loadProductsFx, () => ({})],
+      [
+        loadProductsFx,
+        (ids: unknown) => {
+          productCalls.push(ids);
+          return {};
+        },
+      ],
     ],
   });
-  return { s, calls };
+  return { s, calls, productCalls };
 }
 
 function deferred<T>() {
@@ -192,60 +263,77 @@ function transfer(id: string, patch: Partial<TransferOut> = {}): TransferOut {
   };
 }
 
-const W1 = {
-  id: "w-1",
-  branch_id: "b-1",
-  name: "Asosiy",
-  type: "store",
-  inventory_account: "2920",
-  version: 1,
-};
-const W2 = {
-  id: "w-2",
-  branch_id: "b-2",
-  name: "Yunusobod",
-  type: "store",
-  inventory_account: "2920",
-  version: 1,
-};
 const flush = () => new Promise((r) => setTimeout(r, 0));
 /** Topbar branch switch (the session's own event also persists it). */
 const branchSwitched = createEvent<string>();
 sample({ clock: branchSwitched, target: $activeBranchId });
 
-describe("BO-03 stock page model (19 §7, US-M04-01…03, US-M04-06)", () => {
-  it("mount → refs → the branch warehouse's balances, KPI, expiry days and tab badges", async () => {
-    const { s, calls } = scope();
+describe("BO-03 stock page model (20 §20, 19 §7, US-M04-01…03, US-M04-06)", () => {
+  it("mount → refs → the warehouse report: rows with card fields, KPI, expiry days, badges", async () => {
+    const { s, calls, productCalls } = scope();
     await allSettled(pageMounted, { scope: s, params: { today: TODAY, canListStaff: false } });
     expect(s.getState($warehouses)).toHaveLength(2);
     expect(s.getState($warehouseId)).toBe("w-1");
-    expect(calls[0]).toEqual({ warehouseId: "w-1", filters: { search: "", lowOnly: false }, cursor: null });
-    expect(s.getState($balances).map((b) => b.product_id)).toEqual(["p-1", "p-2"]);
-    expect(s.getState($pageTotal)).toBe("100250.25");
-    expect(s.getState($summary)).toMatchObject({ positions: 2, low: 1, value: "200000.00" });
+    expect(calls).toEqual(["w-1"]);
+    expect(s.getState($balances)).toHaveLength(50);
+    expect(s.getState($hasMore)).toBe(true);
+    expect(s.getState($summary)).toMatchObject({
+      positions: 62,
+      low: 1,
+      value: "200000.00",
+      lowNames: ["Sut Oltin"],
+    });
     expect(s.getState($expiryDays)).toEqual({ "p-1": 3 });
     expect(s.getState($transit)).toEqual({ inTransit: 2, overdue: 1, waitingEttn: 1 });
     expect(s.getState($reviewCount)).toBe(3);
+    expect(s.getState($consolidated)).toBe(false);
+    // WEB-10: unit / category / barcode / marking come with the rows — no per-row product request.
+    expect(productCalls).toEqual([]);
 
     await allSettled(moreRequested, { scope: s });
-    expect(s.getState($balances)).toHaveLength(3);
-    expect(s.getState($pageTotal)).toBe("100250.75");
+    expect(s.getState($balances)).toHaveLength(62);
+    expect(s.getState($hasMore)).toBe(false);
   });
 
-  it("search / lowOnly reload from the first page; the expiring view reads lots", async () => {
+  it("search / lowOnly filter the report on the client (one request); the expiring view reads lots", async () => {
     const { s, calls } = scope();
     await allSettled(pageMounted, { scope: s, params: { today: TODAY, canListStaff: false } });
-    await allSettled(searchChanged, { scope: s, params: "Sut" });
+    await allSettled(searchChanged, { scope: s, params: "sut" });
+    expect(s.getState($balances).map((b) => b.product_id)).toEqual(["p-2"]);
+    await allSettled(searchChanged, { scope: s, params: "4780001" });
+    expect(s.getState($balances).map((b) => b.product_id)).toEqual(["p-2"]);
+    await allSettled(searchChanged, { scope: s, params: "" });
     await allSettled(lowOnlyToggled, { scope: s, params: true });
-    expect(s.getState($filters)).toEqual({ search: "Sut", lowOnly: true });
-    expect(calls.at(-1)).toEqual({
-      warehouseId: "w-1",
-      filters: { search: "Sut", lowOnly: true },
-      cursor: null,
-    });
+    expect(s.getState($filters)).toEqual({ search: "", lowOnly: true });
+    expect(s.getState($balances).map((b) => b.product_id)).toEqual(["p-2"]);
+    expect(s.getState($pageTotal)).toBe("250.25");
+    expect(calls).toEqual(["w-1"]);
 
     await allSettled(viewChanged, { scope: s, params: "expiring" });
     expect(s.getState($lots).map((l) => l.id)).toEqual(["l-1"]);
+  });
+
+  it("QT-M04-03: «Barcha filiallar» reads the consolidated report — every branch and the total", async () => {
+    const two = [...session.branches, { id: "b-2", name: "Yunusobod-1" }];
+    const { s, calls } = scope(ALL_BRANCHES, two);
+    await allSettled(pageMounted, { scope: s, params: { today: TODAY, canListStaff: false } });
+    expect(calls).toEqual(["*"]);
+    expect(s.getState($consolidated)).toBe(true);
+    const [row] = s.getState($balances);
+    expect(row?.by_branch.map((b) => [b.branch_name, b.qty])).toEqual([
+      ["Chilonzor-3", "10.000"],
+      ["Yunusobod-1", "5.000"],
+    ]);
+    expect(row?.qty).toBe("15.000");
+    expect(s.getState($summary)?.value).toBe("150000.00");
+    // Lots, transfers and counts are per warehouse — not read for «Barcha filiallar».
+    expect(s.getState($transit)).toBeNull();
+    expect(s.getState($reviewCount)).toBeNull();
+
+    // Back to one branch → that warehouse's report.
+    await allSettled(branchSwitched, { scope: s, params: "b-2" });
+    expect(calls.at(-1)).toBe("w-2");
+    expect(s.getState($consolidated)).toBe(false);
   });
 
   it("tabs: opening «Ko'chirishlar» / «Inventarizatsiyalar» loads their lists", async () => {
@@ -275,8 +363,7 @@ describe("KPI / badges: scope, stale answers, errors, coalescing (WEB-04/05/06/1
       ],
       handlers: [
         [loadWarehousesFx, () => [W1, W2]],
-        [listBalancesFx, () => ({ items: [], next_cursor: null })],
-        [loadSummaryFx, () => summarize([], false)],
+        [loadStockFx, () => report([])],
         [loadExpiringFx, () => ({ lots: [], capped: false })],
         [
           loadTransitFx,
@@ -299,7 +386,6 @@ describe("KPI / badges: scope, stale answers, errors, coalescing (WEB-04/05/06/1
             return [transfer("t-1")];
           },
         ],
-        [loadProductsFx, () => ({})],
       ],
     });
     await allSettled(pageMounted, { scope: s, params: { today: TODAY, canListStaff: false } });
@@ -309,16 +395,16 @@ describe("KPI / badges: scope, stale answers, errors, coalescing (WEB-04/05/06/1
     expect(s.getState($digest)?.map((t) => t.id)).toEqual(["t-1"]);
   });
 
-  it("start A, switch to B, A answers → the KPI / badge / lot stores stay empty (WEB-05)", async () => {
+  it("start A, switch to B, A answers → the stock / badge / lot stores stay empty (WEB-05)", async () => {
     type Set = {
-      summary: ReturnType<typeof deferred<StockSummary>>;
+      stock: ReturnType<typeof deferred<StockReport>>;
       review: ReturnType<typeof deferred<number>>;
       expiring: ReturnType<typeof deferred<{ lots: Lot[]; capped: boolean }>>;
       transit: ReturnType<typeof deferred<{ inTransit: number; overdue: number; waitingEttn: number }>>;
       lots: ReturnType<typeof deferred<{ items: Lot[]; next_cursor: string | null }>>;
     };
     const make = (): Set => ({
-      summary: deferred(),
+      stock: deferred(),
       review: deferred(),
       expiring: deferred(),
       transit: deferred(),
@@ -334,14 +420,12 @@ describe("KPI / badges: scope, stale answers, errors, coalescing (WEB-04/05/06/1
         [$warehouses, [W1, W2]],
       ],
       handlers: [
-        [listBalancesFx, () => ({ items: [], next_cursor: null })],
-        [loadSummaryFx, (w: string) => pick(w).summary.promise],
+        [loadStockFx, (w: string) => pick(w).stock.promise],
         [loadExpiringFx, (w: string) => pick(w).expiring.promise],
         [loadReviewCountFx, (w: string) => pick(w).review.promise],
         [loadTransitFx, (br: string) => pick(br).transit.promise],
         [loadDigestFx, () => []],
         [listExpiringLotsFx, (r: { warehouseId: string }) => pick(r.warehouseId).lots.promise],
-        [loadProductsFx, () => ({})],
       ],
     });
     scopeBind(pageMounted, { scope: s })({ today: TODAY, canListStaff: false });
@@ -350,7 +434,7 @@ describe("KPI / badges: scope, stale answers, errors, coalescing (WEB-04/05/06/1
     scopeBind(branchSwitched, { scope: s })("b-2");
     expect(s.getState($warehouseId)).toBe("w-2");
 
-    a.summary.resolve(summarize([balance("p-1")], false));
+    a.stock.resolve(report([balance("p-1")]));
     a.review.resolve(9);
     a.expiring.resolve({ lots: [lot("l-1", "p-1", "2026-10-19")], capped: false });
     a.transit.resolve({ inTransit: 5, overdue: 0, waitingEttn: 0 });
@@ -362,7 +446,7 @@ describe("KPI / badges: scope, stale answers, errors, coalescing (WEB-04/05/06/1
     expect(s.getState($transit)).toBeNull();
     expect(s.getState($lots)).toEqual([]);
 
-    b.summary.resolve(summarize([], false));
+    b.stock.resolve(report([]));
     b.review.resolve(1);
     b.expiring.resolve({ lots: [], capped: false });
     b.transit.resolve({ inTransit: 1, overdue: 0, waitingEttn: 0 });
@@ -370,9 +454,10 @@ describe("KPI / badges: scope, stale answers, errors, coalescing (WEB-04/05/06/1
     await allSettled(s);
     expect(s.getState($reviewCount)).toBe(1);
     expect(s.getState($transit)?.inTransit).toBe(1);
+    expect(s.getState($summary)?.positions).toBe(0);
   });
 
-  it("a failed summary is an error state; «Qayta urinish» reads it again (WEB-06)", async () => {
+  it("a failed report is an error state; «Qayta urinish» reads it again (WEB-06)", async () => {
     let fail = true;
     const s = fork({
       values: [
@@ -381,19 +466,17 @@ describe("KPI / badges: scope, stale answers, errors, coalescing (WEB-04/05/06/1
         [$warehouses, [W1]],
       ],
       handlers: [
-        [listBalancesFx, () => ({ items: [], next_cursor: null })],
         [
-          loadSummaryFx,
+          loadStockFx,
           () => {
             if (fail) throw new Error("boom");
-            return summarize([balance("p-1")], false);
+            return report([balance("p-1")]);
           },
         ],
         [loadExpiringFx, () => ({ lots: [], capped: false })],
         [loadTransitFx, () => ({ inTransit: 0, overdue: 0, waitingEttn: 0 })],
         [loadReviewCountFx, () => 0],
         [loadDigestFx, () => []],
-        [loadProductsFx, () => ({})],
       ],
     });
     await allSettled(pageMounted, { scope: s, params: { today: TODAY, canListStaff: false } });
@@ -405,8 +488,8 @@ describe("KPI / badges: scope, stale answers, errors, coalescing (WEB-04/05/06/1
     expect(s.getState($summary)?.positions).toBe(1);
   });
 
-  it("three writes during a running summary queue exactly one more run (WEB-10)", async () => {
-    const runs: ReturnType<typeof deferred<StockSummary>>[] = [];
+  it("three writes during a running read queue exactly one more run (WEB-10)", async () => {
+    const runs: ReturnType<typeof deferred<StockReport>>[] = [];
     const s = fork({
       values: [
         [$session, session],
@@ -415,9 +498,9 @@ describe("KPI / badges: scope, stale answers, errors, coalescing (WEB-04/05/06/1
       ],
       handlers: [
         [
-          loadSummaryFx,
+          loadStockFx,
           () => {
-            const d = deferred<StockSummary>();
+            const d = deferred<StockReport>();
             runs.push(d);
             return d.promise;
           },
@@ -435,10 +518,10 @@ describe("KPI / badges: scope, stale answers, errors, coalescing (WEB-04/05/06/1
     refresh();
     refresh();
     expect(runs).toHaveLength(1);
-    runs[0]?.resolve(summarize([], false));
+    runs[0]?.resolve(report([]));
     await flush();
     expect(runs).toHaveLength(2);
-    runs[1]?.resolve(summarize([], false));
+    runs[1]?.resolve(report([]));
     await allSettled(s);
     expect(runs).toHaveLength(2);
   });
@@ -457,23 +540,20 @@ describe("stock lib", () => {
     expect(digestFrom(TODAY)).toBe("2026-10-10");
   });
 
-  it("query, summary and expiry are decimal-exact", () => {
-    expect(toBalancesQuery("w-1", { search: " sut ", lowOnly: true }, "c")).toEqual({
-      warehouse_id: "w-1",
-      search: "sut",
-      low_stock: true,
-      cursor: "c",
-      limit: 50,
+  it("filters, summary and expiry are decimal-exact", () => {
+    const rows = [
+      balance("a", { qty: "0.000", value: "0.00", name: "Choy", name_ru: "Чай" }),
+      balance("b", { qty: "-1.000", value: "-0.10", below_min: true }),
+    ];
+    expect(filterItems(rows, { search: "чай", lowOnly: false }).map((r) => r.product_id)).toEqual(["a"]);
+    expect(filterItems(rows, { search: "", lowOnly: true }).map((r) => r.product_id)).toEqual(["b"]);
+    expect(summarize(report(rows, { total: { value: "-0.10", positions: 1, below_min_count: 1 } }))).toEqual({
+      value: "-0.10",
+      positions: 1,
+      low: 1,
+      lowNames: ["Tovar b"],
+      negative: 1,
     });
-    expect(
-      summarize(
-        [
-          balance("a", { qty: "0.000", value: "0.00" }),
-          balance("b", { qty: "-1.000", is_negative: true, value: "-0.10" }),
-        ],
-        true,
-      ),
-    ).toEqual({ value: "-0.10", positions: 1, low: 0, lowNames: [], negative: 1, capped: true });
     expect(expiryByProduct([lot("x", "p", "2026-10-15"), lot("y", "q", null)], TODAY)).toEqual({ p: -1 });
   });
 });

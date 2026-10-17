@@ -17,17 +17,21 @@ from app.modules.purchasing.application.goods_receipts import GoodsReceiptServic
 from app.modules.purchasing.application.module import PurchasingModule
 from app.modules.purchasing.application.po_receipts import PurchaseOrderReceipts
 from app.modules.purchasing.application.purchase_orders import PurchaseOrderService
+from app.modules.purchasing.application.supplier_payments import SupplierPaymentService
 from app.modules.purchasing.application.supplier_returns import SupplierReturnService
 from app.modules.purchasing.infrastructure.receipts_sql import (
     SqlGoodsReceiptRepository,
     SqlSupplierReturnRepository,
 )
 from app.modules.purchasing.infrastructure.repositories import SqlPurchaseOrderRepository
+from app.modules.purchasing.infrastructure.supplier_payments_sql import SqlSupplierPaymentRepository
 
 __all__ = [
     "PurchaseOrderReceipts",
     "PurchasingModule",
+    "SupplierPaymentService",
     "build_purchasing_module",
+    "build_supplier_payments",
     "purchase_order_receipts",
 ]
 
@@ -62,4 +66,16 @@ def build_purchasing_module(settings: Settings, db: Database) -> PurchasingModul
             ledger_poster(),
             debt_register(),
         ),
+    )
+
+
+def build_supplier_payments(settings: Settings, db: Database) -> SupplierPaymentService:
+    """``/supplier-payments`` (19 §11, Bosqich 4) — published on ``app.state.supplier_payments``."""
+    del settings
+    return SupplierPaymentService(
+        db.session_factory,
+        SqlSupplierPaymentRepository(),
+        counterparty_directory(),
+        ledger_poster(),
+        debt_register(),
     )

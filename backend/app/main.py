@@ -25,6 +25,9 @@ from app.modules.access.api import roles as access_roles_api
 from app.modules.access.wiring import build_access_module
 from app.modules.accounting.api import ledger as accounting_ledger_api
 from app.modules.accounting.wiring import build_accounting_module
+from app.modules.attachments.api import router as attachments_api
+from app.modules.attachments.wiring import UPLOAD_LIMIT as ATTACHMENT_UPLOAD_LIMIT
+from app.modules.attachments.wiring import build_attachments
 from app.modules.auth.api import admin_users as auth_admin_api
 from app.modules.auth.api import bff as auth_bff_api
 from app.modules.auth.api import devices as auth_devices_api
@@ -37,13 +40,17 @@ from app.modules.branches.api import cash_registers as cash_registers_api
 from app.modules.branches.api import devices as devices_api
 from app.modules.branches.api import tenant as tenant_api
 from app.modules.branches.wiring import build_branches_module
+from app.modules.cash.api import bank_settlements as cash_bank_settlements_api
 from app.modules.cash.api import cash_movements as cash_movements_api
 from app.modules.cash.api import shifts as cash_shifts_api
 from app.modules.cash.wiring import build_approvals, build_cash_module
 from app.modules.catalog.api import router as catalog_api
 from app.modules.catalog.wiring import build_catalog_module
 from app.modules.debts.api import counterparties as debts_counterparties_api
+from app.modules.debts.api import debt_docs as debts_docs_api
 from app.modules.debts.wiring import build_debts_module
+from app.modules.expenses.api import router as expenses_api
+from app.modules.expenses.wiring import build_expenses_module
 from app.modules.imports.api import router as imports_api
 from app.modules.imports.wiring import build_imports_module
 from app.modules.integrations.card_terminal.api import router as card_terminal_api
@@ -54,12 +61,17 @@ from app.modules.inventory.api import stock_counts as inventory_stock_counts_api
 from app.modules.inventory.api import transfers as inventory_transfers_api
 from app.modules.inventory.api import write_offs as inventory_write_offs_api
 from app.modules.inventory.wiring import build_inventory_module
+from app.modules.notifications.api import router as notifications_api
+from app.modules.notifications.wiring import build_notifications_module
 from app.modules.pricing.api import router as pricing_api
 from app.modules.pricing.wiring import build_pricing_module
 from app.modules.purchasing.api import goods_receipts as purchasing_goods_receipts_api
 from app.modules.purchasing.api import purchase_orders as purchasing_purchase_orders_api
+from app.modules.purchasing.api import supplier_payments as purchasing_supplier_payments_api
 from app.modules.purchasing.api import supplier_returns as purchasing_supplier_returns_api
-from app.modules.purchasing.wiring import build_purchasing_module
+from app.modules.purchasing.wiring import build_purchasing_module, build_supplier_payments
+from app.modules.reports.api import reports as reports_api
+from app.modules.reports.wiring import build_reports_service
 from app.modules.returns.api import returns as returns_api
 from app.modules.returns.wiring import build_returns_queries
 from app.modules.sales.api import sales as sales_api
@@ -67,8 +79,9 @@ from app.modules.sales.wiring import build_sales_module
 from app.modules.sync.api import sync as sync_api
 from app.modules.sync.api import sync_exceptions as sync_exceptions_api
 from app.modules.sync.wiring import build_sync_module
+from app.modules.vat.api import tax_settlements as tax_settlements_api
 from app.modules.vat.api import vat as vat_api
-from app.modules.vat.wiring import build_vat_service
+from app.modules.vat.wiring import build_tax_settlement_service, build_vat_service
 
 
 async def _token_tenant(request: Request) -> UUID | None:
@@ -124,6 +137,20 @@ def create_app(
         # --- B3 sync ---
         app.state.sync = build_sync_module(settings, db, lambda: app.state.redis)
         # --- B3 print ---
+        # Bosqich 4 modules (one anchor per slice — add your app.state lines right under your anchor)
+        # --- B4 debts ---
+        # --- B4 supplier-tax ---
+        app.state.supplier_payments = build_supplier_payments(settings, db)
+        app.state.tax_settlements = build_tax_settlement_service(db)
+        # --- B4 expenses ---
+        app.state.expenses = build_expenses_module(settings, db)
+        app.state.attachments = build_attachments(settings, db)  # 17 §12 (BO-17 receipt photo)
+        # --- B4 bank ---
+        # bank settlements + statement import live in app.state.cash (build_cash_module, BO-24)
+        # --- B4 reports ---
+        app.state.reports = build_reports_service(db)
+        # --- B4 telegram ---
+        app.state.notifications = build_notifications_module(settings, db, lambda: app.state.redis)
         app.state.readiness = ReadinessProbe(
             gating={"postgres": postgres_check(db, alembic_head()), "redis": redis_check(redis)},
         )
@@ -162,7 +189,13 @@ def create_app(
     # added before CORS, so it runs inside it and the 413 keeps the CORS headers
     app.add_middleware(
         BodyLimitMiddleware,
-        upload_paths={f"{settings.api_prefix}/import-jobs": settings.import_max_bytes + MULTIPART_MARGIN},
+        upload_paths={
+            f"{settings.api_prefix}/import-jobs": settings.import_max_bytes + MULTIPART_MARGIN,
+            # --- B4 expenses --- (17 §12 POST /attachments, multipart: PDF ≤ 20 MB)
+            f"{settings.api_prefix}/attachments": ATTACHMENT_UPLOAD_LIMIT + MULTIPART_MARGIN,
+            # --- B4 bank --- (20 #55g statement import, multipart)
+            f"{settings.api_prefix}/bank-settlements/imports": settings.import_max_bytes + MULTIPART_MARGIN,
+        },
     )
     if settings.cors_origins:
         app.add_middleware(
@@ -215,6 +248,22 @@ def create_app(
     app.include_router(sync_api.router, prefix=settings.api_prefix)
     app.include_router(sync_exceptions_api.router, prefix=settings.api_prefix)
     # --- B3 print routers ---
+    # Bosqich 4 routers (one anchor per slice — add include_router lines right under your anchor)
+    # --- B4 debts routers ---
+    app.include_router(debts_docs_api.router, prefix=settings.api_prefix)
+    app.include_router(debts_docs_api.reports_router, prefix=settings.api_prefix)
+    # --- B4 supplier-tax routers ---
+    app.include_router(purchasing_supplier_payments_api.router, prefix=settings.api_prefix)
+    app.include_router(tax_settlements_api.router, prefix=settings.api_prefix)
+    # --- B4 expenses routers ---
+    app.include_router(expenses_api.router, prefix=settings.api_prefix)
+    app.include_router(attachments_api.router, prefix=settings.api_prefix)
+    # --- B4 bank routers ---
+    app.include_router(cash_bank_settlements_api.router, prefix=settings.api_prefix)
+    # --- B4 reports routers ---
+    app.include_router(reports_api.router, prefix=settings.api_prefix)
+    # --- B4 telegram routers ---
+    app.include_router(notifications_api.router, prefix=settings.api_prefix)  # 20 #66–#71 + bot webhook
     return app
 
 

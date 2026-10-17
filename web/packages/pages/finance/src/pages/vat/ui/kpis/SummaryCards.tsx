@@ -19,37 +19,41 @@ export function SummaryCards() {
   const summary = useUnit($summary);
   if (!summary) return null;
 
-  if (summary.regime === "turnover") {
-    return (
-      <div className="grid gap-3.5 sm:grid-cols-3">
-        <KpiCard
-          label={t("vat.kpi.turnoverBase")}
-          value={money2(summary.turnoverBase)}
-          icon={Receipt}
-          tone="info"
-          note={t("vat.kpi.turnoverBaseNote")}
-        />
-        <KpiCard
-          label={t("vat.kpi.turnoverRate")}
-          value={summary.turnoverRatePct === null ? "—" : formatPercent(summary.turnoverRatePct)}
-          icon={Percent}
-          tone="neutral"
-        />
-        <KpiCard
-          label={t("vat.kpi.turnoverAmount")}
-          value={money2(summary.turnoverAmount)}
-          icon={Landmark}
-          tone="primary"
-          note={t("vat.kpi.turnoverAmountNote")}
-        />
-      </div>
-    );
-  }
+  // A month where the regime changes carries both blocks (VAT days + turnover days) — show both,
+  // the regime's own first (contracts/supplier-tax.md §2).
+  const turnoverBlock = (
+    <div className="grid gap-3.5 sm:grid-cols-3">
+      <KpiCard
+        label={t("vat.kpi.turnoverBase")}
+        value={money2(summary.turnoverBase)}
+        icon={Receipt}
+        tone="info"
+        note={t("vat.kpi.turnoverBaseNote")}
+      />
+      <KpiCard
+        label={t("vat.kpi.turnoverRate")}
+        value={summary.turnoverRatePct === null ? "—" : formatPercent(summary.turnoverRatePct)}
+        icon={Percent}
+        tone="neutral"
+      />
+      <KpiCard
+        label={t("vat.kpi.turnoverAmount")}
+        value={money2(summary.turnoverAmount)}
+        icon={Landmark}
+        tone="primary"
+        note={t("vat.kpi.turnoverAmountNote")}
+      />
+    </div>
+  );
+  const hasVat = summary.regime === "vat" || summary.outputVat !== null;
+  const hasTurnover = summary.regime === "turnover" || summary.turnoverBase !== null;
+  if (!hasVat) return turnoverBlock;
 
   const sign = netSign(summary.netVat);
   const overLimit = overCreditLimit(summary.pendingCreditPct, PENDING_CREDIT_LIMIT_PCT);
   return (
     <div className="flex flex-col gap-3.5">
+      {hasTurnover && summary.regime === "turnover" ? turnoverBlock : null}
       <div className="grid gap-3.5 sm:grid-cols-3">
         <KpiCard
           label={t("vat.kpi.output")}
@@ -102,6 +106,7 @@ export function SummaryCards() {
           {t("vat.credit.overLimit")}
         </Banner>
       ) : null}
+      {hasTurnover && summary.regime !== "turnover" ? turnoverBlock : null}
     </div>
   );
 }

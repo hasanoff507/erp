@@ -5,17 +5,29 @@
  * OpenAPI spec version: 0.1.0
  */
 import type {
+  BankImportResult,
+  BankSettlementCancel,
+  BankSettlementDetail,
+  BankSettlementIn,
+  BankSettlementOut,
+  BankSettlementPage,
+  BankSettlementPatch,
+  BodyCashImportBankStatement,
   CashHistoryOut,
   CashMovementCancel,
   CashMovementCancelled,
   CashMovementCreated,
   CashMovementIn,
   CashMovementPage,
+  EmptyBody,
+  GetBankSettlementTransitBalancesParams,
   GetCashHistoryParams,
+  ListBankSettlementsParams,
   ListCashMovementsParams,
   ListShiftsParams,
   ShiftOut,
   ShiftPage,
+  TransitBalances,
   ZReportOut
 } from '@shared/models/generated';
 
@@ -111,6 +123,114 @@ export const cancelCashMovement = (
     },
       options);
     }
+  /**
+ * @summary List Bank Settlements
+ */
+export const listBankSettlements = (
+    params?: ListBankSettlementsParams,
+ options?: SecondParameter<typeof apiRequest<BankSettlementPage>>,) => {
+      return apiRequest<BankSettlementPage>(
+      {url: `/api/v1/bank-settlements`, method: 'GET',
+        params
+    },
+      options);
+    }
+  /**
+ * @summary Create Bank Settlement
+ */
+export const createBankSettlement = (
+    bankSettlementIn: BankSettlementIn,
+ options?: SecondParameter<typeof apiRequest<BankSettlementOut>>,) => {
+      return apiRequest<BankSettlementOut>(
+      {url: `/api/v1/bank-settlements`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: bankSettlementIn
+    },
+      options);
+    }
+  /**
+ * @summary Transit Balances
+ */
+export const getBankSettlementTransitBalances = (
+    params?: GetBankSettlementTransitBalancesParams,
+ options?: SecondParameter<typeof apiRequest<TransitBalances>>,) => {
+      return apiRequest<TransitBalances>(
+      {url: `/api/v1/bank-settlements/transit-balances`, method: 'GET',
+        params
+    },
+      options);
+    }
+  /**
+ * @summary Import Bank Statement
+ */
+export const importBankStatement = (
+    bodyCashImportBankStatement: BodyCashImportBankStatement,
+ options?: SecondParameter<typeof apiRequest<BankImportResult>>,) => {const formData = new FormData();
+formData.append(`file`, bodyCashImportBankStatement.file);
+if(bodyCashImportBankStatement.branch_id !== undefined && bodyCashImportBankStatement.branch_id !== null) {
+ formData.append(`branch_id`, bodyCashImportBankStatement.branch_id);
+ }
+
+      return apiRequest<BankImportResult>(
+      {url: `/api/v1/bank-settlements/imports`, method: 'POST',
+      headers: {'Content-Type': 'multipart/form-data', },
+       data: formData
+    },
+      options);
+    }
+  /**
+ * @summary Get Bank Settlement
+ */
+export const getBankSettlement = (
+    settlementId: string,
+ options?: SecondParameter<typeof apiRequest<BankSettlementDetail>>,) => {
+      return apiRequest<BankSettlementDetail>(
+      {url: `/api/v1/bank-settlements/${settlementId}`, method: 'GET'
+    },
+      options);
+    }
+  /**
+ * @summary Update Bank Settlement
+ */
+export const updateBankSettlement = (
+    settlementId: string,
+    bankSettlementPatch: BankSettlementPatch,
+ options?: SecondParameter<typeof apiRequest<BankSettlementOut>>,) => {
+      return apiRequest<BankSettlementOut>(
+      {url: `/api/v1/bank-settlements/${settlementId}`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: bankSettlementPatch
+    },
+      options);
+    }
+  /**
+ * @summary Post Bank Settlement
+ */
+export const postBankSettlement = (
+    settlementId: string,
+    emptyBodyNull?: EmptyBody | null,
+ options?: SecondParameter<typeof apiRequest<BankSettlementOut>>,) => {
+      return apiRequest<BankSettlementOut>(
+      {url: `/api/v1/bank-settlements/${settlementId}/post`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: emptyBodyNull
+    },
+      options);
+    }
+  /**
+ * @summary Cancel Bank Settlement
+ */
+export const cancelBankSettlement = (
+    settlementId: string,
+    bankSettlementCancel: BankSettlementCancel,
+ options?: SecondParameter<typeof apiRequest<BankSettlementOut>>,) => {
+      return apiRequest<BankSettlementOut>(
+      {url: `/api/v1/bank-settlements/${settlementId}/cancel`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: bankSettlementCancel
+    },
+      options);
+    }
   export type ListShiftsResult = NonNullable<Awaited<ReturnType<typeof listShifts>>>
 export type GetShiftResult = NonNullable<Awaited<ReturnType<typeof getShift>>>
 export type GetZReportResult = NonNullable<Awaited<ReturnType<typeof getZReport>>>
@@ -118,3 +238,11 @@ export type GetCashHistoryResult = NonNullable<Awaited<ReturnType<typeof getCash
 export type ListCashMovementsResult = NonNullable<Awaited<ReturnType<typeof listCashMovements>>>
 export type CreateCashMovementResult = NonNullable<Awaited<ReturnType<typeof createCashMovement>>>
 export type CancelCashMovementResult = NonNullable<Awaited<ReturnType<typeof cancelCashMovement>>>
+export type ListBankSettlementsResult = NonNullable<Awaited<ReturnType<typeof listBankSettlements>>>
+export type CreateBankSettlementResult = NonNullable<Awaited<ReturnType<typeof createBankSettlement>>>
+export type GetBankSettlementTransitBalancesResult = NonNullable<Awaited<ReturnType<typeof getBankSettlementTransitBalances>>>
+export type ImportBankStatementResult = NonNullable<Awaited<ReturnType<typeof importBankStatement>>>
+export type GetBankSettlementResult = NonNullable<Awaited<ReturnType<typeof getBankSettlement>>>
+export type UpdateBankSettlementResult = NonNullable<Awaited<ReturnType<typeof updateBankSettlement>>>
+export type PostBankSettlementResult = NonNullable<Awaited<ReturnType<typeof postBankSettlement>>>
+export type CancelBankSettlementResult = NonNullable<Awaited<ReturnType<typeof cancelBankSettlement>>>

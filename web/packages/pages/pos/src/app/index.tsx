@@ -14,6 +14,10 @@ import type { RouteHandle } from "@shared/models";
 import { PosLogin } from "#/pages/login/ui/page/Page.tsx";
 import { Lookup } from "#/pages/lookup/ui/page/Page.tsx";
 import { Sale, SalePayment, SaleReceipt } from "#/pages/sale/ui/page/Page.tsx";
+// --- debts imports (B4, w-debts) ---
+import { DebtBook } from "#/pages/debt-book/ui/page/Page.tsx";
+import { SaleCredit } from "#/pages/sale/ui/page/Page.tsx";
+// --- debts imports end ---
 import { SyncStatus } from "#/pages/sync-status/ui/page/Page.tsx";
 // --- pos-ops imports ---
 import { CashCount } from "#/pages/cash-count/ui/page/Page.tsx";
@@ -88,6 +92,10 @@ export const routes: RouteObject[] = [
     handle: { titleKey: CashMovement.titleKey } satisfies RouteHandle,
   },
   // --- pos-ops routes end ---
+  // --- debts routes (B4, w-debts): POS-06 /pos/sale/credit (F5), POS-13 /pos/debts (F7) ---
+  route(SaleCredit),
+  route(DebtBook),
+  // --- debts routes end ---
   // --- pos-wh routes ---
   // Ombor hub, POS-08, POS-09, POS-10, POS-16
   route(WarehouseHub),

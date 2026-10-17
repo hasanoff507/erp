@@ -1,9 +1,9 @@
 /**
  * BO-04 — Xaridlar (07, route /app/purchases): «Xaridnomalar» (ro'yxat–tafsilot, yaratish / tahrirlash /
  * yuborish / bekor qilish), «Kirimlar» (qoralama — qo'lda yoki xaridnomadan, o'tkazish, bekor qilish),
+ * «Yetkazib beruvchiga to'lov» (B4: bank yoki kassadan naqd, taqsimot, avans — `purchases.pay`),
  * «Qaytarish» (o'tkazilgan kirimdan), «Yetkazib beruvchilar» (STIR bo'yicha to'ldirish, qarz).
- * Later stages, not rendered: «Yetkazib beruvchiga to'lov» and «Men qarzdorman» (B4), AI-03 OCR (B6),
- * e-ishonchnoma (B5). Offline: view only (PWA'da yaratish internet talab qiladi).
+ * Later stages, not rendered: AI-03 OCR (B6), e-ishonchnoma (B5). Offline: view only (PWA'da yaratish internet talab qiladi).
  * useEffect fires pageMounted (24 §2) and consumes the one-shot `?new=1` link (WEB-20).
  */
 import { useUnit } from "effector-react";
@@ -26,6 +26,8 @@ import {
 
 import { $currentWarehouse, $warehousesLoaded } from "#/entities/refs/index.ts";
 import { ReceiptsTab } from "#/features/goods-receipts/index.ts";
+import { PaymentsTab, paymentFormOpened } from "#/features/supplier-payments/index.ts";
+import { PayablesTab } from "#/features/payables/index.ts";
 import { OrdersTab } from "#/features/purchase-orders/index.ts";
 import { ReturnsTab } from "#/features/supplier-returns/index.ts";
 import { SuppliersTab } from "#/features/suppliers/index.ts";
@@ -50,6 +52,9 @@ function PurchasesPage() {
   const canReceive = useCan({ permission: "purchases.receive" });
   const canPost = useCan({ permission: "purchases.post" });
   const canReturn = useCan({ permission: "purchases.return" });
+  const canPay = useCan({ permission: "purchases.pay" });
+  // «Men qarzdorman» (B4): the payable aging needs `reports.finance.view` (or `debts.approve`), 07 BO-04
+  const canPayables = useCan({ anyOf: ["reports.finance.view", "debts.approve"] });
   const canListStaff = useCan({ permission: "settings.users" });
   const online = useOnline();
   const [mounted, tab, onTab, drafts, warehouse, warehousesLoaded, fromOrder, fromReceipt] = useUnit([
@@ -130,7 +135,9 @@ function PurchasesPage() {
               </span>
             ) : null}
           </TabsTrigger>
+          {canPay ? <TabsTrigger value="payments">{t("purchases.tabs.payments")}</TabsTrigger> : null}
           <TabsTrigger value="returns">{t("purchases.tabs.returns")}</TabsTrigger>
+          {canPayables ? <TabsTrigger value="payables">{t("purchases.tabs.payables")}</TabsTrigger> : null}
           <TabsTrigger value="suppliers">{t("purchases.tabs.suppliers")}</TabsTrigger>
         </TabsList>
         <TabsContent value="orders">
@@ -151,9 +158,26 @@ function PurchasesPage() {
             onCreateReturn={(r) => fromReceipt(r.id)}
           />
         </TabsContent>
+        {canPay ? (
+          <TabsContent value="payments">
+            <PaymentsTab canPay={canPay} online={online} />
+          </TabsContent>
+        ) : null}
         <TabsContent value="returns">
           <ReturnsTab rights={{ create: canReturn, post: canPost }} online={online} />
         </TabsContent>
+        {canPayables ? (
+          <TabsContent value="payables">
+            <PayablesTab
+              canPay={canPay}
+              online={online}
+              onPay={(supplierId) => {
+                onTab("payments");
+                paymentFormOpened({ supplierId });
+              }}
+            />
+          </TabsContent>
+        ) : null}
         <TabsContent value="suppliers">
           <SuppliersTab canManage={canCreate} online={online} />
         </TabsContent>

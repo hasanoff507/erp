@@ -1,5 +1,5 @@
 import { useUnit } from "effector-react";
-import { ArrowDownToLine, ArrowUpFromLine, CircleAlert, Info, Wallet } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, CircleAlert, Wallet } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -33,6 +33,7 @@ import {
 } from "#/entities/pos-session/index.ts";
 import { digitKeys, useHotkeys } from "#/shared/lib/use-hotkeys.ts";
 import { ManagerApprovalDialog, type ApprovalRef } from "#/features/manager-approval/index.ts";
+import { ExpenseMode } from "#/features/pos-expense/index.ts";
 
 import {
   COMMENT_MAX,
@@ -60,6 +61,8 @@ function CashMovementPage() {
   // the cashier loads asynchronously — the default mode follows her rights until she picks one
   const [picked, setDirection] = useState<Direction | null>(null);
   const direction: Direction = picked ?? (canOut ? "out" : "in");
+  // POS-14 «Xarajat» (B4): a cash expense from the till — `cash.withdraw` (limit), `expense.created`
+  const [expenseMode, setExpenseMode] = useState(false);
   const [digits, setDigits] = useState("");
   const [reason, setReason] = useState<Reason | null>(null);
   const [comment, setComment] = useState("");
@@ -140,13 +143,17 @@ function CashMovementPage() {
     await commit(null);
   };
 
-  useHotkeys([
-    ...digitKeys((d) => setDigits((v) => numPadAppend(v, d))),
-    { key: "Backspace", handler: () => setDigits((v) => v.slice(0, -1)) },
-    // while the approval form is open its own Enter (PIN submit) wins
-    ...(needApproval ? [] : [{ key: "Enter", handler: () => void submit() }]),
-    { key: "Escape", handler: () => (needApproval ? setNeedApproval(false) : back()) },
-  ]);
+  useHotkeys(
+    [
+      ...digitKeys((d) => setDigits((v) => numPadAppend(v, d))),
+      { key: "Backspace", handler: () => setDigits((v) => v.slice(0, -1)) },
+      // while the approval form is open its own Enter (PIN submit) wins
+      ...(needApproval ? [] : [{ key: "Enter", handler: () => void submit() }]),
+      { key: "Escape", handler: () => (needApproval ? setNeedApproval(false) : back()) },
+    ],
+    // the «Xarajat» mode has its own keys (ExpenseMode)
+    !expenseMode,
+  );
 
   if (!cashier || (!canIn && !canOut)) {
     return (
@@ -186,10 +193,18 @@ function CashMovementPage() {
           <SegmentedControl<"in" | "out" | "expense">
             density="touch"
             label={t("cashMovement.direction")}
-            value={direction}
+            value={expenseMode ? "expense" : direction}
             onChange={(v) => {
-              if (v === "expense") return;
+              if (v === "expense") {
+                if (canOut) {
+                  setExpenseMode(true);
+                  setNeedApproval(false);
+                  setDone(null);
+                }
+                return;
+              }
               if ((v === "in" && !canIn) || (v === "out" && !canOut)) return;
+              setExpenseMode(false);
               setDirection(v);
               setReason(null);
               setErrors([]);
@@ -201,102 +216,125 @@ function CashMovementPage() {
               { value: "expense", label: t("cashMovement.modes.expense") },
             ]}
           />
-          <Banner tone="info" icon={Info}>
-            {t("cashMovement.expenseLater")}
-          </Banner>
-          <FormField label={t("cashMovement.amount")} required error={errorOf("amount")}>
-            <output
-              data-testid="movement-amount"
-              className="flex h-16 items-center justify-end rounded-xl border border-input bg-card px-4 text-[30px] font-extrabold tabular-nums"
-            >
-              {formatMoney(amount ?? "0.00", { withCurrency: false })}{" "}
-              <span className="ml-2 text-[16px] text-foreground-secondary">{t("cashMovement.som")}</span>
-            </output>
-          </FormField>
-          <NumPad value={digits} onChange={setDigits} backspaceLabel={t("cashMovement.backspace")} />
-          <FormField
-            label={t("cashMovement.reason")}
-            required
-            error={errorOf("reason") ?? errorOf("founder")}
-          >
-            <div role="radiogroup" className="flex flex-wrap gap-2">
-              {REASONS[direction].map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  role="radio"
-                  aria-checked={reason === r}
-                  data-testid={`reason-${r}`}
-                  onClick={() => setReason(r)}
-                  className={cn(
-                    "h-12 rounded-xl border px-4 text-[14px] font-bold",
-                    reason === r
-                      ? "border-primary bg-primary-soft text-primary-strong"
-                      : "border-border bg-card",
-                  )}
+          {expenseMode ? (
+            <ExpenseMode
+              onBack={back}
+              onDone={reload}
+              renderApproval={(slot) => (
+                <ManagerApprovalDialog
+                  inline
+                  kind="cash_withdrawal_over_limit"
+                  permission="cash.withdraw"
+                  amount={slot.amount}
+                  context={slot.context}
+                  requesterId={cashier.userId}
+                  reason={t("posExpense.overLimit", { limit: formatMoney(slot.ownLimit) })}
+                  allowRemote={slot.allowRemote}
+                  onApproved={slot.onApproved}
+                  onClose={slot.onClose}
+                />
+              )}
+            />
+          ) : null}
+          {expenseMode ? null : (
+            <>
+              <FormField label={t("cashMovement.amount")} required error={errorOf("amount")}>
+                <output
+                  data-testid="movement-amount"
+                  className="flex h-16 items-center justify-end rounded-xl border border-input bg-card px-4 text-[30px] font-extrabold tabular-nums"
                 >
-                  {t(`cashMovement.reasons.${r}`)}
-                </button>
-              ))}
-            </div>
-          </FormField>
-          {reason === "owner_withdrawal" && !sole ? (
-            <Banner tone="warning" icon={CircleAlert}>
-              {t("cashMovement.founderBackOffice")}
-            </Banner>
-          ) : null}
-          <FormField
-            label={t("cashMovement.comment")}
-            required={reason === "other"}
-            optional={reason !== "other"}
-            error={errorOf("comment")}
-          >
-            <Textarea
-              value={comment}
-              maxLength={COMMENT_MAX}
-              rows={2}
-              data-testid="movement-comment"
-              onChange={(e) => setComment(e.target.value)}
-            />
-          </FormField>
-          {needApproval && amount ? (
-            <ManagerApprovalDialog
-              inline
-              kind="cash_withdrawal_over_limit"
-              permission="cash.withdraw"
-              amount={amount}
-              context={{ amount, reason: reason ?? "other" }}
-              requesterId={cashier.userId}
-              reason={t("cashMovement.overLimit", { limit: formatMoney(ownLimit ?? "0.00") })}
-              allowRemote={online}
-              onApproved={(a) => void commit(a)}
-              onClose={() => setNeedApproval(false)}
-            />
-          ) : null}
-          {done ? (
-            <Banner tone="success" icon={Wallet} live="polite">
-              <span data-testid="movement-done">{t("cashMovement.done", { amount: formatMoney(done) })}</span>
-            </Banner>
-          ) : null}
-          {failed ? (
-            <Banner tone="destructive" icon={CircleAlert} live="assertive">
-              {t("cashMovement.failed")}
-            </Banner>
-          ) : null}
-          {!needApproval ? (
-            <Button
-              size="pos-cta"
-              disabled={busy}
-              onClick={() => void submit()}
-              data-testid="movement-submit"
-            >
-              <Icon as={direction === "out" ? ArrowUpFromLine : ArrowDownToLine} size="lg" />
-              {direction === "out"
-                ? t("cashMovement.submitOut", { amount: formatMoney(amount ?? "0.00") })
-                : t("cashMovement.submitIn", { amount: formatMoney(amount ?? "0.00") })}
-              <Kbd keys="Enter" inverted />
-            </Button>
-          ) : null}
+                  {formatMoney(amount ?? "0.00", { withCurrency: false })}{" "}
+                  <span className="ml-2 text-[16px] text-foreground-secondary">{t("cashMovement.som")}</span>
+                </output>
+              </FormField>
+              <NumPad value={digits} onChange={setDigits} backspaceLabel={t("cashMovement.backspace")} />
+              <FormField
+                label={t("cashMovement.reason")}
+                required
+                error={errorOf("reason") ?? errorOf("founder")}
+              >
+                <div role="radiogroup" className="flex flex-wrap gap-2">
+                  {REASONS[direction].map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      role="radio"
+                      aria-checked={reason === r}
+                      data-testid={`reason-${r}`}
+                      onClick={() => setReason(r)}
+                      className={cn(
+                        "h-12 rounded-xl border px-4 text-[14px] font-bold",
+                        reason === r
+                          ? "border-primary bg-primary-soft text-primary-strong"
+                          : "border-border bg-card",
+                      )}
+                    >
+                      {t(`cashMovement.reasons.${r}`)}
+                    </button>
+                  ))}
+                </div>
+              </FormField>
+              {reason === "owner_withdrawal" && !sole ? (
+                <Banner tone="warning" icon={CircleAlert}>
+                  {t("cashMovement.founderBackOffice")}
+                </Banner>
+              ) : null}
+              <FormField
+                label={t("cashMovement.comment")}
+                required={reason === "other"}
+                optional={reason !== "other"}
+                error={errorOf("comment")}
+              >
+                <Textarea
+                  value={comment}
+                  maxLength={COMMENT_MAX}
+                  rows={2}
+                  data-testid="movement-comment"
+                  onChange={(e) => setComment(e.target.value)}
+                />
+              </FormField>
+              {needApproval && amount ? (
+                <ManagerApprovalDialog
+                  inline
+                  kind="cash_withdrawal_over_limit"
+                  permission="cash.withdraw"
+                  amount={amount}
+                  context={{ amount, reason: reason ?? "other" }}
+                  requesterId={cashier.userId}
+                  reason={t("cashMovement.overLimit", { limit: formatMoney(ownLimit ?? "0.00") })}
+                  allowRemote={online}
+                  onApproved={(a) => void commit(a)}
+                  onClose={() => setNeedApproval(false)}
+                />
+              ) : null}
+              {done ? (
+                <Banner tone="success" icon={Wallet} live="polite">
+                  <span data-testid="movement-done">
+                    {t("cashMovement.done", { amount: formatMoney(done) })}
+                  </span>
+                </Banner>
+              ) : null}
+              {failed ? (
+                <Banner tone="destructive" icon={CircleAlert} live="assertive">
+                  {t("cashMovement.failed")}
+                </Banner>
+              ) : null}
+              {!needApproval ? (
+                <Button
+                  size="pos-cta"
+                  disabled={busy}
+                  onClick={() => void submit()}
+                  data-testid="movement-submit"
+                >
+                  <Icon as={direction === "out" ? ArrowUpFromLine : ArrowDownToLine} size="lg" />
+                  {direction === "out"
+                    ? t("cashMovement.submitOut", { amount: formatMoney(amount ?? "0.00") })
+                    : t("cashMovement.submitIn", { amount: formatMoney(amount ?? "0.00") })}
+                  <Kbd keys="Enter" inverted />
+                </Button>
+              ) : null}
+            </>
+          )}
         </div>
         <aside className="flex flex-col gap-3 rounded-2xl border border-border bg-background p-4">
           <h2 className="text-[16px] font-extrabold">{t("cashMovement.cashInDrawer")}</h2>
@@ -308,6 +346,10 @@ function CashMovementPage() {
               <dd className="text-right tabular-nums">+{formatMoney(snapshot.totals.cashSales)}</dd>
               <dt>{t("cashMovement.calc.cashReturns")}</dt>
               <dd className="text-right tabular-nums">−{formatMoney(snapshot.totals.cashReturns)}</dd>
+              <dt>{t("cashMovement.calc.debtCashIn")}</dt>
+              <dd className="text-right tabular-nums" data-testid="debt-cash-in">
+                +{formatMoney(snapshot.totals.debtCashIn)}
+              </dd>
               <dt>{t("cashMovement.calc.in")}</dt>
               <dd className="text-right tabular-nums">+{formatMoney(snapshot.totals.cashIn)}</dd>
               <dt>{t("cashMovement.calc.out")}</dt>

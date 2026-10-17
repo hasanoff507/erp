@@ -55,7 +55,10 @@
     "ettn_required": "E-TTN ro'yxatdan o'tmaguncha jo'natib bo'lmaydi (holati: {{status}}). E-TTN ro'yxatdan o'tgach qayta urinib ko'ring.",
     "reverse_sale_required": "Kirimdan ({{date}}) 12 oydan ko'p vaqt o'tgan — yetkazib beruvchiga qaytarish emas, teskari realizatsiya (chiquvchi e-faktura) rasmiylashtiriladi.",
     "gratuitous_receipt": "Tekin olingan tovar kirimini yetkazib beruvchiga qaytarib bo'lmaydi.",
-    "receipt_not_posted": "Faqat o'tkazilgan kirim bo'yicha qaytarish mumkin."
+    "receipt_not_posted": "Faqat o'tkazilgan kirim bo'yicha qaytarish mumkin.",
+    "advance_consumed": "Bu to'lovning avansi ({{advance}}) keyingi kirimga hisoblangan — avval o'sha kirimni bekor qiling.",
+    "supplier_payment_allocated": "Kirimga yetkazib beruvchiga to'lov tushgan — avval to'lovni bekor qiling",
+    "shift_closed": "Smena yopilgan — naqd hujjatni bekor qilib bo'lmaydi"
   },
   "kpi": {
     "label": "Ombor ko'rsatkichlari",
@@ -68,13 +71,14 @@
     "expiringNone": "{{days}} kun ichida yo'q",
     "transit": "Yo'ldagi ko'chirishlar",
     "transitNote": "{{overdue}} tasi kechikmoqda · {{ettn}} e-TTN kutmoqda",
-    "error": "Ko'rsatkichlarni o'qib bo'lmadi"
+    "error": "Ko'rsatkichlarni o'qib bo'lmadi",
+    "valueAll": "Ombor qiymati — barcha filiallar"
   },
   "stock": {
     "title": "Ombor qoldig'i",
     "subtitle": "{{branch}} — {{warehouse}}",
     "subtitleNoBranch": "Filial tanlanmagan",
-    "allBranches": "«Barcha filiallar» bo'yicha konsolidatsiya keyingi bosqichda (Hisobotlar). Qoldiqni ko'rish va ombor amallari uchun yuqorida filialni tanlang.",
+    "allBranches": "«Barcha filiallar» — har filial alohida va jami qoldiq. Ko'chirish, inventarizatsiya va hisobdan chiqarish uchun yuqorida filialni tanlang.",
     "noWarehouse": "Bu filialda ombor topilmadi. Sozlamalar → Filiallar bo'limini tekshiring.",
     "offline": "Internet yo'q — faqat ko'rish. Ko'chirish, inventarizatsiya va hisobdan chiqarish internet qaytganda ishlaydi.",
     "tableLabel": "Qoldiq",
@@ -126,6 +130,14 @@
       "action": "Amal",
       "writeOffFor": "Hisobdan chiqarish — {{name}}",
       "empty": "{{days}} kun ichida muddati tugaydigan partiya yo'q"
+    },
+    "consolidated": {
+      "byBranch": "Filiallar bo'yicha qoldiq",
+      "branch": "Filial",
+      "positions": "Pozitsiyalar",
+      "low": "Kam qoldiq",
+      "total": "Jami",
+      "qtyTotal": "Jami qoldiq"
     }
   },
   "transfers": {
@@ -393,7 +405,9 @@
       "orders": "Xaridnomalar",
       "receipts": "Kirimlar",
       "returns": "Qaytarish",
-      "suppliers": "Yetkazib beruvchilar"
+      "suppliers": "Yetkazib beruvchilar",
+      "payments": "Yetkazib beruvchiga to'lov",
+      "payables": "Men qarzdorman"
     }
   },
   "orders": {
@@ -698,6 +712,124 @@
       "updated": "O'zgarishlar saqlandi",
       "archived": "Arxivlandi",
       "unarchived": "Arxivdan chiqarildi"
+    }
+  },
+  "supplierPayments": {
+    "title": "Yetkazib beruvchiga to'lovlar",
+    "subtitle": "Bank orqali yoki kassadan naqd to'lovlar — kreditorlik (6010) eng eski hujjatdan yopiladi.",
+    "create": "To'lov qayd etish",
+    "empty": "To'lov yo'q",
+    "emptyHint": "«To'lov qayd etish» bilan yetkazib beruvchiga to'lovni yozing.",
+    "filters": {
+      "status": "Holat",
+      "method": "To'lov usuli",
+      "all": "Hammasi"
+    },
+    "columns": {
+      "date": "Sana",
+      "number": "Raqam",
+      "supplier": "Yetkazib beruvchi",
+      "method": "Usul",
+      "amount": "Summa",
+      "advance": "Avans (4310)",
+      "status": "Holat",
+      "document": "Hujjat",
+      "due": "Muddat",
+      "outstanding": "Qoldiq qarz",
+      "pay": "To'lanadi"
+    },
+    "methods": {
+      "bank": "Bank",
+      "cash": "Kassadan naqd"
+    },
+    "status": {
+      "draft": "Qoralama",
+      "posted": "O'tkazilgan",
+      "cancelled": "Bekor qilingan"
+    },
+    "docTypes": {
+      "goods_receipts": "Kirim",
+      "debt_openings": "Boshlang'ich qarz"
+    },
+    "created": "To'lov yozildi: {{number}} — {{amount}}.",
+    "advanceWritten": "Qarzdan ortig'i {{amount}} avans sifatida yozildi.",
+    "detailTitle": "To'lov",
+    "createdBy": "Kim yozdi",
+    "cancelledAt": "Bekor qilingan",
+    "cancelReason": "Bekor qilish sababi: «{{reason}}»",
+    "noAllocations": "Taqsimot yo'q — butun summa avans.",
+    "vatUnlocked": "QQS krediti ochildi: {{amount}}",
+    "cancel": "Bekor qilish",
+    "cancelTitle": "To'lovni bekor qilish",
+    "cancelDescription": "Provodka, qarz, kassa va QQS storno qilinadi. Kassadan naqd to'lov faqat smena ochiq bo'lsa bekor qilinadi.",
+    "form": {
+      "title": "Yetkazib beruvchiga to'lov",
+      "description": "Kreditorlik kamayadi: Dt 6010 / Kt 5110 (bank) yoki 5010 (kassa).",
+      "supplier": "Yetkazib beruvchi",
+      "payable": "Joriy qarzimiz (6010):",
+      "advanceBalance": "Berilgan avans:",
+      "method": "To'lov usuli",
+      "shift": "Kassa smenasi",
+      "shiftPlaceholder": "Ochiq smenani tanlang",
+      "shiftOption": "{{register}} · smena №{{number}}",
+      "noShift": "Ochiq smena yo'q — kassadan to'lash uchun kassada smena ochilgan bo'lsin.",
+      "amount": "To'lov summasi",
+      "docDate": "Hujjat sanasi",
+      "allocation": "Taqsimot",
+      "manual": "Qo'lda taqsimlash",
+      "autoHint": "Standart — eng eskisidan avtomatik (muddati yoki sanasi bo'yicha).",
+      "manualHint": "Har hujjatga summa kiriting; jami qarz qismiga teng bo'lsin.",
+      "loadingDocs": "Ochiq hujjatlar yuklanmoqda…",
+      "noDocs": "Ochiq hujjat yo'q — to'lov avans sifatida yoziladi.",
+      "vatPending": "QQS krediti kutilmoqda: {{amount}}",
+      "payFor": "{{number}} uchun summa",
+      "allocationErrors": {
+        "exceeds": "Hujjatga yozilgan summa uning qoldiq qarzidan katta.",
+        "sum": "Taqsimot jami qarz qismiga teng emas."
+      },
+      "overpay": "Ortiqcha {{amount}} avans sifatida yoziladi (Dt 4310).",
+      "overpayBlocked": "Qarzdan ortiq to'lash taqiqlangan (sozlama): qarz {{debt}}, to'lov {{amount}}.",
+      "posting": "Provodka: Dt 6010 / Kt {{kt}}; qarzdan ortig'i — Dt 4310 (avans).",
+      "comment": "Izoh",
+      "submit": "To'lovni qayd etish"
+    }
+  },
+  "payables": {
+    "label": "Yetkazib beruvchilarga qarzimiz",
+    "total": "Jami kreditorlik (6010)",
+    "count": "{{n}} ta yetkazib beruvchi",
+    "hint": "Kimga, qancha va qachon to'lash kerak. Qatorni bosing — daftar; «To'lash» — to'lov formasi.",
+    "supplier": "Yetkazib beruvchi",
+    "amount": "Qarzimiz",
+    "due": "To'lash muddati",
+    "noDue": "Muddat belgilanmagan",
+    "dueState": {
+      "overdue": "O'tdi · {{date}}",
+      "today": "Bugun · {{date}}",
+      "soon": "Yaqin · {{date}}",
+      "later": "{{date}}",
+      "none": "—"
+    },
+    "days": "Kun",
+    "docs": "Ochiq hujjat",
+    "empty": "Yetkazib beruvchilarga qarz yo'q",
+    "openLedger": "Daftar",
+    "pay": "To'lash",
+    "payFirst": "Birinchisini to'lash: {{name}}",
+    "ledgerTitle": "Men qarzdorman — daftar",
+    "owe": "Qarzimiz",
+    "doc": {
+      "goods_receipts": "Kirim",
+      "supplier_payments": "To'lov",
+      "supplier_returns": "Qaytarish",
+      "debt_openings": "Boshlang'ich qarz",
+      "other": "Hujjat"
+    },
+    "status": {
+      "open": "to'lanmagan",
+      "partially_paid": "qisman",
+      "paid": "to'langan",
+      "written_off": "kechilgan"
     }
   }
 }

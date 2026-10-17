@@ -6,14 +6,19 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from app.modules.cash.tasks import approval_requests_expire
+from app.modules.debts.tasks import debts_daily
+from app.modules.expenses.tasks import expenses_recurring_remind
 from app.modules.imports.tasks import import_jobs_commit, import_jobs_validate  # catalog/import slice
 from app.modules.integrations.card_terminal.tasks import card_orphan_sweep
 from app.modules.integrations.einvoice.tasks import einvoice_ettn_send, einvoice_ettn_sweep
 from app.modules.integrations.fiscal.tasks import fiscal_ofd_send, fiscal_ofd_sweep, fiscal_unacked_monitor
 from app.modules.inventory.tasks import inventory_daily, inventory_recost, inventory_recost_sweep
+from app.modules.notifications.tasks import notifications_daily_report, notifications_telegram_sweep
 from app.workers.jobs.approvals import approval_requests_expire_fanout
 from app.workers.jobs.card import card_orphan_sweep_fanout
+from app.workers.jobs.debts import debts_daily_fanout
 from app.workers.jobs.einvoice import einvoice_ettn_sweep_fanout
+from app.workers.jobs.expenses import expenses_recurring_remind_fanout
 from app.workers.jobs.fiscal import fiscal_ofd_sweep_fanout, fiscal_unacked_monitor_fanout
 from app.workers.jobs.inventory import inventory_daily_fanout, inventory_recost_sweep_fanout
 from app.workers.jobs.system import (
@@ -22,6 +27,7 @@ from app.workers.jobs.system import (
     purge_idempotency_keys_fanout,
     purge_login_attempts,
 )
+from app.workers.jobs.telegram import notifications_daily_report_fanout, notifications_telegram_sweep_fanout
 
 FUNCTIONS: list[tuple[str, Callable[..., Awaitable[Any]]]] = [
     ("noop", noop),
@@ -57,4 +63,17 @@ FUNCTIONS: list[tuple[str, Callable[..., Awaitable[Any]]]] = [
     ("card_orphan_sweep", card_orphan_sweep),
     # --- B3 sync jobs ---
     # --- B3 device-auth jobs ---
+    # --- B4 debts jobs ---
+    ("debts_daily_fanout", debts_daily_fanout),
+    ("debts_daily", debts_daily),
+    # --- B4 expenses jobs ---
+    ("expenses_recurring_remind_fanout", expenses_recurring_remind_fanout),
+    ("expenses_recurring_remind", expenses_recurring_remind),
+    # --- B4 bank jobs ---
+    # --- B4 reports jobs ---
+    # --- B4 telegram jobs ---
+    ("notifications_telegram_sweep_fanout", notifications_telegram_sweep_fanout),
+    ("notifications_daily_report_fanout", notifications_daily_report_fanout),
+    ("notifications_telegram_sweep", notifications_telegram_sweep),
+    ("notifications_daily_report", notifications_daily_report),
 ]

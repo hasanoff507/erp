@@ -171,7 +171,19 @@
       "phone": "Telefon",
       "amount": "Summa"
     },
-    "badge": "ixtiyoriy"
+    "badge": "ixtiyoriy",
+    "direction": "Kim kimga qarz",
+    "receivable": "Mijozlar menga qarz",
+    "payable": "Men yetkazib beruvchiga qarzman",
+    "remove": "Qatorni o'chirish",
+    "rowSaved": "Saqlandi",
+    "addRow": "Qator qo'shish",
+    "paste": "Excel'dan qo'yish",
+    "pasteHint": "Excel/Google Sheets'dan ustunlarni nusxalab qo'ying: ism, telefon, summa (ixtiyoriy — to'lash muddati).",
+    "pasteApply": "Jadvalga qo'shish",
+    "total": "{{n}} ta qator · jami {{amount}}",
+    "save": "Qarzlarni saqlash",
+    "note": "Qarzlar tizim ishga tushgan sanadan oldingi kun bilan yoziladi va Nasiyalar bo'limida ko'rinadi. Keyin ham BO-06 → «Boshlang'ich qarz» orqali qo'shish mumkin."
   },
   "ofd": {
     "intro": "Fiskal cheklar OFD'ga, e-fakturalar operatorga yuboriladi. Ulashni hozir yoki keyin Sozlamalarda bajarish mumkin.",

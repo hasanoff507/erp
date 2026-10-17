@@ -4,7 +4,7 @@
  * QQS» by rate — US-M10-01, JAMI the largest figure), CHEGIRMA (F2) · NASIYA (F5) · BEKOR and «TO'LOVGA O'TISH» (F4).
  */
 import { useUnit } from "effector-react";
-import { Minus, Plus, ScanBarcode, ShoppingCart, UserPlus, X } from "lucide-react";
+import { BookUser, Minus, Plus, ScanBarcode, ShoppingCart, UserPlus, X } from "lucide-react";
 
 import { useTranslation } from "@shared/i18n";
 import { formatMoney, formatPercent, formatQty } from "@shared/lib/format";
@@ -33,6 +33,8 @@ export interface ReceiptPanelProps {
   onVoidLine: (lineId: string) => void;
   onQty: (lineId: string) => void;
   onPay: () => void;
+  /** B4: «📒 Qarz daftari» (POS-13, F7) — a permanent button of the main screen (07 POS-02). */
+  onDebtBook?: () => void;
 }
 
 function LineRow({
@@ -166,6 +168,13 @@ export function ReceiptPanel(props: ReceiptPanelProps) {
           {props.receiptLabel}
         </span>
         <div className="grow" />
+        {props.onDebtBook ? (
+          <Button size="sm" variant="secondary" onClick={props.onDebtBook} data-testid="debt-book-button">
+            <Icon as={BookUser} size="sm" />
+            {t("debts.bookButton")}
+            <Kbd keys="F7" />
+          </Button>
+        ) : null}
         <Button size="sm" variant="secondary" onClick={props.onCustomer} data-testid="customer-button">
           <Icon as={UserPlus} size="sm" />
           {props.customerName ?? t("sale.customer")}
@@ -238,6 +247,7 @@ export function ReceiptPanel(props: ReceiptPanelProps) {
           variant="warning"
           disabled={!props.canDebt || empty || props.payDisabled}
           onClick={props.onDebt}
+          data-testid="debt-button"
         >
           {t("sale.debtButton")}
           <Kbd keys="F5" />

@@ -45,6 +45,9 @@ export interface LocalShiftTotals {
   cashReturns: Money;
   cashIn: Money;
   cashOut: Money;
+  /** Cash debt payments of the shift (`debt_payment.created`, method `cash`) — `cash_moves` +X (WEB-01). */
+  debtCashIn: Money;
+  /** = opening + Σ signed `cash_moves(method='cash')` of this device's events (18 §3.2). */
   expectedCash: Money;
   /** Shift cash movements for the POS-14 list (newest first). */
   movements: LocalMovement[];
@@ -131,6 +134,7 @@ export function localShiftTotals(
   let voidedCount = 0;
   let cashIn = ZERO;
   let cashOut = ZERO;
+  let debtCashIn = ZERO;
   const movements: LocalMovement[] = [];
 
   for (const row of events) {
@@ -179,6 +183,23 @@ export function localShiftTotals(
         comment: asString(row.payload.comment),
         approvedBy: approval ? asString(approval.approved_by) : null,
       });
+    } else if (row.type === "expense.created") {
+      // B4 POS-14 «Xarajat» (18 §13.2): cash paid out of the till (`cash_moves` −X on the server)
+      const amount = safeMoney(row.payload.amount);
+      cashOut = addMoney(cashOut, amount);
+      const approval = (row.payload.approval ?? null) as Record<string, unknown> | null;
+      movements.push({
+        id: asString(row.payload.id) ?? row.client_event_id,
+        createdAt: row.created_at,
+        direction: "out",
+        reason: "expense",
+        amount,
+        comment: asString(row.payload.comment),
+        approvedBy: approval ? asString(approval.approved_by) : null,
+      });
+    } else if (row.type === "debt_payment.created") {
+      // POS-13 (18 §12.2): the server writes `cash_moves(+amount, method)`; only `cash` reaches the drawer
+      if (row.payload.method === "cash") debtCashIn = addMoney(debtCashIn, safeMoney(row.payload.amount));
     }
   }
 
@@ -205,7 +226,11 @@ export function localShiftTotals(
   for (const r of Object.values(rows)) r.net = subtractMoney(r.sales, r.returns);
   const opening = safeMoney(openingCash);
   const cashSales = byMethod.cash;
-  const expectedCash = subtractMoney(addMoney(opening, cashSales, cashIn), addMoney(cashReturns, cashOut));
+  // server rule (18 §3.2, 13 X-01): expected_cash = opening_cash + Σ cash_moves(shift, method='cash')
+  const expectedCash = subtractMoney(
+    addMoney(opening, cashSales, cashIn, debtCashIn),
+    addMoney(cashReturns, cashOut),
+  );
   movements.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   return {
@@ -222,6 +247,7 @@ export function localShiftTotals(
     cashReturns,
     cashIn,
     cashOut,
+    debtCashIn,
     expectedCash,
     movements,
   };

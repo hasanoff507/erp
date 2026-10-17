@@ -57,6 +57,7 @@ from app.modules.integrations.otp.wiring import (
     build_eskiz_sender,
     build_telegram_sender,
 )
+from app.modules.notifications.wiring import telegram_links_revoker
 
 __all__ = [
     "AuthModule",
@@ -322,6 +323,7 @@ def build_auth_module(settings: Settings, db: Database, redis: Callable[[], Redi
         profiles.forget,
         access_guard,
         otp,
+        on_blocked=telegram_links_revoker(),  # M18 QT-M18-05: a blocked user's Telegram link is revoked
     )
     signup = SignupService(
         db.session_factory,

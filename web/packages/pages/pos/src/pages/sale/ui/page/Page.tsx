@@ -23,6 +23,7 @@ import {
   selectionMoved,
 } from "#/entities/receipt-draft/index.ts";
 import { $posCashier, $posShift, cashierCan } from "#/entities/pos-session/index.ts";
+import { CustomerPicker } from "#/features/debt-customer/index.ts";
 import { Ladder46Modal } from "#/features/fiscal-ladder/index.tsx";
 import { dyn, errorText } from "#/shared/lib/i18n-errors.ts";
 import { useBarcodeWedge } from "#/shared/lib/use-barcode-wedge.ts";
@@ -44,16 +45,21 @@ import { PaymentDialog } from "../PaymentDialog.tsx";
 import { ProductPanel } from "../ProductPanel.tsx";
 import { ReceiptDialog } from "../ReceiptDialog.tsx";
 import { ReceiptPanel } from "../ReceiptPanel.tsx";
-import { CustomerDialog, DiscountDialog, QtyDialog, VoidConfirm, WeightDialog } from "../SaleDialogs.tsx";
+import { CreditSaleDialog } from "../CreditSaleDialog.tsx";
+import { DiscountDialog, QtyDialog, VoidConfirm, WeightDialog } from "../SaleDialogs.tsx";
 
 export const SALE_PATH = "/pos/sale";
 export const PAYMENT_PATH = "/pos/sale/payment";
+/** POS-06 (B4) — nasiya sale overlay. */
+export const CREDIT_PATH = "/pos/sale/credit";
+/** POS-13 (B4) — the quick debt book. */
+export const DEBT_BOOK_PATH = "/pos/debts";
 export const RECEIPT_PATH = "/pos/sale/receipt";
 export const LOOKUP_PATH = "/pos/lookup";
 export const SYNC_PATH = "/pos/sync";
 export const EQUIPMENT_PATH = "/pos/settings/devices";
 
-type Overlay = "payment" | "receipt" | null;
+type Overlay = "payment" | "receipt" | "credit" | null;
 type Dialogs = "discount" | "customer" | { qty: string } | { void: string | null } | null;
 
 function SalePage({ overlay }: { overlay: Overlay }) {
@@ -107,6 +113,11 @@ function SalePage({ overlay }: { overlay: Overlay }) {
   const payDisabled = blocked || fmLocked || !shift || !canSell;
 
   const focusScanner = () => inputRef.current?.focus();
+  // POS-06: a debt-only sale issues no fiscal receipt now (qaror #30) — no 46 h modal, same other guards
+  const openCredit = () => {
+    if (payDisabled || !canDebt || draft.lines.length === 0) return;
+    void navigate(CREDIT_PATH);
+  };
   const openPayment = (mode?: "debt") => {
     if (payDisabled || draft.lines.length === 0) return;
     if (ladder.level === "modal46" && !ladderAck) {
@@ -141,7 +152,8 @@ function SalePage({ overlay }: { overlay: Overlay }) {
       { key: "F2", handler: () => canDiscount && draft.lines.length > 0 && setDialog("discount") },
       { key: "F3", handler: () => setDialog("customer") },
       { key: "F4", handler: () => openPayment() },
-      { key: "F5", handler: () => canDebt && openPayment("debt") },
+      { key: "F5", handler: () => openCredit() },
+      { key: "F7", handler: () => void navigate(DEBT_BOOK_PATH) },
       // line keys also work from the (empty) scanner field — the cashier never has to leave it
       {
         key: "+",
@@ -267,7 +279,8 @@ function SalePage({ overlay }: { overlay: Overlay }) {
           linesDisabled={linesDisabled}
           onCustomer={() => setDialog("customer")}
           onDiscount={() => setDialog("discount")}
-          onDebt={() => openPayment("debt")}
+          onDebt={() => openCredit()}
+          onDebtBook={() => void navigate(DEBT_BOOK_PATH)}
           onVoidReceipt={() => setDialog({ void: null })}
           onVoidLine={(id) => setDialog({ void: id })}
           onQty={(id) => setDialog({ qty: id })}
@@ -284,8 +297,10 @@ function SalePage({ overlay }: { overlay: Overlay }) {
       ) : null}
       {dialog === "discount" ? <DiscountDialog onClose={() => setDialog(null)} /> : null}
       {dialog === "customer" ? (
-        <CustomerDialog
+        <CustomerPicker
           selectedId={draft.customerId}
+          actorUserId={cashier?.userId ?? null}
+          canCreate={canDebt}
           onSelect={(c) => {
             customerSet(c?.id ?? null);
             setDialog(null);
@@ -335,6 +350,9 @@ function SalePage({ overlay }: { overlay: Overlay }) {
           }}
         />
       ) : null}
+      {overlay === "credit" ? (
+        <CreditSaleDialog receiptLabel={receiptLabel} onDone={() => void navigate(SALE_PATH)} />
+      ) : null}
       {overlay === "receipt" ? (
         <ReceiptDialog
           equipmentPath={EQUIPMENT_PATH}
@@ -357,6 +375,11 @@ export const SalePayment = {
   route: "sale/payment",
   titleKey: "pos:payment.title",
   Page: () => <SalePage overlay="payment" />,
+} as const;
+export const SaleCredit = {
+  route: "sale/credit",
+  titleKey: "pos:debts.creditTitle",
+  Page: () => <SalePage overlay="credit" />,
 } as const;
 export const SaleReceipt = {
   route: "sale/receipt",

@@ -18,10 +18,13 @@ from app.core.db.session import Database, unscoped_transaction
 from app.core.queue import JobQueue
 from app.workers.jobs.approvals import approval_requests_expire_fanout
 from app.workers.jobs.card import card_orphan_sweep_fanout
+from app.workers.jobs.debts import debts_daily_fanout
 from app.workers.jobs.einvoice import einvoice_ettn_sweep_fanout
+from app.workers.jobs.expenses import expenses_recurring_remind_fanout
 from app.workers.jobs.fiscal import fiscal_ofd_sweep_fanout, fiscal_unacked_monitor_fanout
 from app.workers.jobs.inventory import inventory_daily_fanout, inventory_recost_sweep_fanout
 from app.workers.jobs.system import purge_idempotency_keys_fanout, purge_login_attempts
+from app.workers.jobs.telegram import notifications_daily_report_fanout, notifications_telegram_sweep_fanout
 
 # SAQ cron runs in UTC; Asia/Tashkent is UTC+5 all year (no DST)
 CRON_JOBS: list[CronJob[Any]] = [
@@ -40,6 +43,15 @@ CRON_JOBS: list[CronJob[Any]] = [
     # --- B3 card cron ---
     CronJob(card_orphan_sweep_fanout, cron="5 * * * *"),  # hourly: approved purchase w/o document > 24 h
     # --- B3 sync cron ---
+    # --- B4 debts cron ---
+    CronJob(debts_daily_fanout, cron="0 4 * * *"),  # 09:00 Tashkent: debt_due_today / debt_aging_60
+    # --- B4 expenses cron ---
+    CronJob(expenses_recurring_remind_fanout, cron="0 4 * * *"),  # 09:00 Tashkent: recurring reminders
+    # --- B4 bank cron ---
+    # --- B4 reports cron ---
+    # --- B4 telegram cron ---
+    CronJob(notifications_telegram_sweep_fanout, cron="* * * * *"),  # M18 events, deliveries, retries
+    CronJob(notifications_daily_report_fanout, cron="*/5 * * * *"),  # daily report at the user's time
 ]
 
 _ACTIVE_TENANTS = text("SELECT app.list_active_tenant_ids()")

@@ -2,8 +2,8 @@
 
 ``record_event`` writes ``outbox_jobs(kind='telegram', status='queued', payload={"event": kind, ...},
 idempotency_key=dedupe_key)`` with ``ON CONFLICT (tenant_id, idempotency_key) DO NOTHING`` — so a
-daily cron that runs twice, or a retried posting, records each event once. Nothing consumes
-``kind='telegram'`` before Bosqich 4 (the sender).
+daily cron that runs twice, or a retried posting, records each event once. The M18 sender
+(:mod:`.sender`) consumes these rows: fan-out to the recipients, then Telegram delivery.
 """
 
 from __future__ import annotations

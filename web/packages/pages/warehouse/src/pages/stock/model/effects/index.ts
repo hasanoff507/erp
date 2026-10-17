@@ -1,28 +1,29 @@
 /**
- * BO-03 effects — `GET /stock-balances`, `GET /stock-lots` (19 §7), `GET /transfers?status=` (19 §13)
- * and `GET /stock-counts?status=review` (19 §14) for the KPI cards and tab badges.
+ * BO-03 effects — `GET /reports/stock` (20 §20: rows + KPI of one warehouse or of every branch, WEB-10),
+ * `GET /stock-lots` (19 §7), `GET /transfers?status=` (19 §13) and `GET /stock-counts?status=review`
+ * (19 §14) for the KPI cards and tab badges.
  */
 import { api } from "@shared/api";
 
 import { BULK_LIMIT, apiFx, readAllPages } from "#/shared/lib/effect.ts";
 
-import { digestOf, ofBranch, summarize, toBalancesQuery } from "../lib/index.ts";
+import { digestOf, ofBranch } from "../lib/index.ts";
 import {
+  ALL_STOCK,
   BALANCE_PAGE_SIZE,
   EXPIRY_DAYS,
-  type BalancesRequest,
   type DigestRequest,
   type DigestTransfer,
   type ExpiringSummary,
   type LotsRequest,
-  type StockBalancePage,
   type StockLotPage,
-  type StockSummary,
+  type StockReport,
   type TransitSummary,
 } from "../types/index.ts";
 
-export const listBalancesFx = apiFx<BalancesRequest, StockBalancePage>(({ warehouseId, filters, cursor }) =>
-  api.inventory.listStockBalances(toBalancesQuery(warehouseId, filters, cursor)),
+/** The «Qoldiq» report: one warehouse (its id) or every branch ({@link ALL_STOCK}). */
+export const loadStockFx = apiFx<string, StockReport>((scope) =>
+  api.reports.getStock(scope === ALL_STOCK ? {} : { warehouse_id: scope }),
 );
 
 export const listExpiringLotsFx = apiFx<LotsRequest, StockLotPage>(({ warehouseId, cursor }) =>
@@ -33,18 +34,6 @@ export const listExpiringLotsFx = apiFx<LotsRequest, StockLotPage>(({ warehouseI
     limit: BALANCE_PAGE_SIZE,
   }),
 );
-
-/** KPI «Ombor qiymati / Kam qoldiq»: every balance page of the warehouse (no aggregate API yet). */
-export const loadSummaryFx = apiFx<string, StockSummary>(async (warehouseId) => {
-  const { items, capped } = await readAllPages((cursor) =>
-    api.inventory.listStockBalances({
-      warehouse_id: warehouseId,
-      ...(cursor ? { cursor } : {}),
-      limit: BULK_LIMIT,
-    }),
-  );
-  return summarize(items, capped);
-});
 
 /** KPI «Muddati yaqin partiyalar (7 kun)» + «Muddati N kunda» chips of the balance rows. */
 export const loadExpiringFx = apiFx<string, ExpiringSummary>(async (warehouseId) => {

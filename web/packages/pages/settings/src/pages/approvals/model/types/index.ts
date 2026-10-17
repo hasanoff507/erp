@@ -67,9 +67,15 @@ export interface ApprovalsMountParams {
   now: number;
 }
 
-/** `context.reason` of a cash withdrawal (18 §13.1 `cash_movements.reason`). */
-export const CASH_REASONS = ["collection", "deposit", "owner_withdrawal", "other"] as const;
+/**
+ * `context.reason` of a cash withdrawal (18 §13.1 `cash_movements.reason`) — plus `expense`: POS-14
+ * «Xarajat» asks the same `cash_withdrawal_over_limit` approval for a cash expense (18 §13.2, B4).
+ */
+export const CASH_REASONS = ["collection", "deposit", "owner_withdrawal", "other", "expense"] as const;
 export type CashReason = (typeof CASH_REASONS)[number];
+/** `context.source` of an `expense_over_limit` request (20 #43). */
+export const EXPENSE_SOURCES = ["cash", "bank", "card"] as const;
+export type ExpenseSource = (typeof EXPENSE_SOURCES)[number];
 /** `context.manual_reason` of a terminalsiz card request (18 §4.1). */
 export const MANUAL_REASONS = [
   "standalone_terminal",
@@ -96,4 +102,10 @@ export type ContextLine =
   | { key: "reason"; value: CashReason }
   | { key: "manualReason"; value: ManualReason }
   | { key: "comment"; value: string }
-  | { key: "lines"; count: number };
+  | { key: "lines"; count: number }
+  | { key: "category"; value: string }
+  | { key: "source"; value: ExpenseSource }
+  | { key: "docDate"; value: string }
+  | { key: "customer"; value: string }
+  | { key: "creditLimit"; value: string }
+  | { key: "currentDebt"; value: string };

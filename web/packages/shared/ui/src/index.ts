@@ -78,6 +78,19 @@ export {
 } from "./components/ui/sheet.tsx";
 export { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "./components/ui/popover.tsx";
 export {
+  Command,
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandLoading,
+  CommandSeparator,
+  CommandShortcut,
+  type CommandDialogProps,
+} from "./components/ui/command.tsx";
+export {
   SimpleTooltip,
   Tooltip,
   TooltipContent,

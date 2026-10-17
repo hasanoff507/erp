@@ -7,6 +7,7 @@ import {
   NAV_GROUPS,
   navItemForPath,
   navItemTarget,
+  paletteSearchRights,
   requiresForPath,
 } from "./nav-items.ts";
 
@@ -117,5 +118,28 @@ describe("Bosqich 3 back-office items (BO-07, BO-16)", () => {
     expect(hasPermissions(access(["card.manual_entry.approve"]), approvals.requires)).toBe(true);
     expect(hasPermissions(access(["cash.withdraw"]), approvals.requires)).toBe(true);
     expect(hasPermissions(access(["sales.create"]), approvals.requires)).toBe(false);
+  });
+});
+
+describe("WEB-06: BO-06 rights — sidebar, route guard and Ctrl+K agree with the page guard", () => {
+  it("test_web06_palette_hides_counterparties_without_debts_screen_right", () => {
+    // the cashier taking debt payments has no BO-06 (debts-aging) right → no counterparty hits, no item
+    const cashier = access(["sales.create", "debts.payment.accept"]);
+    expect(paletteSearchRights(cashier).counterparties).toBe(false);
+    expect(hasPermissions(cashier, requiresForPath("/app/debts"))).toBe(false);
+    for (const right of ["reports.finance.view", "debts.approve"]) {
+      const granted = access(["sales.create", right]);
+      expect(paletteSearchRights(granted).counterparties).toBe(true);
+      expect(hasPermissions(granted, requiresForPath("/app/debts"))).toBe(true);
+    }
+    // the BO-06 right alone does not read counterparties
+    expect(paletteSearchRights(access(["reports.finance.view"]))).toEqual({
+      products: false,
+      counterparties: false,
+    });
+    expect(paletteSearchRights(access(["stock.view", "debts.approve"]))).toEqual({
+      products: true,
+      counterparties: true,
+    });
   });
 });

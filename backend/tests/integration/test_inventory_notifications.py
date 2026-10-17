@@ -93,7 +93,10 @@ async def test_qt_m04_02_low_stock_event(env: Env) -> None:
 
 def test_no_worker_consumes_telegram_events_and_crons_are_registered() -> None:
     names = {name for name, _ in FUNCTIONS}
-    assert not any("telegram" in n or "outbox" in n for n in names)  # sending is Bosqich 4
+    # Bosqich 4: the only consumer of the recorded events is the M18 sender (notifications module)
+    assert {n for n in names if "telegram" in n} == {
+        "notifications_telegram_sweep", "notifications_telegram_sweep_fanout"
+    }  # fmt: skip
     assert {"inventory_daily", "inventory_recost", "inventory_recost_sweep"} <= names
     crons = {job.function.__name__ for job in CRON_JOBS}
     assert {"inventory_daily_fanout", "inventory_recost_sweep_fanout"} <= crons

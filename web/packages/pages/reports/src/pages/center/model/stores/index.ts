@@ -2,15 +2,18 @@ import { createStore } from "effector";
 
 import type { ApiError } from "@shared/api";
 
-import type {
-  CashMovement,
-  CashRegister,
-  DateRange,
-  LoadStatus,
-  ReportKey,
-  Shift,
-  ShiftRow,
-  VatMove,
+import {
+  DEFAULT_OPTIONS,
+  type CashMovement,
+  type CashRegister,
+  type DateRange,
+  type LoadStatus,
+  type ReportKey,
+  type ReportOptions,
+  type ReportResult,
+  type Shift,
+  type ShiftRow,
+  type VatMove,
 } from "../types/index.ts";
 
 export const $today = createStore("1970-01-01");
@@ -37,3 +40,12 @@ export const $vatMoves = createStore<VatMove[]>([]);
 export const $vatCursor = createStore<string | null>(null, { skipVoid: false });
 export const $vatStatus = createStore<LoadStatus>("idle");
 export const $vatError = createStore<ApiError | null>(null, { skipVoid: false });
+
+// --- Bosqich 4 reports (`/reports/*`) --------------------------------------------------------------
+/** «Filial» filter; `null` = «Barcha filiallar» (consolidated, US-M14-01). */
+export const $branchFilter = createStore<string | null>(null, { skipVoid: false });
+export const $options = createStore<ReportOptions>(DEFAULT_OPTIONS);
+/** The answer of the open report (`null` — not read yet / another report). */
+export const $reportResult = createStore<ReportResult | null>(null, { skipVoid: false });
+export const $reportStatus = createStore<LoadStatus>("idle");
+export const $reportError = createStore<ApiError | null>(null, { skipVoid: false });

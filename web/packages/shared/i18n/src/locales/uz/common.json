@@ -76,7 +76,19 @@
     "allBranches": "Barcha filiallar",
     "notifications": "Bildirishnomalar",
     "openMenu": "Menyuni ochish",
-    "closeMenu": "Menyuni yopish"
+    "closeMenu": "Menyuni yopish",
+    "notificationsCount": "Bildirishnomalar: {{count}} ta",
+    "palette": {
+      "title": "Tezkor qidiruv",
+      "hint": "Ekran, tovar yoki mijozni qidiring. ↑ ↓ — tanlash, Enter — ochish, Esc — yopish.",
+      "searching": "Qidirilmoqda…",
+      "error": "Qidiruvni bajarib bo'lmadi",
+      "empty": "Hech narsa topilmadi",
+      "typeMore": "Tovar yoki mijoz uchun kamida 2 ta belgi kiriting",
+      "screens": "EKRANLAR",
+      "products": "TOVARLAR",
+      "counterparties": "KONTRAGENTLAR"
+    }
   },
   "user": {
     "menuLabel": "Foydalanuvchi menyusi",
@@ -249,9 +261,28 @@
     "transfer_cost_pending": "Jo'natuvchi omborda tovar tannarxi hali aniqlanmagan (manfiy qoldiq) — avval kirimni o'tkazing"
   },
   "validation": {
+    "allocations_exceed_amount": "Taqsimlangan summa to'lov summasidan katta",
+    "cash_movement_debt_repayment": "Qarz to'lovi faqat kassada qarz to'lovi (chek bilan) yoki bank to'lovi orqali qabul qilinadi",
+    "cash_movement_exceeds_customer_credit": "Summa mijozning ortiqcha to'lovidan ({{available}}) oshmasin",
+    "sale_debt_written_off": "Bu sotuv qarzi hisobdan chiqarilgan — avval kechishni bekor qiling",
+    "tax_type_not_accrued": "Bu soliq hisoblanmaydi — «Davr soliqlari» yoki ish haqi toifasi orqali xarajat qiling",
+    "date_in_future": "Sana kelajakda bo'lishi mumkin emas",
+    "debt_writeoff_exceeds_balance": "Kechiriladigan summa mijozning ochiq qarzidan katta",
+    "fiscal_lines_total_mismatch": "Chek qatorlari jami to'lov summasiga teng emas",
+    "reserve_4910_insufficient": "Bu mijoz bo'yicha shubhali qarzlar rezervi (4910) yetarli emas",
+    "cash_fields_bank_payment": "Bank to'lovida kassa va smena ko'rsatilmaydi",
+    "allocation_target_invalid": "Hujjat bu yetkazib beruvchining ochiq qarzi emas",
+    "allocation_exceeds_outstanding": "Taqsimot summasi hujjatning qolgan qarzidan oshmasin",
+    "allocation_sum_mismatch": "Taqsimot jami to'lovning qarz qismiga teng bo'lishi kerak",
+    "branch_required": "Filialni tanlang",
+    "doc_date_outside_period": "Hujjat sanasi tanlangan davr ichida bo'lishi kerak",
+    "branch_not_allowed_for_vat_offset": "QQS hisob-kitobida filial ko'rsatilmaydi",
+    "tax_kind_regime_mismatch": "Soliq turi davrdagi soliq rejimiga mos emas",
+    "tax_settlement_exists": "Bu davr uchun soliq hisob-kitobi hujjati allaqachon bor",
     "weight_prefix_duplicate": "Bu prefiks boshqa tarozi shablonida bor",
     "weight_template_length": "PLU kodi va qiymat uzunligi yig'indisi 10 bo'lishi kerak (EAN-13)",
     "archived": "Bu yozuv arxivlangan",
+    "bank_commission_ge_gross": "Komissiya yopiladigan summadan kichik bo'lishi kerak",
     "bank_settlement_exceeds_in_transit": "Summa bankka o'tmagan tushum qoldig'idan katta",
     "barcode_check_digit": "Shtrix-kodning nazorat raqami mos kelmadi",
     "barcode_duplicate": "Bu shtrix-kod boshqa tovarda yoki faylda takrorlangan",
@@ -271,6 +302,7 @@
     "debt_payment_backoffice_bank_only": "Back-office'da qarz to'lovi faqat bank orqali qabul qilinadi",
     "date_format": "Sana formati YYYY-MM-DD bo'lsin",
     "date_range": "Boshlanish sanasi tugash sanasidan keyin bo'lmasin",
+    "date_range_too_long": "Davr 366 kundan oshmasin",
     "decimal_format": "Raqamni to'g'ri kiriting (masalan 12 000 yoki 1,250)",
     "default_branch_missing": "Asosiy filial topilmadi",
     "duplicate": "Bunday nom allaqachon bor",
@@ -466,7 +498,9 @@
     "vat_amount_mismatch": "QQS summasi qator jamiga mos emas",
     "vat_rate": "QQS stavkasi 12% yoki 0% bo'lishi kerak",
     "z_report_exists": "Bu smena uchun Z-hisobot allaqachon yaratilgan",
-    "counterparty_mismatch": "Kontragent asl sotuv mijoziga mos emas"
+    "counterparty_mismatch": "Kontragent asl sotuv mijoziga mos emas",
+    "recurring_expense_not_due": "Takrorlanuvchi xarajat muddati hali kelmagan",
+    "recurring_expense_inactive": "Takrorlanuvchi xarajat qoidasi o'chirilgan"
   },
   "otp_sent_telegram": "Kod Telegram orqali yuborildi",
   "otp_sent_sms": "Kod SMS orqali yuborildi",
@@ -563,6 +597,7 @@
   },
   "notificationsPanel": {
     "title": "Bildirishnomalar",
-    "soon": "Ogohlantirishlar ro'yxati keyingi bosqichda qo'shiladi. Tasdiq so'rovlari — «Tasdiqlash navbati» bo'limida."
+    "empty": "Hozircha ogohlantirish yo'q",
+    "error": "Ogohlantirishlarni yuklab bo'lmadi"
   }
 }

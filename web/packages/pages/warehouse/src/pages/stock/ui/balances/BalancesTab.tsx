@@ -3,6 +3,9 @@
  * «Xaridnoma tuzish»), filters (qidiruv, faqat kam qoldiq, muddati 7 kunda tugaydi), the balance
  * table (tovar — birlik, kategoriya, markirovka; shtrix-kod, qoldiq, min., tannarx (o'rt.), qiymat,
  * holat «Kam qoldi» / «Yetarli» + «Muddati N kunda», «⚠ manfiy»), sahifadagi jami, oxirgi yangilanish.
+ * Rows come from `GET /reports/stock` with the card fields (WEB-10 — no per-row product request).
+ * «Barcha filiallar» (US-M04-03, QT-M04-03): the quantity of every branch in its own column + the
+ * total, a per-branch totals table; the expiring-lots view and write-offs need one warehouse.
  * The expiring view lists lots (`GET /stock-lots?expiring_within_days=7`) with «Hisobdan chiqarish».
  */
 import { useUnit } from "effector-react";
@@ -22,32 +25,35 @@ import {
   StatusChip,
   Switch,
   buttonVariants,
+  cn,
   type DataTableColumn,
 } from "@shared/ui";
 
-import { $categories, $products, unitLabel, useQtyFormat } from "#/entities/refs/index.ts";
+import { unitLabel, useQtyFormat } from "#/entities/refs/index.ts";
 import { daysUntil } from "#/shared/lib/effect.ts";
 import { isNegative } from "#/shared/lib/decimal.ts";
 import { errorText } from "#/shared/lib/errors.ts";
 
 import {
   $balances,
-  $cursor,
+  $consolidated,
   $error,
   $expiring,
   $expiryDays,
   $filters,
+  $hasMore,
   $lastUpdated,
   $lots,
   $lotsCursor,
   $lotsError,
   $lotsMoreLoading,
   $lotsStatus,
-  $moreLoading,
   $pageTotal,
   $status,
+  $stock,
   $summary,
   $today,
+  $units,
   $view,
   EXPIRY_DAYS,
   lotsMoreRequested,
@@ -58,6 +64,7 @@ import {
   viewChanged,
   type Balance,
   type Lot,
+  type StockReport,
 } from "../../model/index.ts";
 
 export interface BalancesTabProps {
@@ -76,35 +83,74 @@ function ExpiryChip({ days }: { days: number }) {
   );
 }
 
+type BranchRow = StockReport["branches"][number] & { isTotal: boolean };
+
+/** «Barcha filiallar»: value / positions / below-min of each branch and the total (QT-M04-03). */
+function BranchTotals({ stock }: { stock: StockReport }) {
+  const { t } = useTranslation("warehouse");
+  const rows: BranchRow[] = [
+    ...stock.branches.map((b) => ({ ...b, isTotal: false })),
+    {
+      branch_id: "total",
+      name: t("stock.consolidated.total"),
+      value: stock.total.value,
+      positions: stock.total.positions,
+      below_min_count: stock.total.below_min_count,
+      isTotal: true,
+    },
+  ];
+  const strong = (r: BranchRow, text: string) => (
+    <span className={cn(r.isTotal && "font-extrabold")}>{text}</span>
+  );
+  const columns: DataTableColumn<BranchRow>[] = [
+    { id: "name", header: t("stock.consolidated.branch"), cell: (r) => strong(r, r.name) },
+    {
+      id: "positions",
+      header: t("stock.consolidated.positions"),
+      numeric: true,
+      cell: (r) => String(r.positions),
+    },
+    {
+      id: "low",
+      header: t("stock.consolidated.low"),
+      numeric: true,
+      cell: (r) => String(r.below_min_count),
+    },
+    {
+      id: "value",
+      header: t("stock.columns.value"),
+      numeric: true,
+      cell: (r) => formatMoney(r.value, { withCurrency: false }),
+    },
+  ];
+  return (
+    <DataTable
+      label={t("stock.consolidated.byBranch")}
+      columns={columns}
+      data={rows}
+      getRowId={(r) => r.branch_id}
+      minWidth={560}
+    />
+  );
+}
+
 export function BalancesTab({ canWriteOff, canCreatePo, online, onWriteOffLot }: BalancesTabProps) {
   const { t } = useTranslation("warehouse");
-  const [
-    rows,
-    status,
-    error,
-    cursor,
-    moreLoading,
-    filters,
-    view,
-    total,
-    updated,
-    summary,
-    expiring,
-    expiryDays,
-  ] = useUnit([
-    $balances,
-    $status,
-    $error,
-    $cursor,
-    $moreLoading,
-    $filters,
-    $view,
-    $pageTotal,
-    $lastUpdated,
-    $summary,
-    $expiring,
-    $expiryDays,
-  ]);
+  const [rows, status, error, hasMore, filters, view, total, updated, summary, expiring, expiryDays] =
+    useUnit([
+      $balances,
+      $status,
+      $error,
+      $hasMore,
+      $filters,
+      $view,
+      $pageTotal,
+      $lastUpdated,
+      $summary,
+      $expiring,
+      $expiryDays,
+    ]);
+  const [stock, consolidated] = useUnit([$stock, $consolidated]);
   const [onSearch, onLow, onView, more, reload] = useUnit([
     searchChanged,
     lowOnlyToggled,
@@ -112,27 +158,23 @@ export function BalancesTab({ canWriteOff, canCreatePo, online, onWriteOffLot }:
     moreRequested,
     reloadRequested,
   ]);
-  const [products, categories] = useUnit([$products, $categories]);
   const formatQty = useQtyFormat();
 
-  const unitOf = (productId: string) => products[productId]?.unit_code;
-  const expiringCount = expiring?.lots.length ?? 0;
+  const expiringCount = consolidated ? 0 : (expiring?.lots.length ?? 0);
   const lowCount = summary?.low ?? 0;
+  const branchColumns = consolidated && stock && stock.branches.length > 1 ? stock.branches : [];
 
   const columns: DataTableColumn<Balance>[] = [
     {
       id: "product",
       header: t("stock.columns.product"),
       cell: (b) => {
-        const p = products[b.product_id];
-        const meta = [
-          unitLabel(p?.unit_code),
-          p?.category_id ? categories[p.category_id] : null,
-          p?.is_marked ? t("stock.marked") : null,
-        ].filter(Boolean);
+        const meta = [unitLabel(b.unit_code), b.category_name, b.is_marked ? t("stock.marked") : null].filter(
+          Boolean,
+        );
         return (
           <span className="flex flex-col">
-            <span className="font-semibold">{b.product_name}</span>
+            <span className="font-semibold">{b.name}</span>
             {meta.length > 0 ? (
               <span className="text-[12px] text-muted-foreground">{meta.join(" · ")}</span>
             ) : null}
@@ -144,20 +186,32 @@ export function BalancesTab({ canWriteOff, canCreatePo, online, onWriteOffLot }:
       id: "barcode",
       header: t("stock.columns.barcode"),
       width: "140px",
-      cell: (b) => (
-        <span className="tabular-nums text-foreground-secondary">
-          {products[b.product_id]?.barcodes[0]?.barcode ?? "—"}
-        </span>
-      ),
+      cell: (b) => <span className="tabular-nums text-foreground-secondary">{b.barcode ?? "—"}</span>,
     },
+    ...branchColumns.map((br): DataTableColumn<Balance> => ({
+      id: `branch-${br.branch_id}`,
+      header: br.name,
+      numeric: true,
+      width: "110px",
+      cell: (b) => {
+        const q = b.by_branch.find((x) => x.branch_id === br.branch_id);
+        return q ? (
+          <span className={q.below_min ? "text-destructive-strong" : undefined}>
+            {formatQty(q.qty, b.unit_code)}
+          </span>
+        ) : (
+          "—"
+        );
+      },
+    })),
     {
       id: "qty",
-      header: t("stock.columns.qty"),
+      header: branchColumns.length > 0 ? t("stock.consolidated.qtyTotal") : t("stock.columns.qty"),
       numeric: true,
       width: "110px",
       cell: (b) => (
-        <span className={b.is_low || b.is_negative ? "text-destructive-strong" : undefined}>
-          {formatQty(b.qty, unitOf(b.product_id))}
+        <span className={b.below_min || isNegative(b.qty) ? "text-destructive-strong" : undefined}>
+          {formatQty(b.qty, b.unit_code)}
         </span>
       ),
     },
@@ -166,7 +220,7 @@ export function BalancesTab({ canWriteOff, canCreatePo, online, onWriteOffLot }:
       header: t("stock.columns.min"),
       numeric: true,
       width: "90px",
-      cell: (b) => (b.min_stock ? formatQty(b.min_stock, unitOf(b.product_id)) : "—"),
+      cell: (b) => (b.min_stock ? formatQty(b.min_stock, b.unit_code) : "—"),
     },
     {
       id: "cost",
@@ -190,11 +244,11 @@ export function BalancesTab({ canWriteOff, canCreatePo, online, onWriteOffLot }:
         const days = expiryDays[b.product_id];
         return (
           <span className="flex flex-wrap gap-1.5">
-            {b.is_negative || isNegative(b.qty) ? (
+            {isNegative(b.qty) ? (
               <StatusChip tone="destructive" icon={TriangleAlert}>
                 {t("stock.status.negative")}
               </StatusChip>
-            ) : b.is_low ? (
+            ) : b.below_min ? (
               <StatusChip tone="destructive">{t("stock.status.low")}</StatusChip>
             ) : (
               <StatusChip tone="success">{t("stock.status.ok")}</StatusChip>
@@ -219,7 +273,7 @@ export function BalancesTab({ canWriteOff, canCreatePo, online, onWriteOffLot }:
                   {t("stock.banner.showLow")}
                 </Button>
               ) : null}
-              {canCreatePo && lowCount > 0 ? (
+              {canCreatePo && lowCount > 0 && !consolidated ? (
                 <Link to="/app/purchases?tab=orders&new=1" className={buttonVariants({ size: "sm" })}>
                   {t("stock.banner.createPo")}
                 </Link>
@@ -245,6 +299,7 @@ export function BalancesTab({ canWriteOff, canCreatePo, online, onWriteOffLot }:
           </span>
         </Banner>
       ) : null}
+      {consolidated && stock && stock.branches.length > 1 ? <BranchTotals stock={stock} /> : null}
       <div role="search" aria-label={t("stock.filters.label")} className="flex flex-wrap items-center gap-4">
         <SearchInput
           className="w-72"
@@ -258,16 +313,18 @@ export function BalancesTab({ canWriteOff, canCreatePo, online, onWriteOffLot }:
           <Switch id="stock-low-only" checked={filters.lowOnly} onCheckedChange={onLow} />
           <Label htmlFor="stock-low-only">{t("stock.filters.lowOnly")}</Label>
         </span>
-        <span className="flex items-center gap-2">
-          <Switch
-            id="stock-expiring"
-            checked={view === "expiring"}
-            onCheckedChange={(on) => onView(on ? "expiring" : "balances")}
-          />
-          <Label htmlFor="stock-expiring">{t("stock.filters.expiring", { days: EXPIRY_DAYS })}</Label>
-        </span>
+        {consolidated ? null : (
+          <span className="flex items-center gap-2">
+            <Switch
+              id="stock-expiring"
+              checked={view === "expiring"}
+              onCheckedChange={(on) => onView(on ? "expiring" : "balances")}
+            />
+            <Label htmlFor="stock-expiring">{t("stock.filters.expiring", { days: EXPIRY_DAYS })}</Label>
+          </span>
+        )}
       </div>
-      {view === "expiring" ? (
+      {view === "expiring" && !consolidated ? (
         <LotsTable canWriteOff={canWriteOff} online={online} onWriteOff={onWriteOffLot} />
       ) : (
         <>
@@ -279,7 +336,7 @@ export function BalancesTab({ canWriteOff, canCreatePo, online, onWriteOffLot }:
             status={status}
             errorMessage={error ? errorText(error) : undefined}
             onRetry={reload}
-            minWidth={1000}
+            minWidth={1000 + branchColumns.length * 110}
             empty={
               <EmptyState
                 icon={PackageOpen}
@@ -287,12 +344,7 @@ export function BalancesTab({ canWriteOff, canCreatePo, online, onWriteOffLot }:
                 description={filters.search || filters.lowOnly ? undefined : t("stock.empty.description")}
               />
             }
-            pagination={{
-              kind: "cursor",
-              hasMore: cursor !== null,
-              loadingMore: moreLoading,
-              onLoadMore: more,
-            }}
+            pagination={{ kind: "cursor", hasMore, onLoadMore: more }}
           />
           {rows.length > 0 ? (
             <div
@@ -331,18 +383,17 @@ function LotsTable({
   onWriteOff: (lot: Lot) => void;
 }) {
   const { t } = useTranslation("warehouse");
-  const [lots, status, error, cursor, moreLoading, today, products] = useUnit([
+  const [lots, status, error, cursor, moreLoading, today, units] = useUnit([
     $lots,
     $lotsStatus,
     $lotsError,
     $lotsCursor,
     $lotsMoreLoading,
     $today,
-    $products,
+    $units,
   ]);
   const [more, reload] = useUnit([lotsMoreRequested, reloadRequested]);
   const formatQty = useQtyFormat();
-  const unitOf = (id: string) => products[id]?.unit_code;
 
   const columns: DataTableColumn<Lot>[] = [
     {
@@ -367,7 +418,7 @@ function LotsTable({
       header: t("stock.lots.left"),
       numeric: true,
       width: "110px",
-      cell: (l) => formatQty(l.qty_left, unitOf(l.product_id)),
+      cell: (l) => formatQty(l.qty_left, units[l.product_id]),
     },
     {
       id: "cost",

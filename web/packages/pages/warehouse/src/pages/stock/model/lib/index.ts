@@ -1,51 +1,62 @@
 import { dayjs } from "@shared/lib/date";
-import type { ListStockBalancesParams, TransferOut } from "@shared/models";
+import type { TransferOut } from "@shared/models";
 
 import { isNegative, isZero, sumMoney } from "#/shared/lib/decimal.ts";
 import { daysUntil } from "#/shared/lib/effect.ts";
 
 import {
-  BALANCE_PAGE_SIZE,
+  ALL_STOCK,
   DIGEST_DAYS,
   DIGEST_ROWS,
   STOCK_TABS,
   type Balance,
   type BalanceFilters,
   type Lot,
+  type StockReport,
   type StockSummary,
   type StockTab,
 } from "../types/index.ts";
 
-export function toBalancesQuery(
-  warehouseId: string,
-  filters: BalanceFilters,
-  cursor: string | null,
-): ListStockBalancesParams {
-  const search = filters.search.trim();
-  return {
-    warehouse_id: warehouseId,
-    ...(search ? { search } : {}),
-    ...(filters.lowOnly ? { low_stock: true } : {}),
-    ...(cursor ? { cursor } : {}),
-    limit: BALANCE_PAGE_SIZE,
-  };
+/**
+ * The «Qoldiq» scope: a branch → its warehouse id (`null` while unknown); «Barcha filiallar» (no branch)
+ * → {@link ALL_STOCK} (consolidated, US-M04-03).
+ */
+export function stockScope(branchId: string | null, warehouseId: string | null): string | null {
+  return branchId === null ? ALL_STOCK : warehouseId;
+}
+
+/** Client filters of the report rows: name (uz/ru) contains / exact barcode; «Faqat kam qoldiq». */
+export function filterItems(items: readonly Balance[], filters: BalanceFilters): Balance[] {
+  const q = filters.search.trim().toLowerCase();
+  return items.filter((r) => {
+    if (filters.lowOnly && !r.below_min) return false;
+    if (!q) return true;
+    return (
+      r.name.toLowerCase().includes(q) ||
+      (r.name_ru ?? "").toLowerCase().includes(q) ||
+      r.barcode === filters.search.trim()
+    );
+  });
+}
+
+/** product_id → unit code (quantities of the lots view are formatted with it). */
+export function unitsOf(report: StockReport | null): Record<string, string> {
+  return Object.fromEntries((report?.items ?? []).map((r) => [r.product_id, r.unit_code]));
 }
 
 export function sameFilters(a: BalanceFilters, b: BalanceFilters): boolean {
   return a.search === b.search && a.lowOnly === b.lowOnly;
 }
 
-/** Positions = balance rows with a non-zero quantity (a zero row is history, not stock). */
-export function summarize(rows: readonly Balance[], capped: boolean, nameLimit = 3): StockSummary {
-  const live = rows.filter((r) => !isZero(r.qty));
-  const low = live.filter((r) => r.is_low);
+/** KPI from the report totals (07 BO-03: value at cost, positions, below-min, negative rows). */
+export function summarize(report: StockReport, nameLimit = 3): StockSummary {
+  const low = report.items.filter((r) => r.below_min);
   return {
-    value: sumMoney(rows.map((r) => r.value)),
-    positions: live.length,
-    low: low.length,
-    lowNames: low.slice(0, nameLimit).map((r) => r.product_name),
-    negative: rows.filter((r) => r.is_negative || isNegative(r.qty)).length,
-    capped,
+    value: report.total.value,
+    positions: report.total.positions,
+    low: report.total.below_min_count,
+    lowNames: low.slice(0, nameLimit).map((r) => r.name),
+    negative: report.items.filter((r) => isNegative(r.qty)).length,
   };
 }
 
@@ -64,13 +75,6 @@ export function expiryByProduct(lots: readonly Lot[], today: string): Record<str
     if (known === undefined || days < known) out[lot.product_id] = days;
   }
   return out;
-}
-
-/** Latest `updated_at` of the rows (07 «oxirgi yangilanish»), `null` without one. */
-export function lastUpdated(rows: readonly Balance[]): string | null {
-  let best: string | null = null;
-  for (const r of rows) if (r.updated_at && (best === null || r.updated_at > best)) best = r.updated_at;
-  return best;
 }
 
 export function isStockTab(value: string | null): value is StockTab {

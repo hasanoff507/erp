@@ -13,6 +13,8 @@ Summary of a period (``YYYY-MM``):
   ``tobacco`` rate, the rest at the branch rate (``branches.wiring.turnover_rate_on``; YaTT — the whole base
   at ``sole_proprietor``); ``turnover_rate_pct`` — the branch rate when one branch is summed without a
   tobacco share, else the effective rate ``amount ÷ base × 100``;
+* transition month (both regimes in force, 13 §4.3): ``regime`` is still the last day's, but the other
+  regime's figures are filled too — the turnover figure counts only the turnover days (ACC-06);
 * ``tax_settlement_id`` — the period's ``posted`` ``tax_settlements`` (``vat_offset`` / ``turnover_tax``).
 """
 
@@ -21,8 +23,9 @@ from __future__ import annotations
 import base64
 import calendar
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Protocol
 from uuid import UUID
@@ -59,8 +62,13 @@ class VatMoveRow:
     created_at: datetime
 
 
+RegimeRange = tuple[date, date, str]  # (from, to inclusive, 'vat' | 'turnover')
+
+
 class VatRepository(Protocol):
     async def regime_on(self, s: AsyncSession, on: date) -> str: ...
+
+    async def regime_ranges(self, s: AsyncSession, start: date, end: date) -> list[RegimeRange]: ...
 
     async def legal_form(self, s: AsyncSession) -> str: ...
 
@@ -112,6 +120,28 @@ def parse_period(raw: str) -> date:
         ) from None
 
 
+def split_regimes(changes: Sequence[tuple[date, str]], start: date, end: date) -> list[RegimeRange]:
+    """Sub-ranges of ``[start, end]`` per tax regime (13 §4.3, ACC-06). ``changes`` = the
+    ``tenant_tax_regimes`` rows ``(valid_from, regime)`` with ``valid_from ≤ end``; before the first row
+    the tenant is a VAT payer. Adjacent days of one regime are merged."""
+    current = "vat"
+    starts: list[tuple[date, str]] = []
+    for valid_from, regime in sorted(changes):
+        norm = "turnover" if regime == "turnover" else "vat"
+        if valid_from <= start:
+            current = norm
+        elif valid_from <= end:
+            starts.append((valid_from, norm))
+    out: list[RegimeRange] = []
+    begin = start
+    for valid_from, regime in starts:
+        if regime != current:
+            out.append((begin, valid_from - timedelta(days=1), current))
+            begin, current = valid_from, regime
+    out.append((begin, end, current))
+    return out
+
+
 def _month_end(first: date) -> date:
     return first.replace(day=calendar.monthrange(first.year, first.month)[1])
 
@@ -131,6 +161,60 @@ def _decode(cursor: str | None) -> tuple[datetime, UUID] | None:
             ErrorCode.VALIDATION_ERROR,
             details=[ErrorDetail(field="cursor", message_key="validation.cursor_invalid")],
         ) from None
+
+
+@dataclass(frozen=True, slots=True)
+class TurnoverFigure:
+    """13 §4.3 turnover tax of a period for the given branches (``None`` = every branch)."""
+
+    base: Decimal
+    amount: Decimal
+    rate_pct: Decimal | None
+
+
+async def turnover_figure(
+    repo: VatRepository,
+    branch_rate: BranchRateReader,
+    s: AsyncSession,
+    tenant_id: UUID,
+    period: date,
+    branches: tuple[UUID, ...] | None,
+    branch_id: UUID | None,
+) -> TurnoverFigure:
+    """One source of truth for ``/reports/vat-summary`` and ``tax_settlements(turnover_tax)`` (20 #1, #8b):
+    per branch ``(base − tobacco) × branch rate + tobacco × tobacco rate`` (YaTT — the whole base at the
+    branch's ``sole_proprietor`` rate); ``rate_pct`` — the branch rate for one branch without a tobacco share,
+    else the effective rate ``amount ÷ base × 100``. Only the days the turnover regime was in force count
+    (13 §4.3 transition month: turnover up to the VAT ``valid_from``, ACC-06); rates are taken on the last
+    day of each turnover sub-range."""
+    end = _month_end(period)
+    legal_form = await repo.legal_form(s)
+    ranges = [(a, b) for a, b, regime in await repo.regime_ranges(s, period, end) if regime == "turnover"]
+    items: list[tuple[BranchBase, Decimal, Decimal]] = []  # (base, branch rate, tobacco part)
+    total_base = ZERO
+    total_amount = ZERO
+    for start, stop in ranges:
+        tobacco_rate = await repo.tobacco_rate(s, stop)
+        for b in await repo.turnover_bases(s, start, stop, branches):
+            rate = (await branch_rate(s, tenant_id, b.branch_id, stop)).rate_pct or ZERO
+            tobacco = ZERO if legal_form == "sole_proprietor" else b.tobacco_base
+            t_rate = tobacco_rate if tobacco_rate is not None else rate
+            amount = ((b.base - tobacco) * rate / 100 + tobacco * t_rate / 100).quantize(CENT, ROUND_HALF_UP)
+            total_base += b.base
+            total_amount += amount
+            items.append((b, rate, tobacco))
+    single_rate: Decimal | None = None
+    if len(items) == 1 and items[0][2] == 0:
+        single_rate = items[0][1]
+    if single_rate is None and not items and branch_id is not None:
+        single_rate = (await branch_rate(s, tenant_id, branch_id, end)).rate_pct
+    if single_rate is not None:
+        rate_pct: Decimal | None = single_rate
+    elif total_base > 0:
+        rate_pct = total_amount * 100 / total_base
+    else:
+        rate_pct = None
+    return TurnoverFigure(total_base, total_amount, rate_pct)
 
 
 class VatService:
@@ -162,6 +246,7 @@ class VatService:
             branches = scope.allowed
         async with self._sf() as s, tenant_transaction(s, actor.tenant_id, user_id=actor.user_id):
             regime = await self._repo.regime_on(s, end)
+            in_force = {r for _, _, r in await self._repo.regime_ranges(s, period, end)}
             if regime == "vat" and restricted:
                 raise AppError(ErrorCode.PERMISSION_DENIED, params={"reason": "tenant_wide_vat"})
             body: dict[str, Any] = {
@@ -177,7 +262,9 @@ class VatService:
                 "turnover_amount": None,
                 "tax_settlement_id": None,
             }
-            if regime == "vat":
+            # a transition month (13 §4.3, ACC-06) shows both figures; the tenant-wide VAT one only to an
+            # unrestricted user
+            if regime == "vat" or ("vat" in in_force and not restricted):
                 output, input_ = await self._repo.vat_totals(s, period)
                 count, pending = await self._repo.pending_credit(s, period, end)
                 denominator = input_ + pending
@@ -189,38 +276,19 @@ class VatService:
                     pending_credit_red_invoices=count,
                     pending_credit_pct=_m2(pct),
                 )
+            if regime == "vat":
                 settlement = await self._repo.settlement_id(s, period, "vat_offset", None)
             else:
-                legal_form = await self._repo.legal_form(s)
-                bases = await self._repo.turnover_bases(s, period, end, branches)
-                tobacco_rate = await self._repo.tobacco_rate(s, end)
-                total_base = ZERO
-                total_amount = ZERO
-                single_rate: Decimal | None = None
-                for b in bases:
-                    rate = (await self._branch_rate(s, actor.tenant_id, b.branch_id, end)).rate_pct or ZERO
-                    tobacco = ZERO if legal_form == "sole_proprietor" else b.tobacco_base
-                    t_rate = tobacco_rate if tobacco_rate is not None else rate
-                    amount = ((b.base - tobacco) * rate / 100 + tobacco * t_rate / 100).quantize(
-                        CENT, ROUND_HALF_UP
-                    )
-                    total_base += b.base
-                    total_amount += amount
-                    single_rate = rate if len(bases) == 1 and tobacco == 0 else None
-                if single_rate is None and not bases and branch_id is not None:
-                    single_rate = (await self._branch_rate(s, actor.tenant_id, branch_id, end)).rate_pct
-                if single_rate is not None:
-                    rate_pct: Decimal | None = single_rate
-                elif total_base > 0:
-                    rate_pct = total_amount * 100 / total_base
-                else:
-                    rate_pct = None
-                body.update(
-                    turnover_base=_m2(total_base),
-                    turnover_amount=_m2(total_amount),
-                    turnover_rate_pct=None if rate_pct is None else _m2(rate_pct),
-                )
                 settlement = await self._repo.settlement_id(s, period, "turnover_tax", branch_id)
+            if regime == "turnover" or "turnover" in in_force:  # transition month: both figures (ACC-06)
+                figure = await turnover_figure(
+                    self._repo, self._branch_rate, s, actor.tenant_id, period, branches, branch_id
+                )
+                body.update(
+                    turnover_base=_m2(figure.base),
+                    turnover_amount=_m2(figure.amount),
+                    turnover_rate_pct=None if figure.rate_pct is None else _m2(figure.rate_pct),
+                )
             body["tax_settlement_id"] = None if settlement is None else str(settlement)
         return body
 

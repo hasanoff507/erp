@@ -255,9 +255,10 @@ function RevokedOverlay() {
   );
 }
 
-/** Global POS screen keys (07 "(global)"): F6 returns, F8 shift close, F9 lookup, F12 sync status. */
+/** Global POS screen keys (07 "(global)"): F6 returns, F7 debt book (B4), F8 shift close, F9 lookup, F12 sync. */
 export const GLOBAL_KEYS: Readonly<Record<string, string>> = {
   F6: "/pos/returns",
+  F7: "/pos/debts",
   F8: "/pos/shift/close",
   F9: "/pos/lookup",
   F12: "/pos/sync",
@@ -268,7 +269,7 @@ export const GLOBAL_KEYS: Readonly<Record<string, string>> = {
  * screens keep F9 for «finish / submit» (contracts/pos-wh-routes.md), so the global F9 is off there.
  */
 export function globalKeysFor(pathname: string): [string, string][] {
-  if (/^\/pos\/sale\/(payment|receipt)/.test(pathname)) return [];
+  if (/^\/pos\/sale\/(payment|receipt|credit)/.test(pathname)) return [];
   const warehouse = pathname === "/pos/warehouse" || pathname.startsWith("/pos/warehouse/");
   return Object.entries(GLOBAL_KEYS).filter(([key]) => !(warehouse && key === "F9"));
 }

@@ -531,6 +531,31 @@ async def test_local_vite_login_origin_is_local_only(world: World, settings) -> 
         assert proxied.status_code == 403
 
 
+async def test_null_origin_login_uses_fetch_metadata(world: World, settings) -> None:  # type: ignore[no-untyped-def]
+    async with running_app(settings) as (_, client):
+        params = {**authorize_params(Pkce.new()), "phone": world.owner_phone, "password": PASSWORD}
+        same_origin = await client.post(
+            "/oauth/authorize",
+            data=params,
+            headers={"Origin": "null", "Sec-Fetch-Site": "same-origin"},
+        )
+        assert same_origin.status_code == 302 and "code" in query_of(same_origin)
+
+        cross_site = await client.post(
+            "/oauth/authorize",
+            data=params,
+            headers={"Origin": "null", "Sec-Fetch-Site": "cross-site"},
+        )
+        assert cross_site.status_code == 403
+
+        malicious = await client.post(
+            "/oauth/authorize",
+            data=params,
+            headers={"Origin": "https://evil.example", "Sec-Fetch-Site": "same-origin"},
+        )
+        assert malicious.status_code == 403
+
+
 # --- subscription lockout (14 §16) ------------------------------------------------------------------
 async def test_subscription_lockout_and_sync_drain(  # type: ignore[no-untyped-def]
     world: World, settings, admin_engine: AsyncEngine, clean_redis: Redis

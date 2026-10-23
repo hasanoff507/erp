@@ -9,18 +9,33 @@ from app.modules.auth.api import oauth
 
 
 @pytest.mark.parametrize(
-    ("environment", "origin", "expected"),
+    ("environment", "origin", "fetch_site", "expected"),
     [
-        ("local", "http://localhost:5173", True),
-        ("local", "https://evil.example", False),
-        ("test", "http://localhost:5173", False),
-        ("prod", "http://localhost:5173", False),
-        ("prod", "https://erp.example.uz", True),
+        ("local", "http://localhost:5173", None, True),
+        ("local", "https://evil.example", "same-origin", False),
+        ("test", "http://localhost:5173", None, False),
+        ("prod", "http://localhost:5173", None, False),
+        ("prod", "https://erp.example.uz", None, True),
+        ("test", "null", "same-origin", True),
+        ("test", "null", "cross-site", False),
+        ("test", "null", None, False),
+        ("test", None, "same-origin", True),
+        ("test", None, "cross-site", False),
+        ("test", "https://evil.example", "same-origin", False),
     ],
 )
 def test_authorize_origin_allowlist_is_environment_scoped(
-    monkeypatch: pytest.MonkeyPatch, environment: str, origin: str, expected: bool
+    monkeypatch: pytest.MonkeyPatch,
+    environment: str,
+    origin: str | None,
+    fetch_site: str | None,
+    expected: bool,
 ) -> None:
+    headers = []
+    if origin is not None:
+        headers.append((b"origin", origin.encode()))
+    if fetch_site is not None:
+        headers.append((b"sec-fetch-site", fetch_site.encode()))
     request = Request(
         {
             "type": "http",
@@ -32,7 +47,7 @@ def test_authorize_origin_allowlist_is_environment_scoped(
             "path": "/oauth/authorize",
             "raw_path": b"/oauth/authorize",
             "query_string": b"",
-            "headers": [(b"origin", origin.encode())],
+            "headers": headers,
         }
     )
     module = SimpleNamespace(

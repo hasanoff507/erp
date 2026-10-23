@@ -17,7 +17,10 @@ Matching of one incoming line (credit ``C`` on ``entry_date``):
    returned in ``unmatched_card_transactions``). Otherwise — by amount and date: the daily 5710 inflows of
    (branch, method) minus everything already settled or held by open drafts (oldest day first), then the
    smallest run of days with ``Σ ≥ C`` and ``(Σ − C)/Σ ≤ 5%`` (terminal-less card receipts have no RRN and
-   are only ever matched this way, 21 §9.2);
+   are only ever matched this way, 21 §9.2). A card line without a registry whose purpose names a terminal
+   TID/MID is first matched to that terminal's open settlement batches (``card_terminal_settlements``,
+   oldest ``business_date`` first, ``Σ net_total`` within the same 5%; 13 §2.18a) — the batches are linked to
+   the draft at once so no later line takes them;
 4. ``commission = gross − C`` (``commission_invalid`` when ``< 0`` or ``≥ gross``), ``variance = 0``;
    ``gross`` must fit the transit balance (else ``no_transit_match``).
 """
@@ -44,8 +47,20 @@ from app.core.permissions import BranchScope
 from app.modules.cash.application.bank_settlements import DOC_TYPE, BankSettlementService, require_branch
 from app.modules.cash.application.bank_settlements_ports import BankSettlementRepository, CardTx, FileStore
 from app.modules.cash.application.common import m2
-from app.modules.cash.domain.bank_matching import detect_branches, detect_method, rrn_registry
-from app.modules.cash.domain.bank_settlements import ZERO, Amounts, match_days, remaining_after
+from app.modules.cash.domain.bank_matching import (
+    detect_branches,
+    detect_method,
+    detect_terminals,
+    match_batches,
+    rrn_registry,
+)
+from app.modules.cash.domain.bank_settlements import (
+    MATCH_TOLERANCE,
+    ZERO,
+    Amounts,
+    match_days,
+    remaining_after,
+)
 from app.modules.cash.domain.bank_statement import (
     Statement,
     StatementDoc,
@@ -270,6 +285,12 @@ class BankStatementImportService:
             await self._repo.lock_transit(s, branch, method)
             rrns = rrn_registry(doc.purpose) if method == "card" else ()
             linked: list[CardTx] = []
+            batch_ids: tuple[UUID, ...] = ()
+            batch = None
+            if not rrns and method == "card":  # 13 §2.18a: TID + business_date + batch total
+                tids = detect_terminals(doc.purpose, terminals)
+                batches = await self._repo.open_terminal_batches(s, branch, sorted(tids), doc.entry_date)
+                batch = match_batches(batches, doc.amount, MATCH_TOLERANCE)
             if rrns:
                 linked = [t for t in await self._repo.card_txs_by_rrn(s, rrns) if t.branch_id == branch]
                 if not linked:
@@ -278,6 +299,9 @@ class BankStatementImportService:
                 gross = sum((t.amount for t in linked), ZERO)
                 days = sorted(t.business_date for t in linked)
                 settled_from, settled_to = days[0], days[-1]
+            elif batch is not None:
+                gross, settled_from, settled_to = batch.gross, batch.settled_from, batch.settled_to
+                batch_ids = batch.batch_ids
             else:
                 inflows = await self._repo.daily_inflows(s, branch, method, doc.entry_date)
                 holds = await self._repo.holds(s, branch, method)
@@ -310,6 +334,8 @@ class BankStatementImportService:
                 ip=ip,
             )
             draft_ids.append(str(row.id))
+            if batch_ids:
+                await self._repo.link_batches(s, batch_ids, row.id)
             if linked:
                 await self._repo.link_card_txs(s, [t.id for t in linked], row.id)
                 taken = {t.id for t in linked}

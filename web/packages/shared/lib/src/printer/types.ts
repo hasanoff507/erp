@@ -50,6 +50,8 @@ export type PrinterErrorCode =
   | "agent_unavailable"
   | "agent_unpaired"
   | "agent_print_disabled"
+  | "printer_not_registered"
+  | "printer_unreachable"
   | "lan_address_invalid"
   | "http_failed"
   | "cloud_unavailable"

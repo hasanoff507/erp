@@ -12,9 +12,11 @@ from a ```sql block of 12. Each block is routed by the rule in 12 §6.1:
 Revisions 0027a (web_pos, Bosqich 3) and 0027b (debts_finance, Bosqich 4) are append-only:
 their blocks carry the marker ``-- 0027a web_pos`` / ``-- 0027b debts_finance`` (up) or
 ``-- 0027a down`` / ``-- 0027b down`` (verbatim down statements — ALTER/DROP COLUMN, previous
-function bodies — that cannot be derived). Revisions 0028
-(store_agent, Bosqich 5) and 0029 (onec_integration, Bosqich 7) are not generated
-yet. Other ``down`` scripts are derived from what ``up`` creates.
+function bodies — that cannot be derived). Revision 0028 (store_agent, Bosqich 5) is
+generated from the blocks marked ``-- 0028 store_agent``; 0028a (fiscal_edocs, Bosqich 5) is
+append-only like 0027a/0027b (``-- 0028a fiscal_edocs`` / ``-- 0028a down``). 0029
+(onec_integration, Bosqich 7) is not generated yet. Other ``down`` scripts are derived from what
+``up`` creates.
 
     uv run python scripts/gen_migration_sql.py          # write files
     uv run python scripts/gen_migration_sql.py --check  # exit 1 on drift
@@ -63,8 +65,10 @@ REVISIONS: dict[str, str] = {
     "0027": "security_definer_functions",
     "0027a": "web_pos",  # Bosqich 3 — append-only (27 B3: device-bound login, POS deltas)
     "0027b": "debts_finance",  # Bosqich 4 — append-only (27 B4: debts, expenses, bank, reports, Telegram)
+    "0028": "store_agent",  # Bosqich 5 — Do'kon agenti registry (12 §2.11, qaror #66)
+    "0028a": "fiscal_edocs",  # Bosqich 5 — append-only (27 B5: fiscal, e-documents, marking, payments, print)
 }
-LATER_REVISIONS = frozenset({"0028", "0029"})  # Bosqich 5 / 7
+LATER_REVISIONS = frozenset({"0029"})  # Bosqich 7
 
 TABLES_ROUTE = "tables"
 SKIP = "skip"
@@ -77,7 +81,7 @@ SECTION_ROUTES: dict[str, str] = {
     "1.2": "0001",
     "1.4": "0001",
     **dict.fromkeys(("2.1", "2.2", "2.3", "2.4", "2.5", "2.5a", "2.6", "2.7", "2.8", "2.9"), TABLES_ROUTE),
-    "2.11": DEFERRED,
+    "2.11": TABLES_ROUTE,  # 0028 tables now; the 0029 tables stay deferred (LATER_REVISIONS)
     "3": "0001",  # app.forbid_mutation(); the per-revision blocks are marked
     "4.1": "0026",
     "4.2": "0026",
@@ -227,11 +231,37 @@ TABLES: dict[str, list[str]] = {
         "app.tenant_glossary",
     ],
     "0024": ["app.audit_log", "app.period_closings"],
+    "0028": [
+        "app.onec_agents",
+        "app.onec_agent_tasks",
+        "app.onec_task_results",
+        "auth.onec_device_authorizations",
+    ],
+    "0029": [
+        "app.onec_bases",
+        "app.onec_settings",
+        "app.onec_branch_bindings",
+        "app.onec_metadata_snapshots",
+        "app.onec_catalog_items",
+        "app.onec_mappings",
+        "app.onec_value_mappings",
+        "app.onec_ref_create_requests",
+        "app.onec_export_batches",
+        "app.onec_export_items",
+        "app.onec_export_item_sources",
+        "app.onec_object_refs",
+        "app.onec_reconciliations",
+        "app.onec_events",
+    ],
+    "0028a": ["app.onec_agent_logs"],  # Do'kon agenti logs (A-06/W-08) — Bosqich 5, marked 0028a block
 }
+# revisions whose table-section (unmarked) statements must run before their marked blocks:
+# 0028's trigger/RLS/grant/function blocks sit in 2.10/4.x, above the 2.11 tables they need
+TABLES_FIRST = frozenset({"0028"})
 TABLE_REV = {t: rev for rev, ts in TABLES.items() for t in ts}
 
 # functions written inside the table sections (2.x)
-FUNCTION_REV = {"app.next_doc_number": "0019"}
+FUNCTION_REV = {"app.next_doc_number": "0019", "app.onec_forbid_namespace_change": "0029"}
 
 
 def _marker_route(marker: str) -> str:
@@ -262,11 +292,13 @@ def route(st: Statement, last_table_rev: str) -> str:
     if st.kind == "function":
         if st.target not in FUNCTION_REV:
             raise SystemExit(f"spec line {st.line}: function {st.target} has no revision")
-        return FUNCTION_REV[st.target]
+        rev = FUNCTION_REV[st.target]
+        return DEFERRED if rev in LATER_REVISIONS else rev
     if st.target in TABLE_REV:
         # a deferred FK/index written right after the table it depends on
         # (e.g. fk_bp_invoice_attachment after attachments) goes with that table
-        return max(TABLE_REV[st.target], last_table_rev)
+        rev = max(TABLE_REV[st.target], last_table_rev)
+        return DEFERRED if rev in LATER_REVISIONS else rev
     raise SystemExit(f"unrouted statement at spec line {st.line}: {st.kind} {st.target}")
 
 
@@ -298,6 +330,7 @@ def _qualified_index(sql: str, table: str) -> str:
 
 def build() -> dict[str, tuple[str, str]]:
     up: dict[str, list[str]] = defaultdict(list)
+    up_first: dict[str, list[str]] = defaultdict(list)
     tables_in: dict[str, list[str]] = defaultdict(list)
     functions_in: dict[str, list[str]] = defaultdict(list)
     foreign_constraints: dict[str, list[tuple[str, str]]] = defaultdict(list)
@@ -316,7 +349,7 @@ def build() -> dict[str, tuple[str, str]]:
         if rev.endswith(" down"):
             explicit_down[rev[: -len(" down")]].append(st.sql + "\n")
             continue
-        up[rev].append(st.sql + "\n")
+        (up_first if rev in TABLES_FIRST and st.marker is None else up)[rev].append(st.sql + "\n")
         if st.kind == "table":
             tables_in[rev].append(st.target)
         elif st.kind == "function":
@@ -349,7 +382,7 @@ def build() -> dict[str, tuple[str, str]]:
         if explicit_down[rev]:  # append-only revisions: derived drops first, then the hand-written
             # down statements (they restore the previous function bodies the derived drops removed)
             down = (down + "\n" if down else "") + "\n".join(explicit_down[rev])
-        out[rev] = (header + "\n".join(up[rev]), header + down)
+        out[rev] = (header + "\n".join(up_first[rev] + up[rev]), header + down)
     return out
 
 

@@ -11,6 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.integrations.einvoice.application.ettn_outbox import ClaimedJob, EttnRow
+from app.modules.integrations.einvoice.application.ports import Pkcs7Signature
 
 STALE_RUNNING_S = 600  # a 'running' job untouched this long lost its worker
 
@@ -52,6 +53,19 @@ class SqlEttnOutboxRepository:
             )
         ).first()
         return EttnRow(row[0], row[1], row[2], _json(row[3]) or {}) if row else None
+
+    async def signature(self, s: AsyncSession, ettn_id: UUID) -> Pkcs7Signature | None:
+        row = (
+            await s.execute(
+                text(
+                    "SELECT signature_pkcs7, certificate_serial FROM app.edoc_signatures "
+                    "WHERE entity = 'ettn_documents' AND entity_id = :id AND action = 'sign' ORDER BY id "
+                    "DESC LIMIT 1"
+                ),
+                {"id": ettn_id},
+            )
+        ).first()
+        return Pkcs7Signature(row[0], row[1]) if row else None
 
     async def lock_transfer(self, s: AsyncSession, transfer_id: UUID) -> None:
         await s.execute(text("SELECT id FROM app.transfers WHERE id = :id FOR UPDATE"), {"id": transfer_id})

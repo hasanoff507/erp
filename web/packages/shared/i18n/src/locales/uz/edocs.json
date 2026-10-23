@@ -1,0 +1,206 @@
+{
+  "title": "E-faktura markazi",
+  "subtitle": "Kiruvchi va chiquvchi e-fakturalar, kiruvchi e-TTN va e-ishonchnomalar — E-IMZO bilan imzolash",
+  "offline": "Internet yo'q — faqat ko'rish. Imzolash va yuborish E-IMZO va operator bilan aloqa talab qiladi.",
+  "offlineSign": "Imzolash uchun internet kerak (E-IMZO va operator).",
+  "deferredNote": "VM 830: «qizil» va «noma'lum» fakturalar bo'yicha QQS krediti to'lovgacha kechiktiriladi. Faktura.uz xavf belgisini bermaydi — noma'lumni my.soliq.uz kabinetidan tekshirib qo'lda belgilang.",
+  "noSecondVat": "Chek asosidagi e-faktura QQSni qayta hisoblamaydi va provodka yozmaydi — QQS chek paytida hisoblangan.",
+  "tabs": {
+    "in": "Kiruvchi",
+    "out": "Chiquvchi",
+    "ettn": "E-TTN",
+    "poa": "E-ishonchnomalar"
+  },
+  "filters": {
+    "risk": "Xavf darajasi",
+    "status": "Holat",
+    "riskOptions": {
+      "all": "Barchasi",
+      "green": "Yashil",
+      "red": "Qizil",
+      "unknown": "Noma'lum"
+    },
+    "statusOptions": {
+      "all": "Barchasi",
+      "received": "Imzo kutmoqda",
+      "accepted": "Qabul qilingan",
+      "rejected": "Rad etilgan"
+    }
+  },
+  "columns": {
+    "invoiceSupplier": "Faktura · yetkazib beruvchi",
+    "invoiceBuyer": "Faktura · xaridor",
+    "date": "Sana",
+    "total": "Summa",
+    "vat": "QQS",
+    "risk": "Xavf",
+    "status": "Holat",
+    "source": "Manba",
+    "ettn": "E-TTN",
+    "combined": "Turi",
+    "supplier": "Yetkazib beruvchi",
+    "employee": "Ishonchli shaxs",
+    "valid": "Amal qilish muddati"
+  },
+  "risk": {
+    "green": "Yashil",
+    "red": "Qizil",
+    "unknown": "Noma'lum",
+    "formTitle": "Xavf darajasini belgilash",
+    "note": "Izoh",
+    "checkedInCabinet": "Kabinetda tekshirdim",
+    "save": "Belgilashni saqlash"
+  },
+  "status": {
+    "in": {
+      "received": "Imzo kutmoqda",
+      "signed": "Imzolangan",
+      "accepted": "Qabul qilingan",
+      "rejected": "Rad etilgan",
+      "cancelled": "Bekor qilingan"
+    },
+    "out": {
+      "draft": "Qoralama",
+      "signed": "Imzolangan",
+      "sent": "Yuborildi",
+      "accepted": "Qabul qilindi",
+      "rejected": "Rad etildi",
+      "cancelled": "Bekor qilingan"
+    },
+    "ettn": {
+      "received": "Tasdiq kutmoqda",
+      "accepted": "Tasdiqlangan",
+      "rejected": "Rad etilgan",
+      "pending_signature": "Imzo kutilmoqda",
+      "sending": "Yuborilmoqda",
+      "registered": "Ro'yxatdan o'tgan",
+      "failed": "Xato",
+      "cancelled": "Bekor qilingan"
+    },
+    "poa": {
+      "draft": "Qoralama",
+      "pending_signature": "Imzo kutilmoqda",
+      "sending": "Yuborilmoqda",
+      "sent": "Yuborildi",
+      "accepted": "Yetkazib beruvchi tasdiqladi",
+      "rejected": "Rad etildi",
+      "cancelled": "Bekor qilindi",
+      "failed": "Xato — qayta imzolang"
+    }
+  },
+  "source": {
+    "receipt": "Chek asosida / B2B nasiya",
+    "manual": "Qo'lda"
+  },
+  "ettn": {
+    "combined": "E-faktura bilan birga",
+    "separate": "Alohida"
+  },
+  "facturaType": {
+    "additional": "Qo'shimcha e-faktura",
+    "corrected": "Tuzatuvchi e-faktura"
+  },
+  "detail": {
+    "title": "E-faktura",
+    "noNumber": "Raqamsiz",
+    "stir": "STIR",
+    "operatorId": "Operator raqami",
+    "lines": "Tovar qatorlari",
+    "line": "Nomi",
+    "qty": "Miqdor",
+    "net": "QQSsiz",
+    "vat": "QQS",
+    "total": "Jami",
+    "lastError": "Oldingi urinish xatosi: {{error}}",
+    "afterAccept": "Qabul qilingach — «Kirim yaratish» (Omborga kirim, BO-04)."
+  },
+  "actions": {
+    "signAccept": "Imzolab qabul qilish",
+    "reject": "Rad etish",
+    "signSend": "E-IMZO imzo va yuborish",
+    "send": "Yuborish",
+    "cancelOut": "Bekor qilish",
+    "fromReceipt": "Chek asosida e-faktura",
+    "createOut": "Chiquvchi e-faktura",
+    "ettnAccept": "Tasdiqlash",
+    "ettnReject": "Rad etish",
+    "poaSign": "Imzolash va yuborish",
+    "poaCancel": "Bekor qilish",
+    "createReceipt": "Kirim yaratish"
+  },
+  "kpi": {
+    "incoming": "Kiruvchi (shu oy)",
+    "incomingNote": "{{total}} · QQS {{vat}}",
+    "awaiting": "Imzo kutmoqda",
+    "deferred": "Kechiktirilgan QQS krediti",
+    "deferredNote": "Qizil va noma'lum",
+    "outUnsent": "Chiquvchi yuborilmagan"
+  },
+  "eimzo": {
+    "key": "E-IMZO kaliti",
+    "owner": "Egasi",
+    "role": "Roli",
+    "validTo": "Amal qilish muddati"
+  },
+  "dialogs": {
+    "company": "Xaridor (yuridik shaxs)",
+    "companyPlaceholder": "Nomi yoki STIR",
+    "searchCompany": "Xaridorni qidirish",
+    "companies": "Topilgan xaridorlar",
+    "noStir": "STIR yo'q",
+    "fromReceipt": "Chek asosida e-faktura chiqarish",
+    "receiptSearch": "Chekni qidirish",
+    "receiptPlaceholder": "Chek raqami",
+    "searchReceipt": "Chekni topish",
+    "receipts": "Topilgan cheklar",
+    "openCustomer": "Mijoz kartasini ochish",
+    "close": "Yopish",
+    "create": "Yaratish",
+    "createOut": "Chiquvchi e-faktura",
+    "lines": "Qatorlar",
+    "lineName": "{{n}}-qator nomi",
+    "price": "Narx (QQSsiz)",
+    "vatRate": "QQS",
+    "removeLine": "Qatorni o'chirish",
+    "addLine": "Qator qo'shish"
+  },
+  "reason": {
+    "label": "Sabab",
+    "required": "Sabab majburiy"
+  },
+  "notices": {
+    "risk": "Xavf darajasi saqlandi.",
+    "accepted": "Imzolandi va qabul navbatga qo'yildi.",
+    "rejected": "Rad etish navbatga qo'yildi.",
+    "sent": "Imzolandi va operatorga yuborish navbatga qo'yildi.",
+    "cancelled": "E-faktura bekor qilindi.",
+    "created": "Chiquvchi e-faktura qoralamasi yaratildi.",
+    "ettnQueued": "E-TTN javobi imzolanib navbatga qo'yildi.",
+    "poaSent": "E-ishonchnoma imzolandi va yuborilmoqda.",
+    "poaCancelled": "E-ishonchnoma bekor qilindi."
+  },
+  "signReasons": {
+    "challenge_invalid": "Imzo so'rovi eskirgan yoki boshqa foydalanuvchiniki — qayta urinib ko'ring.",
+    "content_mismatch": "Imzo boshqa hujjatga qo'yilgan — qayta imzolang.",
+    "certificate_expired": "E-IMZO sertifikatining muddati o'tgan.",
+    "bad_format": "Imzo formati noto'g'ri (PKCS#7).",
+    "document_changed": "Hujjat imzolash paytida o'zgardi — qayta imzolang.",
+    "verification_unavailable": "Imzoni tekshirish xizmati (E-IMZO-SERVER) hali ulanmagan."
+  },
+  "stateReasons": {
+    "cancel_in_operator": "Yuborilgan e-faktura operator kabinetida bekor qilinadi.",
+    "transfer_not_received": "Ko'chirish hali qabul qilinmagan.",
+    "combined_with_einvoice": "Bu e-TTN e-faktura bilan birga — e-fakturani qabul qiling.",
+    "outgoing_einvoice": "Bu amal faqat kiruvchi e-fakturaga.",
+    "incoming_einvoice": "Bu amal faqat chiquvchi e-fakturaga.",
+    "sale_not_posted": "Chek hali o'tkazilmagan."
+  },
+  "receipt": {
+    "title": "Kirim yaratish (e-fakturadan)",
+    "warehouse": "Ombor",
+    "amountsKept": "Qator summalari va QQS e-fakturadan o'zgarmasdan olinadi; narx ulardan hisoblanadi.",
+    "productSearch": "«{{name}}» uchun tovar qidirish",
+    "findProduct": "Tovarni topish",
+    "create": "Kirim qoralamasini yaratish"
+  }
+}

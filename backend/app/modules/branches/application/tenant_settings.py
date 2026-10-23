@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import asdict, dataclass
 from datetime import date
 from typing import Any
@@ -24,6 +25,9 @@ from app.modules.branches.domain.tenant_settings import effective_settings, merg
 
 # 20 #40d provider → tenant_secrets.kind
 _PROVIDERS = ("faktura_uz", "crpt", "click", "payme", "uzum", "uzqr")
+
+# the BO-14 read model of integrations/tenant_keys (20 #40a): {kind: {status, connected_at, last_ok_at, …}}
+IntegrationStatusReader = Callable[[AsyncSession], Awaitable[Mapping[str, Any]]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,10 +89,14 @@ def _integrations(rows: list[IntegrationRow], ofd_connected: bool) -> dict[str, 
 
 class TenantSettingsService:
     def __init__(
-        self, session_factory: async_sessionmaker[AsyncSession], repo: TenantSettingsRepository
+        self,
+        session_factory: async_sessionmaker[AsyncSession],
+        repo: TenantSettingsRepository,
+        integration_status: IntegrationStatusReader | None = None,
     ) -> None:
         self._sf = session_factory
         self._repo = repo
+        self._integration_status = integration_status
 
     async def get(self, actor: Principal) -> dict[str, Any]:
         today = tashkent_today()
@@ -97,8 +105,12 @@ class TenantSettingsService:
             if row is None:
                 raise not_found("tenants")
             regimes = await self._repo.tax_regimes(s, actor.tenant_id)
-            integrations = await self._repo.integrations(s, actor.tenant_id)
             ofd = await self._repo.ofd_connected(s, actor.tenant_id)
+            if self._integration_status is not None:  # 20 #40a: tenant_keys read model (incl. didox, last_*)
+                status = dict(await self._integration_status(s))
+                integration_block = {"ofd": {"status": "connected" if ofd else "not_connected"}, **status}
+            else:
+                integration_block = _integrations(await self._repo.integrations(s, actor.tenant_id), ofd)
         current = None
         for valid_from, regime in regimes:  # ascending
             if valid_from <= today:
@@ -109,7 +121,7 @@ class TenantSettingsService:
                 "current": current,
                 "history": [{"regime": r, "valid_from": v} for v, r in sorted(regimes, reverse=True)],
             },
-            "integrations": _integrations(integrations, ofd),
+            "integrations": integration_block,
         }
 
     async def update(self, actor: Principal, patch: TenantPatch, ip: str | None) -> dict[str, Any]:

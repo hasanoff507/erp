@@ -18,11 +18,13 @@ from app.modules.accounting.wiring import ledger_poster
 from app.modules.cash.wiring import shift_guard
 from app.modules.debts.wiring import debt_register
 from app.modules.integrations.card_terminal.wiring import card_payments
+from app.modules.integrations.einvoice.wiring import einvoice_hooks
 from app.modules.integrations.fiscal.wiring import (
     FiscalReceiptQueries,
     fiscal_receipt_queries,
     fiscal_service,
 )
+from app.modules.integrations.marking.wiring import marking_hooks
 from app.modules.inventory.wiring import stock_service
 from app.modules.sales.application.audit_events import DraftVoidedHandler, ReceiptReprintedHandler
 from app.modules.sales.application.queries import SaleQueries
@@ -51,6 +53,8 @@ def posting_deps(settings: Settings) -> Deps:
         shifts=shift_guard(),
         approvals=approval_gate(),
         cards=card_payments(settings),
+        marking=marking_hooks(),
+        einvoices=einvoice_hooks(),
     )
 
 

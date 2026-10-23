@@ -7,7 +7,11 @@ from its lot (``422 INSUFFICIENT_STOCK {lot_id, available}``), writes the 13 §2
 ``debt_moves`` payable ``−Σ invoice``; numbers it ``MV-…``. A return more than 12 months after the
 receipt is refused (``409 DOC_INVALID_STATE {reason: "reverse_sale_required"}``) — the reverse sale
 is a separate flow. The VAT row (``Dt 6010 / Kt 4410``) and the negative ``vat_moves`` are written
-when the supplier's additional e-invoice is accepted (``supplier_return.vat_adjusted``, Bosqich 5).
+when the supplier's additional e-invoice is accepted (``integrations.einvoice`` ``VatCredit``;
+``vat_adjustment_status='adjusted'``); such a return can no longer be cancelled (``409 DOC_INVALID_STATE``,
+``reason='vat_adjusted'`` — the EHF is registered at the operator). Marked lines carry their codes
+(``lines[].marking_codes``); ``post`` hands them to the marking hook (CRPT ``marking_supplier_return``,
+contract marking.md §2), ``cancel`` of a posted return gives them back (§4).
 ``cancel``: draft → cancelled; posted → stock back to the same lots, storno of ledger and debt rows.
 
 Lock order (23 §2.1): return row → ``stock_balances`` → ``debt_balances``; the receipt status is
@@ -39,12 +43,14 @@ from app.modules.accounting.application.posting import LedgerPoster
 from app.modules.accounting.domain.entries import LedgerLine
 from app.modules.debts.application.register import DebtRegister
 from app.modules.debts.domain.register import DebtMoveInput
+from app.modules.integrations.marking.application.hooks import MarkedLine
 from app.modules.inventory.application.stock import StockService, StockTxn
 from app.modules.inventory.domain.analytics import cost_analytics
 from app.modules.purchasing.application.goods_receipts import check_doc_date, decode_cursor, encode_cursor
 from app.modules.purchasing.application.ports import (
     DocFilter,
     GoodsReceiptRepository,
+    MarkingHooksPort,
     ReturnedSoFar,
     SupplierReturnRepository,
 )
@@ -69,6 +75,7 @@ class ReturnLineInput:
     receipt_line_id: UUID
     lot_id: UUID
     qty: Decimal
+    marking_codes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,6 +103,8 @@ def _vat_adjustment(sr: SupplierReturn) -> str | None:
     """US-M07-05: a posted VAT-regime return with VAT waits for the supplier's additional e-invoice."""
     if sr.status != "posted":
         return None
+    if sr.vat_adjusted:
+        return "adjusted"
     if sr.receipt_regime == "vat" and sr.vat_total > 0:
         return "awaiting_einvoice"
     return "not_required"
@@ -144,6 +153,7 @@ def return_json(sr: SupplierReturn) -> dict[str, Any]:
             "cost": price_str(ln.cost),
             "vat_amount": money_str(ln.vat_amount),
             "net_amount": money_str(ln.net),
+            "marking_codes": list(ln.marking_codes),
             "invoice_amount": money_str(
                 invoice_amount(ln.qty, ln.cost, ln.vat_amount, regime=sr.receipt_regime)
             ),
@@ -176,6 +186,7 @@ class SupplierReturnService:
         stock: StockService,
         poster: LedgerPoster,
         debts: DebtRegister,
+        marking: MarkingHooksPort | None = None,
     ) -> None:
         self._sf = session_factory
         self._repo = repo
@@ -183,6 +194,7 @@ class SupplierReturnService:
         self._stock = stock
         self._poster = poster
         self._debts = debts
+        self._marking = marking
 
     # --- reads ------------------------------------------------------------------------------------
     async def list_page(
@@ -245,7 +257,8 @@ class SupplierReturnService:
                 rows.append(
                     {"id": uuid7(), "tenant_id": actor.tenant_id, "supplier_return_id": return_id,
                      "line_no": index + 1, "receipt_line_id": rl.id, "lot_id": lot.id, "qty": quantity,
-                     "cost": rl.cost, "vat_amount": shares.take(rl, quantity)}
+                     "cost": rl.cost, "vat_amount": shares.take(rl, quantity),
+                     "marking_codes": _line_codes(index, ln, rl.is_marked)}
                 )  # fmt: skip
             head = {
                 "id": return_id, "tenant_id": actor.tenant_id, "branch_id": gr.branch_id,
@@ -288,6 +301,15 @@ class SupplierReturnService:
                 )
             await self._debts.lock(s, actor.tenant_id, [(sr.supplier_id, PAYABLE)])
             invoice_total = await self._post_lines(s, actor.tenant_id, txn, sr, gr)
+            marked = [
+                MarkedLine(index=i, product_id=ln.product_id, qty=ln.qty, codes=ln.marking_codes)
+                for i, ln in enumerate(sr.lines)
+                if ln.is_marked
+            ]
+            if marked and self._marking is not None:  # contract marking.md §2 (CRPT, 3 business days)
+                await self._marking.on_supplier_return_posted(
+                    s, actor.tenant_id, sr.id, lines=marked, actor_user_id=actor.user_id
+                )
             if invoice_total > 0:
                 await self._debts.post(
                     s,
@@ -355,11 +377,17 @@ class SupplierReturnService:
                     ErrorCode.DOC_INVALID_STATE,
                     params={"expected_status": "draft|posted", "actual_status": sr.status},
                 )
+            if sr.status == "posted" and sr.vat_adjusted:
+                raise AppError(ErrorCode.DOC_INVALID_STATE, params={"reason": "vat_adjusted"})
             if sr.status == "posted":
                 txn = await self._stock.lock(
                     s, actor.tenant_id, [(sr.warehouse_id, ln.product_id) for ln in sr.lines]
                 )
                 await txn.reverse_issue(DOC_TYPE, sr.id)
+                if self._marking is not None and any(ln.marking_codes for ln in sr.lines):
+                    await self._marking.on_codes_document_cancelled(
+                        s, actor.tenant_id, sr.id, actor_user_id=actor.user_id
+                    )
                 await self._poster.reverse_document(s, actor.tenant_id, DOC_TYPE, sr.id)
                 await self._debts.reverse(s, actor.tenant_id, DOC_TYPE, sr.id)
             await self._repo.update(
@@ -390,6 +418,23 @@ class SupplierReturnService:
             raise not_found()
         check_read_scope(scope, sr.branch_id)
         return sr
+
+
+def _line_codes(index: int, ln: ReturnLineInput, is_marked: bool) -> list[str]:
+    """Marked lines need exactly ``qty`` distinct codes (CRPT notice, VM 833 85); unmarked — none. Whether the
+    codes are in stock is checked by the marking hook on ``post``."""
+    codes = list(ln.marking_codes)
+    field = f"lines[{index}].marking_codes"
+    if not is_marked:
+        if codes:
+            raise _invalid(field, "validation.marking_not_required")
+        return []
+    quantity = qty(ln.qty)
+    if quantity != quantity.to_integral_value() or Decimal(len(codes)) != quantity:
+        raise _invalid(field, "validation.marking_count_mismatch")
+    if len(set(codes)) != len(codes):
+        raise _invalid(field, "validation.duplicate")
+    return codes
 
 
 def _check_input(data: ReturnInput) -> None:

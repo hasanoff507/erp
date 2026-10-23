@@ -24,6 +24,7 @@
     "@pages/billing": "workspace:*",
     "@pages/catalog": "workspace:*",
     "@pages/debts": "workspace:*",
+    "@pages/edocs": "workspace:*",
     "@pages/finance": "workspace:*",
     "@pages/onec": "workspace:*",
     "@pages/pos": "workspace:*",

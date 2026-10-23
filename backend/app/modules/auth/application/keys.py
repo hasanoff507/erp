@@ -144,11 +144,12 @@ class AccessTokenCodec:
     def issuer(self) -> str:
         return self._issuer
 
-    async def mint(self, claims: dict[str, Any]) -> str:
+    async def mint(self, claims: dict[str, Any], *, audience: str = AUD_API) -> str:
+        """``audience`` — ``urn:erp:api`` (users) or ``urn:erp:onec-agent`` (store agent, 14 §2.3)."""
         kid, key = await self._ring.signing_key()
         header = {"alg": ACCESS_ALG, "typ": TYP_ACCESS, "kid": kid}
         return jwt.encode(
-            header, {"iss": self._issuer, "aud": AUD_API, **claims}, key, algorithms=_ALGORITHMS
+            header, {"iss": self._issuer, "aud": audience, **claims}, key, algorithms=_ALGORITHMS
         )
 
     async def verify(self, token: str, *, audience: str = AUD_API, verify_exp: bool = True) -> dict[str, Any]:

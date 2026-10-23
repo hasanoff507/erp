@@ -7,6 +7,8 @@ arrives without them the server fills ``unknown``/``bin_table`` (the BIN never r
 
 from __future__ import annotations
 
+import re
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
@@ -24,6 +26,9 @@ from app.modules.integrations.card_terminal.application.ports import (
     TxKind,
 )
 from app.modules.integrations.card_terminal.domain.model import (
+    CARD_SCHEMES,
+    CARD_TYPES,
+    ENTRY_MODES,
     decline_code_of,
     normalize_mask,
     tx_status_of,
@@ -103,6 +108,80 @@ def parse_card_result(raw: Any, field: str = "card_result") -> CardResultIn:
         raise AppError(ErrorCode.VALIDATION_ERROR, details=details) from None
 
 
+_ALNUM = re.compile(r"[^0-9A-Za-z]")
+_SHORT = ("stan", "acquirer", "decline_code")
+_LIMITS = {"decline_message": 500, "slip_text": 4000}
+_ENUMS: dict[str, frozenset[str]] = {
+    "card_type": CARD_TYPES,
+    "card_type_source": frozenset({"terminal", "bin_table"}),
+    "entry_mode": ENTRY_MODES,
+}
+_IDENT_MAX = {"rrn": (6, 32), "tid": (1, 16), "mid": (1, 20), "approval_code": (1, 12)}
+
+
+def lenient_card_result(raw: Any) -> tuple[dict[str, Any], list[str]]:
+    """SYNC-05 (16 §2.1 — a paid sale is never rejected for the terminal's data format): event-mode clean-up
+    of a ``CardResult`` that failed the strict schema. Identifiers lose separators (``RRN 1234-5678`` →
+    ``12345678``), a mask is normalised to 4+4, free text is truncated, unknown enums become ``null``
+    (an unknown scheme → ``other``), unknown keys are dropped. Returns the cleaned object and the names of the
+    fields that were changed; the caller keeps the raw object in ``terminal_response`` and reports
+    ``card_result_mismatch{reason:'malformed_result'}``. Required values that cannot be recovered (an approved
+    purchase without a usable RRN/mask) still fail the strict parse afterwards."""
+    if not isinstance(raw, Mapping):
+        return {}, ["card_result"]
+    out: dict[str, Any] = {}
+    changed: list[str] = []
+    allowed = set(CardResultIn.model_fields)
+    for key, value in raw.items():
+        if key not in allowed:
+            changed.append(str(key))
+            continue
+        out[key] = value
+    for key, (low, high) in _IDENT_MAX.items():
+        value = out.get(key)
+        if value is None:
+            continue
+        cleaned = _ALNUM.sub("", str(value))
+        if cleaned != value:
+            changed.append(key)
+        out[key] = cleaned if low <= len(cleaned) <= high else None
+        if out[key] is None and key not in changed:
+            changed.append(key)
+    if out.get("card_mask") is not None:
+        norm = normalize_mask(str(out["card_mask"]))
+        value = None if norm is None else norm.mask
+        if value != out["card_mask"]:
+            changed.append("card_mask")
+        out["card_mask"] = value
+    for key in _SHORT:
+        if isinstance(out.get(key), str) and len(out[key]) > 64:
+            out[key] = out[key][:64]
+            changed.append(key)
+    for key, limit in _LIMITS.items():
+        if isinstance(out.get(key), str) and len(out[key]) > limit:
+            out[key] = out[key][:limit]
+            changed.append(key)
+    scheme = out.get("card_scheme")
+    if scheme is not None and scheme not in CARD_SCHEMES:
+        lowered = str(scheme).strip().lower()
+        out["card_scheme"] = lowered if lowered in CARD_SCHEMES else ("other" if lowered else None)
+        changed.append("card_scheme")
+    for key, values in _ENUMS.items():
+        if out.get(key) is not None and out[key] not in values:
+            out[key] = None
+            changed.append(key)
+    if out.get("card_type") is None and out.get("card_type_source") is not None:
+        out["card_type_source"] = None
+        changed.append("card_type_source")
+    if out.get("tx_at") is not None and not isinstance(out["tx_at"], datetime):
+        try:
+            datetime.fromisoformat(str(out["tx_at"]).replace("Z", "+00:00"))
+        except ValueError:
+            out["tx_at"] = None
+            changed.append("tx_at")
+    return out, list(dict.fromkeys(changed))
+
+
 def tiyin_to_money(value: int) -> str:
     sign = "-" if value < 0 else ""
     whole, frac = divmod(abs(value), 100)
@@ -159,4 +238,10 @@ def card_result_from_port(
     }
 
 
-__all__ = ["CardResultIn", "card_result_from_port", "parse_card_result", "tiyin_to_money"]
+__all__ = [
+    "CardResultIn",
+    "card_result_from_port",
+    "lenient_card_result",
+    "parse_card_result",
+    "tiyin_to_money",
+]

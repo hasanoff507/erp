@@ -98,6 +98,7 @@ class DashboardOut(BaseModel):
     avg_receipt: str
     previous_total_sales: str
     net_profit: str | None
+    expenses_total: str | None
     cash_on_hand: str
     by_branch: list[DashboardBranchOut]
     top_products: list[DashboardTopOut]

@@ -45,12 +45,11 @@ async def test_get_settings_defaults(client: httpx.AsyncClient, app_db: Database
     }  # fmt: skip
     assert body["tax_regime"] == {"current": None, "history": []}
     assert body["integrations"]["ofd"] == {"status": "not_connected"}
-    assert body["integrations"]["crpt"] == {"status": "not_connected", "key_last4": None}
-    assert body["integrations"]["uzqr"] == {
-        "status": "not_connected",
-        "connected_at": None,
-        "cash_register_ids": [],
-    }
+    empty = {"status": "not_connected", "connected_at": None, "last_ok_at": None, "last_error": None,
+             "last_error_at": None}  # fmt: skip
+    assert body["integrations"]["crpt"] == {**empty, "key_last4": None}
+    assert body["integrations"]["didox"] == empty
+    assert body["integrations"]["uzqr"] == {**empty, "cash_register_ids": []}
 
 
 async def test_patch_settings_merges_and_audits(

@@ -4,31 +4,21 @@
  * token in erp-device, `$agentStatus` for the agent transport. Any PrinterError → the screen offers the
  * equipment settings (POS-16); nothing is lost — the document is in the outbox / on the server.
  */
-import { AGENT_TOKEN_KEY, createAgentClient, type AgentClient } from "@shared/lib/agent";
 import { createPrinterPort, loadPrinterSettings, PrinterError } from "@shared/lib/printer";
 import type { ReceiptDoc } from "@shared/lib/receipt";
 import { deviceSettings } from "@shared/offline";
 import { $agentStatus } from "@shared/state/device";
 
-let agent: AgentClient | null = null;
-
-function agentClient(): AgentClient {
-  agent ??= createAgentClient({
-    tokenStore: {
-      get: () => deviceSettings.get<string>(AGENT_TOKEN_KEY).then((t) => t ?? null),
-      set: (t) => (t ? deviceSettings.set(AGENT_TOKEN_KEY, t) : deviceSettings.remove(AGENT_TOKEN_KEY)),
-    },
-  });
-  return agent;
-}
+import { posAgentClient, posCloudPrint } from "#/shared/lib/device-runtime.ts";
 
 export type PrintOutcome = { ok: true } | { ok: false; code: string };
 
 export async function printDoc(doc: ReceiptDoc): Promise<PrintOutcome> {
   try {
     const port = createPrinterPort(await loadPrinterSettings(deviceSettings), {
-      agent: agentClient(),
+      agent: posAgentClient(),
       agentState: () => $agentStatus.getState(),
+      cloud: posCloudPrint,
     });
     await port.printReceipt(doc);
     return { ok: true };

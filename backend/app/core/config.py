@@ -234,6 +234,80 @@ class Settings(BaseSettings):
     telegram_link_code_ttl_s: int = Field(default=600, ge=60, le=3600)  # link_code 10 min (qaror #54)
     # ERP_TELEGRAM_FAKE: in-process FakeTelegram instead of the Bot API — local/test/staging only (qaror #34)
     telegram_fake: bool = False
+    # --- Bosqich 5 settings: agent-auth slice ---
+    # store agent OAuth (14 §2.3): access token 10 min; /oauth/device_authorization per IP per hour (14 §12)
+    agent_access_token_ttl_s: int = Field(default=600, ge=60, le=900)
+    agent_device_auth_per_ip_hour: int = Field(default=10, ge=1)
+    # RFC 8628 verification_uri (BO pairing page); default "<public_base_url>/app/settings/onec/pair"
+    agent_verification_uri: str | None = None
+    # --- Bosqich 5 settings: agent slice ---
+    # 33 §9.1: hello/poll of an older agent (X-Agent-Version < this) → 426 ONEC_AGENT_UPDATE_REQUIRED
+    agent_min_version: str = "1.0.0"
+    agent_poll_max_wait_s: int = Field(default=25, ge=0, le=25)  # A-03 long-poll ceiling (33 §9.3)
+    # long-poll backstop: re-check the queue this often even without a Redis wake-up
+    agent_poll_recheck_s: float = Field(default=5.0, gt=0, le=25)
+    agent_status_cache_s: int = Field(default=60, ge=1, le=60)  # onec:agent_status:{id} (33 §4.5)
+    agent_diagnostics_max_bytes: int = Field(default=20 * 1024 * 1024, ge=1024)  # A-07 zip ≤ 20 MB
+    # --- Bosqich 5 settings: fiscal slice ---
+    # ERP_FISCAL_PARTNER_FAKE: with ERP_FISCAL_PROVIDER=partner_cloud use the in-process FakePartnerCloud (FM
+    # emulator) — the real partner client is ⛔ 26 #109; dev/test/staging only, refused in prod (21 §1)
+    fiscal_partner_fake: bool = False
+
+    @model_validator(mode="after")
+    def _guard_fiscal_partner_fake(self) -> Self:
+        if self.environment == "prod" and self.fiscal_partner_fake:
+            raise ValueError("prod'da ERP_FISCAL_PARTNER_FAKE ruxsat etilmaydi (21 §1)")
+        return self
+
+    # --- Bosqich 5 settings: edocs slice ---
+    # E-IMZO server-side PKCS#7 verification (21 §5): "eimzo_server" — E-IMZO-SERVER (contract ⛔ 26 #118;
+    # until
+    # then submit-signed answers EIMZO_SIGN_FAILED reason=verification_unavailable); "fake" —
+    # local/test/staging
+    # only (FakeSignatureVerifier), refused in prod (qaror #34)
+    eimzo_verifier: Literal["fake", "eimzo_server"] = "eimzo_server"
+
+    @model_validator(mode="after")
+    def _guard_eimzo_fake(self) -> Self:
+        if self.environment == "prod" and self.eimzo_verifier == "fake":
+            raise ValueError("prod'da ERP_EIMZO_VERIFIER=fake ruxsat etilmaydi (21 §5)")
+        return self
+
+    # --- Bosqich 5 settings: marking slice ---
+    # CRPT Turon / Asl belgisi (21 §4): "crpt" — the tenant's crpt_api_key (real xTrace adapter ⛔ 26 #40);
+    # "fake" — FakeMarkingAdapter (GS1 parser), local/test/staging only, refused in prod (qaror #34)
+    marking_provider: Literal["fake", "crpt"] = "crpt"
+    marking_verify_timeout_s: float = Field(default=3.0, gt=0, le=30)  # 18 §15: synchronous, 3 s, no retry
+
+    @model_validator(mode="after")
+    def _guard_marking_fake(self) -> Self:
+        if self.environment == "prod" and self.marking_provider == "fake":
+            raise ValueError("prod'da ERP_MARKING_PROVIDER=fake ruxsat etilmaydi (21 §4, qaror #34)")
+        return self
+
+    # --- Bosqich 5 settings: payments slice ---
+    # shop checkouts (18 §16): pending → expired after this long (qaror #54 default 24 h)
+    payments_checkout_ttl_s: int = Field(default=86_400, ge=60)
+    # provider webhooks: requests per minute per (provider, client IP) before 429 (15 §5)
+    payments_webhook_rate_per_min: int = Field(default=600, ge=1)
+    payments_http_timeout_s: float = Field(default=10.0, gt=0)  # outbound checkout calls (Uzum dynamic QR)
+    # public checkout links (docs.click.uz "Payment Button", developer.help.paycom.uz "GET checkout")
+    click_pay_url: str = "https://my.click.uz/services/pay"
+    payme_checkout_url: str = "https://checkout.paycom.uz"
+    payme_test_checkout_url: str = "https://checkout.test.paycom.uz"
+    # Uzum Bank Dynamic QR (developer.uzumbank.uz/en/dynamicqr)
+    uzum_dynamic_qr_base_url: str = "https://mobile.apelsin.uz"
+    # ERP_UZQR_PROVIDER: dynamic bank UzQR (21 §9.1) — "stub" (real POS API ⛔ 26 #49) or "fake" (local/test)
+    uzqr_provider: Literal["stub", "fake"] = "stub"
+
+    @model_validator(mode="after")
+    def _guard_uzqr_fake(self) -> Self:
+        if self.environment == "prod" and self.uzqr_provider == "fake":
+            raise ValueError("prod'da ERP_UZQR_PROVIDER=fake ruxsat etilmaydi (21 §9.1, qaror #34)")
+        return self
+
+    # --- Bosqich 5 settings: accounting slice ---
+    # --- Bosqich 5 settings: devices slice ---
 
     @model_validator(mode="after")
     def _guard_telegram(self) -> Self:

@@ -13,7 +13,10 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
+from datetime import date
+from decimal import Decimal
 from typing import Final
 from uuid import UUID
 
@@ -62,6 +65,48 @@ def detect_branches(purpose: str, terminal_ids: Mapping[str, UUID]) -> set[UUID]
     """Branches whose terminal TID/MID (case-insensitive, whole token) occurs in the purpose."""
     tokens = {t.upper() for t in _IDENT.findall(purpose)}
     return {branch for ident, branch in terminal_ids.items() if ident.upper() in tokens}
+
+
+def detect_terminals(purpose: str, terminal_ids: Mapping[str, UUID]) -> set[str]:
+    """TID/MID identifiers (as registered) that occur as whole tokens in the purpose."""
+    tokens = {t.upper() for t in _IDENT.findall(purpose)}
+    return {ident for ident in terminal_ids if ident.upper() in tokens}
+
+
+@dataclass(frozen=True, slots=True)
+class Batch:
+    """An open terminal settlement batch (``card_terminal_settlements``, no bank settlement yet)."""
+
+    id: UUID
+    business_date: date
+    net_total: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class BatchMatch:
+    gross: Decimal
+    settled_from: date
+    settled_to: date
+    batch_ids: tuple[UUID, ...]
+
+
+def match_batches(batches: Sequence[Batch], credit: Decimal, tolerance: Decimal) -> BatchMatch | None:
+    """13 §2.18a without an RRN registry: the terminal's open batches (TID from the statement purpose), oldest
+    first (``business_date``, ``id``) — the smallest prefix with ``Σ net_total ≥ credit`` and
+    ``(Σ − credit) / Σ ≤ tolerance`` (the acquirer commission); ``None`` when no prefix fits."""
+    total = Decimal("0.00")
+    taken: list[Batch] = []
+    for batch in sorted(batches, key=lambda b: (b.business_date, b.id)):
+        if batch.net_total <= 0:
+            continue
+        total += batch.net_total
+        taken.append(batch)
+        if total >= credit:
+            if (total - credit) / total <= tolerance:
+                return BatchMatch(total, taken[0].business_date, taken[-1].business_date,
+                                  tuple(b.id for b in taken))  # fmt: skip
+            return None
+    return None
 
 
 def rrn_registry(purpose: str) -> tuple[str, ...]:

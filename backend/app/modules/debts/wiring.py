@@ -40,7 +40,6 @@ from app.modules.debts.infrastructure.docs_sql import SqlDebtDocsRepository
 from app.modules.debts.infrastructure.repositories import SqlCounterpartyRepository, SqlDebtRegisterRepository
 from app.modules.integrations.card_terminal.wiring import card_payments
 from app.modules.integrations.einvoice.application.ports import EInvoicePort
-from app.modules.integrations.einvoice.wiring import einvoice_port
 from app.modules.integrations.fiscal.wiring import fiscal_service
 from app.modules.notifications.wiring import event_recorder
 from app.modules.sync.application.handlers import SyncEventHandler
@@ -108,6 +107,9 @@ def sync_handlers(settings: Settings, db: Database) -> Mapping[str, SyncEventHan
 def build_debts_module(
     settings: Settings, db: Database, *, einvoice: EInvoicePort | None = None
 ) -> DebtsModule:
+    # lazy: einvoice.wiring imports debts.wiring (debt_register) — no import cycle at module load
+    from app.modules.integrations.einvoice.wiring import einvoice_port
+
     port = einvoice or einvoice_port(settings)
     register = debt_register()
     repo = SqlDebtDocsRepository()

@@ -295,6 +295,25 @@ describe("PrinterPort adapters", () => {
     expect(await unpaired.status()).toMatchObject({ state: "unavailable", code: "agent_unavailable" });
   });
 
+  it("B5 agent_raw: 404 → printer_not_registered, 503 PRINTER_UNREACHABLE → printer_unreachable (21 §16.1)", async () => {
+    const make = (status: number, code: string) =>
+      createPrinterPort(settings({ transport: "agent_raw", lanAddress: "192.168.1.50:9100" }), {
+        agent: { printRaw: () => Promise.reject(new AgentError("http", code, { status })) },
+        env: desktop(),
+        rasterizer,
+      });
+    await expect(make(404, "NOT_FOUND").printReceipt(TEST_DOC)).rejects.toMatchObject({
+      code: "printer_not_registered",
+      messageKey: "pos:equipment.printer.errors.printer_not_registered",
+    });
+    await expect(make(503, "PRINTER_UNREACHABLE").printReceipt(TEST_DOC)).rejects.toMatchObject({
+      code: "printer_unreachable",
+    });
+    await expect(make(413, "FILE_TOO_LARGE").printReceipt(TEST_DOC)).rejects.toMatchObject({
+      code: "write_failed",
+    });
+  });
+
   it("http_epos posts ePOS-Print with the ESC/POS bytes as hex; http_webprnt sends a bitimage", async () => {
     expect(eposRequestBody(Uint8Array.from([0x1b, 0x40]))).toContain("<command>1b40</command>");
     const fetch = vi.fn((_url: string, _init: RequestInit) =>

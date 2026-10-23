@@ -244,8 +244,13 @@
       "validation_error": "Ma'lumot noto'g'ri — hujjatni tekshiring",
       "outbox_not_empty": "Yuborilmagan hujjatlar bor",
       "card_data_forbidden": "Karta ma'lumotini saqlash taqiqlangan",
-      "unknown_event_type": "Noma'lum hujjat turi"
-    }
+      "unknown_event_type": "Noma'lum hujjat turi",
+      "fiscal_module_not_connected": "Fiskal modul ulanmagan — chek yopilmadi, savat saqlandi. Do'kon agentini tekshiring va qayta urining",
+      "fiscal_result_unknown": "Fiskal modul javobi kelmadi — «Tasdiqlash»ni qayta bosing: chek ikki marta imzolanmaydi",
+      "fiscal_result_pending": "Fiskal modulda shu chek uchun imzolangan chek bor (№ {{receipt_seq}}) — avvalgi to'lov usuli va summani tanlang"
+    },
+    "markingChecking": "Markirovka kodi tekshirilmoqda…",
+    "markingPrecheckWarning": "Markirovka kodi CRPT tekshiruvidan o'tmadi yoki javob kelmadi — sotuv davom etadi"
   },
   "equipment": {
     "title": "Uskunalar sozlamasi",
@@ -278,9 +283,11 @@
         "agent_print_disabled": "Do'kon agentida chop etish imkoniyati yoqilmagan.",
         "lan_address_invalid": "Printer manzili noto'g'ri: lokal tarmoq IP manzili va portini kiriting (masalan 192.168.1.50:9100).",
         "http_failed": "LAN printerga ulanib bo'lmadi. Manzilni va brauzer ruxsatini tekshiring.",
-        "cloud_unavailable": "Bulut printer hali ulanmagan. Elektron chekdan foydalaning.",
+        "cloud_unavailable": "Bulut printer javob bermadi. Elektron chekdan foydalaning.",
         "cloud_failed": "Bulut printerga chop etish ishi yuborilmadi.",
-        "cancelled": "Printer tanlash bekor qilindi."
+        "cancelled": "Printer tanlash bekor qilindi.",
+        "printer_not_registered": "Printer Do'kon agentida ro'yxatdan o'tmagan. Agentda printerni qo'shing yoki manzilni tekshiring.",
+        "printer_unreachable": "Printerga ulanib bo'lmadi — printer yoqilganini va tarmoqqa ulanganini tekshiring."
       },
       "title": "Chek printeri",
       "transport": "Ulanish turi",
@@ -291,7 +298,7 @@
         "webbluetooth": "Faqat BLE printerlar",
         "http_epos": "Epson ePOS-Print, LAN (administrator ruxsat bergan manzil)",
         "http_webprnt": "Star WebPRNT, LAN (administrator ruxsat bergan manzil)",
-        "cloud": "Bulut printer — keyingi bosqichda",
+        "cloud": "Star CloudPRNT / Epson Server Direct Print — server navbati orqali (iOS uchun ham)",
         "system_print": "Brauzer chop oynasi orqali"
       },
       "unavailable": "Bu qurilmada mavjud emas",
@@ -321,7 +328,14 @@
       "lastTest": "Oxirgi sinov {{time}}",
       "notConfigured": "Printer tanlanmagan",
       "empty": "Printer topilmadi — USB/Bluetooth ulanishini tekshiring yoki Do'kon agentini o'rnating",
-      "iosNote": "iOS: faqat bulut printer yoki elektron chek"
+      "iosNote": "iOS: faqat bulut printer yoki elektron chek",
+      "cloudId": "Bulut printer",
+      "cloudPick": "Bulut printerni tanlang",
+      "cloudNone": "Bu filialda bulut printer ro'yxatga olinmagan (BO-14 «Bulut printerlar»).",
+      "cloudOffline": "Offlayn — bulut printerlar ro'yxati keyin yuklanadi.",
+      "cloudOnline": "so'rov qilmoqda",
+      "cloudSilent": "javob yo'q",
+      "cloudRequired": "Bulut printerni tanlang"
     },
     "agent": {
       "states": {
@@ -337,7 +351,12 @@
         "aborted": "So'rov bekor qilindi.",
         "http": "Do'kon agenti xato qaytardi.",
         "protocol": "Do'kon agentining javobi tushunarsiz. Agentni yangilang."
-      }
+      },
+      "port": "Lokal port: {{port}}",
+      "device": "Bu kassa qurilmasi: {{id}}",
+      "fiscal": "Fiskal ko'prik: {{state}}",
+      "fiscalOn": "yoqilgan",
+      "fiscalOff": "yoqilmagan"
     },
     "subtitle": "Shu qurilma sozlamasi · serverga yozilmaydi",
     "save": "Saqlash",
@@ -675,7 +694,20 @@
     "confirmShortTitle": "Qoldiq yetarli emas",
     "confirmShortBody": "Ba'zi tovarlar manbada kam. Davom etasizmi?",
     "noRights": "Ko'chirish uchun ruxsat yo'q",
-    "historyLines": "{{count}} pozitsiya"
+    "historyLines": "{{count}} pozitsiya",
+    "ettnRefresh": "E-TTN holatini yangilash",
+    "ettnState": "E-TTN: {{state}}",
+    "ettnStates": {
+      "draft": "qoralama",
+      "pending_signature": "imzo kutilmoqda",
+      "signed": "imzolangan",
+      "sent": "yuborilgan",
+      "registered": "ro'yxatga olingan",
+      "accepted": "qabul qilingan",
+      "rejected": "rad etilgan",
+      "cancelled": "bekor qilingan",
+      "failed": "xato"
+    }
   },
   "goodsReceipt": {
     "title": "Tovar qabul qilish",
@@ -766,9 +798,10 @@
       "cash": "qaytim hisoblanadi",
       "card": "terminalga yuboriladi",
       "uzqr": "statik QR, faqat onlayn",
-      "provider": "ulanmagan",
+      "provider": "QR-kodli to'lov",
       "mixed": "bir nechta usul",
-      "debt": "mijoz qarziga"
+      "debt": "mijoz qarziga",
+      "providerOffline": "faqat onlayn"
     },
     "offlineNote": "Offlayn: UzQR, Click, Payme, Uzum mavjud emas — naqd, karta va nasiya ishlaydi.",
     "chooseMethod": "To'lov usulini tanlang",
@@ -805,7 +838,10 @@
       "card": "Karta (terminalsiz)",
       "cardTerminal": "Karta · terminal",
       "uzqr": "UzQR",
-      "debt": "Nasiya"
+      "debt": "Nasiya",
+      "click": "Click",
+      "payme": "Payme",
+      "uzum": "Uzum"
     },
     "rest": "Qoldiq",
     "cardAutoReceipt": "Bank tasdiqlagach fiskal chek avtomatik chiqadi",
@@ -816,7 +852,14 @@
     "printerNotReady": "Printer tayyor emas — chekni elektron berish mumkin.",
     "useElectronic": "Elektron chek (zahira)",
     "electronicCustomer": "Elektron chek (xaridor so'radi)",
-    "electronicPrinter": "Elektron chek (printer ishlamayapti)"
+    "electronicPrinter": "Elektron chek (printer ishlamayapti)",
+    "uzqrType": "UzQR turi",
+    "uzqrTypes": {
+      "static": "Statik",
+      "dynamic": "Dinamik"
+    },
+    "uzqrDynamicHint": "Dinamik QR har bir chek uchun alohida yaratiladi — to'lov avtomatik tasdiqlanadi.",
+    "checkoutWaiting": "To'lov kutilmoqda…"
   },
   "receipt": {
     "title": "Chek",
@@ -1252,6 +1295,46 @@
     "fiscalOffline": "Offline: fiskal belgi internet qaytganda keladi.",
     "fiscalPending": "Fiskal belgi kutilmoqda.",
     "printAgain": "Qayta chop etish",
-    "next": "Keyingi mijoz"
+    "next": "Keyingi mijoz",
+    "checkoutTitle": "To'lov tizimi orqali",
+    "checkoutWaitHint": "To'lov tasdiqlangach «To'lovni qabul qilish» ochiladi."
+  },
+  "fiscal": {
+    "notConnected": {
+      "title": "Fiskal modul ulanmagan — chek yopilmadi, savat saqlandi",
+      "reason": {
+        "agent_offline": "Do'kon agenti javob bermayapti.",
+        "agent_not_installed": "Bu kompyuterda Do'kon agenti topilmadi.",
+        "agent_unpaired": "Do'kon agenti bu kassaga bog'lanmagan (yoki bog'lanish bekor qilingan).",
+        "capability_off": "Do'kon agentida fiskal ko'prik yoqilmagan.",
+        "device_missing": "Kassaga bog'langan fiskal modul agentda topilmadi.",
+        "fm_unknown": "Fiskal modul holati noma'lum — FM ulangan USB ridyerni tekshiring."
+      },
+      "step1": "Kompyuterda Do'kon agenti ishlayotganini tekshiring (soat yonidagi belgi); ishlamasa — qayta ishga tushiring.",
+      "step2": "Fiskal modul (USB ridyer) ulanganini tekshiring.",
+      "step3": "Agent bog'lanmagan bo'lsa — Uskunalar sozlamasida (POS-16) agent kodini kiriting. Keyin «Qayta tekshirish» va chekni qayta tasdiqlang."
+    },
+    "locked": "Fiskal modul bloklangan ({{state}}) — chek chiqarib bo'lmaydi. Cheklarni OFD'ga yuboring yoki fiskal hamkorga murojaat qiling.",
+    "recheck": "Qayta tekshirish",
+    "signing": "Chek fiskal modulda imzolanmoqda…",
+    "fmRequisites": "FM {{terminal}} · chek № {{seq}}"
+  },
+  "checkout": {
+    "intro": "{{provider}} orqali {{amount}} — mijoz QR-kodni skanerlab to'laydi.",
+    "create": "QR-kod yaratish",
+    "creating": "To'lov yaratilmoqda…",
+    "qrLabel": "{{provider}} to'lov QR-kodi",
+    "scanHint": "Mijoz {{provider}} ilovasida QR-kodni skanerlasin yoki havolani ochsin",
+    "expiresAt": "Amal qiladi: {{time}} gacha",
+    "waiting": "To'lov kutilmoqda… Tasdiq kelgach chek avtomatik yopiladi.",
+    "offlinePending": "Internet yo'q — to'lov kutilmoqda. Tasdiq kelmaguncha chek bu usul bilan yopilmaydi.",
+    "confirmed": "{{provider}} to'lovi tasdiqlandi",
+    "failed": "To'lov o'tmadi. Qayta yarating yoki boshqa usulni tanlang.",
+    "expired": "To'lov muddati o'tdi. Qayta yarating yoki boshqa usulni tanlang.",
+    "retry": "Qayta yaratish",
+    "cancel": "Bekor qilish",
+    "cancelTitle": "To'lovni bekor qilasizmi?",
+    "cancelText": "Mijoz hali to'lamagan bo'lsa bekor qiling. To'lov shu payt kelgan bo'lsa, u saqlanib qoladi va chek yopiladi.",
+    "cancelYes": "Ha, bekor qilish"
   }
 }

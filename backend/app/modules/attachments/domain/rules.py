@@ -21,9 +21,18 @@ JPEG: Final = "image/jpeg"
 PNG: Final = "image/png"
 PDF: Final = "application/pdf"
 XLSX: Final = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+XLS: Final = "application/vnd.ms-excel"
 CSV: Final = "text/csv"
+ZIP: Final = "application/zip"  # server-written only (onec_diagnostics, A-07) — never uploadable here
 
-MAX_BYTES: Final[dict[str, int]] = {JPEG: 10 * MB, PNG: 10 * MB, PDF: 20 * MB, XLSX: 10 * MB, CSV: 10 * MB}
+MAX_BYTES: Final[dict[str, int]] = {
+    JPEG: 10 * MB,
+    PNG: 10 * MB,
+    PDF: 20 * MB,
+    XLSX: 10 * MB,
+    XLS: 10 * MB,
+    CSV: 10 * MB,
+}
 UPLOAD_LIMIT: Final = max(MAX_BYTES.values())
 
 UPLOAD_PERMISSIONS: Final[dict[str, tuple[str, ...]]] = {
@@ -34,13 +43,25 @@ UPLOAD_PERMISSIONS: Final[dict[str, tuple[str, ...]]] = {
 }
 # SEC-02 (17 §12): a bank statement is read only with the bank-settlement right, not the other import rights
 BANK_STATEMENT_READ: Final[tuple[str, ...]] = ("bank_settlements.manage",)
+# server-written kinds readable through GET /attachments/{id} (no upload path): kind → read rights
+SERVER_KIND_READ: Final[dict[str, tuple[str, ...]]] = {
+    "onec_diagnostics": ("onec.settings.manage",),  # Do'kon agenti diagnostics package (33 W-07/A-07, BO-14)
+}
 CONTENT_TYPES: Final[dict[str, frozenset[str]]] = {
     "expense_receipt": frozenset({JPEG, PNG, PDF}),
     "ocr_source": frozenset({JPEG, PNG, PDF}),
-    "state_report": frozenset({PDF, XLSX, CSV}),
+    "state_report": frozenset({PDF, XLSX, XLS}),
     "import": frozenset({XLSX, CSV}),
 }
-EXTENSIONS: Final[dict[str, str]] = {JPEG: "jpg", PNG: "png", PDF: "pdf", XLSX: "xlsx", CSV: "csv"}
+EXTENSIONS: Final[dict[str, str]] = {
+    JPEG: "jpg",
+    PNG: "png",
+    PDF: "pdf",
+    XLSX: "xlsx",
+    XLS: "xls",
+    CSV: "csv",
+    ZIP: "zip",
+}
 URL_TTL_S: Final = 15 * 60  # 17 §12: signed URL lives 15 minutes
 
 
@@ -58,6 +79,9 @@ def matches_magic(content_type: str, content: bytes) -> bool:
         return content.startswith(b"%PDF-")
     if content_type == XLSX:
         return content.startswith(b"PK\x03\x04")
+    if content_type == XLS:
+        # Legacy BIFF workbooks are OLE Compound File containers.
+        return content.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1")
     if content_type == CSV:
         return b"\x00" not in content[:4096]
     return False

@@ -174,14 +174,17 @@ class TaxRegimeBlockOut(BaseModel):
 class IntegrationOut(BaseModel):
     status: Literal["connected", "not_connected"]
     connected_at: datetime | None
+    last_ok_at: datetime | None = Field(default=None, description="Last successful call with this key")
+    last_error: str | None = Field(default=None, description="Last error text (never a secret)")
+    last_error_at: datetime | None = None
 
 
 class OfdOut(BaseModel):
     status: Literal["connected", "not_connected"]
 
 
-class CrptOut(BaseModel):
-    status: Literal["connected", "not_connected"]
+class CrptOut(IntegrationOut):
+    connected_at: datetime | None = None
     key_last4: str | None
 
 
@@ -192,6 +195,7 @@ class UzqrOut(IntegrationOut):
 class IntegrationsOut(BaseModel):
     ofd: OfdOut
     faktura_uz: IntegrationOut
+    didox: IntegrationOut | None = None
     crpt: CrptOut
     click: IntegrationOut
     payme: IntegrationOut

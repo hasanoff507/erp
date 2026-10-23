@@ -972,7 +972,8 @@
       "card_result_mismatch": "Karta natijasi mos emas",
       "card_orphan_transaction": "Hujjatsiz karta tranzaksiyasi",
       "actor_unverified": "Tasdiqlanmagan bajaruvchi",
-      "late_in_closed_shift": "Yopilgan smenaga kech kelgan hujjat"
+      "late_in_closed_shift": "Yopilgan smenaga kech kelgan hujjat",
+      "marking_code_duplicate": "Takroriy markirovka kodi"
     },
     "hints": {
       "price_mismatch": "Kassadagi narx serverdagidan farq qilgan — sotuv kassa narxida o'tkazildi",
@@ -989,7 +990,8 @@
       "card_result_mismatch": "Terminal natijasi hujjatdagi to'lovdan farq qiladi",
       "card_orphan_transaction": "Terminal tranzaksiyasi hech qaysi hujjatga bog'lanmagan",
       "actor_unverified": "Onlayn voqeani shu qurilmada PIN bilan tasdiqlanmagan xodim nomidan yuborilgan — tekshiring.",
-      "late_in_closed_shift": "Hujjat smena yopilgandan keyin keldi — kutilgan naqd va farq tuzatildi."
+      "late_in_closed_shift": "Hujjat smena yopilgandan keyin keldi — kutilgan naqd va farq tuzatildi.",
+      "marking_code_duplicate": "Fiskal imzolangan chekda oldin sotilgan markirovka kodi bor — chek qabul qilindi, CRPT kabinetida tekshiring."
     },
     "docTypes": {
       "sales": "Sotuv",
@@ -1140,6 +1142,26 @@
       "card_settlement_mismatch": {
         "title": "Terminal yakuni farqi",
         "description": "Karta terminali yakuni kassa hisobi bilan mos emas"
+      },
+      "marking_alert": {
+        "title": "Markirovka kodi muammosi",
+        "description": "Asl belgisi kodi tekshiruvdan o'tmadi yoki fiskal chekda takroriy kod topildi"
+      },
+      "marking_acceptance_due": {
+        "title": "Markirovka qabul muddati",
+        "description": "Markirovkali kirimni Asl belgisida qabul qilish muddati yaqin yoki o'tdi"
+      },
+      "late_in_closed_period": {
+        "title": "Yopilgan davrga kech chek",
+        "description": "Kassadan yopilgan oyga tegishli hujjat kech keldi — birinchi ochiq oyga yozildi"
+      },
+      "onec_agent_paired": {
+        "title": "Do'kon agenti ulandi/uzildi",
+        "description": "Kompyuter Do'kon agenti sifatida ulandi yoki uzildi"
+      },
+      "onec_base_error": {
+        "title": "Do'kon agenti xatosi",
+        "description": "Agent kompyuteri almashdi yoki vazifa rad etildi"
       },
       "low_stock": {
         "title": "Kam qolgan tovar",

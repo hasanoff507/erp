@@ -32,7 +32,8 @@
       "debtNote": "{{debtors}} ta qarzdor · {{overdue}} ta muddati o'tgan",
       "stockNote": "{{low}} ta tovar kam qolgan",
       "netProfit": "Sof foyda",
-      "netProfitNote": "Tushum − tannarx − xarajatlar"
+      "netProfitNote": "Tushum − tannarx − xarajatlar",
+      "expensesNote": "Tushum − tannarx − xarajatlar · xarajatlar {{amount}}"
     },
     "salesChart": {
       "title": "Savdo — oxirgi 7 kun",
@@ -148,6 +149,10 @@
       "discounts": {
         "title": "Chegirmalar va marja",
         "description": "Berilgan chegirmalar va ular kamaytirgan marja"
+      },
+      "stock-as-of": {
+        "title": "Ombor qoldig'i (sana holatiga)",
+        "description": "Hujjat sanasi bo'yicha qoldiq va 2910/2920 buxgalteriya qoldig'i bilan farq"
       }
     }
   },
@@ -435,6 +440,43 @@
       "label": "Yo'nalish",
       "receivable": "Mijozlar qarzi",
       "payable": "Men qarzdorman"
+    }
+  },
+  "m11": {
+    "month": "Oy",
+    "total": "Jami",
+    "tb": {
+      "account": "Hisob",
+      "openingDt": "Boshlang'ich Dt",
+      "openingKt": "Boshlang'ich Kt",
+      "debit": "Dt oboroti",
+      "credit": "Kt oboroti",
+      "closingDt": "Yakuniy Dt",
+      "closingKt": "Yakuniy Kt",
+      "turnover": "Davr oboroti",
+      "balanced": "Dt oboroti = Kt oboroti",
+      "unbalanced": "Dt va Kt oborotlari teng emas"
+    },
+    "bs": {
+      "assets": "Aktivlar",
+      "liabilities": "Majburiyatlar",
+      "equity": "Kapital",
+      "totalAssets": "Aktivlar jami",
+      "totalLiabilitiesEquity": "Majburiyatlar va kapital jami",
+      "openingWarning": "Boshlang'ich qoldiqlar to'liq kiritilmagan — 0000 qoldig'i {{amount}}"
+    },
+    "stock": {
+      "basis": "Qoldiq hujjat sanasi (doc_date) bo'yicha — o'tgan sanali kirim shu sanadagi qoldiqqa kiradi.",
+      "mismatch": "Ombor qiymati buxgalteriya qoldig'idan farq qiladi — davrni yopishda ogohlantirish chiqadi.",
+      "accountsTitle": "Buxgalteriya bilan solishtirish",
+      "itemsTitle": "Tovarlar",
+      "account": "Hisob",
+      "stockValue": "Ombor qiymati",
+      "ledgerValue": "Buxgalteriya qoldig'i",
+      "difference": "Farq",
+      "product": "Tovar",
+      "qty": "Miqdor",
+      "value": "Qiymati"
     }
   }
 }

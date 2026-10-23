@@ -24,7 +24,9 @@
     "./scanner": "./src/scanner/index.ts",
     "./agent": "./src/agent/index.ts",
     "./card-terminal": "./src/card-terminal/index.ts",
-    "./debt-allocation": "./src/debt-allocation/index.ts"
+    "./fiscal": "./src/fiscal/index.ts",
+    "./debt-allocation": "./src/debt-allocation/index.ts",
+    "./eimzo": "./src/eimzo/index.ts"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",

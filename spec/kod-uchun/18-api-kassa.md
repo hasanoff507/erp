@@ -76,6 +76,8 @@
 | 32 | `GET /api/v1/cash-movements` | Kassa pul harakati ro'yxati | 13.3 |
 | 33 | `GET /api/v1/fiscal-receipts` / `GET /{id}` | Fiskal chek holati, qayta chop etish uchun qidiruv | 14.1 |
 | 34 | `POST /api/v1/fiscal-receipts/{id}/retry` | Qo'lda qayta urinish (BO-14) | 14.2 |
+| 34a | `GET /api/v1/fiscal-registers` | Kassalar bo'yicha fiskal holat (BO-14 «Fiskal») | 14.3 |
+| 34b | `POST /api/v1/cash-registers/{id}/fiscal-resend` | Lokal ko'prik kassasida yuborilmagan cheklarni qayta yuborish (BO-14) | 14.4 |
 | 35 | `GET /api/v1/einvoices?direction=out` / `POST /einvoices` / `POST /einvoices/from-receipt` / sign / `send` / `cancel` | Chiquvchi e-faktura (B2B) | 14a |
 | 36 | `POST /api/v1/marking-codes/verify` | Markirovka kodini tekshirish (sinxron) | 15 |
 | 37 | `POST /api/v1/payments/checkouts` | To'lov boshlash (dinamik uzqr/click/payme/uzum; statik UzQR checkout'siz) | 16.2 |
@@ -270,7 +272,7 @@ Server hisoblaydi: `expected_cash = opening_cash + Σcash_moves(shift_id)` (`cas
 | `branch_id`, `cash_register_id`, `shift_id` | UUID | ha | `shift_id` — `status=open`, shu `device_id` |
 | `receipt_seq` | integer\|null | shartli | **Qurilma beradi**, shu smena ichida ketma-ket (`kind='sale'` cheki raqami); faqat-qarz sotuvda (`payments[]` faqat `debt` — `sale` cheki chiqmaydi) `null`, aks holda majburiy. Server `UNIQUE (tenant_id, cash_register_id, shift_id, receipt_seq)` tekshiradi, o'zi raqam bermaydi (istisno — §4.6 `RECEIPT_SEQ_CONFLICT` qayta raqamlash) |
 | `credit_receipt_seq` | integer\|null | shartli | `FiscalPolicy.credit_sale_receipt='credit_type'` va `payments[]`da `debt` bo'lsa majburiy — `kind='credit_sale'` cheki raqami (shu smenadagi `receipt_seq` ketma-ketligidan); aks holda `null` |
-| `fiscal_result` | object\|null | shartli | Lokal ko'prik rejimida (`ERP_FISCAL_PROVIDER = multikassa_local \| fiscaldrive_local`) chek FM'da imzolangan bo'lsa **majburiy**: `{fm_terminal_id, fm_receipt_seq, fiscal_sign, qr_url, fiscal_at}`; hamkor bulut va `fake` rejimida, faqat-qarz sotuvda — `null` (qaror #68) |
+| `fiscal_result` | object\|null | shartli | Lokal ko'prik rejimida (`ERP_FISCAL_PROVIDER = multikassa_local \| fiscaldrive_local`) chek FM'da imzolangan bo'lsa **majburiy**: `{fm_terminal_id, fm_receipt_seq, fiscal_sign, qr_url, fiscal_at}`; hamkor bulut va `fake` rejimida, faqat-qarz sotuvda — `null` (qaror #68). Tekshiruv: `fm_terminal_id` — `^[A-Za-z0-9]{1,64}$` (`validation.fiscal_terminal_format`), `fiscal_sign` — 12 raqam (`validation.fiscal_sign_format`), `qr_url` — `https`; `ofd.soliq.uz/check` havolasida `t`/`r`/`s` shu chekning `fm_terminal_id`/`fm_receipt_seq`/`fiscal_sign` iga teng (`validation.fiscal_result_qr_mismatch`) |
 | `delivery` | enum | yo'q | `printed` / `electronic`, standart `printed` → `fiscal_receipts.delivery` |
 | `delivery_reason` | enum\|null | shartli | `printer_failure` / `customer_request`; `delivery=electronic` bo'lsa majburiy, aks holda `null` |
 | `temp_number` | string | ha | `{device_id}-{local_seq}` (`11-malumotlar-modeli.md` §6/§11) |
@@ -883,6 +885,18 @@ Qarz eskirishi hisoboti — **yagona manba `20-api-moliya-admin.md` #21, `GET /a
 **Idempotentlik**: `Idempotency-Key` majburiy.
 **Javob**: `{status: "requeued"}` — `failed` chek `pending`ga qaytadi, audit `fiscal.retry`. Allaqachon `fiscalized` chek yoki serverda yuborilmaydigan (lokal ko'prik) rejim — `409 DOC_INVALID_STATE`.
 
+### 14.3 `GET /api/v1/fiscal-registers`
+
+**Maqsad**: BO-14 «Fiskal» bo'limi — har kassa uchun FM holati va yuborilmagan cheklar (`21-integratsiyalar.md` §0 BO-14, §1 «Monitoring»).
+**Ruxsat**: `reports.sales.view` (filial doirasi qo'llanadi).
+**Javob**: `{items:[{cash_register_id, name, branch_id, fiscal_agent_id, fiscal_local_device_id, fm_state, fm_receipts_pending, last_unacked_receipt_at, unacked_count, failed_count, oldest_unacked_at, oldest_unacked_age_s}]}` — sahifasiz (kassalar soni kichik); `unacked_count` — serverdagi `ofd_acked_at IS NULL` cheklar (48 soat hisobi, `z_report`siz), `fm_receipts_pending` — FM'ning o'z hisobi (agent `fiscal.status`), `failed_count` — `status='failed'` cheklar (hamkor bulut/`fake`).
+
+### 14.4 `POST /api/v1/cash-registers/{id}/fiscal-resend`
+
+**Maqsad**: BO-14 «Qayta yuborish» — lokal ko'prik kassasining Do'kon agentiga `fiscal.resend_unsent` vazifasi (`21-integratsiyalar.md` §16); natijadagi `acked[]` → `fiscal_receipts.ofd_acked_at`.
+**Ruxsat**: `integrations.retry`. **Idempotentlik**: `Idempotency-Key` majburiy.
+**Javob**: `202 {task_id, status: "queued"}`, audit `fiscal.resend_requested`. Kassaga agent bog'lanmagan — `409 DOC_INVALID_STATE` (`params.reason="no_fiscal_agent"`); agentda fiskal imkoniyat yoqilmagan — `409 AGENT_CAPABILITY_DISABLED`; boshqa filial kassasi — `404 NOT_FOUND`.
+
 ---
 
 ## 14a. Chiquvchi e-faktura (`einvoices`, `direction=out`)
@@ -911,7 +925,7 @@ Qarz eskirishi hisoboti — **yagona manba `20-api-moliya-admin.md` #21, `GET /a
 
 ### `POST /api/v1/einvoices/{id}/send` · `POST /api/v1/einvoices/{id}/cancel`
 
-`send` → `202`, `outbox_jobs(kind=einvoice_send)` → Faktura.uz orqali; `cancel` — operator qoidasi bo'yicha.
+`send` (faqat `signed`; `draft` — `409 EINVOICE_NOT_SIGNED`) → `202 {id, status:"queued", job_id}`, `outbox_jobs(kind=einvoice_send)` → operator `sent` (`operator_doc_id`); xaridor javobi poll orqali → `accepted`/`rejected`. `cancel` `{reason}` — faqat `draft`/`signed` (yuborish navbatda emas) → `cancelled`; `sent` faktura operator kabinetida bekor qilinadi (`409 DOC_INVALID_STATE`, `params.reason="cancel_in_operator"`).
 **Ruxsat**: `einvoice.sign`.
 
 Provodka **yo'q** (`13-provodka-qoidalari.md` §2.22); bitta hujjatga bitta faol chiquvchi faktura — `uq_einvoice_out_per_doc`.
@@ -924,7 +938,7 @@ Provodka **yo'q** (`13-provodka-qoidalari.md` §2.22); bitta hujjatga bitta faol
 ### `POST /api/v1/marking-codes/verify`
 
 **Maqsad**: DataMatrix kodni skanerlashda sotuvdan oldingi ixtiyoriy sifat tekshiruvi — **hech narsa saqlamaydi**, faqat tekshiradi (`21-integratsiyalar.md` §4.1). Sotuvning o'zi CRPT'ga bu endpoint orqali emas, fiskal chek ichida OFD orqali boradi (§4.2, qaror #62). `MARKING_PRECHECK=off`da POS bu endpoint'ni chaqirmaydi.
-**Ruxsat**: `sales.create`. Sinxron, timeout 3 s (standart, sozlanadi), retry yo'q.
+**Ruxsat**: `sales.create` (POS PIN aktori), `Idempotency-Key` majburiy (`warn` auditi yoziladi). Sinxron, timeout 3 s (standart, `ERP_MARKING_VERIFY_TIMEOUT_S`), retry yo'q. `operation_id`: `sales_verify_marking_code`.
 
 **So'rov**:
 
@@ -933,7 +947,7 @@ Provodka **yo'q** (`13-provodka-qoidalari.md` §2.22); bitta hujjatga bitta faol
 | `code` | string | ha — DataMatrix xom qiymati |
 | `product_id` | UUID\|null | yo'q — agar kod ichidan mahsulot aniqlanmasa, qurilma skanerlangan shtrix-kod/tanlangan tovarni beradi |
 
-Server avval **lokal** tekshiradi (format, tenantdagi `marking_codes.status IN ('sold','pending_verification')` takrori), keyin `MarkingPort.verify_code` orqali CRPT'ga murojaat qiladi. Natija `MARKING_PRECHECK` rejimiga qarab:
+Server avval **lokal** tekshiradi (format — `sale.created` bilan bir xil qoida; `product_id` berilsa — mavjud va `is_marked=true`, aks holda `422 VALIDATION_ERROR` `validation.not_found` / `validation.marking_code_unexpected`; tenantdagi `marking_codes.status IN ('sold','pending_verification')` takrori), keyin `MarkingPort.verify_code` orqali CRPT'ga murojaat qiladi (tenantda CRPT kaliti yo'q bo'lsa — "CRPT javob bermadi" qatori). Javob tanasi: `{valid: true|false|null, status, details: {gtin, serial, reason}, warnings: []}` — `gtin`/`serial` kodning GS1 elementlaridan (`(01)`/`(21)`, o'qilmasa `null`), `reason` faqat `valid=false`da. `warn` auditi — `marking.precheck_failed` (`after.reason`: CRPT sababi yoki `timeout`). Natija `MARKING_PRECHECK` rejimiga qarab (`off` — POS chaqirmaydi; chaqirilsa natija ogohlantirishsiz qaytadi):
 
 | Holat | `warn` (standart) | `block` |
 |---|---|---|
@@ -944,7 +958,7 @@ Server avval **lokal** tekshiradi (format, tenantdagi `marking_codes.status IN (
 | CRPT javob bermadi (timeout 3 s) | `200 {valid: null, warnings: ["MARKING_PRECHECK_WARNING"]}` — sotuv davom etadi | `503 MARKING_VERIFY_UNAVAILABLE` — POS qatorni chekka qo'shmaydi, zaxira yo'l yo'q (qaror #62) |
 
 **Offline**: bu endpoint umuman chaqirilmaydi (internet yo'q) — POS mahalliy format va takror-kod (sinxronlangan `marking_codes` keshi) tekshiradi, `sale.created`ga `marking_offline=true` bilan yuboradi (§4.2).
-**Bosqich**: endpoint Bosqich 5 da (B5-EP-18#36). Bosqich 3 veb-kassasi uni chaqirmaydi va online sotuvda "CRPT javob bermadi" qatoridagidek ishlaydi: `warn` — sotuv davom etadi, `block` — qator `MARKING_VERIFY_UNAVAILABLE` bilan qo'shilmaydi; lokal format va takror-kod tekshiruvi har doim ishlaydi.
+**Bosqich**: Bosqich 5 (B5-EP-18#36); lokal format va takror-kod tekshiruvi har doim ishlaydi.
 **Bog'liq**: US-M01-03, POS-02.
 
 ---
@@ -955,7 +969,7 @@ Server avval **lokal** tekshiradi (format, tenantdagi `marking_codes.status IN (
 
 **Fiskalizatsiya qoidasi**: do'kon sotuvida har bir to'lov usulida fiskal chekni **faqat bizning kassamiz** chiqaradi (`FiscalPort`, §4.10); provayderga faqat chek havolasi yuboriladi (Click `submit_qrcode`, Payme `receipts.set_fiscal_data`, Uzum `/fiscal`). Tenant provayder kabinetida **provayder tomonidagi avto-fiskalizatsiya o'chiq** bo'lishi shart — aks holda ikki marta fiskalizatsiya bo'ladi (onboarding/BO-14 tekshiruv bandi, `21-integratsiyalar.md` §9).
 
-**Provayderlar holati** (`21-integratsiyalar.md` §9): **UzQR** — statik QR hozir (qo'lda tasdiq, checkout'siz), dinamik QR — `UzqrPort` stub (POS API spetsifikatsiyasi bank/CBU'dan kelgach real adapter); **Click** — rasmiy sandbox bor (Playground + Postman to'plami); **Payme** — sandbox (`TEST_KEY`), Basic Auth; **Uzum** — Merchant API JSON webhook'lari (`/check`, `/create`, `/confirm`, `/reverse`, `/status`) + Basic Auth.
+**Provayderlar holati** (`21-integratsiyalar.md` §9): **UzQR** — statik QR hozir (qo'lda tasdiq, checkout'siz), dinamik QR — `UzqrPort` stub (POS API spetsifikatsiyasi bank/CBU'dan kelgach real adapter); **Click** — rasmiy sandbox bor (Playground + Postman to'plami); **Payme** — sandbox (`TEST_KEY`), Basic Auth; **Uzum** — Merchant API JSON webhook'lari (`/check`, `/create`, `/confirm`, `/reverse`, `/status`) + Basic Auth; kassadagi QR — Uzum Dynamic QR (`/api/dynamic-qr/merchant/payment/create`, holat — `status-by-order`).
 
 ### 16.1 Oqim
 
@@ -970,7 +984,7 @@ Server avval **lokal** tekshiradi (format, tenantdagi `marking_codes.status IN (
 ### 16.2 `POST /api/v1/payments/checkouts`
 
 **Maqsad**: to'lov boshlash.
-**Ruxsat**: `sales.create`. **Faqat online**.
+**Ruxsat**: `sales.create` yoki `debts.payment.accept` (POS-13 qarz to'lovi, §12.2). **Faqat online**.
 
 **So'rov**:
 
@@ -983,22 +997,30 @@ Server avval **lokal** tekshiradi (format, tenantdagi `marking_codes.status IN (
 | `qr_type` | enum\|null | shartli | `provider=uzqr`da majburiy, faqat `dynamic` (statik UzQR checkout'siz — §16.1); `static` kelsa `VALIDATION_ERROR` |
 
 Bu endpoint faqat do'kon sotuvi uchun — bizning obuna to'lovi (`"billing"` konteksti) alohida `POST /billing/checkout` yo'lida.
-**Javob**: `{checkout_ref, provider, provider_tx_id|null, qr_payload|checkout_url, status: "pending", expires_at}` — `expires_at` va eskirgan (`expired`) checkout'larni tozalash muddati — 24 soat (standart, sozlanadi, qaror #54). Webhook tenantni `app.payments_checkout_by_provider_tx()`/`app.payments_checkout_by_ref()` orqali topadi.
-**Idempotentlik**: `Idempotency-Key` majburiy (takror bosilgan tugma ikkinchi checkout yaratmasligi uchun).
+**Javob**: `201 {checkout_ref, provider, provider_tx_id|null, status: "pending", amount, qr_type, qr_payload, checkout_url, confirmed_at: null, expires_at}` — `qr_payload` mijoz telefoni skanerlaydigan QR mazmuni: Click — to'lov havolasi `https://my.click.uz/services/pay?service_id&merchant_id&amount&transaction_param=<checkout_ref>` (docs.click.uz «Payment Button»; `transaction_param` = SHOP API `merchant_trans_id`); Payme — `https://checkout.paycom.uz/base64("m=<merchant_id>;ac.order_id=<checkout_ref>;a=<tiyin>")` (`test_mode` kalitida `checkout.test.paycom.uz`; kabinetdagi hisob maydoni — `order_id`); Uzum — Dynamic QR `payment_link` (`order_id` = `checkout_ref`, tenantning Dynamic QR kredensiallari bilan); dinamik UzQR — `UzqrPort.create_dynamic_qr` natijasi (`provider_tx_id` shu yerda beriladi). `expires_at` va eskirgan (`expired`) checkout'larni tozalash muddati — 24 soat (standart, sozlanadi, qaror #54; cron `payments_checkout_expire` har 5 daqiqa `pending`ni `expired` qiladi).
+**Xatolar**: `VALIDATION_ERROR` — `qr_type` noto'g'ri (`validation.invalid_choice`, `validation.qr_type_uzqr_only`), `amount ≤ 0`, kassa tenantniki emas/arxivlangan (`validation.cash_register_unknown`), provayder tenantda ulanmagan (`validation.payment_provider_not_configured` — `tenant_secrets` yo'q; UzQR'da shu kassaning `api_key`i, Uzum'da Dynamic QR kredensiallari yo'q), shu `checkout_ref` boshqa provayder/kassa/summa bilan band (`validation.checkout_ref_reused`); `BRANCH_SCOPE_DENIED`; `502 PAYMENT_PROVIDER_ERROR` — provayder checkout yaratmadi (dinamik UzQR stub'i ham — 26 #49), hech narsa saqlanmaydi.
+**Idempotentlik**: `Idempotency-Key` majburiy (takror bosilgan tugma ikkinchi checkout yaratmasligi uchun); shu `checkout_ref` bilan bir xil provayder/kassa/summadagi takroriy so'rov mavjud checkout'ni qaytaradi. Audit `payment_checkout.created`.
 **Bog'liq**: POS-03.
 
 ### 16.3 `GET /api/v1/payments/checkouts/{checkout_ref}`
 
-**Ruxsat**: `sales.create`.
-**Javob**: `{checkout_ref, provider, provider_tx_id, status: "pending"|"confirmed"|"consumed"|"failed"|"expired", amount, confirmed_at}`. POS poll qiladi (har 2 s — standart, sozlanadi, qaror #54) chek "to'lov kutilmoqda" holatida.
+**Ruxsat**: `sales.create` yoki `debts.payment.accept`; boshqa tenant/ruxsatsiz filial checkout'i — `404 NOT_FOUND`.
+**Javob**: §16.2 javobi bilan bir xil shakl, `status: "pending"|"confirmed"|"consumed"|"failed"|"expired"` (`expires_at` o'tgan `pending` — `expired` deb ko'rsatiladi). POS poll qiladi (har 2 s — standart, sozlanadi, qaror #54) chek "to'lov kutilmoqda" holatida. Uzum Dynamic QR'da callback yo'q: `pending` checkout'da server shu so'rov ichida `status-by-order`ni so'raydi — `SUCCESS` → `confirmed` (`provider_tx_id` = `payment_id`), `FAILED`/`REVERSED`/`CANCELLED`/`PARTIAL_CANCELLED` → `failed`; provayder javob bermasa holat o'zgarmaydi.
 **Bog'liq**: POS-03.
 
 ### 16.4 `POST /api/v1/payments/webhooks/{provider}` (kiruvchi)
 
 **Maqsad**: bank/to'lov tizimidan keladigan tasdiq.
 **Ruxsat**: — (bizning OAuth/CSRF emas, provayderning o'z imzosi tekshiriladi, tenantning o'z merchant kalitlari bilan: Click — MD5 `sign_string` (SHOP API Prepare/Complete); Payme — Basic Auth (JSON-RPC Merchant API); Uzum — Basic Auth (JSON webhook'lar `/check`, `/create`, `/confirm`, `/reverse`, `/status`); dinamik UzQR — `UzqrPort` (protokol bank/CBU spetsifikatsiyasidan, hozircha stub), `21-integratsiyalar.md` §9).
-**Javob**: darhol `200` (aks holda provayder qayta-qayta yuboradi).
-**Idempotentlik**: `provider_tx_id` (`UNIQUE`, ikkinchi marta kelsa no-op muvaffaqiyat).
+**Yo'llar**: `POST /api/v1/payments/webhooks/click`, `/payme`, `/uzqr`; Uzum — `POST /api/v1/payments/webhooks/uzum/{operation}` (`check`/`create`/`confirm`/`reverse`/`status`; kabinetga asos URL `…/payments/webhooks/uzum` beriladi). OpenAPI sxemasida yo'q, `Idempotency-Key` talab qilinmaydi, sessiya/CSRF yo'q; (provayder, IP) bo'yicha daqiqasiga `ERP_PAYMENTS_WEBHOOK_RATE_PER_MIN` (standart 600) — oshsa `429 RATE_LIMITED`.
+**Tenantni aniqlash** (faqat `SECURITY DEFINER` funksiyalar, `12-db-sxema.md` §4.5): Click — `merchant_trans_id` (= `checkout_ref`) → `app.payments_checkout_by_ref()`; dinamik UzQR — `provider_tx_id` → `app.payments_checkout_by_provider_tx()`; Payme/Uzum — Basic Auth kredensialining barmoq izi (`tenant_secrets.lookup_hash`) → `app.payments_tenant_by_credential()` — kredensial har qanday checkout ma'lumotidan **oldin** tekshiriladi (Payme `GetStatement`, Uzum `/check` checkout havolasisiz ham keladi). Keyin hammasi shu tenantning tranzaksiyasida, RLS ostida, checkout qatori `FOR UPDATE` bilan; boshqa tenant kaliti bu tenant checkout'iga yeta olmaydi.
+**Tekshiruvlar**: imzo/parol doimiy vaqtda solishtiriladi (Click `md5(click_trans_id + service_id + SECRET_KEY + merchant_trans_id [+ merchant_prepare_id] + amount + action + sign_time)`, Payme `Paycom:<key>`, Uzum `login:password`, Uzum `serviceId` = kalitdagi `merchant_id`); summa checkout summasiga aynan teng (Payme/Uzum — tiyin); provayder checkout provayderiga mos; tasdiqlanmagan so'rov hech narsa yozmaydi. Karta ma'lumoti va mijoz telefoni saqlanmaydi (`payment_checkouts.provider_data` — faqat protokol holati). Har holat o'zgarishi audit: `payment_checkout.prepared` / `.confirmed` / `.failed` / `.expired` (foydalanuvchisiz).
+**Javob** — provayder protokoli bo'yicha (aks holda provayder qayta-qayta yuboradi):
+- **Click** (SHOP API, form-urlencoded; docs.click.uz/en/shop-api): har doim HTTP `200` JSON; Prepare (`action=0`) → `{click_trans_id, merchant_trans_id, merchant_prepare_id, error: 0, error_note}` (checkout `pending`da qoladi, `provider_tx_id` = `click_trans_id`); Complete (`action=1`) → `{…, merchant_confirm_id, error: 0}` va checkout `confirmed`. Xatolar: `-1` imzo, `-2` summa, `-3` action, `-4` allaqachon to'langan (takroriy Complete — ikkinchi marta hisoblanmaydi), `-5` buyurtma yo'q, `-6` tranzaksiya/`merchant_prepare_id` mos emas, `-8` so'rov to'liq emas, `-9` bekor qilingan/muddati o'tgan (Click `error < 0` yuborsa checkout `failed`).
+- **Payme** (JSON-RPC 2.0; developer.help.paycom.uz): har doim HTTP `200`; `CheckPerformTransaction`, `CreateTransaction` (`state=1`; 12 soat — 43 200 000 ms — ichida `Perform` bo'lmasa `reason=4` bilan bekor), `PerformTransaction` (`state=2`, checkout `confirmed`), `CancelTransaction` (`-1`/`-2`; checkout `consumed` bo'lsa — `-31007`), `CheckTransaction`, `GetStatement`. Xatolar: `-32504` kredensial, `-32700`/`-32600`/`-32601`, `-31001` summa, `-31003` tranzaksiya yo'q, `-31008` amal mumkin emas, `-31050` buyurtma (`data: "order_id"`) yo'q, `-31051` buyurtmani to'lab bo'lmaydi (to'langan/bekor/muddati o'tgan yoki boshqa tranzaksiya jarayonda); `message` — `{ru, uz, en}`.
+- **Uzum** (Merchant API; developer.uzumbank.uz/en/merchant): muvaffaqiyat HTTP `200` (`OK`/`CREATED`/`CONFIRMED`/`REVERSED`), xato HTTP `400` `{status: "FAILED", errorCode}` — `10001` kredensial, `10002` JSON, `10005` parametr yo'q, `10006` `serviceId`, `10007` buyurtma yo'q, `10008` to'langan/band, `10009` bekor/muddati o'tgan, `10010` `transId` takror, `10011` summa, `10014` tranzaksiya yo'q, `10015` bekor qilingan (yoki `/create`dan 30 daqiqa o'tib `/confirm` — `FAILED`), `10016` allaqachon tasdiqlangan, `10017` bekor qilib bo'lmaydi (checkout `consumed`), `10018` allaqachon bekor qilingan.
+- **Dinamik UzQR** — `UzqrPort` (real protokol ⛔ 26 #49; `ERP_UZQR_PROVIDER=fake` — faqat local/test emulyatori): `200 {status: "ok"}`; imzo mos kelmasa `403 WEBHOOK_SIGNATURE_INVALID` (17 §14).
+**Idempotentlik**: `provider_tx_id` (`UNIQUE (provider, provider_tx_id)`; ikkinchi marta kelsa — saqlangan natija, qayta hisoblanmaydi).
 
 ### 16.5 Xatolar
 
@@ -1078,10 +1100,10 @@ Kassir karta raqami/RRN'ni yozmaydi: POS summani do'kondagi bank terminaliga tar
 **Ruxsat**: `GET` — `cash_register.manage` yoki `sales.create` (o'z kassasi); `POST`/`PATCH` — `cash_register.manage`.
 **`GET`** `?branch_id=&cash_register_id=&status=&page=&size=` → `{items: [CardTerminal], total, page, size}` (page pagination — ma'lumotnoma).
 **`CardTerminal`**: `{id, branch_id, cash_register_id, name, vendor, model, adapter, driver, agent_id, local_id, host, port, vendor_terminal_ref, tid, mid, acquirer_counterparty_id, status, is_default, capabilities, health_status, health_checked_at, version}` — `card_terminals` ustunlari (`12-db-sxema.md`).
-**`POST`** tanasi — `CardTerminal` (`id`, `health_*`, `capabilities`, `version`siz); qoidalar: `adapter=agent_ecr` — `agent_id`, `local_id`, `host` majburiy (`local_id` agent `capabilities.card_terminal.devices[]`da bo'lishi, `host` — RFC 1918 xususiy IPv4); `adapter=cloud` — `vendor_terminal_ref` majburiy, vendor kredensiali `tenant_secrets(kind='card_terminal_vendor')`da; `adapter=fake` — faqat `ERP_CARD_FAKE_TERMINALS=true` bo'lgan dev/test/staging muhitida (prod'da sozlamaning o'zi taqiqlangan; aks holda `VALIDATION_ERROR`, `validation.card_terminal_fake_forbidden`); faol real terminalda `tid` majburiy va tenantda yagona; `is_default=true` — `cash_register_id` majburiy, shu kassadagi oldingi standart avtomatik `false`.
+**`POST`** tanasi — `CardTerminal` (`id`, `health_*`, `capabilities`, `version`siz); qoidalar: `adapter=agent_ecr` — `agent_id`, `local_id`, `host` majburiy, `host` — RFC 1918 xususiy IPv4; faol (`status='active'`) terminal uchun qo'shimcha: `agent_id` — shu tenantning faol agenti (`validation.card_terminal_agent_not_found` / `validation.card_terminal_agent_revoked`), agentda `capabilities.card_terminal.enabled = true` (aks holda `409 AGENT_CAPABILITY_DISABLED`), `local_id` agent `capabilities.card_terminal.devices[]` da bo'lishi (`validation.card_terminal_local_unknown`), qurilma `host` xabar qilgan bo'lsa — terminal `host` aynan shu manzil (ruxsat ro'yxati; `validation.card_terminal_host_mismatch`); `disabled`/`archived` qilishda bog'lanish qayta tekshirilmaydi; `adapter=cloud` — `vendor_terminal_ref` majburiy, vendor kredensiali `tenant_secrets(kind='card_terminal_vendor')`da; `adapter=fake` — faqat `ERP_CARD_FAKE_TERMINALS=true` bo'lgan dev/test/staging muhitida (prod'da sozlamaning o'zi taqiqlangan; aks holda `VALIDATION_ERROR`, `validation.card_terminal_fake_forbidden`); faol real terminalda `tid` majburiy va tenantda yagona; `is_default=true` — `cash_register_id` majburiy, shu kassadagi oldingi standart avtomatik `false`.
 **`PATCH`** — `version` majburiy (`409 VERSION_CONFLICT`); `status` `active`/`disabled`/`archived` (arxivlangan terminal tahrirlanmaydi); hal qilinmagan (`pending`/`unknown`) urinishi bor terminal `disabled`/`archived` qilinmaydi — `CARD_OUTCOME_UNKNOWN`.
 **Idempotentlik**: `POST` — `Idempotency-Key` majburiy. **Audit**: `card_terminal.created` / `card_terminal.updated` / `card_terminal.archived`.
-**Xatolar**: `VALIDATION_ERROR`, `VERSION_CONFLICT`, `CARD_OUTCOME_UNKNOWN`, `NOT_FOUND`, `PERMISSION_DENIED`.
+**Xatolar**: `VALIDATION_ERROR`, `VERSION_CONFLICT`, `CARD_OUTCOME_UNKNOWN`, `AGENT_CAPABILITY_DISABLED`, `NOT_FOUND`, `PERMISSION_DENIED`.
 
 ### 16a.6 `POST /api/v1/card-terminal-settlements`
 

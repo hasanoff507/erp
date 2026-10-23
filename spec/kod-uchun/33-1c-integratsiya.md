@@ -309,7 +309,7 @@ Har job imzosida birinchi argument `tenant_id` (qaror #1, #2); tana `tenant_tran
 | `onec_apply_catalog_page` | `read_refs` natijasi kelganda | `tenant_id, task_id` | Sahifani `onec_catalog_items` ga upsert; `next_after_guid` bo'lsa keyingi `read_refs` vazifasi | `(task_id)` |
 | `onec_notify` | xizmatlardan | `tenant_id, template, entity_id` | `outbox_jobs(kind='telegram')` yozadi (§13.3) | `idempotency_key = onec:{template}:{entity_id}:{revision}` |
 
-Cron ro'yxati `workers/cron.py` ga qo'shiladi: `onec_schedule_tick` (*/5), `onec_lease_sweeper` (*/1), `onec_drift_check` (30 6 * * *), `onec_agent_offline_check` (*/15), `onec_cleanup` (0 3 * * *). Fan-out — `app.onec_tenants_due(p_kind text)` SECURITY DEFINER funksiyasi (§5.18): faqat faol bazasi bor tenantlar qaytadi.
+Bosqich 5 da (1C bazalarisiz) `onec_lease_sweeper` faqat Do'kon agenti vazifalari uchun ishlaydi va `app.list_active_tenant_ids()` bo'yicha fan-out qiladi (`onec_tenants_due` — `0029`). Cron ro'yxati `workers/cron.py` ga qo'shiladi: `onec_schedule_tick` (*/5), `onec_lease_sweeper` (*/1), `onec_drift_check` (30 6 * * *), `onec_agent_offline_check` (*/15), `onec_cleanup` (0 3 * * *). Fan-out — `app.onec_tenants_due(p_kind text)` SECURITY DEFINER funksiyasi (§5.18): faqat faol bazasi bor tenantlar qaytadi.
 
 ### 4.5 Redis kalitlari
 
@@ -330,7 +330,7 @@ Cron ro'yxati `workers/cron.py` ga qo'shiladi: `onec_schedule_tick` (*/5), `onec
 
 ### 5.1 Umumiy
 
-Konventsiyalar — `12-db-sxema.md` §1: hammasi `app` sxemasida (device grant jadvali — `auth`), `id UUID` ilova tomonida UUIDv7 bilan generatsiya qilinadi (`DEFAULT app.uuidv7()` — faqat zaxira), har jadvalda `tenant_id NOT NULL`, pul `NUMERIC(18,2)`, miqdor `NUMERIC(18,3)`, enum — `TEXT + CHECK`, vaqt `TIMESTAMPTZ` (UTC). Istisno: 1C hujjat vaqti (`doc_time`, `onec_date`) — `TIMESTAMP` (zonasiz, Asia/Tashkent mahalliy vaqti — 1C `Дата` shunday saqlaydi). `updated_at` trigger'i 12 §2.10 bloki bilan ulanadi (revizion oxirida aniq `CREATE TRIGGER trg_set_updated_at` ham yoziladi). Migratsiya — ikki Alembic revizion (12 §6.1, qaror #66), `core_tenant_user`, `auth_schema`, `platform_global`, `integration_sync` revizionlaridan keyin: **`0028 store_agent`** (Bosqich 5) — Do'kon agentining umumiy registri `onec_agents`, `onec_agent_tasks`, `onec_task_results`, `auth.onec_device_authorizations` (nomi moslik uchun `onec_` prefiksli; `onec_agent_tasks` ning 1C ga ishora qiluvchi ustunlari FK'siz), `cash_registers.fiscal_agent_id` FK'i, ulash/token funksiyalari; **`0029 onec_integration`** (Bosqich 7) — qolgan 15 ta 1C ga xos jadval, `onec_forbid_namespace_change`, `onec_tenants_due` va kechiktirilgan FK'lar (§5.21), jumladan `onec_agent_tasks` ga `fk_oat_*`. Shu bo'limdagi DDL, RLS, grant va SECURITY DEFINER funksiyalar matni `12-db-sxema.md` §2.11, §4.2, §4.4, §4.5 bilan aynan bir xil; DDL matnida farq topilsa `12` ustun.
+Konventsiyalar — `12-db-sxema.md` §1: hammasi `app` sxemasida (device grant jadvali — `auth`), `id UUID` ilova tomonida UUIDv7 bilan generatsiya qilinadi (`DEFAULT app.uuidv7()` — faqat zaxira), har jadvalda `tenant_id NOT NULL`, pul `NUMERIC(18,2)`, miqdor `NUMERIC(18,3)`, enum — `TEXT + CHECK`, vaqt `TIMESTAMPTZ` (UTC). Istisno: 1C hujjat vaqti (`doc_time`, `onec_date`) — `TIMESTAMP` (zonasiz, Asia/Tashkent mahalliy vaqti — 1C `Дата` shunday saqlaydi). `updated_at` trigger'i 12 §2.10 bloki bilan ulanadi (revizion oxirida aniq `CREATE TRIGGER trg_set_updated_at` ham yoziladi). Migratsiya — ikki Alembic revizion (12 §6.1, qaror #66), `core_tenant_user`, `auth_schema`, `platform_global`, `integration_sync` revizionlaridan keyin: **`0028 store_agent`** (Bosqich 5) — Do'kon agentining umumiy registri `onec_agents`, `onec_agent_tasks`, `onec_task_results`, `auth.onec_device_authorizations` (nomi moslik uchun `onec_` prefiksli; `onec_agent_tasks` ning 1C ga ishora qiluvchi ustunlari FK'siz), `cash_registers.fiscal_agent_id` FK'i, ulash/token funksiyalari; **`0029 onec_integration`** (Bosqich 7) — qolgan 14 ta 1C ga xos jadval (`onec_agent_logs` — Do'kon agenti registri bilan `0028a fiscal_edocs` da, A-06/W-08), `onec_forbid_namespace_change`, `onec_tenants_due` va kechiktirilgan FK'lar (§5.21), jumladan `onec_agent_tasks` ga `fk_oat_*`. Shu bo'limdagi DDL, RLS, grant va SECURITY DEFINER funksiyalar matni `12-db-sxema.md` §2.11, §4.2, §4.4, §4.5 bilan aynan bir xil; DDL matnida farq topilsa `12` ustun.
 
 ```mermaid
 erDiagram
@@ -1396,7 +1396,7 @@ Voqea kodlari: `agent.paired`, `agent.online`, `agent.offline`, `agent.revoked`,
 
 ### 5.20 `onec_agent_logs`
 
-**Maqsad:** agent `POST /onec-agent/logs` (A-06) bilan yuborgan maskalangan log yozuvlari (sirlar agentda maskalanadi; server ham `Pwd=`, `Bearer`, `client_assertion` naqshlarini qayta maskalaydi).
+**Maqsad:** agent `POST /onec-agent/logs` (A-06) bilan yuborgan maskalangan log yozuvlari (sirlar agentda maskalanadi; server ham `Pwd=`, `Bearer`, `client_assertion`, JWT va karta raqamiga o'xshash raqamlar naqshlarini qayta maskalaydi). Do'kon agenti umumiy registriga tegishli (A-06, W-08 — Bosqich 5): jadval `0028a fiscal_edocs` da yaratiladi, `base_id` FK'i (`fk_onec_logs_base`) — `0029` da; Bosqich 5 da `base_id` doim `NULL`.
 
 ```sql
 CREATE TABLE app.onec_agent_logs (
@@ -1404,7 +1404,7 @@ CREATE TABLE app.onec_agent_logs (
   tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
   agent_id        UUID NOT NULL REFERENCES app.onec_agents(id),
   client_log_id   UUID NOT NULL,          -- agent beradi (takror yuborishda dedupe)
-  base_id         UUID NULL REFERENCES app.onec_bases(id),
+  base_id         UUID NULL,              -- FK fk_onec_logs_base (0029)
   task_id         UUID NULL,
   at              TIMESTAMPTZ NOT NULL,   -- agent vaqti (server_time ofseti bilan tuzatilgan)
   level           TEXT NOT NULL CHECK (level IN ('debug','info','warn','error')),
@@ -2212,7 +2212,7 @@ Muvaffaqiyatli tuzatishdan keyin asl `onec_object_refs.content_snapshot` **o'zga
 | Xato | `17` §7 konverti `{"error":{code, message_key, params, details, request_id}}` |
 | Tenant | Faqat tokendan (`tenant_id`, `agent_id`); so'rov tanasidagi tenant/agent maydonlari e'tiborga olinmaydi |
 | Hajm chegarasi | So'rov ≤ 10 MB (gzip'dan keyin), A-07 fayl ≤ 20 MB |
-| Protokol versiyasi | Server `2` ni qo'llaydi (A-01 `capabilities` bilan, qaror #66); qo'llanmaydigan versiya yoki `agent_version < min_agent_version` → `426 ONEC_AGENT_UPDATE_REQUIRED` |
+| Protokol versiyasi | Server `2` ni qo'llaydi (A-01 `capabilities` bilan, qaror #66); A-01 `hello` va A-03 `poll` da `X-Agent-Protocol` yo'q/qo'llanmaydigan yoki `X-Agent-Version < min_agent_version` → `426 ONEC_AGENT_UPDATE_REQUIRED` (A-04…A-10 tekshirilmaydi: lease'dagi ish tugaydi, A-09 yangilanish uchun ochiq qoladi) |
 | Obuna lokauti (qaror #15) | `restricted`/`closed` tenant agentiga token beriladi (§9.2), cheklovni agent API qo'llaydi. **Rad** (`403 SUBSCRIPTION_RESTRICTED`): A-01 `hello`, A-02 `bases`, A-03 `poll` — yangi baza va yangi vazifa yo'q. **Ruxsat**: A-04 `heartbeat`, A-05 `result`, A-06 `logs` (lease'dagi yozish yarim qolmasin, natija va loglar yetib borsin), A-07 `diagnostics` (qo'llab-quvvatlash), A-08 `task-keys` (lease'dagi vazifa imzosini tekshirish), A-09 `update-manifest` (xavfsizlik yangilanishi), A-10 `unpair` (o'chirish). Agent `403` dan keyin faqat `hello` ni har 600 s takrorlaydi (§9.9) |
 | Vaqt | Agent `hello.server_time` dan ofset hisoblaydi; imzo `exp` tekshiruvi tuzatilgan vaqt bilan, ±120 s tolerans |
 
@@ -2253,7 +2253,7 @@ sequenceDiagram
 | `pc_name` | ha | ≤ 64 belgi |
 | `os_version`, `agent_version` | yo'q | satr |
 
-Javob `200`: `{"device_code":"<43 belgi base64url, 256 bit>","user_code":"WDJB-MJHT","verification_uri":"https://<domen>/app/settings/onec/pair","verification_uri_complete":"https://<domen>/app/settings/onec/pair?user_code=WDJBMJHT","expires_in":600,"interval":5}`. `user_code` — RFC 8628 alifbosi `BCDFGHJKLMNPQRSTVWXZ`, 8 belgi, ko'rsatishda `XXXX-XXXX`, kiritishda chiziqcha olib tashlanadi va katta harfga o'tkaziladi. Rate limit: IP bo'yicha 10/soat (`429 RATE_LIMITED`).
+Javob `200`: `{"device_code":"<43 belgi base64url, 256 bit>","user_code":"WDJB-MJHT","verification_uri":"https://<domen>/app/settings/onec/pair","verification_uri_complete":"https://<domen>/app/settings/onec/pair?user_code=WDJBMJHT","expires_in":600,"interval":5}`. `user_code` — RFC 8628 alifbosi `BCDFGHJKLMNPQRSTVWXZ`, 8 belgi, ko'rsatishda `XXXX-XXXX`, kiritishda chiziqcha olib tashlanadi va katta harfga o'tkaziladi. Rate limit: IP bo'yicha 10/soat — `429 {"error":"slow_down","error_description":"rate_limited"}` + `Retry-After` (OAuth endpoint'i RFC 6749 xato tanasini qaytaradi, `/oauth/token` limiti bilan bir xil). Xatolar: `400 invalid_request` (`error_description` — maydon nomi), `400 invalid_client`, `400 invalid_scope`. Manba: RFC 8628 §3.1–§3.5 (https://www.rfc-editor.org/rfc/rfc8628), RFC 7523 (https://www.rfc-editor.org/rfc/rfc7523).
 
 **`POST /oauth/token` — device grant:** `grant_type=urn:ietf:params:oauth:grant-type:device_code`, `device_code`, `client_id=onec-agent`. Xatolar (RFC 8628, `400 {"error": …}`): `authorization_pending`, `slow_down` (agent `interval += 5`), `expired_token`, `access_denied`. Muvaffaqiyat: `{"access_token":"…","token_type":"Bearer","expires_in":600,"scope":"onec.agent","agent_id":"…","agent_client_id":"onec-agent:<agent_id>","tenant_name":"…","task_keyset":"<JWS, §9.4>"}`.
 
@@ -2416,9 +2416,11 @@ O'chirishda (uninstall) yoki agent oynasidagi «Uzish». So'rov `{"reason": "uni
 | Claims | `iss = "urn:erp:onec"`, `aud = "urn:erp:onec-agent:<agent_id>"`, `tid` (task_id), `att` (attempt), `lid` (lease_id), `ten` (tenant_id), `aid` (agent_id), `bid` (base_id yoki `null`), `knd` (kind), `psh` (payload_sha256), `iat`, `exp = leased_at + timeout_s + 300` |
 | `payload_sha256` | `SHA-256(JCS(payload))` (RFC 8785), hex |
 
-**Vazifa kalitlari to'plami** (`task_keyset`) — agent `onec_task` ochiq kalitlariga qanday ishonadi: JWS, header `{"alg":"EdDSA","typ":"onec-task-keyset+jwt","kid":"<agent_update kid>"}`, payload `{"ver":3,"iat":…,"exp":iat+180 kun,"keys":[{"kid":"…","kty":"OKP","crv":"Ed25519","x":"…","nbf":…,"exp":…}]}` — **`agent_update` ildiz kaliti** bilan imzolanadi (kalit oflayn saqlanadi, CI'da emas; `onec_task` rotatsiyasida to'plam qo'lda qayta imzolanadi). Agent binariga `agent_update` ildiz ochiq kalitlari (joriy + keyingi) joylanadi. Agent to'plamning `ver`ini pasaytirmaydi (eski to'plam qabul qilinmaydi); noma'lum `kid` kelsa bir marta A-08 so'raydi, baribir topilmasa vazifani rad etadi. TLS buzilsa (AV/proksi MITM) ham soxta vazifa bajarilmaydi.
+**Vazifa kalitlari to'plami** (`task_keyset`) — agent `onec_task` ochiq kalitlariga qanday ishonadi: JWS, header `{"alg":"EdDSA","typ":"onec-task-keyset+jwt","kid":"<agent_update kid>"}` (`agent_update` kid — ildiz ochiq JWK'sining RFC 7638 thumbprint'i), payload `{"ver":3,"iat":…,"exp":iat+180 kun,"keys":[{"kid":"…","kty":"OKP","crv":"Ed25519","x":"…","nbf":…,"exp":…}]}` — **`agent_update` ildiz kaliti** bilan imzolanadi (kalit oflayn saqlanadi, CI'da emas; `onec_task` rotatsiyasida to'plam qo'lda qayta imzolanadi). Agent binariga `agent_update` ildiz ochiq kalitlari (joriy + keyingi) joylanadi. Agent to'plamning `ver`ini pasaytirmaydi (eski to'plam qabul qilinmaydi); noma'lum `kid` kelsa bir marta A-08 so'raydi, baribir topilmasa vazifani rad etadi. TLS buzilsa (AV/proksi MITM) ham soxta vazifa bajarilmaydi.
 
 **Yangilanish manifesti** — xuddi shu `agent_update` kaliti (A-09).
+
+**Ildiz kalit serverda yo'q:** `agent_update` maxfiy kaliti `platform.signing_keys` ga yozilmaydi. Ops CLI (`scripts/auth_ops.py`: `gen-agent-root-key` — oflayn kompyuterda, `sign-task-keyset`, `publish-agent-manifest`) kalitni fayldan o'qib imzolaydi va faqat natijani `platform.agent_signed_artifacts` ga (`0028a`, 12 §2.1) yozadi; server A-08/A-09, `hello` va device grant javobida shu oldindan imzolangan artefaktlarni beradi. `onec_task` kaliti esa `signing_keys` da (`rotate-signing-key --purpose onec_task`), har rotatsiyadan keyin `sign-task-keyset` qayta ishga tushiriladi. Manbalar: RFC 7515 (JWS), RFC 8037 (EdDSA/OKP), RFC 7638 (JWK thumbprint), RFC 8785 (JCS).
 
 ### 9.5 Vazifa turlari (oq ro'yxat)
 
@@ -2442,7 +2444,7 @@ Agent faqat shu 13 turni biladi; boshqasi → `ONEC_TASK_REJECTED`. **`delete` (
 
 `Target = {"meta_kind": "Document"|"Catalog", "meta_name": "…", "guid": "…"}`.
 
-**Do'kon agenti kengaytmasi (qaror #60, Bosqich 5).** Yuqoridagi 13 tur — 1C modulining oq ro'yxati, u o'zgarmaydi; 1C protokoli (§9) ham o'zgarmaydi. Xuddi shu agent va shu bulut kanali (A-01…A-10, imzoli vazifa, lease) orqali server navbatga qo'yadigan Do'kon agenti xizmat vazifalari — alohida oila oq ro'yxati, `base_id = null` (1C bazasi talab qilinmaydi), agent `hello` da modulni e'lon qilgandagina (`capabilities.<oila>.enabled = true`, aks holda `AgentTaskPort.enqueue` → `409 AGENT_CAPABILITY_DISABLED`): `fiscal.status`, `fiscal.resend_unsent`, `fiscal.zreport`, `print.raw`, `scale.plu_upload` (MVP'dan keyin), `card.status`, `card.settlement` (karta terminali, qaror #71). Bu vazifalar `purpose='device_service'` (§5.15 CHECK'lari: `kind` nuqtali ⇔ `purpose='device_service'`, `base_id IS NULL`). Payload'lar: `fiscal.status` / `fiscal.resend_unsent` — `{cash_register_id}`; `fiscal.zreport` — `{cash_register_id, shift_id}`; `print.raw` — `{printer_local_id, data_base64, encoding: "cp866"|"raster"}`; `scale.plu_upload` — `{scale_local_id, items:[{plu, name, price, barcode_prefix}]}`; `card.status` va `card.settlement` payload/natijalari — `21` §16. Natija `fiscal.status` — `{cash_register_id, fm_state, pending_count, oldest_unacked_at, acked:[{fm_terminal_id, fm_receipt_seq, acked_at}]}` → `cash_registers.fm_state`, `fm_receipts_pending`, `last_unacked_receipt_at`, `acked[]` → `fiscal_receipts.ofd_acked_at`. Kassa bog'lanishi — `cash_registers.fiscal_agent_id` + `fiscal_local_device_id` (`capabilities.fiscal.devices[].local_id`). Vazifa va natija — `21-integratsiyalar.md` §16, ishlovchi modullar — `23-backend-arxitekturasi.md` §4.2, agent tomoni — `34-1c-agent.md` §14. Agent infratuzilmasining o'zi (A-01, A-03…A-10, ulash, token, imzo, lease, imzoli yangilanish, `0028 store_agent`) Bosqich 5 da quriladi (qaror #66); 1C vazifa turlari, A-02 va `0029 onec_integration` — Bosqich 7. Sotuv paytidagi fiskallashtirish, chek chop etish va tortish — server vazifasi emas: POS ularni agentning lokal API'si (`127.0.0.1`, `Origin` oq ro'yxati + qurilmaga bog'langan token; sxemalar — `21` §16.1) orqali bajaradi.
+**Do'kon agenti kengaytmasi (qaror #60, Bosqich 5).** Yuqoridagi 13 tur — 1C modulining oq ro'yxati, u o'zgarmaydi; 1C protokoli (§9) ham o'zgarmaydi. Xuddi shu agent va shu bulut kanali (A-01…A-10, imzoli vazifa, lease) orqali server navbatga qo'yadigan Do'kon agenti xizmat vazifalari — alohida oila oq ro'yxati, `base_id = null` (1C bazasi talab qilinmaydi), agent `hello` da modulni e'lon qilgandagina (`capabilities.<oila>.enabled = true`, aks holda `AgentTaskPort.enqueue` → `409 AGENT_CAPABILITY_DISABLED`): `fiscal.status`, `fiscal.resend_unsent`, `fiscal.zreport`, `print.raw`, `scale.plu_upload` (MVP'dan keyin), `card.status`, `card.settlement` (karta terminali, qaror #71). Bu vazifalar `purpose='device_service'` (§5.15 CHECK'lari: `kind` nuqtali ⇔ `purpose='device_service'`, `base_id IS NULL`). Lease muddati o'tgan `device_service` vazifasi `expired` bo'ladi va **avtomatik qayta urinilmaydi** (ikkinchi `print.raw` ikki marta chop etmasligi uchun; davriy `fiscal.status`/`card.status` ni egasi modul cron'i qayta qo'yadi, `AgentTaskPort.enqueue(..., dedupe_key)` navbatda to'planishga yo'l qo'ymaydi); kech natija baribir qabul qilinadi. Agent darajasidagi vazifalar (`base_id IS NULL`) bir vaqtda bittadan lease qilinadi (`uq_onec_tasks_one_leased_agent_level`), shuning uchun Bosqich 5 da A-03 javobida ko'pi bilan bitta vazifa bo'ladi. Payload'lar: `fiscal.status` / `fiscal.resend_unsent` — `{cash_register_id, local_id}`; `fiscal.zreport` — `{cash_register_id, local_id, shift_id}` (`local_id` = `cash_registers.fiscal_local_device_id`); `print.raw` — `{printer_local_id, data_base64, encoding: "cp866"|"raster"}`; `scale.plu_upload` — `{scale_local_id, items:[{plu, name, price, barcode_prefix}]}`; `card.status` va `card.settlement` payload/natijalari — `21` §16. Natija `fiscal.status` — `{cash_register_id, fm_state, pending_count, oldest_unacked_at, acked:[{fm_terminal_id, fm_receipt_seq, acked_at}]}` → `cash_registers.fm_state`, `fm_receipts_pending`, `last_unacked_receipt_at`, `acked[]` → `fiscal_receipts.ofd_acked_at`. Kassa bog'lanishi — `cash_registers.fiscal_agent_id` + `fiscal_local_device_id` (`capabilities.fiscal.devices[].local_id`). Vazifa va natija — `21-integratsiyalar.md` §16, ishlovchi modullar — `23-backend-arxitekturasi.md` §4.2, agent tomoni — `34-1c-agent.md` §14. Agent infratuzilmasining o'zi (A-01, A-03…A-10, ulash, token, imzo, lease, imzoli yangilanish, `0028 store_agent`) Bosqich 5 da quriladi (qaror #66); 1C vazifa turlari, A-02 va `0029 onec_integration` — Bosqich 7. Sotuv paytidagi fiskallashtirish, chek chop etish va tortish — server vazifasi emas: POS ularni agentning lokal API'si (`127.0.0.1`, `Origin` oq ro'yxati + qurilmaga bog'langan token; sxemalar — `21` §16.1) orqali bajaradi.
 
 Turlar bo'yicha aniqliklar (agent 34 shu qoidalar bilan ishlaydi):
 
@@ -2768,10 +2770,12 @@ Jami **55** veb endpoint + **10** agent endpoint (§9.3) + OAuth (`/oauth/device
 
 ```json
 // OneCAgent
-{"id":"…","name":"DOKON-PC","pc_name":"DOKON-PC","os_version":"Windows 10 Pro 22H2","agent_version":"1.4.2",
+{"id":"…","device_id":"…","name":"DOKON-PC","pc_name":"DOKON-PC","os_version":"Windows 10 Pro 22H2","agent_version":"1.4.2",
  "worker_bits":[32,64],"platforms":[{"version":"8.3.25.1374","bits":64,"registered":true}],
  "status":"active","online":true,"last_hello_at":"…","last_poll_at":"…","paired_by":"…","paired_by_name":"Aziz",
- "paired_at":"…","update_available":"1.4.3","bases_count":1,"version":3}
+ "paired_at":"…","update_channel":"stable","update_available":"1.4.3",
+ "capabilities":{"fiscal":{"enabled":true,"version":1,"devices":[…]},"…":{}},
+ "revoked_at":null,"revoke_reason":null,"bases_count":1,"version":3}
 // OneCBase
 {"id":"…","agent_id":"…","agent_name":"DOKON-PC","name":"Do'kon BP","connect_kind":"file","connect_display":"D:\\1C\\Shop",
  "auth_kind":"password","onec_user_name":"ERP integratsiya","config_name":"…","config_synonym":"…","config_version":"3.0.64.8",
@@ -2881,7 +2885,7 @@ Jami **55** veb endpoint + **10** agent endpoint (§9.3) + OAuth (`/oauth/device
 | Maqsad | `collect_diagnostics` vazifasi — qo'llab-quvvatlash uchun log paketi |
 | Ruxsat | `onec.settings.manage` |
 | So'rov | `{include_logs_days: 1..7}` |
-| Javob | `202 {task_id, warnings}`; tayyor bo'lgach W-08 da `code='diagnostics_ready'` yozuvi, `context.attachment_id`; vazifaning `created_by` = so'rovchi (A-07 `attachments.uploaded_by`); agent jim bo'lsa `warnings: [ONEC_AGENT_OFFLINE]` (W-06 kabi) |
+| Javob | `202 {task_id, warnings}`; vazifa `purpose='diagnostics'`, `priority=10`, `expires_at` = 1 soat; tayyor bo'lgach (A-07 yuklash + A-05 `{attachment_id}`) W-08 da `code='diagnostics_ready'` yozuvi, `context.attachment_id`; vazifaning `created_by` = so'rovchi (A-07 `attachments.uploaded_by`); agent jim bo'lsa `warnings: [ONEC_AGENT_OFFLINE]` (W-06 kabi) |
 | Xatolar | — |
 | Idempotentlik | Majburiy |
 | Offline | Yo'q |
@@ -2894,7 +2898,7 @@ Jami **55** veb endpoint + **10** agent endpoint (§9.3) + OAuth (`/oauth/device
 | Maqsad | Agent loglari + server voqealari (BO-22 «Jurnal») |
 | Ruxsat | `onec.view` |
 | So'rov | `?level__in=warn,error&base_id=&at__gte=&cursor=&limit=` |
-| Javob | `200 {items:[{id, at, level, code, message, message_key, base_id, task_id, context, source: "agent"\|"server"}], next_cursor}` (`onec_agent_logs` ∪ `onec_events`). Birlashtirish xaritasi: `level` — server voqeasida `warning → warn` (yagona to'plam `debug`/`info`/`warn`/`error`; `level__in` filtri shu to'plamda); `message_key` — server voqeasida `onec_events.message_key`, agent logida `null` (`message` — agent matni); `context` — agent logida `context`, server voqeasida `params`; diagnostika tayyor — `code='diagnostics_ready'`, `context.attachment_id` |
+| Javob | `200 {items:[{id, at, level, code, message, message_key, base_id, task_id, context, source: "agent"\|"server"}], next_cursor}` (`onec_agent_logs` ∪ `onec_events`). Birlashtirish xaritasi: `level` — server voqeasida `warning → warn` (yagona to'plam `debug`/`info`/`warn`/`error`; `level__in` filtri shu to'plamda); `message_key` — server voqeasida `onec_events.message_key`, agent logida `null` (`message` — agent matni); `context` — agent logida `context`, server voqeasida `params`; diagnostika tayyor — `code='diagnostics_ready'`, `context.attachment_id`. Bosqich 5 da (`onec_events` — `0029`) server voqeasi sifatida faqat `diagnostics_ready` qaytadi — u `collect_diagnostics` vazifasining `done` natijasidan (`onec_task_results.data.attachment_id`, `at = received_at`) olinadi; tartib `at DESC, id DESC`, cursor `(at, id)` |
 | Xatolar | — |
 | Idempotentlik | Kerak emas |
 | Offline | Yo'q |

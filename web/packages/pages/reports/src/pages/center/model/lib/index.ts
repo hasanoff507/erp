@@ -98,6 +98,9 @@ const DATA_REPORTS: readonly DataReportKey[] = [
   "profit-and-loss",
   "discounts",
   "debts-aging",
+  "trial-balance",
+  "balance-sheet",
+  "stock-as-of",
 ];
 
 export function isDataReport(key: ReportKey | null): key is DataReportKey {
@@ -136,7 +139,22 @@ export function reportRequest(
       return { kind: "discounts", range, branchId, groupBy: options.discountsGroupBy };
     case "debts-aging":
       return { kind: "debts-aging", asOf: range.to, branchId, direction: options.agingDirection };
+    case "trial-balance":
+      return { kind: "trial-balance", period: range.to.slice(0, 7), branchId };
+    case "balance-sheet":
+      return { kind: "balance-sheet", asOf: range.to, branchId };
+    case "stock-as-of":
+      return { kind: "stock-as-of", asOf: range.to, branchId };
   }
+}
+
+/**
+ * «Sinov balansi» is monthly (20 #11 `?period=YYYY-MM`): choosing a month sets the range to that month (up to
+ * today for the current month).
+ */
+export function monthRange(month: string, today: string): DateRange {
+  const last = dayjs(`${month}-01`).endOf("month").format("YYYY-MM-DD");
+  return { from: `${month}-01`, to: last < today ? last : today };
 }
 
 /** Stable identity of a request (answers to an older request are dropped). */

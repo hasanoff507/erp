@@ -14,4 +14,11 @@ export interface ReturnLineIn {
      * @pattern ^-?\d{1,15}\.\d{3}$
      */
   qty: string;
+  /**
+     * Marked products: exactly qty in-stock codes
+     * @maxItems 100000
+     * @items.minLength 1
+     * @items.maxLength 512
+     */
+  marking_codes?: string[];
 }

@@ -16,8 +16,10 @@ from sqlalchemy import RowMapping, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.integrations.card_terminal.application.ports import (
+    AgentRow,
     OrphanRow,
     SettlementRow,
+    SweepTerminal,
     TerminalFilter,
     TerminalRow,
     TxRow,
@@ -66,6 +68,69 @@ def _placeholder(column: str) -> str:
 
 
 class SqlCardRepository:
+    # --- Do'kon agent (0028 store_agent, read-only) ---------------------------------------------------
+    async def agent(self, s: AsyncSession, agent_id: UUID) -> AgentRow | None:
+        row = (
+            (
+                await s.execute(
+                    text("SELECT id, device_id, status, capabilities FROM app.onec_agents WHERE id = :id"),
+                    {"id": agent_id},
+                )
+            )
+            .mappings()
+            .first()
+        )
+        return None if row is None else AgentRow(**row)
+
+    async def agent_terminals(self, s: AsyncSession, agent_id: UUID) -> list[TerminalRow]:
+        rows = (
+            await s.execute(
+                text(
+                    f"SELECT {_TERMINAL_COLS} FROM app.card_terminals WHERE agent_id = :a "
+                    "AND adapter = 'agent_ecr' AND status <> 'archived' ORDER BY id"
+                ),
+                {"a": agent_id},
+            )
+        ).mappings()
+        return [_terminal(r) for r in rows]
+
+    async def settlement_sweep_terminals(self, s: AsyncSession, business_date: date) -> list[SweepTerminal]:
+        """23 §4.2 ``card_settlement_sweep``: active ``agent_ecr`` terminals of active agents with the
+        ``card_terminal`` capability and no settlement of ``business_date`` yet."""
+        rows = (
+            await s.execute(
+                text(
+                    "SELECT t.id, t.agent_id, t.local_id, t.branch_id FROM app.card_terminals t "
+                    "JOIN app.onec_agents a ON a.id = t.agent_id "
+                    "WHERE t.adapter = 'agent_ecr' AND t.status = 'active' AND a.status = 'active' "
+                    "AND COALESCE((a.capabilities -> 'card_terminal' ->> 'enabled')::boolean, false) "
+                    "AND NOT EXISTS (SELECT 1 FROM app.card_terminal_settlements c "
+                    "WHERE c.card_terminal_id = t.id AND c.business_date = :d) ORDER BY t.id"
+                ),
+                {"d": business_date},
+            )
+        ).mappings()
+        return [SweepTerminal(**r) for r in rows]
+
+    async def status_sweep_agents(self, s: AsyncSession) -> list[UUID]:
+        rows = await s.execute(
+            text(
+                "SELECT DISTINCT a.id FROM app.onec_agents a JOIN app.card_terminals t ON t.agent_id = a.id "
+                "WHERE a.status = 'active' AND t.adapter = 'agent_ecr' AND t.status = 'active' "
+                "AND COALESCE((a.capabilities -> 'card_terminal' ->> 'enabled')::boolean, false) "
+                "ORDER BY a.id"
+            )
+        )
+        return [r[0] for r in rows]
+
+    async def update_health(self, s: AsyncSession, terminal_id: UUID, health_status: str) -> None:
+        await s.execute(
+            text(
+                "UPDATE app.card_terminals SET health_status = :h, health_checked_at = now() WHERE id = :id"
+            ),
+            {"h": health_status, "id": terminal_id},
+        )
+
     # --- terminals ----------------------------------------------------------------------------------
     async def terminal(self, s: AsyncSession, terminal_id: UUID, *, lock: bool = False) -> TerminalRow | None:
         sql = f"SELECT {_TERMINAL_COLS} FROM app.card_terminals WHERE id = :id" + (

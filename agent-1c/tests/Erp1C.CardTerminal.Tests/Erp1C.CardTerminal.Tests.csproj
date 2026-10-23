@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Erp1C.CardTerminal.Tests</RootNamespace>
+    <AssemblyName>Erp1C.CardTerminal.Tests</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Erp1C.CardTerminal\Erp1C.CardTerminal.csproj" />
+    <ProjectReference Include="..\..\src\Erp1C.CardTerminal.Drivers.Fake\Erp1C.CardTerminal.Drivers.Fake.csproj" />
+  </ItemGroup>
+</Project>

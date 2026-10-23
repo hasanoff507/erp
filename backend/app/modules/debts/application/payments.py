@@ -646,7 +646,9 @@ class DebtPaymentHandler:
             and found["provider"] == p.method
             and found["cash_register_id"] == p.cash_register_id
             and money(found["amount"]) == amount
-            and (found["provider_tx_id"] is None or found["provider_tx_id"] == p.provider_tx_id)
+            # a confirmed checkout always carries the provider transaction it was paid by (18 §16.4)
+            and found["provider_tx_id"] is not None
+            and found["provider_tx_id"] == p.provider_tx_id
         )
         if not ok:
             raise AppError(ErrorCode.PAYMENT_NOT_CONFIRMED, params={"checkout_ref": str(p.checkout_ref)})

@@ -17,6 +17,7 @@ from starlette.responses import JSONResponse, Response
 from app.core.ratelimit import hit
 from app.modules.auth.api.deps import auth_module
 from app.modules.auth.api.login_page import OAUTH_PARAMS, UI_LOCALES_PARAM, render_login
+from app.modules.auth.application.agent_grants import AGENT_SCOPE, DEVICE_CODE_GRANT
 from app.modules.auth.application.gateway import request_meta
 from app.modules.auth.application.login import LoginError
 from app.modules.auth.application.oauth_server import ErpOAuth2Request, OAuthResponse
@@ -96,13 +97,25 @@ async def metadata(request: Request) -> JSONResponse:
         "introspection_endpoint": f"{issuer}/oauth/introspect",
         "response_types_supported": ["code"],
         "response_modes_supported": ["query"],
-        # Bosqich 0 advertises only what is implemented (client_credentials/device_code: Bosqich 5)
-        "grant_types_supported": ["authorization_code", "refresh_token"],
+        # client_credentials (+ private_key_jwt) and device_code: the store agent only (14 §2.3)
+        "grant_types_supported": [
+            "authorization_code",
+            "refresh_token",
+            "client_credentials",
+            DEVICE_CODE_GRANT,
+        ],
+        "device_authorization_endpoint": f"{issuer}/oauth/device_authorization",
         "code_challenge_methods_supported": ["S256"],
-        "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post", "none"],
+        "token_endpoint_auth_methods_supported": [
+            "client_secret_basic",
+            "client_secret_post",
+            "none",
+            "private_key_jwt",
+        ],
+        "token_endpoint_auth_signing_alg_values_supported": ["EdDSA"],
         "revocation_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post", "none"],
         "introspection_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
-        "scopes_supported": sorted(IMPLICIT_SCOPES),
+        "scopes_supported": sorted({*IMPLICIT_SCOPES, AGENT_SCOPE}),
     }
     AuthorizationServerMetadata(data).validate()
     return JSONResponse(data, headers={"Cache-Control": "public, max-age=300"})
@@ -195,7 +208,23 @@ async def token(request: Request) -> Response:
         response = _oauth_error("slow_down", "rate_limited", 429)
         response.headers["Retry-After"] = str(retry_after)
         return response
+    agent_form = {k: v for k, v in form.items() if isinstance(v, str)}
+    if module.agent_grants.handles(agent_form):  # store agent: device code / private_key_jwt (14 §2.3)
+        status, body, headers = await module.agent_grants.token(agent_form)
+        return to_response((status, body, list(headers.items())))
     return to_response(await module.server.token(_oauth_request(request, form)))
+
+
+@router.post(
+    "/oauth/device_authorization", operation_id="oauth_device_authorization", include_in_schema=False
+)
+async def device_authorization(request: Request) -> Response:
+    """RFC 8628 §3.1 — only ``client_id=onec-agent`` (14 §2.3, 33 §9.2); 10 requests / IP / hour."""
+    module = auth_module(request)
+    form = await request.form()
+    fields = {k: v for k, v in form.items() if isinstance(v, str)}
+    status, body, headers = await module.agent_grants.device_authorization(fields, request_meta(request).ip)
+    return to_response((status, body, list(headers.items())))
 
 
 @router.post("/oauth/revoke", operation_id="oauth_revoke", include_in_schema=False)

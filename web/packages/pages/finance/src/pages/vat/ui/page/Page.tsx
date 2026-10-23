@@ -3,8 +3,10 @@
  * of the «QQS va davlat hisoboti» section (06 §1.9; the neighbouring «Davlat hisoboti bilan solishtirish»
  * tab is BO-10). Bosqich 3 part: period (month or quarter, summed on the client), tax-regime chip,
  * KPI cards from `GET /reports/vat-summary` (20 #1) and the «QQS registri» from `GET /vat-moves` (20 #2).
- * Bosqich 4: the «Soliq hisob-kitobi (ST)» card (tax-settlement/, 20 #8a–#8d). Risky inbound e-invoices and
- * the BO-10 difference banner are later stages (e-invoices, state reports).
+ * Bosqich 4: the «Soliq hisob-kitobi (ST)» card (tax-settlement/, 20 #8a–#8d). Bosqich 5: «Riskli kiruvchi
+ * e-fakturalar» (20 #1 `pending_credit_invoices[]`, US-M10-03), the pending credit sum, the ST card's
+ * «o'tkazishdan keyingi 6410 qoldig'i» (20 #11). BO-10 has its own route; live upload/compare actions depend on
+ * the state-report API contract in `20` #3–#8, which is not yet present in backend OpenAPI.
  * Offline: view only. useEffect only fires pageMounted (24 §2).
  */
 import { useUnit } from "effector-react";
@@ -45,7 +47,9 @@ import {
 } from "../../model/index.ts";
 import { SummaryCards } from "../kpis/SummaryCards.tsx";
 import { MovesTable } from "../moves/MovesTable.tsx";
+import { taxBalanceEnabled } from "../../tax-settlement/model/index.ts";
 import { TaxSettlementCard } from "../../tax-settlement/ui/TaxSettlementCard.tsx";
+import { RedInvoices } from "../red-invoices/RedInvoices.tsx";
 
 const MONTH_KEYS = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"] as const;
 
@@ -82,7 +86,13 @@ function SectionTabs() {
 function VatPage() {
   const { t } = useTranslation("finance");
   const canView = useCan({ permission: "tax.vat.view" });
-  const [mounted, onPeriod, reload] = useUnit([pageMounted, periodChanged, summaryReloadRequested]);
+  const canFinance = useCan({ permission: "reports.finance.view" });
+  const [mounted, onPeriod, reload, enableBalance] = useUnit([
+    pageMounted,
+    periodChanged,
+    summaryReloadRequested,
+    taxBalanceEnabled,
+  ]);
   const [today, period, summary, status, error, online] = useUnit([
     $today,
     $period,
@@ -93,8 +103,10 @@ function VatPage() {
   ]);
 
   useEffect(() => {
-    if (canView) mounted({ today: dayjs().format("YYYY-MM-DD") });
-  }, [mounted, canView]);
+    if (!canView) return;
+    enableBalance(canFinance);
+    mounted({ today: dayjs().format("YYYY-MM-DD") });
+  }, [mounted, enableBalance, canView, canFinance]);
 
   if (!canView || error?.status === 403) return <NoPermissionState />;
 
@@ -158,6 +170,7 @@ function VatPage() {
             </Banner>
           ) : null}
           <SummaryCards />
+          <RedInvoices />
         </>
       )}
 

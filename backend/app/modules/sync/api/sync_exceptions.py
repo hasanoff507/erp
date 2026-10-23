@@ -44,6 +44,7 @@ ExceptionKind = Literal[
     "approval_limit_exceeded_offline", "receipt_seq_conflict", "debt_overpayment_offline",
     "debt_allocation_mismatch", "late_in_closed_period", "cost_unknown", "count_late_move",
     "card_result_mismatch", "card_orphan_transaction", "actor_unverified", "late_in_closed_shift",
+    "marking_code_duplicate",
 ]  # fmt: skip
 
 

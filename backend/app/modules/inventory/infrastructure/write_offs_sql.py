@@ -37,11 +37,12 @@ class SqlWriteOffRepository:
             text(
                 "INSERT INTO app.write_off_lines (id, tenant_id, write_off_id, line_no, product_id, "
                 "lot_id, qty, "
-                "reason, gift_kind) VALUES (:id, :tenant_id, :write_off_id, :line_no, :product_id, "
+                "reason, gift_kind, marking_codes) VALUES (:id, :tenant_id, :write_off_id, :line_no, "
+                ":product_id, "
                 ":lot_id, :qty, "
-                ":reason, :gift_kind)"
+                ":reason, :gift_kind, CAST(:marking_codes AS text[]))"
             ),
-            [dict(x) for x in lines],
+            [{"marking_codes": [], **dict(x)} for x in lines],
         )
 
     async def _lines(self, s: AsyncSession, ids: Sequence[UUID]) -> dict[UUID, list[WriteOffLine]]:
@@ -52,7 +53,8 @@ class SqlWriteOffRepository:
             text(
                 "SELECT l.write_off_id, l.id, l.line_no, l.product_id, p.name, l.lot_id, lot.expiry_date, "
                 "l.qty, "
-                "l.reason, l.gift_kind, l.cost_amount FROM app.write_off_lines l "
+                "l.reason, l.gift_kind, l.cost_amount, l.marking_codes, p.is_marked FROM "
+                "app.write_off_lines l "
                 "JOIN app.products p ON p.id = l.product_id LEFT JOIN app.stock_lots lot ON lot.id = "
                 "l.lot_id "
                 "WHERE l.write_off_id = ANY(CAST(:ids AS uuid[])) ORDER BY l.write_off_id, l.line_no"
@@ -60,8 +62,20 @@ class SqlWriteOffRepository:
             {"ids": [str(i) for i in ids]},
         )
         for r in rows:
-            out.setdefault(r[0], []).append(WriteOffLine(*r[1:]))
+            line = WriteOffLine(
+                r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], tuple(r[11] or ()), bool(r[12])
+            )
+            out.setdefault(r[0], []).append(line)
         return out
+
+    async def marked_products(self, s: AsyncSession, product_ids: Sequence[UUID]) -> set[UUID]:
+        if not product_ids:
+            return set()
+        rows = await s.execute(
+            text("SELECT id FROM app.products WHERE id = ANY(CAST(:ids AS uuid[])) AND is_marked"),
+            {"ids": [str(i) for i in product_ids]},
+        )
+        return {r[0] for r in rows}
 
     async def get(self, s: AsyncSession, doc_id: UUID, *, lock: bool = False) -> WriteOff | None:
         sql = f"SELECT {_HEAD} FROM app.write_offs WHERE id = :id" + (" FOR UPDATE" if lock else "")  # noqa: S608

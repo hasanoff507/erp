@@ -17,4 +17,5 @@ export interface WriteOffLineOut {
   reason: string;
   gift_kind: string | null;
   cost_amount: string;
+  marking_codes: string[];
 }

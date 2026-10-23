@@ -1,0 +1,25 @@
+{
+  "description": "A-09 response (33 §9.3, 34 §4.4): Ed25519 over base64-decoded `manifest` bytes (not re-serialised) with the root key `kid`.",
+  "root_kid": "FtIu-VbGrfe_KB6CH7GNwODB72MNxj_ml11dEvO-7kk",
+  "response": {
+    "manifest": "ewogInByb2R1Y3QiOiAiZXJwLW9uZWMtYWdlbnQiLAogInZlcnNpb24iOiAiMS40LjMiLAogImNoYW5uZWwiOiAic3RhYmxlIiwKICJ1cmwiOiAiaHR0cHM6Ly9lcnAuZXhhbXBsZS51ei9kb3dubG9hZHMvZXJwLW9uZWMtYWdlbnQtMS40LjMtc2V0dXAuZXhlIiwKICJzaGEyNTYiOiAiOWRhOWZmZWU2MjEzNTFjNTlhM2RmZDNlMzUyMGZjNGEwMmM2OTIwODk4MDA4OGFkODYzY2U3Zjc4MWY5NjFlNiIsCiAic2l6ZSI6IDUyNDI4ODAsCiAibWluX29zIjogIjYuMS43NjAxIiwKICJtaW5fcHJvdG9jb2wiOiAxLAogInJvbGxvdXRfcGN0IjogMTAwLAogInJlbGVhc2VkX2F0IjogIjIwMjYtMTAtMTRUMTA6MDA6MDBaIiwKICJub3Rlc191eiI6ICJYYXRvbGFyIHR1emF0aWxkaSIsCiAibm90ZXNfcnUiOiAi0JjRgdC/0YDQsNCy0LvQtdC90Ysg0L7RiNC40LHQutC4Igp9",
+    "signature": "1fcHas1TQg95piSnRktB40eRByOCLa+078u7fdJ3Qxh+095CYgE2P4w6+GEJwWHHFLJun9yru95BhWYArW1vCw==",
+    "kid": "FtIu-VbGrfe_KB6CH7GNwODB72MNxj_ml11dEvO-7kk"
+  },
+  "expected_manifest": {
+    "product": "erp-onec-agent",
+    "version": "1.4.3",
+    "channel": "stable",
+    "url": "https://erp.example.uz/downloads/erp-onec-agent-1.4.3-setup.exe",
+    "sha256": "9da9ffee621351c59a3dfd3e3520fc4a02c69208980088ad863ce7f781f961e6",
+    "size": 5242880,
+    "min_os": "6.1.7601",
+    "min_protocol": 1,
+    "rollout_pct": 100,
+    "released_at": "2026-10-14T10:00:00Z",
+    "notes_uz": "Xatolar tuzatildi",
+    "notes_ru": "Исправлены ошибки"
+  },
+  "installed_version_older": "1.4.2",
+  "installed_version_same": "1.4.3"
+}

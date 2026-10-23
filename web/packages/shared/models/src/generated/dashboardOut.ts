@@ -23,6 +23,7 @@ export interface DashboardOut {
   avg_receipt: string;
   previous_total_sales: string;
   net_profit: string | null;
+  expenses_total: string | null;
   cash_on_hand: string;
   by_branch: DashboardBranchOut[];
   top_products: DashboardTopOut[];

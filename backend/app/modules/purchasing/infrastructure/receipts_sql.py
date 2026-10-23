@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from decimal import Decimal
@@ -13,7 +14,7 @@ from uuid import UUID
 from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.purchasing.application.ports import DocFilter, ProductRef, ReturnedSoFar
+from app.modules.purchasing.application.ports import DocFilter, EInvoiceSource, ProductRef, ReturnedSoFar
 from app.modules.purchasing.domain.receipts import ZERO, ZERO_QTY, GoodsReceipt, ReceiptLine, Regime
 from app.modules.purchasing.domain.supplier_returns import ReturnLine, SupplierReturn
 
@@ -21,7 +22,7 @@ _GR_UPDATABLE = frozenset(
     {
         "doc_date", "supplier_id", "po_id", "warehouse_id", "branch_id", "paid_immediately", "kind", "source",
         "ettn_ref", "poa_id", "poa_number", "comment", "status", "number", "posted_at", "cancelled_at",
-        "cancelled_by", "cancel_reason",
+        "einvoice_id", "cancelled_by", "cancel_reason",
     }
 )  # fmt: skip
 _SR_UPDATABLE = frozenset({"status", "number", "posted_at", "cancelled_at", "cancelled_by", "cancel_reason"})
@@ -37,13 +38,14 @@ _GR_HEAD = (
     "LEFT JOIN app.counterparties c ON c.id = gr.supplier_id "
     "LEFT JOIN app.users u ON u.id = gr.created_by "
     "LEFT JOIN app.einvoices e ON e.id = gr.einvoice_id "
-    "LEFT JOIN LATERAL (SELECT count(*) AS line_count, sum(round(l.qty * l.cost, 2)) AS net_total, "
+    "LEFT JOIN LATERAL (SELECT count(*) AS line_count, "
+    "  sum(COALESCE(l.net_amount, round(l.qty * l.cost, 2))) AS net_total, "
     "  sum(l.vat_amount) AS vat_total FROM app.receipt_lines l WHERE l.receipt_id = gr.id) t ON true "
 )
 
 _GR_LINES = text(
     "SELECT l.id, l.line_no, l.product_id, l.qty, l.cost, l.vat_rate, l.vat_exemption_code, l.vat_amount, "
-    "l.expiry_date, l.discrepancy_reason, p.name AS product_name, p.unit_code, p.is_marked, "
+    "l.expiry_date, l.discrepancy_reason, l.net_amount, p.name AS product_name, p.unit_code, p.is_marked, "
     "p.marking_group_code, mg.acceptance_deadline AS marking_deadline, lot.id AS lot_id, "
     "lot.qty_left AS lot_qty_left, COALESCE(r.qty, 0) AS returned_qty "
     "FROM app.receipt_lines l "
@@ -65,7 +67,10 @@ _SR_HEAD = (
     "COALESCE((SELECT x.regime FROM app.tenant_tax_regimes x WHERE x.valid_from <= gr.doc_date "
     "  ORDER BY x.valid_from DESC LIMIT 1), 'vat') AS receipt_regime, "
     "COALESCE(t.line_count, 0) AS line_count, COALESCE(t.net_total, 0) AS net_total, "
-    "COALESCE(t.vat_total, 0) AS vat_total "
+    "COALESCE(t.vat_total, 0) AS vat_total, "
+    "EXISTS (SELECT 1 FROM app.ledger_entries le WHERE le.doc_type = 'supplier_returns' AND le.doc_id = "
+    "sr.id "
+    "  AND le.account_kt = '4410' AND le.reversal_of_id IS NULL) AS vat_adjusted "
     "FROM app.supplier_returns sr "
     "JOIN app.goods_receipts gr ON gr.id = sr.receipt_id "
     "LEFT JOIN app.counterparties c ON c.id = sr.supplier_id "
@@ -77,7 +82,7 @@ _SR_HEAD = (
 
 _SR_LINES = text(
     "SELECT l.id, l.line_no, l.receipt_line_id, l.lot_id, rl.product_id, l.qty, l.cost, l.vat_amount, "
-    "p.name AS product_name, p.unit_code "
+    "p.name AS product_name, p.unit_code, l.marking_codes, p.is_marked "
     "FROM app.supplier_return_lines l "
     "JOIN app.receipt_lines rl ON rl.id = l.receipt_line_id "
     "LEFT JOIN app.products p ON p.id = rl.product_id "
@@ -151,7 +156,8 @@ def _return(m: Any, lines: tuple[ReturnLine, ...] = ()) -> SupplierReturn:
         warehouse_id=m["warehouse_id"], reason=m["reason"], comment=m["comment"], created_by=m["created_by"],
         created_by_name=m["created_by_name"], created_at=m["created_at"], updated_at=m["updated_at"],
         posted_at=m["posted_at"], cancelled_at=m["cancelled_at"], cancel_reason=m["cancel_reason"],
-        receipt_regime=m["receipt_regime"], lines=lines, line_count=int(m["line_count"]),
+        receipt_regime=m["receipt_regime"], vat_adjusted=bool(m["vat_adjusted"]), lines=lines,
+        line_count=int(m["line_count"]),
         net_total=Decimal(m["net_total"]), vat_total=Decimal(m["vat_total"]),
     )  # fmt: skip
 
@@ -224,6 +230,7 @@ class SqlGoodsReceiptRepository:
                 lot_id=r.lot_id,
                 lot_qty_left=r.lot_qty_left,
                 returned_qty=Decimal(r.returned_qty) if r.returned_qty else ZERO_QTY,
+                net_amount=r.net_amount,
             )
             for r, mine in zip(line_rows, codes, strict=True)
         )
@@ -243,12 +250,14 @@ class SqlGoodsReceiptRepository:
         await s.execute(
             text(
                 "INSERT INTO app.goods_receipts (id, tenant_id, branch_id, doc_date, supplier_id, po_id, "
-                "warehouse_id, paid_immediately, kind, source, ettn_ref, poa_id, poa_number, created_by, "
-                "comment) "
+                "warehouse_id, paid_immediately, kind, source, einvoice_id, ettn_ref, poa_id, poa_number, "
+                "created_by, comment) "
                 "VALUES (:id, :tenant_id, :branch_id, :doc_date, :supplier_id, :po_id, :warehouse_id, "
-                ":paid_immediately, :kind, :source, :ettn_ref, :poa_id, :poa_number, :created_by, :comment)"
+                ":paid_immediately, :kind, :source, :einvoice_id, :ettn_ref, :poa_id, :poa_number, "
+                ":created_by, "
+                ":comment)"
             ),
-            dict(row),
+            {"einvoice_id": None, **dict(row)},
         )
 
     async def update(self, s: AsyncSession, receipt_id: UUID, values: Mapping[str, Any]) -> None:
@@ -269,11 +278,12 @@ class SqlGoodsReceiptRepository:
             await s.execute(
                 text(
                     "INSERT INTO app.receipt_lines (id, tenant_id, receipt_id, line_no, product_id, qty, "
-                    "cost, vat_rate, vat_exemption_code, vat_amount, expiry_date, discrepancy_reason) "
+                    "cost, vat_rate, vat_exemption_code, vat_amount, expiry_date, discrepancy_reason, "
+                    "net_amount) "
                     "VALUES (:id, :tenant_id, :receipt_id, :line_no, :product_id, :qty, :cost, :vat_rate, "
-                    ":vat_exemption_code, :vat_amount, :expiry_date, :discrepancy_reason)"
+                    ":vat_exemption_code, :vat_amount, :expiry_date, :discrepancy_reason, :net_amount)"
                 ),
-                [dict(r) for r in rows],
+                [{"net_amount": None, **dict(r)} for r in rows],
             )
 
     async def products(self, s: AsyncSession, product_ids: Sequence[UUID]) -> dict[UUID, ProductRef]:
@@ -297,6 +307,69 @@ class SqlGoodsReceiptRepository:
             )
             for r in rows
         }
+
+    async def einvoice_source(self, s: AsyncSession, einvoice_id: UUID) -> EInvoiceSource | None:
+        """The incoming e-invoice a receipt is made from (19 §8 ``from-einvoice``) + its combined e-TTN."""
+        row = (
+            await s.execute(
+                text(
+                    "SELECT e.id, e.direction, e.status, e.counterparty_id, e.doc_date, e.payload, "
+                    "(SELECT x.operator_doc_id FROM app.ettn_documents x WHERE x.einvoice_id = e.id "
+                    "  ORDER BY x.id LIMIT 1) AS ettn_ref, "
+                    "(SELECT g.id FROM app.goods_receipts g WHERE g.einvoice_id = e.id AND g.status <> "
+                    "'cancelled' "
+                    "  ORDER BY g.id LIMIT 1) AS receipt_id "
+                    "FROM app.einvoices e WHERE e.id = :id"
+                ),
+                {"id": einvoice_id},
+            )
+        ).first()
+        if row is None:
+            return None
+        payload = json.loads(row[5]) if isinstance(row[5], str) else (row[5] or {})
+        return EInvoiceSource(row[0], row[1], row[2], row[3], row[4], payload, row[6], row[7])
+
+    async def product_by_code(self, s: AsyncSession, *, barcode: str | None, mxik: str | None) -> UUID | None:
+        """A non-archived product by barcode, else by an MXIK code only one product carries."""
+        if barcode:
+            found = (
+                await s.execute(
+                    text(
+                        "SELECT b.product_id FROM app.product_barcodes b JOIN app.products p ON p.id = "
+                        "b.product_id "
+                        "WHERE b.barcode = :b AND p.archived_at IS NULL"
+                    ),
+                    {"b": barcode},
+                )
+            ).scalar_one_or_none()
+            if found is not None:
+                value: UUID = found
+                return value
+        if mxik:
+            rows = list(
+                await s.execute(
+                    text("SELECT id FROM app.products WHERE mxik_code = :m AND archived_at IS NULL LIMIT 2"),
+                    {"m": mxik},
+                )
+            )
+            if len(rows) == 1:
+                only: UUID = rows[0][0]
+                return only
+        return None
+
+    async def shipped_on(self, s: AsyncSession, receipt_id: UUID) -> date | None:
+        """Dispatch date of a from-einvoice receipt (the e-invoice date) — marking deadline start (19 §8)."""
+        value: date | None = (
+            await s.execute(
+                text(
+                    "SELECT e.doc_date FROM app.goods_receipts g JOIN app.einvoices e ON e.id = "
+                    "g.einvoice_id "
+                    "WHERE g.id = :id"
+                ),
+                {"id": receipt_id},
+            )
+        ).scalar_one_or_none()
+        return value
 
     async def regime_on(self, s: AsyncSession, day: date) -> Regime:
         """``tenant_tax_regimes`` in force on ``day``; no row → VAT payer (the general regime)."""
@@ -415,6 +488,8 @@ class SqlSupplierReturnRepository:
                 vat_amount=r.vat_amount,
                 product_name=r.product_name,
                 unit_code=r.unit_code,
+                marking_codes=tuple(r.marking_codes or ()),
+                is_marked=bool(r.is_marked),
             )
             for r in await s.execute(_SR_LINES, {"id": return_id})
         )
@@ -445,10 +520,11 @@ class SqlSupplierReturnRepository:
         await s.execute(
             text(
                 "INSERT INTO app.supplier_return_lines (id, tenant_id, supplier_return_id, line_no, "
-                "receipt_line_id, lot_id, qty, cost, vat_amount) VALUES (:id, :tenant_id, "
-                ":supplier_return_id, :line_no, :receipt_line_id, :lot_id, :qty, :cost, :vat_amount)"
+                "receipt_line_id, lot_id, qty, cost, vat_amount, marking_codes) VALUES (:id, :tenant_id, "
+                ":supplier_return_id, :line_no, :receipt_line_id, :lot_id, :qty, :cost, :vat_amount, "
+                "CAST(:marking_codes AS text[]))"
             ),
-            [dict(x) for x in lines],
+            [{"marking_codes": [], **dict(x)} for x in lines],
         )
 
     async def returned_so_far(

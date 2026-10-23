@@ -38,6 +38,7 @@ function summary(period: string, patch: Partial<VatSummary> = {}): VatSummary {
     net_vat: "710400.00",
     pending_credit_red_invoices: 1,
     pending_credit_pct: "6.40",
+    pending_credit_invoices: [],
     turnover_base: null,
     turnover_rate_pct: null,
     turnover_amount: null,

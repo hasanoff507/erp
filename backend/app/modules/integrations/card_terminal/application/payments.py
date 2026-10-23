@@ -30,7 +30,10 @@ from app.modules.integrations.card_terminal.application.contracts import (
     SettlementRecorded,
 )
 from app.modules.integrations.card_terminal.application.ports import CardRepository
-from app.modules.integrations.card_terminal.application.schemas import parse_card_result
+from app.modules.integrations.card_terminal.application.schemas import (
+    lenient_card_result,
+    parse_card_result,
+)
 from app.modules.integrations.card_terminal.application.settlements import SettlementWriter
 from app.modules.integrations.card_terminal.application.transactions import (
     APPROVE_PERMISSION,
@@ -40,7 +43,10 @@ from app.modules.integrations.card_terminal.application.transactions import (
 )
 
 _POLICIES: frozenset[str] = frozenset({"allow", "manager_approval", "forbid"})
-DEFAULT_POLICY = "manager_approval"  # 12 tenants.settings: key absent → manager_approval
+DEFAULT_POLICY = "manager_approval"
+_PAN_KEYS: frozenset[str] = frozenset(
+    {"pan", "track", "track2", "cvv", "pin_block", "card_number"}
+)  # 12 tenants.settings: key absent → manager_approval
 
 
 class _SettlementItem(BaseModel):
@@ -187,7 +193,13 @@ class CardPaymentsService:
         actor_user_id: UUID,
         device_id: UUID | None,
     ) -> RecordedCardTx:
-        result = parse_card_result(card_result)
+        malformed: dict[str, Any] | None = None
+        try:
+            result = parse_card_result(card_result)
+        except AppError:  # SYNC-05: the sale already happened — clean up instead of rejecting
+            cleaned, fields = lenient_card_result(card_result)
+            result = parse_card_result(cleaned)  # an unrecoverable required value still fails here
+            malformed = {"reason": "malformed_result", "fields": fields}
         if result.status != "approved" or result.resolved_by == "manager":
             raise invalid("card_result.status", "validation.card_result_required")
         if result.kind != kind:
@@ -205,7 +217,14 @@ class CardPaymentsService:
             s, tenant_id=tenant_id, actor=actor_user_id, terminal=terminal, attempt=attempt, result=result,
             mode="event", doc=(doc_type, doc_id),
         )  # fmt: skip
+        if malformed is not None:
+            raw = {k: v for k, v in card_result.items() if str(k).lower() not in _PAN_KEYS}
+            response = result.model_dump(mode="json", exclude={"slip_text"})
+            response.update(raw_card_result=raw, malformed_fields=malformed["fields"])
+            await self._repo.update_tx(s, applied.tx.id, {"terminal_response": response})
         mismatch = dict(applied.mismatch) if applied.mismatch else None
+        if malformed is not None:
+            mismatch = malformed if mismatch is None else {**mismatch, "malformed_result": malformed}
         if money(result.amount) != money(expected_amount):
             amount_diff = {"reason": "amount", "card_result_amount": result.amount,
                            "payment_amount": money_str(money(expected_amount))}  # fmt: skip

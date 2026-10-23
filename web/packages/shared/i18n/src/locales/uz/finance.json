@@ -222,7 +222,13 @@
       "cancelPosted": "Storno yoziladi — 6410 qoldig'i avvalgi holatiga qaytadi.",
       "back": "Orqaga",
       "close": "Yopish",
-      "createKind": "Qoralama hisoblash — {{kind}}"
+      "createKind": "Qoralama hisoblash — {{kind}}",
+      "balance6410": "O'tkazishdan keyingi 6410 qoldig'i",
+      "taxTypes": {
+        "vat": "QQS",
+        "turnover": "Aylanma solig'i",
+        "other": "Boshqa"
+      }
     },
     "moves": {
       "title": "QQS registri",
@@ -256,6 +262,30 @@
       "write_offs": "Hisobdan chiqarish",
       "supplier_payments": "Yetkazib beruvchiga to'lov",
       "other": "Hujjat"
+    },
+    "red": {
+      "title": "Riskli kiruvchi e-fakturalar",
+      "hint": "Qizil yoki holati noma'lum yetkazib beruvchining fakturasi — QQS krediti to'lovdan keyin, to'langan qismi bo'yicha ochiladi.",
+      "center": "E-faktura markazi",
+      "noNumber": "raqamsiz",
+      "empty": "Krediti kutilayotgan riskli e-faktura yo'q",
+      "columns": {
+        "invoice": "E-faktura · yetkazib beruvchi",
+        "date": "Sana",
+        "risk": "Risk",
+        "total": "Summa",
+        "vat": "QQS",
+        "credited": "Hisobga olingan",
+        "pending": "Kutilayotgan"
+      },
+      "risk": {
+        "red": "Qizil",
+        "unknown": "Noma'lum"
+      },
+      "credit": {
+        "pending": "kredit tasdiqlanmagan",
+        "partial": "qisman ochilgan"
+      }
     }
   },
   "shared": {
@@ -571,5 +601,143 @@
   },
   "reasons": {
     "shift_closed": "Smena yopilgan — naqd hujjatni bekor qilib bo'lmaydi"
+  },
+  "adjustments": {
+    "title": "Tuzatuvchi yozuvlar",
+    "hint": "Qo'lda kiritilgan yozuv faqat joriy ochiq davrda; yopilgan oydagi xato shu yerda tuzatiladi. Bekor qilish — storno.",
+    "new": "Tuzatuvchi yozuv",
+    "dialogTitle": "Tuzatuvchi yozuv",
+    "dialogDescription": "Bitta provodka: Dt hisobi / Kt hisobi = summa. Sana — faqat ochiq davr (boshlang'ich 0000 yozuvi — ish boshlanishidan bir kun oldin).",
+    "branch": "Filial",
+    "branchPlaceholder": "Filialni tanlang",
+    "docDate": "Sana",
+    "docDateHint": "Joriy ochiq davr, bugungacha",
+    "accountDt": "Debet hisobi",
+    "accountKt": "Kredit hisobi",
+    "accountPlaceholder": "Hisobni tanlang",
+    "amount": "Summa",
+    "correctionOfPeriod": "Tuzatilayotgan davr",
+    "correctionHint": "Ixtiyoriy — yopilgan oy",
+    "counterpartySearch": "Kontragentni qidirish",
+    "counterpartySearchPlaceholder": "Ism, telefon yoki STIR",
+    "counterparty": "Kontragent",
+    "counterpartyPlaceholder": "Kontragentni tanlang",
+    "comment": "Izoh",
+    "preview": "Provodka: Dt {{dt}} / Kt {{kt}} = {{amount}}",
+    "submit": "Yozish",
+    "created": "Tuzatuvchi yozuv {{number}} o'tkazildi",
+    "columns": {
+      "doc": "Hujjat",
+      "posting": "Provodka",
+      "comment": "Izoh",
+      "status": "Holat",
+      "amount": "Summa"
+    },
+    "dtKt": "Dt {{dt}} / Kt {{kt}}",
+    "corrects": "Tuzatilayotgan davr: {{period}}",
+    "cancelReason": "Bekor qilish sababi: {{reason}}",
+    "status": {
+      "posted": "O'tkazilgan",
+      "cancelled": "Bekor qilingan"
+    },
+    "cancel": "Bekor qilish",
+    "cancelTitle": "{{number}} yozuvini bekor qilish",
+    "cancelDescription": "Storno joriy ochiq davr sanasida yoziladi.",
+    "empty": {
+      "title": "Tuzatuvchi yozuv yo'q",
+      "description": "Yopilgan oydagi xato joriy ochiq oyda tuzatuvchi yozuv bilan tuzatiladi."
+    }
+  },
+  "closing": {
+    "title": "Davrni yopish",
+    "ready": "Tayyor",
+    "notReady": "Yopib bo'lmaydi",
+    "oldestOpen": "Eng eski ochiq oy:",
+    "retry": "Qayta urinish",
+    "recheck": "Qayta tekshirish",
+    "allClear": "To'siq va ogohlantirish yo'q.",
+    "notEnded": "{{period}} hali tugamagan — oy tugagach yopiladi.",
+    "close": "{{period}}ni yopish",
+    "done": "{{period}} yopildi",
+    "irreversible": "Yopilgan oy qayta ochilmaydi — keyingi tuzatishlar joriy ochiq oyda tuzatuvchi yozuv bilan.",
+    "confirmTitle": "{{period}}ni yopish",
+    "confirmDescription": "{{period}} yopiladi. Yopilgan oy qayta ochilmaydi — keyingi tuzatishlar joriy ochiq oyda tuzatuvchi yozuv bilan kiritiladi.",
+    "blockersTitle": "To'siqlar",
+    "warningsTitle": "Ogohlantirishlar",
+    "blockers": {
+      "recost_pending": "Qayta hisoblash navbatida tugallanmagan ishlar: {{count}}",
+      "fiscal_pending": "OFD ga yuborilmagan yoki tasdiqlanmagan fiskal cheklar: {{count}}",
+      "devices_unsynced": "Sinxronlanmagan qurilmalar: {{count}}"
+    },
+    "device": "{{name}} — navbatda {{count}} ta voqea, eng eskisi {{since}}",
+    "deviceUnnamed": "Nomsiz qurilma",
+    "devicesLink": "Qurilmani bekor qilish — Qurilmalar",
+    "warnings": {
+      "tax_settlement_missing": "Soliq hisob-kitobi (ST) o'tkazilmagan",
+      "tax_settlement_stale": "O'tkazilgan soliq hisob-kitobi joriy raqamdan farq qiladi",
+      "opening_0000_nonzero": "Boshlang'ich qoldiqlar to'liq kiritilmagan (0000 qoldig'i nol emas)",
+      "open_shifts": "Davr tugashidan oldin ochilgan smenalar hali ochiq",
+      "drafts_in_period": "Davr sanali qoralama hujjatlar bor",
+      "devices_not_synced_after_period_end": "Ba'zi qurilmalar davr tugagandan keyin sinxronlanmagan",
+      "ledger_stock_mismatch": "Ombor qiymati buxgalteriya qoldig'idan farq qiladi"
+    },
+    "stale": "{{kind}}: o'tkazilgan {{amount}}, joriy {{current}}",
+    "mismatch": "{{account}}: buxgalteriya {{ledger}}, ombor {{stock}}, farq {{difference}}",
+    "opening": "0000 qoldig'i: {{amount}}"
+  },
+  "balances": {
+    "title": "Hisob qoldiqlari",
+    "period": "{{period}} oxiriga",
+    "empty": "Bu oyda harakat yoki qoldiq yo'q",
+    "turnover": "Dt {{dt}} · Kt {{kt}}",
+    "side": {
+      "debit": "debet qoldiq",
+      "credit": "kredit qoldiq",
+      "zero": "qoldiq yo'q"
+    },
+    "totals": "Jami oborot: Dt {{dt}} = Kt {{kt}}"
+  },
+  "reconciliation": {
+    "title": "Davlat hisobotini solishtirish",
+    "subtitle": "my.soliq.uz hisobotini ichki hisob bilan tekshiring. Tuzatish davlat portalida kiritiladi.",
+    "internalVat": "QQS ichki hisobi",
+    "offline": "Internet yo'q — solishtirish va hisobot yuklash uchun ulanish kerak.",
+    "taxType": "Soliq turi",
+    "regime": { "active": "Amaldagi soliq rejimi", "inactive": "Bu rejim tenant uchun faol emas" },
+    "types": { "vat": "QQS", "turnover": "Aylanma solig'i" },
+    "period": "Davr",
+    "previous": "Oldingi davrlar",
+    "refresh": "Yangilash",
+    "loadMore": "Yana hisobotlar",
+    "deadline": "Muddat: {{date}}",
+    "published": "Kabinetga joylangan: {{date}}",
+    "countdown": "Javob muddati: {{count}} ish kuni qoldi ({{date}} gacha). Muddat topshirish muddatidan oshmaydi.",
+    "fileLink": "Yuklangan hisobotni ochish",
+    "compare": "Qayta solishtirish",
+    "confirm": "Mos deb tasdiqlash",
+    "selectTitle": "Hisobotni tanlang yoki yangisini yuklang",
+    "amounts": { "state": "Davlat hisoboti", "ours": "Ichki hisob", "diff": "Farq" },
+    "status": {
+      "uploaded": "Yuklandi", "compared": "Solishtirildi", "match": "Mos",
+      "diff_found": "Farq topildi", "correction_sent": "Tuzatish qayd etildi",
+      "confirmed": "Tasdiqlandi", "auto_accepted": "Avtomatik qabul qilindi"
+    },
+    "empty": { "title": "Hisobot topilmadi", "description": "Tanlangan soliq turi va davr uchun davlat hisobotini yuklang." },
+    "upload": {
+      "title": "Davlat hisobotini yuklash", "publishedAt": "Kabinetga joylangan sana",
+      "file": "PDF yoki Excel fayli", "limit": "PDF/XLS/XLSX, 5 MB gacha. Solishtirish yuklangandan so'ng boshlanadi.",
+      "action": "Yuklash va solishtirish", "invalidFile": "PDF/XLS/XLSX faylini tanlang (5 MB gacha)."
+    },
+    "diffs": {
+      "title": "Farq qatorlari", "indicator": "Ko'rsatkich yoki hujjat", "state": "Davlat",
+      "ours": "Ichki", "diff": "Farq", "status": "Holat", "resolved": "Yopilgan", "open": "Tekshiriladi",
+      "redInvoices": "Qizil e-fakturalar va QQS krediti holatini ko'rish:", "openEdocs": "E-fakturalar",
+      "filterLabel": "Farq filtri", "filterOpen": "Farqli va tekshiriladigan", "filterAll": "Barchasi"
+    },
+    "response": {
+      "title": "Javobni qayd etish", "comment": "Tuzatish izohi", "portalRef": "Kabinetdagi hujjat raqami",
+      "recordCorrection": "Tuzatish kiritilganini qayd etish", "portal": "my.soliq.uz kabinetini ochish",
+      "note": "Tuzatishni portalda kiriting. ERP faqat qayd qiladi, davlat portaliga ma'lumot yubormaydi."
+    }
   }
 }

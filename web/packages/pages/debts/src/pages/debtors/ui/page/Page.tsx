@@ -67,6 +67,8 @@ function DebtorsPage() {
   const canCard = useCan({ permission: "debts.limit.manage" });
   // «Qaytarish» posts a cash movement: accounting.post (07 BO-06) + the server's cash.withdraw
   const canRefund = useCan({ permission: ["accounting.post", "cash.withdraw"] });
+  // «Keyingi qarzga hisoblash» — a ledger adjustment Dt 6310 / Kt 4010 (07 BO-06, 20 #10)
+  const canOffset = useCan({ permission: "accounting.post" });
   const [params] = useSearchParams();
   const [
     mounted,
@@ -189,7 +191,15 @@ function DebtorsPage() {
               {t("panel.pick")}
             </p>
           )}
-          {payable ? null : <OverpaymentsBlock names={names} version={version} canRefund={canRefund} />}
+          {payable ? null : (
+            <OverpaymentsBlock
+              names={names}
+              version={version}
+              canRefund={canRefund}
+              canOffset={canOffset}
+              onChanged={reload}
+            />
+          )}
         </div>
       </div>
 

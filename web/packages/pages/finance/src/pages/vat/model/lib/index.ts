@@ -79,6 +79,8 @@ export function summarize(period: PeriodKey, list: readonly VatSummary[]): Summa
   if (!last) return null;
   const single = list.length === 1;
   const reds = list.map((s) => s.pending_credit_red_invoices).filter((n): n is number => n !== null);
+  const invoices = list.flatMap((s) => s.pending_credit_invoices ?? []);
+  const vatPayer = list.some((s) => s.pending_credit_invoices !== null);
   return {
     period,
     months: list.map((s) => s.period),
@@ -87,6 +89,8 @@ export function summarize(period: PeriodKey, list: readonly VatSummary[]): Summa
     inputVat: sum(list.map((s) => s.input_vat)),
     netVat: sum(list.map((s) => s.net_vat)),
     pendingRedInvoices: reds.length === 0 ? null : reds.reduce((a, b) => a + b, 0),
+    pendingCreditInvoices: invoices,
+    pendingCreditTotal: vatPayer ? addMoney(...invoices.map((i) => money(i.pending_vat))) : null,
     pendingCreditPct: single ? last.pending_credit_pct : null,
     turnoverBase: sum(list.map((s) => s.turnover_base)),
     turnoverRatePct: last.turnover_rate_pct,

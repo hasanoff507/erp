@@ -208,7 +208,7 @@
     "title": "Ortiqcha to'lovlar",
     "customer": "Mijoz",
     "account": "offline · Kt 6310",
-    "howTo": "Qaytarish — shu yerda «Qaytarish» (kassa smenasi ochiq bo'lishi kerak); keyingi qarzga hisoblash — keyingi bosqich.",
+    "howTo": "Qaytarish — «Qaytarish» (kassa smenasi ochiq bo'lishi kerak); yoki «Keyingi qarzga hisoblash» — ortiqcha summa mijozning qarzidan yopiladi (kassasiz).",
     "refund": {
       "action": "Qaytarish",
       "title": "Ortiqcha to'lovni qaytarish",
@@ -228,7 +228,19 @@
     },
     "offset": {
       "action": "Keyingi qarzga hisoblash",
-      "later": "Keyingi bosqich (B5)"
+      "title": "Keyingi qarzga hisoblash",
+      "description": "{{name}} — ortiqcha to'lov {{amount}} mijozning ochiq qarzidan yopiladi",
+      "branch": "Filial",
+      "branchPlaceholder": "Filialni tanlang",
+      "amount": "Summa",
+      "comment": "Izoh",
+      "defaultComment": "Ortiqcha to'lov keyingi qarzga hisoblandi",
+      "confirm": "{{amount}} keyingi qarzga hisoblanadi",
+      "posting": "Kassasiz, fiskal chek chiqmaydi · Dt 6310 / Kt 4010",
+      "submit": "Hisoblash",
+      "done": "Ortiqcha to'lov keyingi qarzga hisoblandi ({{number}})",
+      "exceeds": "Summa ortiqcha to'lovdan oshmasin",
+      "available": "Ko'pi bilan {{amount}} — mijozning avans yoki qarz qoldig'i shuncha"
     }
   },
   "reasons": {

@@ -4,17 +4,18 @@
  * ERP API
  * OpenAPI spec version: 0.1.0
  */
+import type { AppModulesBranchesApiTenantIntegrationOut } from './appModulesBranchesApiTenantIntegrationOut.ts';
 import type { CrptOut } from './crptOut.ts';
-import type { IntegrationOut } from './integrationOut.ts';
 import type { OfdOut } from './ofdOut.ts';
 import type { UzqrOut } from './uzqrOut.ts';
 
 export interface IntegrationsOut {
   ofd: OfdOut;
-  faktura_uz: IntegrationOut;
+  faktura_uz: AppModulesBranchesApiTenantIntegrationOut;
+  didox?: AppModulesBranchesApiTenantIntegrationOut | null;
   crpt: CrptOut;
-  click: IntegrationOut;
-  payme: IntegrationOut;
-  uzum: IntegrationOut;
+  click: AppModulesBranchesApiTenantIntegrationOut;
+  payme: AppModulesBranchesApiTenantIntegrationOut;
+  uzum: AppModulesBranchesApiTenantIntegrationOut;
   uzqr: UzqrOut;
 }

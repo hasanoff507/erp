@@ -5,10 +5,21 @@
  * (server-side) fiscal receipt → `sale.created` — an approved integrated card finishes the sale by itself.
  * The `sale.created` client_event_id is allocated when the payment opens, so the card attempt is recorded
  * with the same id the sale event gets (18 §16a.4 manager-resolved unknown attempts).
+ * B5: dynamic UzQR / Click / Payme / Uzum through a provider checkout (18 §16 — the sale closes only after
+ * `confirmed`, QT-M01-13), and the local-bridge fiscal receipt: when the register is bound to a Do'kon agenti FM
+ * (21 §16) the FM signs BEFORE `sale.created` and the event carries `receipt_seq` + `fiscal_result` (qaror #68);
+ * «Fiskal modul ulanmagan» keeps the cart and the payment open.
  */
 import { combine, createEffect, createEvent, createStore, sample } from "effector";
 
 import { newAttemptId as newId } from "@shared/lib/card-terminal";
+import {
+  fiscalItem,
+  fiscalReceipt,
+  fiscalShares,
+  type FiscalLineInput,
+  type FiscalPaymentInput,
+} from "@shared/lib/fiscal";
 import type { Money } from "@shared/lib/money";
 import {
   $fiscalLadder,
@@ -49,6 +60,19 @@ import {
   cardPaymentStarted,
   type CardPaymentOutcome,
 } from "#/features/card-payment/index.ts";
+import {
+  $fiscalBinding,
+  fiscalErrorOf,
+  fiscalSigned,
+  signFiscalReceipt,
+  type FiscalBinding,
+} from "#/features/local-fiscal/index.ts";
+import {
+  $checkoutConfirmed,
+  checkoutReset,
+  checkoutStarted,
+  type ConfirmedCheckout,
+} from "#/features/provider-checkout/index.ts";
 import { tashkentDate } from "#/shared/lib/dates.ts";
 import { nextTempNumber } from "#/shared/lib/device-runtime.ts";
 
@@ -63,7 +87,10 @@ import {
 } from "./lib/sale-payload.ts";
 import type { ScanError } from "./scan.ts";
 
-export type PayMode = "cash" | "card" | "uzqr" | "debt" | "mixed";
+export type PayMode = "cash" | "card" | "uzqr" | "click" | "payme" | "uzum" | "debt" | "mixed";
+/** Dynamic payments through a provider checkout (18 §16). */
+export const CHECKOUT_MODES: readonly PayMode[] = ["click", "payme", "uzum"];
+export type UzqrType = "static" | "dynamic";
 export type DeliveryReason = "printer_failure" | "customer_request";
 
 export interface PaymentState {
@@ -76,6 +103,8 @@ export interface PaymentState {
   dueDate: string | null;
   debtApproval: ApprovalRef | null;
   uzqrRef: string;
+  /** B5 (07 POS-03 `qrType`): static (cashier confirms) / dynamic (checkout). */
+  uzqrType: UzqrType;
   /** B4 (POS-06): comment of the debt sale (18 §4.1 `comment`, ≤ 1000). */
   comment: string;
   /** B4 (POS-06, 16 §5): offline over-limit debt confirmed by the cashier (the server flags it). */
@@ -103,6 +132,8 @@ export interface FinishedSale {
   shiftNo: number | null;
   customerName: string | null;
   isOffline: boolean;
+  /** B5 local bridge: the FM answer (sign, QR) — printed on POS-04 at once. */
+  fiscalResult?: Record<string, unknown> | null;
 }
 
 export const paymentOpened = createEvent();
@@ -114,6 +145,7 @@ export const mixedPartRemoved = createEvent<number>();
 export const dueDateChanged = createEvent<string | null>();
 export const debtApproved = createEvent<ApprovalRef | null>();
 export const uzqrRefChanged = createEvent<string>();
+export const uzqrTypeChanged = createEvent<UzqrType>();
 // --- B4 debts (w-debts) ---
 export const commentChanged = createEvent<string>();
 export const debtOverLimitConfirmed = createEvent<boolean>();
@@ -134,6 +166,7 @@ const fresh = (): PaymentState => ({
   dueDate: null,
   debtApproval: null,
   uzqrRef: "",
+  uzqrType: "static",
   comment: "",
   debtOverLimitConfirmed: false,
   electronic: null,
@@ -166,15 +199,42 @@ export function cardPartOf(o: CardPaymentOutcome | null): PaymentPart | null {
   };
 }
 
+/** The checkout counts only for the chosen method (`uzqr` dynamic / click / payme / uzum). */
+export function checkoutPartOf(p: PaymentState, checkout: ConfirmedCheckout | null): PaymentPart | null {
+  if (!checkout) return null;
+  const method = p.mode === "uzqr" && p.uzqrType === "dynamic" ? "uzqr" : p.mode;
+  if (method !== checkout.provider) return null;
+  return {
+    method: checkout.provider,
+    amount: checkout.amount,
+    checkout: { checkoutRef: checkout.ref, providerTxId: checkout.providerTxId },
+  };
+}
+
 /** Parts of the receipt as they would be sent now. */
-export function partsFor(p: PaymentState, total: Money, card: PaymentPart | null): PaymentPart[] {
+export function partsFor(
+  p: PaymentState,
+  total: Money,
+  card: PaymentPart | null,
+  checkout: ConfirmedCheckout | null = null,
+): PaymentPart[] {
   switch (p.mode) {
     case "cash":
       return [{ method: "cash", amount: total }];
     case "card":
       return card ? [card] : [];
     case "uzqr":
+      if (p.uzqrType === "dynamic") {
+        const part = checkoutPartOf(p, checkout);
+        return part ? [part] : [];
+      }
       return [{ method: "uzqr", amount: total, terminalRef: p.uzqrRef || null }];
+    case "click":
+    case "payme":
+    case "uzum": {
+      const part = checkoutPartOf(p, checkout);
+      return part ? [part] : [];
+    }
     case "debt":
       return [{ method: "debt", amount: total, dueDate: p.dueDate, debtApproval: p.debtApproval }];
     case "mixed": {
@@ -188,8 +248,8 @@ export function partsFor(p: PaymentState, total: Money, card: PaymentPart | null
   }
 }
 
-export const $paid = combine($payment, $totals, $cardPart, (p, t, card) =>
-  p ? sumMoney(partsFor(p, t.total, card).map((x) => x.amount)) : ("0.00" as Money),
+export const $paid = combine($payment, $totals, $cardPart, $checkoutConfirmed, (p, t, card, checkout) =>
+  p ? sumMoney(partsFor(p, t.total, card, checkout).map((x) => x.amount)) : ("0.00" as Money),
 );
 export const $remaining = combine($totals, $paid, (t, paid) => {
   const rest = minusMoney(t.total, paid);
@@ -210,6 +270,7 @@ $payment
   .on(dueDateChanged, (p, dueDate) => (p ? { ...p, dueDate } : p))
   .on(debtApproved, (p, debtApproval) => (p ? { ...p, debtApproval } : p))
   .on(uzqrRefChanged, (p, uzqrRef) => (p ? { ...p, uzqrRef: uzqrRef.slice(0, 40) } : p))
+  .on(uzqrTypeChanged, (p, uzqrType) => (p ? { ...p, uzqrType } : p))
   .on(commentChanged, (p, comment) => (p ? { ...p, comment: comment.slice(0, 1000) } : p))
   .on(debtOverLimitConfirmed, (p, debtOverLimitConfirmed) => (p ? { ...p, debtOverLimitConfirmed } : p))
   .on(electronicChosen, (p, electronic) => (p ? { ...p, electronic } : p))
@@ -221,6 +282,27 @@ $paymentError
 
 // Leaving the payment without a card result: the card flow goes back to idle (only allowed phases).
 sample({ clock: paymentClosed, target: cardPaymentClosed });
+// a provider checkout that is not paid is dropped with the payment (the dialog never closes over a paid one)
+sample({ clock: paymentClosed, target: checkoutReset });
+
+/** B5: choosing Click / Payme / Uzum / dynamic UzQR creates the checkout at once (like the card terminal). */
+export const checkoutRequested = createEvent();
+sample({
+  clock: checkoutRequested,
+  source: { p: $payment, totals: $totals, device: $posDevice, online: $isOnline },
+  filter: ({ p, device, online }) =>
+    online &&
+    device?.cashRegisterId != null &&
+    p !== null &&
+    (CHECKOUT_MODES.includes(p.mode as PayMode) || (p.mode === "uzqr" && p.uzqrType === "dynamic")),
+  fn: ({ p, totals, device }) => ({
+    provider: (p?.mode === "uzqr" ? "uzqr" : p?.mode) as "uzqr" | "click" | "payme" | "uzum",
+    purpose: "sale" as const,
+    amount: totals.total,
+    cashRegisterId: device?.cashRegisterId ?? "",
+  }),
+  target: checkoutStarted,
+});
 
 sample({
   clock: cardStartRequested,
@@ -242,6 +324,10 @@ export interface CompleteInput {
   draft: Draft;
   totals: DraftTotals;
   card: PaymentPart | null;
+  /** B5: the confirmed provider checkout (dynamic UzQR / Click / Payme / Uzum). */
+  checkout?: ConfirmedCheckout | null;
+  /** B5: BO-12 binding of the register to a Do'kon agenti FM → the local-bridge mode (21 §16). */
+  fiscalBinding?: FiscalBinding | null;
   device: PosDevice | null;
   shift: PosShift | null;
   cashier: PosCashier | null;
@@ -269,7 +355,12 @@ export function validateParts(input: CompleteInput): PaymentPart[] {
   if (!input.shift) throw new SaleError("SHIFT_NOT_OPEN");
   if (!input.cashier) throw new SaleError("PIN_REQUIRED");
   if (input.draft.lines.length === 0 || !isPositive(totals.total)) throw new SaleError("RECEIPT_EMPTY");
-  const parts = partsFor(p, totals.total, input.card);
+  const checkoutMode =
+    CHECKOUT_MODES.includes(p.mode as PayMode) || (p.mode === "uzqr" && p.uzqrType === "dynamic");
+  if (checkoutMode && !input.online) throw new SaleError("PAYMENT_ONLINE_ONLY");
+  const parts = partsFor(p, totals.total, input.card, input.checkout ?? null);
+  // QT-M01-13: no sale with a dynamic method until the provider confirmed it
+  if (checkoutMode && parts.length === 0) throw new SaleError("PAYMENT_NOT_CONFIRMED");
   if (parts.length === 0) throw new SaleError("PAYMENT_METHOD_REQUIRED");
   if (cmpMoney(sumMoney(parts.map((x) => x.amount)), totals.total) !== 0) {
     throw new SaleError("PAYMENT_NOT_COMPLETE");
@@ -282,7 +373,7 @@ export function validateParts(input: CompleteInput): PaymentPart[] {
   const anyReceipt = receiptSeqOption(parts, input.creditType === true, "", "") !== null;
   if (anyReceipt && input.fiscalBlocked) throw new SaleError("FISCAL_OFFLINE_48H_BLOCKED");
   if (anyReceipt && input.fiscalLocked) throw new SaleError("FISCAL_DEVICE_LOCKED");
-  if (parts.some((x) => x.method === "uzqr") && !input.online) {
+  if (parts.some((x) => x.method !== "cash" && x.method !== "card" && x.method !== "debt") && !input.online) {
     throw new SaleError("PAYMENT_ONLINE_ONLY");
   }
   if (parts.some((x) => x.method === "debt")) {
@@ -353,6 +444,27 @@ export const completeSaleFx = createEffect(async (input: CompleteInput): Promise
 
   const tempNumber = await nextTempNumber(device.deviceId);
   const delivery = p.electronic ? "electronic" : "printed";
+
+  // B5 local bridge (21 §16, qaror #68): the FM signs the `sale` receipt before the event is written
+  const binding = input.fiscalBinding ?? null;
+  let signed: { receiptSeq: number; result: Record<string, unknown> } | null = null;
+  if (binding && fiscalReceipt && binding.cashRegisterId === cashRegisterId) {
+    try {
+      const out = await signFiscalReceipt({
+        ref: draft.ref,
+        binding,
+        shiftId: shift.id,
+        shiftNo: shift.shift_no ?? null,
+        cashierName: cashier.fullName,
+        build: (seq) => saleFiscalPayload(binding, seq, totals, parts),
+      });
+      signed = { receiptSeq: out.receiptSeq, result: out.result as unknown as Record<string, unknown> };
+    } catch (error) {
+      const known = fiscalErrorOf(error);
+      if (known) throw new SaleError(known.code, known.params);
+      throw error;
+    }
+  }
   const payload = buildSalePayload(
     totals,
     parts,
@@ -371,8 +483,15 @@ export const completeSaleFx = createEffect(async (input: CompleteInput): Promise
       delivery,
       deliveryReason: p.electronic,
       comment: p.comment.trim() ? p.comment.trim() : null,
+      ...(signed ? { receiptSeq: signed.receiptSeq, fiscalResult: signed.result } : {}),
     },
   );
+  // the signed number is in the payload; under credit_type the «kredit» receipt still takes the next one
+  const enqueueSeq = signed
+    ? seqOption?.count === 2
+      ? { cashRegisterId, shiftId: shift.id, target: "credit_receipt_seq" as const }
+      : null
+    : seqOption;
 
   // approved integrated attempts leave card_attempts in the same transaction (16 §2.1)
   const removeIds: string[] = [];
@@ -392,7 +511,7 @@ export const completeSaleFx = createEffect(async (input: CompleteInput): Promise
     result = await enqueueEvent("sale.created", payload, {
       actorUserId: cashier.userId,
       clientEventId: p.clientEventId,
-      ...(seqOption ? { receiptSeq: seqOption } : {}),
+      ...(enqueueSeq ? { receiptSeq: enqueueSeq } : {}),
       ...(removeIds.length ? { removeCardAttemptIds: removeIds } : {}),
       ...(codes.length ? { markingCodes: codes } : {}),
       history: {
@@ -429,6 +548,7 @@ export const completeSaleFx = createEffect(async (input: CompleteInput): Promise
     if (isOfflineError(error)) throw new SaleError(error.code, { ...error.params });
     throw error;
   }
+  if (signed) await fiscalSigned(draft.ref).catch(() => undefined);
 
   return {
     saleId: p.saleId,
@@ -448,14 +568,63 @@ export const completeSaleFx = createEffect(async (input: CompleteInput): Promise
     shiftNo: shift.shift_no ?? null,
     customerName: customer?.name ?? null,
     isOffline: !input.online,
+    fiscalResult: signed?.result ?? null,
   };
 });
+
+/** 21 §16.1 `FiscalReceiptPayload` of the `sale` receipt (18 §4.5 shares when part of it is debt). */
+export function saleFiscalPayload(
+  binding: FiscalBinding,
+  receiptSeq: number,
+  totals: DraftTotals,
+  parts: readonly PaymentPart[],
+) {
+  const lines: FiscalLineInput[] = totals.lines.map((l) => ({
+    name: l.name,
+    nameRu: l.nameRu,
+    mxik: l.mxik,
+    packageCode: l.packageCode ?? null,
+    unitCode: l.unitCode,
+    qty: l.qty,
+    price: l.price,
+    lineTotal: l.total,
+    vatRate: l.vatRate,
+    vatAmount: l.vat,
+    markingCode: l.markingCode,
+  }));
+  const shares = fiscalShares(lines, nonDebtAmount(parts));
+  const payments: FiscalPaymentInput[] = parts
+    .filter((x) => x.method !== "debt")
+    .map((x) => {
+      const r = x.card?.mode === "integrated" ? x.card.cardResult : null;
+      return {
+        method: x.method as FiscalPaymentInput["method"],
+        amount: x.amount,
+        card: r
+          ? {
+              cardType: typeof r.card_type === "string" ? r.card_type : null,
+              cardMask: typeof r.card_mask === "string" ? r.card_mask : null,
+              rrn: typeof r.rrn === "string" ? r.rrn : null,
+            }
+          : null,
+      };
+    });
+  return fiscalReceipt({
+    register: { cash_register_id: binding.cashRegisterId, local_id: binding.localId },
+    receiptSeq,
+    kind: "sale",
+    items: lines.map((l, i) => fiscalItem(l, shares[i])),
+    payments,
+  });
+}
 
 const $completeSource = combine({
   payment: $payment,
   draft: $draft,
   totals: $totals,
   card: $cardPart,
+  checkout: $checkoutConfirmed,
+  fiscalBinding: $fiscalBinding,
   device: $posDevice,
   shift: $posShift,
   cashier: $posCashier,
@@ -479,6 +648,17 @@ sample({
   },
   target: finishRequested,
 });
+// B5: a confirmed provider checkout that pays the whole receipt finishes the sale by itself (like the card)
+sample({
+  clock: $checkoutConfirmed,
+  source: { p: $payment, totals: $totals },
+  filter: ({ p, totals }, checkout) =>
+    p !== null &&
+    checkout !== null &&
+    checkoutPartOf(p, checkout) !== null &&
+    cmpMoney(checkout.amount, totals.total) === 0,
+  target: finishRequested,
+});
 
 sample({
   clock: finishRequested,
@@ -495,7 +675,7 @@ $lastSale.on(completeSaleFx.doneData, (_, sale) => sale);
 
 /** Sale written → the card outcome is consumed, a fresh draft starts, the payment closes. */
 export const saleCompleted = completeSaleFx.doneData;
-sample({ clock: saleCompleted, target: [cardOutcomeConsumed, draftReset] });
+sample({ clock: saleCompleted, target: [cardOutcomeConsumed, draftReset, checkoutReset] });
 sample({ clock: saleCompleted, fn: () => null, target: $payment });
 
 export { nonDebtAmount };

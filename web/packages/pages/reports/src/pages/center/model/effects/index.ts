@@ -2,7 +2,8 @@
  * BO-09 effects — generated clients only: `api.branches.cashRegistersList`, `api.cash.getCashHistory`
  * (20 #55), `api.cash.getShift` (z_report when closed / running totals while open),
  * `api.cash.listCashMovements` (18 §13.3), `api.tax.listVatMoves` (20 #2); Bosqich 4 — `api.reports.*`
- * (sales, top-products, stock, profit-and-loss, discounts, debts-aging).
+ * (sales, top-products, stock, profit-and-loss, discounts, debts-aging); Bosqich 5 — trial-balance (20 #11),
+ * balance-sheet (#13), stock-as-of (#13a).
  */
 import { createEffect } from "effector";
 
@@ -112,6 +113,21 @@ export const loadReportFx = wrap<ReportRequest, ReportData>(async (req) => {
       return {
         kind: "debts-aging",
         data: await api.reports.getDebtsAging({ direction: req.direction, as_of: req.asOf, ...branch }),
+      };
+    case "trial-balance":
+      return {
+        kind: "trial-balance",
+        data: await api.reports.getTrialBalance({ period: req.period, ...branch }),
+      };
+    case "balance-sheet":
+      return {
+        kind: "balance-sheet",
+        data: await api.reports.getBalanceSheet({ as_of: req.asOf, ...branch }),
+      };
+    case "stock-as-of":
+      return {
+        kind: "stock-as-of",
+        data: await api.reports.getStockAsOf({ as_of: req.asOf, ...branch }),
       };
   }
 });

@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type {
+  AppModulesAccessApiApprovalRequestsRejectIn,
   ApprovalRequestCreated,
   ApprovalRequestIn,
   ApprovalRequestOut,
@@ -12,7 +13,6 @@ import type {
   ApproveIn,
   ApproveOut,
   ListRequestsParams,
-  RejectIn,
   RejectOut
 } from '@shared/models/generated';
 
@@ -77,12 +77,12 @@ export const approveRequest = (
  */
 export const rejectRequest = (
     requestId: string,
-    rejectIn: RejectIn,
+    appModulesAccessApiApprovalRequestsRejectIn: AppModulesAccessApiApprovalRequestsRejectIn,
  options?: SecondParameter<typeof apiRequest<RejectOut>>,) => {
       return apiRequest<RejectOut>(
       {url: `/api/v1/approval-requests/${requestId}/reject`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: rejectIn
+      data: appModulesAccessApiApprovalRequestsRejectIn
     },
       options);
     }

@@ -54,6 +54,8 @@ def ledger_poster() -> LedgerPoster:
 
 
 def build_accounting_module(settings: Settings, db: Database) -> AccountingModule:
+    """B5 services (adjustments, closings) are attached by :mod:`app.modules.accounting.assembly` — this
+    module is imported by every posting service and must not import other modules' wiring."""
     del settings
     repo = SqlLedgerRepository()
     return AccountingModule(journal=JournalService(db.session_factory, repo), poster=LedgerPoster(repo))

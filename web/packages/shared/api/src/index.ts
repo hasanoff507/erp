@@ -14,11 +14,13 @@ import * as auth from "./generated/auth/auth.ts";
 import * as branches from "./generated/branches/branches.ts";
 import * as cardTerminals from "./generated/card-terminals/card-terminals.ts";
 import * as cash from "./generated/cash/cash.ts";
+import * as cloudPrint from "./generated/cloud-print/cloud-print.ts";
 import * as debts from "./generated/debts/debts.ts";
 import * as expenses from "./generated/expenses/expenses.ts";
 import * as health from "./generated/health/health.ts";
 import * as inventory from "./generated/inventory/inventory.ts";
 import * as notifications from "./generated/notifications/notifications.ts";
+import * as onec from "./generated/onec/onec.ts";
 import * as pricing from "./generated/pricing/pricing.ts";
 import * as purchasing from "./generated/purchasing/purchasing.ts";
 import * as reports from "./generated/reports/reports.ts";
@@ -38,11 +40,13 @@ export const api = {
   branches,
   cardTerminals,
   cash,
+  cloudPrint,
   debts,
   expenses,
   health,
   inventory,
   notifications,
+  onec,
   pricing,
   purchasing,
   reports,

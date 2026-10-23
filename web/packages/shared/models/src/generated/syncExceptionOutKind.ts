@@ -24,4 +24,5 @@ export const SyncExceptionOutKind = {
   card_orphan_transaction: 'card_orphan_transaction',
   actor_unverified: 'actor_unverified',
   late_in_closed_shift: 'late_in_closed_shift',
+  marking_code_duplicate: 'marking_code_duplicate',
 } as const;

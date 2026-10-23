@@ -8,11 +8,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, Literal, Protocol
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.modules.integrations.fiscal.domain.boundary import ResendResult
 
 ErrorKind = Literal["transient", "auth", "validation"]
 
@@ -72,7 +74,30 @@ class FiscalDeviceStatus:
     acked: Sequence[tuple[str, int]] = field(default_factory=tuple)  # (terminal_id, fm_receipt_seq)
 
 
+@dataclass(frozen=True, slots=True)
+class FiscalShiftResult:
+    """``FiscalShiftResult {fm_terminal_id, opened_at}`` (21 §16.1)."""
+
+    terminal_id: str
+    opened_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class UnsentReceipt:
+    """``UnsentReceipt {fm_receipt_seq, fiscal_at, amount_tiyin}`` (21 §16.1)."""
+
+    fm_receipt_seq: int
+    fiscal_at: datetime
+    amount_tiyin: int
+
+
 class FiscalPort(Protocol):
+    """21 §1. ``close_shift`` takes the server's ``z_report`` receipt row (its id is the provider idempotency
+    key) and answers with the FM requisites of the Z-report (``fm_receipt_seq`` = Z number); the local
+    bridge's ``ZReport`` comes back through the ``fiscal.zreport`` agent task instead."""
+
+    async def open_shift(self, register: CashRegisterRef) -> FiscalShiftResult: ...
+
     async def register_sale(self, receipt: FiscalReceiptPayload) -> FiscalResult: ...
 
     async def register_refund(
@@ -82,6 +107,33 @@ class FiscalPort(Protocol):
     async def close_shift(self, receipt: FiscalReceiptPayload) -> FiscalResult: ...
 
     async def get_device_status(self, register: CashRegisterRef) -> FiscalDeviceStatus: ...
+
+    async def list_unsent(self, register: CashRegisterRef) -> list[UnsentReceipt]: ...
+
+    async def resend_unsent(self, register: CashRegisterRef) -> ResendResult: ...
+
+
+class AgentTaskPort(Protocol):
+    """The store-agent task queue (b5-agent ``onec_integration.application.ports.AgentTaskPort``, 23 §4.2):
+    ``capabilities.<family>.enabled`` is checked → ``409 AGENT_CAPABILITY_DISABLED``;
+    ``purpose='device_service'``,
+    ``base_id=None``. Runs in the caller's tenant transaction."""
+
+    async def enqueue(
+        self,
+        s: AsyncSession,
+        tenant_id: UUID,
+        agent_id: UUID,
+        kind: str,
+        payload: dict[str, Any],
+        *,
+        priority: int = 100,
+        not_before: datetime | None = None,
+        dedupe_key: str | None = None,
+        created_by: UUID | None = None,
+        expires_in_s: int | None = 86400,
+        timeout_s: int | None = None,
+    ) -> UUID: ...
 
 
 # --- repository -------------------------------------------------------------------------------------
@@ -128,6 +180,20 @@ class RegisterState:
     fm_state: str
     fiscal_module_id: str | None
     last_unacked_receipt_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
+class RegisterBinding:
+    """A register's local-bridge binding (``cash_registers.fiscal_agent_id`` / ``fiscal_local_device_id``)."""
+
+    id: UUID
+    branch_id: UUID
+    name: str
+    agent_id: UUID | None
+    local_id: str | None
+    fm_state: str
+    fm_receipts_pending: int | None
+    archived: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -213,3 +279,36 @@ class FiscalRepository(Protocol):
     async def mark_codes_sold(self, s: AsyncSession, doc_id: UUID) -> None: ...
 
     async def original_sale_receipt(self, s: AsyncSession, return_id: UUID) -> ReceiptRow | None: ...
+
+    async def binding(self, s: AsyncSession, register_id: UUID) -> RegisterBinding | None: ...
+
+    async def bound_registers(self, s: AsyncSession) -> list[RegisterBinding]: ...
+
+    async def set_fm_status(
+        self, s: AsyncSession, register_id: UUID, fm_state: str, pending: int | None
+    ) -> None: ...
+
+    async def z_of_shift(self, s: AsyncSession, shift_id: UUID) -> ReceiptRow | None: ...
+
+    async def set_z_fiscalized(
+        self,
+        s: AsyncSession,
+        receipt_id: UUID,
+        terminal_id: str,
+        fiscal_at: datetime,
+        fm_z: Mapping[str, Any],
+    ) -> None: ...
+
+    async def unacked_by_register(self, s: AsyncSession, provider_side: bool) -> list[tuple[UUID, int]]: ...
+
+    async def readiness(
+        self, s: AsyncSession, date_from: date, date_to: date
+    ) -> tuple[int, int, datetime | None]: ...
+
+    async def alert_counts(
+        self, s: AsyncSession, at: datetime, branch_ids: tuple[UUID, ...] | None
+    ) -> tuple[int, int, int, int]: ...
+
+    async def registers_overview(
+        self, s: AsyncSession, branch_ids: tuple[UUID, ...] | None
+    ) -> list[dict[str, Any]]: ...

@@ -5,20 +5,26 @@
  * OpenAPI spec version: 0.1.0
  */
 import type {
+  BalanceSheetOut,
   DashboardOut,
   DebtsAgingOut,
   DiscountReportOut,
+  GetBalanceSheetParams,
   GetDashboardParams,
   GetDebtsAgingParams,
   GetDiscountsParams,
   GetProfitAndLossParams,
   GetSalesParams,
+  GetStockAsOfParams,
   GetStockParams,
   GetTopProductsParams,
+  GetTrialBalanceParams,
   ProfitAndLossOut,
   SalesReportOut,
+  StockAsOfOut,
   StockReportOut,
-  TopProductsOut
+  TopProductsOut,
+  TrialBalanceOut
 } from '@shared/models/generated';
 
 import { apiRequest } from '../../_base/instance.ts';
@@ -111,6 +117,42 @@ export const getDiscounts = (
     },
       options);
     }
+  /**
+ * @summary Trial Balance
+ */
+export const getTrialBalance = (
+    params: GetTrialBalanceParams,
+ options?: SecondParameter<typeof apiRequest<TrialBalanceOut>>,) => {
+      return apiRequest<TrialBalanceOut>(
+      {url: `/api/v1/reports/trial-balance`, method: 'GET',
+        params
+    },
+      options);
+    }
+  /**
+ * @summary Balance Sheet
+ */
+export const getBalanceSheet = (
+    params?: GetBalanceSheetParams,
+ options?: SecondParameter<typeof apiRequest<BalanceSheetOut>>,) => {
+      return apiRequest<BalanceSheetOut>(
+      {url: `/api/v1/reports/balance-sheet`, method: 'GET',
+        params
+    },
+      options);
+    }
+  /**
+ * @summary Stock As Of
+ */
+export const getStockAsOf = (
+    params: GetStockAsOfParams,
+ options?: SecondParameter<typeof apiRequest<StockAsOfOut>>,) => {
+      return apiRequest<StockAsOfOut>(
+      {url: `/api/v1/reports/stock-as-of`, method: 'GET',
+        params
+    },
+      options);
+    }
   export type GetDebtsAgingResult = NonNullable<Awaited<ReturnType<typeof getDebtsAging>>>
 export type GetDashboardResult = NonNullable<Awaited<ReturnType<typeof getDashboard>>>
 export type GetSalesResult = NonNullable<Awaited<ReturnType<typeof getSales>>>
@@ -118,3 +160,6 @@ export type GetTopProductsResult = NonNullable<Awaited<ReturnType<typeof getTopP
 export type GetStockResult = NonNullable<Awaited<ReturnType<typeof getStock>>>
 export type GetProfitAndLossResult = NonNullable<Awaited<ReturnType<typeof getProfitAndLoss>>>
 export type GetDiscountsResult = NonNullable<Awaited<ReturnType<typeof getDiscounts>>>
+export type GetTrialBalanceResult = NonNullable<Awaited<ReturnType<typeof getTrialBalance>>>
+export type GetBalanceSheetResult = NonNullable<Awaited<ReturnType<typeof getBalanceSheet>>>
+export type GetStockAsOfResult = NonNullable<Awaited<ReturnType<typeof getStockAsOf>>>

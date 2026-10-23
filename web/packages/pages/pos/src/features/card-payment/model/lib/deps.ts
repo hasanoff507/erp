@@ -4,7 +4,7 @@
  * $agentStatus / $isOnline. Tests replace all of it through `configureCardPayment`.
  */
 import { api } from "@shared/api";
-import { AGENT_TOKEN_KEY, createAgentClient, type AgentClient } from "@shared/lib/agent";
+import type { AgentClient } from "@shared/lib/agent";
 import {
   createCardTerminalClient,
   type CardBinRule,
@@ -15,7 +15,6 @@ import {
   $fiscalLadder,
   cardAttempts,
   cardTerminals,
-  deviceSettings,
   settings,
   staff,
   verifyLocalPin,
@@ -23,18 +22,13 @@ import {
 import { $agentStatus } from "@shared/state/device";
 import { $isOnline } from "@shared/state/network";
 
+import { posAgentClient } from "#/shared/lib/device-runtime.ts";
+
 import type { CardPaymentDeps } from "../types/index.ts";
 
-let agentClient: AgentClient | null = null;
-
+/** The POS's single Do'kon agenti client (token + `X-Device-Id`, 21 §16). */
 export function cardAgentClient(): AgentClient {
-  agentClient ??= createAgentClient({
-    tokenStore: {
-      get: () => deviceSettings.get<string>(AGENT_TOKEN_KEY).then((t) => t ?? null),
-      set: (t) => (t ? deviceSettings.set(AGENT_TOKEN_KEY, t) : deviceSettings.remove(AGENT_TOKEN_KEY)),
-    },
-  });
-  return agentClient;
+  return posAgentClient();
 }
 
 const str = (v: unknown): string | null => (typeof v === "string" && v ? v : null);

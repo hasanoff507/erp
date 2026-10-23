@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Erp1C.Fiscal.Tests</RootNamespace>
+    <AssemblyName>Erp1C.Fiscal.Tests</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Erp1C.Fiscal\Erp1C.Fiscal.csproj" />
+
+  </ItemGroup>
+</Project>

@@ -21,6 +21,9 @@ KIND_ORDER: Final[tuple[str, ...]] = (
     "daily_report", "low_stock", "expiry_soon", "cash_variance", "over_limit_action", "state_report_diff",
     "offline_48h", "subscription_due", "subscription_grace", "debt_due_today", "debt_aging_60",
     "debt_limit_exceeded_offline", "card_settlement_mismatch", "recurring_expense_due",
+    "marking_alert", "marking_acceptance_due",  # B5 marking
+    "late_in_closed_period",  # B5 accounting
+    "onec_agent_paired", "onec_base_error",  # B5 agent
 )  # fmt: skip
 
 # the permission (15 §2.1) a linked user needs to receive the kind — the data in the message is what that
@@ -40,6 +43,11 @@ AUDIENCE: Final[dict[str, str]] = {
     "subscription_due": "billing.manage",
     "subscription_grace": "billing.manage",
     "recurring_expense_due": "expenses.create",  # US-M15-02 reminder (never auto-paid)
+    "marking_alert": "reports.finance.view",  # 16 §7: Owner/Accountant (B5 marking)
+    "marking_acceptance_due": "purchases.return",  # 21 §4: Storekeeper/Accountant (+Manager/Owner)
+    "late_in_closed_period": "accounting.post",  # 16 §3.4 / 13 §5.1: Accountant/Owner
+    "onec_agent_paired": "onec.view",  # 33 §13.3
+    "onec_base_error": "onec.view",  # 33 §13.3
 }
 
 DAILY_REPORT: Final = "daily_report"

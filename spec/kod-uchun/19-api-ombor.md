@@ -422,8 +422,9 @@ Uchta `kind`: `products` (US-M04-04), `opening_stock` (US-M04-04), `opening_debt
 
 **Maqsad**: qabul qilingan kiruvchi e-faktura (§19) asosida draft kirim hujjatini oldindan to'ldirish (qatorlar, summalar, QQS, markirovka kodlari — e-faktura `payload`dan); `source="einvoice"`, `einvoice_id` saqlanadi — "qizil" faktura QQS kechiktirish yo'li shu bog'lanish orqali aniqlanadi. E-faktura birlashtirilgan EHF+TTN shaklida bo'lsa, `ettn_ref` shu fakturaga bog'langan kiruvchi `ettn_documents` yozuvidan (`direction="in"`, operator poll'ida yaratiladi, §20) to'ldiriladi (alohida e-TTN emas, EHF'ning bir qismi).
 **Ruxsat**: `purchases.receive`.
-**So'rov**: `{warehouse_id}` (qolgan maydonlar e-fakturadan olinadi, foydalanuvchi keyin `PATCH` bilan tahrirlaydi — masalan `expiry_date` qo'shadi).
-**Xatolar**: `404 NOT_FOUND` (`params.resource="einvoice"`), `409 {code:"EINVOICE_NOT_ACCEPTED"}` (faqat `status=accepted` fakturadan kirim yaratiladi).
+**So'rov**: `{warehouse_id, doc_date?, lines?:[{line_no, product_id}]}` (qolgan maydonlar e-fakturadan olinadi, foydalanuvchi keyin `PATCH` bilan tahrirlaydi — masalan `expiry_date` qo'shadi). `doc_date` standart — joriy biznes kuni. Qator mahsulotga `payload.lines[].product_id`, so'ng shtrix-kod, so'ng yagona mahsulotga tegishli MXIK kodi bo'yicha moslanadi; moslanmagan qator `lines[]` (`line_no` → `product_id`) bilan beriladi, aks holda `422 VALIDATION_ERROR` (`field=lines[i].product_id`, `validation.einvoice_line_unmatched`).
+**Summalar** (ACC-07): EHF qatorining `net_amount` (QQSsiz) va `vat_amount`i **o'zgarmasdan** olinadi (`receipt_lines.net_amount`), `cost` = `ROUND_HALF_UP(net_amount / qty, 4)` — faqat ko'rsatish uchun; partiya qiymati, `Dt inv_acct`, QQS va kreditorlik EHF summasidan. `PATCH`da mahsulot, miqdor, narx va QQS stavkasi o'zgarmagan qator EHF summasini saqlaydi, o'zgargani qayta hisoblanadi.
+**Xatolar**: `404 NOT_FOUND` (`params.resource="einvoice"`), `409 {code:"EINVOICE_NOT_ACCEPTED"}` (faqat `status=accepted` fakturadan kirim yaratiladi), `409 EINVOICE_ALREADY_LINKED` (shu fakturadan bekor qilinmagan kirim bor, `uq_gr_einvoice_active`).
 
 ### `GET /goods-receipts` · `GET /goods-receipts/{id}` · `PATCH /goods-receipts/{id}`
 
@@ -448,7 +449,7 @@ Uchta `kind`: `products` (US-M04-04), `opening_stock` (US-M04-04), `opening_debt
 
 **Kiruvchi e-TTN** (qaror #63): e-TTN'ni **yuk jo'natuvchi (yetkazib beruvchi)** chiqaradi — odatda e-faktura bilan birlashtirilgan; do'kon (yuk oluvchi) tashish yakunida uni **elektron tasdiqlaydi yoki rad etadi** — birlashtirilgan shaklda §19 `accept`/`reject` bilan birga, alohida e-TTN bo'lsa §20 `accept`/`reject`. E-TTN'siz kirim bloklanmaydi, lekin `ettn_status="none"` BO-04/BO-15'da "E-TTN yo'q" belgisi bilan ko'rsatiladi.
 
-**Markirovkalangan tovar qabuli** (`is_marked=true` qatorlar): markirovka kodlari (e-faktura `payload`idan yoki POS-08 skaneridan) `marking_codes`ga yoziladi va `post`da Asl belgisi'da **CRPT API orqali** qabul qilinadi (`MarkingPort`, `outbox_jobs(kind="marking_accept")`; CRPT API ishlatiladigan joylardan biri — chakana sotuvdan farqli, qaror #62). Qabul muddati — tovar guruhi bo'yicha sozlanadi (`marking_product_groups.acceptance_deadline`): umumiy standart **3 ish kuni** (VM 833 66–67-band), o'simlik yog'i, suv/ichimlik va dori vositalari guruhlarida — **72 soat**; hisoblagich jo'natish (e-faktura/e-TTN) sanasidan boshlanadi. Tizim muddatni kuzatadi (`marking_acceptance.due_at`) va BO-04/BO-14'da ogohlantiradi, `post`ni bloklamaydi. Real CRPT adapteri — Bosqich 5, unggacha stub (26 #40 (OQ-025)).
+**Markirovkalangan tovar qabuli** (`is_marked=true` qatorlar): markirovka kodlari (e-faktura `payload`idan yoki POS-08 skaneridan) `marking_codes`ga yoziladi va `post`da Asl belgisi'da **CRPT API orqali** qabul qilinadi (`MarkingPort`, `outbox_jobs(kind="marking_accept")`; CRPT API ishlatiladigan joylardan biri — chakana sotuvdan farqli, qaror #62). Qabul muddati — tovar guruhi bo'yicha sozlanadi (`marking_product_groups.acceptance_deadline`): umumiy standart **3 ish kuni** (VM 833 66–67-band), o'simlik yog'i, suv/ichimlik va dori vositalari guruhlarida — **72 soat**; hisoblagich jo'natish (e-faktura/e-TTN) sanasidan boshlanadi (kirim `doc_date` bilan ertarog'i, 00:00 Toshkent; hisob qoidasi va ogohlantirish — `21-integratsiyalar.md` §4 SLA); `marking_acceptance.status`: `accepted` — CRPT qabulni tasdiqladi, `overdue` — `due_at` o'tdi va tasdiq yo'q, aks holda `pending`. Tizim muddatni kuzatadi (`marking_acceptance.due_at`) va BO-04/BO-14'da ogohlantiradi, `post`ni bloklamaydi. Real CRPT adapteri — Bosqich 5, unggacha stub (26 #40 (OQ-025)).
 **Bog'liq**: US-M04-01, US-M07-01…03, BP-01, BO-04, POS-08.
 
 ---
@@ -658,6 +659,7 @@ Bank to'lovida hujjat filiali — `X-Branch-Id` (yo'q bo'lsa cheklanmagan foydal
 | `lines[].lot_id` | UUID | ha | shu qatordan yaratilgan partiya |
 | `lines[].qty` | decimal(3dp) | ha | ≤ `stock_lots.qty_left` |
 | `reason` | enum | ha | `expired`/`damaged`/`excess`/`other` — sarlavha darajasida |
+| `lines[].marking_codes` | string[] | `is_marked=true` bo'lsa shart | soni = `qty`, takrorsiz; `post`da Asl belgisi xabarnomasi uchun beriladi (pastda "Markirovka") |
 
 `lines[].cost`, `lines[].vat_amount` — javobda **hosila** (server asl kirim qatoridan oladi, kiritilmaydi).
 **Javob**: `201 {id, status:"draft", ...}`.
@@ -666,16 +668,16 @@ Bank to'lovida hujjat filiali — `X-Branch-Id` (yo'q bo'lsa cheklanmagan foydal
 
 Ombor qoldig'i − (asl partiyadan), yetkazib beruvchiga qarz − (yoki debitorlik +), kiritiladigan QQS − (`13-provodka-qoidalari.md` 2.20).
 **Ruxsat**: `purchases.post`.
-**Xatolar**: `422 {code:"INSUFFICIENT_STOCK", params:{lot_id, available}}` (`qty` > `qty_left − blocked_qty`), `409 PERIOD_CLOSED`, `409 DOC_INVALID_STATE` (`params.reason`: `reverse_sale_required` — asl kirimdan 12 oy o'tgan (`13` §2.20, teskari realizatsiya — alohida oqim), `receipt_not_posted`, `gratuitous_receipt` — tekin kirimni qaytarib bo'lmaydi). 2-qator (`Dt 6010 / Kt 4410`) post paytida yozilmaydi — javobda `vat_adjustment_status:"awaiting_einvoice"`.
+**Xatolar**: `422 {code:"INSUFFICIENT_STOCK", params:{lot_id, available}}` (`qty` > `qty_left − blocked_qty`), `409 PERIOD_CLOSED`, `409 DOC_INVALID_STATE` (`params.reason`: `reverse_sale_required` — asl kirimdan 12 oy o'tgan (`13` §2.20, teskari realizatsiya — alohida oqim), `receipt_not_posted`, `gratuitous_receipt` — tekin kirimni qaytarib bo'lmaydi). 2-qator (`Dt 6010 / Kt 4410`) post paytida yozilmaydi — javobda `vat_adjustment_status:"awaiting_einvoice"`; yetkazib beruvchining qo'shimcha EHF'i (§19, poll uni shu qaytarishga bog'laydi) qabul qilinganda yoziladi → `"adjusted"` (`13-provodka-qoidalari.md` §2.20).
 
 ### `POST /supplier-returns/{id}/cancel`
 
 **Ruxsat**: `purchases.post`. **So'rov**: `{reason}`.
-**Xatolar**: `404 NOT_FOUND` (`params.resource="supplier_return"`), `409 DOC_INVALID_STATE`.
+**Xatolar**: `404 NOT_FOUND` (`params.resource="supplier_return"`), `409 DOC_INVALID_STATE` (shu jumladan `params.reason="vat_adjusted"` — qo'shimcha EHF qabul qilingan, QQS tuzatilgan qaytarish bekor qilinmaydi).
 **Idempotentlik**: `Idempotency-Key` majburiy.
 **Offline**: yo'q (ofis/ombor, internet mavjud joy).
 **Bog'liq**: US-M07-05, BO-04.
-**Markirovka**: markirovkalangan tovarni yetkazib beruvchiga qaytarish — subyektlar o'rtasida egalik o'tishi, shuning uchun Asl belgisi'ga xabarnoma **3 ish kuni** ichida (VM 833 85-band) **CRPT API orqali** (`MarkingPort`, `outbox_jobs(kind="marking_return")`) yuboriladi; chakana chek yo'li (OFD) bu yerda ishlatilmaydi (qaror #62). Aniq CRPT metodi/hujjat turi — tashqi javob kutilmoqda (Ochiq savollar #1); unggacha stub, qaytarish faqat online.
+**Markirovka**: markirovkalangan tovarni yetkazib beruvchiga qaytarish — subyektlar o'rtasida egalik o'tishi, shuning uchun Asl belgisi'ga xabarnoma **3 ish kuni** ichida (VM 833 85-band) **CRPT API orqali** (`MarkingPort`, `outbox_jobs(kind="marking_supplier_return")`) yuboriladi; chakana chek yo'li (OFD) bu yerda ishlatilmaydi (qaror #62). Aniq CRPT metodi/hujjat turi — tashqi javob kutilmoqda (Ochiq savollar #1); unggacha stub, qaytarish faqat online.
 
 ---
 
@@ -821,6 +823,7 @@ Validatsiya: har qator aynan bir marta, `0 ≤ qty_received ≤ qty_sent`, aks h
 | `lines[].lot_id` | UUID | **yo'q** | ixtiyoriy — berilmasa server FIFO/AVECO bo'yicha o'zi taqsimlaydi |
 | `lines[].qty` | decimal(3dp) | ha | ≤ `stock_lots.qty_left` |
 | `lines[].reason` | enum | ha | `expired`/`damaged`/`gift`/`expired_return`/`other` — qator darajasida |
+| `lines[].marking_codes` | string[] | `is_marked=true` bo'lsa shart | soni = `qty`, takrorsiz, `in_stock`; `post`da Asl belgisi hisobdan chiqarish xabarnomasi (`outbox_jobs(kind='marking_writeoff')`) uchun |
 | `lines[].gift_kind` | enum | `reason=gift` bo'lsa shart | `promo_justified` (iqtisodiy asoslangan reklama/aksiya, buyruq bilan — QQS obyekti emas) / `other` (asoslanmagan — QQS bozor qiymatidan, `13-provodka-qoidalari.md` 2.12) |
 | `promo_order_ref` | string | `gift_kind=promo_justified` qatori bo'lsa shart | aksiya buyrug'i raqami/sanasi |
 | `responsible_user_id` | UUID | yo'q | javobgar belgilansa `4730`, aks holda `9430` (`13-provodka-qoidalari.md` §2.12) |
@@ -965,7 +968,7 @@ Standart ikki shablon: `{prefixes:["22"], value_kind:"WEIGHT", decimals:3}` (og'
 **Maqsad**: kiruvchi faktura xavf darajasini Buxgalter my.soliq.uz kabinetida tekshirib qo'lda belgilaydi (operator API'si qaytarmasa — `risk_flag="unknown"`, qaror #63, 26 #47). `green` belgilansa kechiktirilgan QQS krediti keyingi to'lovni kutmaydi — bog'langan `posted` kirimlar bo'yicha `Dt 4410 / Kt 6010` shu tranzaksiyada yoziladi (`13-provodka-qoidalari.md` §2.8; `doc_type='goods_receipts'`, `entry_date` — belgilash kuni).
 **Ruxsat**: `purchases.post`.
 **So'rov**: `{risk_flag: "green"|"red", note: string}` (`note` majburiy, audit `einvoice.risk_flag_set`).
-**Javob**: `200 {id, risk_flag}`.
+**Javob**: `200 {id, risk_flag, vat_released}` (`vat_released` — shu o'zgarishda `vat_moves`ga yozilgan QQS; to'lov/avans allaqachon ochgan qism ayiriladi, `red → green` qaytadan yozmaydi).
 **Xatolar**: `404 NOT_FOUND` (`params.resource="einvoice"`), `409 DOC_INVALID_STATE` (`direction="out"` faktura), `422 VALIDATION_ERROR`.
 **Idempotentlik**: `Idempotency-Key` majburiy.
 
@@ -974,17 +977,17 @@ Standart ikki shablon: `{prefixes:["22"], value_kind:"WEIGHT", decimals:3}` (og'
 **Maqsad**: imzolangan kiruvchi fakturani qabul qilish (operatorga tasdiq yuborish, `21-integratsiyalar.md` §2). Birlashtirilgan EHF+TTN bo'lsa, shu tasdiq e-TTN'ni ham tasdiqlaydi (bog'langan `ettn_documents.status="accepted"`).
 **Ruxsat**: `purchases.post`.
 Avval imzolash shart — `sign-challenge`/`submit-signed` (pastda) o'tmagan hujjat uchun `409 {code:"EINVOICE_NOT_SIGNED"}`.
-**Javob**: `202 {status:"queued"}` → `outbox_jobs(kind=einvoice_accept)` → worker orqali operatorga yuboriladi → `status="accepted"` (yashil bo'lsa `vat_moves(kind=input)` darhol; qizil yoki `unknown` bo'lsa to'lovgacha kutiladi, §11).
+**Javob**: `202 {id, status:"queued", job_id}` → `outbox_jobs(kind=einvoice_accept)` → worker orqali operatorga (hujjatning oxirgi E-IMZO imzosi bilan) yuboriladi → `status="accepted"` (yashil bo'lsa `vat_moves(kind=input)` darhol; qizil yoki `unknown` bo'lsa to'lovgacha kutiladi, §11).
 
 ### `POST /einvoices/{id}/reject`
 
-**Ruxsat**: `purchases.post`. **So'rov**: `{reason: string}` (majburiy). Birlashtirilgan EHF+TTN bo'lsa e-TTN ham rad etiladi (`ettn_documents.status="rejected"`).
+**Ruxsat**: `purchases.post`. **So'rov**: `{reason: string}` (majburiy). `received`/`signed` holatda; `202 {id, status:"queued", job_id}` → `outbox_jobs(kind=einvoice_accept, payload.action="reject")` → `status="rejected"`. Birlashtirilgan EHF+TTN bo'lsa e-TTN ham rad etiladi (`ettn_documents.status="rejected"`).
 
 ### `POST /einvoices/{id}/sign-challenge`
 
 **Maqsad**: E-IMZO imzolash uchun hujjat xeshini (signing payload) qaytarish — brauzer shu payload'ni lokal E-IMZO.exe'ga yuboradi (`21-integratsiyalar.md` §5).
 **Ruxsat**: `einvoice.sign`.
-**Javob**: `200 {document_hash: "...", challenge_id: "..."}`.
+**Javob**: `200 {document_hash: "...", challenge_id: "...", expires_in: 600}` — brauzer `document_hash` satrini attached PKCS#7 qilib imzolaydi; challenge bir martalik, foydalanuvchi va hujjatga bog'langan (`21-integratsiyalar.md` §5). Kiruvchi — `received`, chiquvchi — `draft` (STIR'siz kontragent — `422 EINVOICE_COUNTERPARTY_INCOMPLETE`) holatda; `signed` — `409 EINVOICE_ALREADY_SIGNED`.
 
 ### `POST /einvoices/{id}/submit-signed`
 
@@ -992,7 +995,7 @@ Avval imzolash shart — `sign-challenge`/`submit-signed` (pastda) o'tmagan hujj
 **Ruxsat**: `einvoice.sign`.
 **So'rov**: `{challenge_id, signature_pkcs7: "<base64>"}`.
 **Javob**: `200 {status:"signed", signed_at}` — `audit_log(action=sign)` yoziladi.
-**Xatolar**: `422 {code:"EIMZO_SIGN_FAILED"}` (imzo tekshiruvi muvaffaqiyatsiz — sertifikat muddati/parol), `409 {code:"EINVOICE_ALREADY_SIGNED"}`, `404 NOT_FOUND` (`params.resource="einvoice"`).
+**Xatolar**: `422 {code:"EIMZO_SIGN_FAILED"}` (`params.reason`: `challenge_invalid`, `content_mismatch`, `certificate_expired`, `bad_format`, `document_changed`, `verification_unavailable`), `409 {code:"EINVOICE_ALREADY_SIGNED"}`, `404 NOT_FOUND` (`params.resource="einvoice"`).
 **Idempotentlik**: `Idempotency-Key` majburiy (`accept`/`reject`/`submit-signed`); `document_hash` orqali ham qo'shimcha himoya (bitta hujjat bir necha marta imzolansa, oxirgisi amal qiladi, `21-integratsiyalar.md` §5).
 **Offline**: yo'q — imzolash E-IMZO OCSP/TSA tekshiruvi orqali online talab qiladi.
 **Bog'liq**: US-M07-03, BP-01, BO-15.
@@ -1012,7 +1015,7 @@ Avval imzolash shart — `sign-challenge`/`submit-signed` (pastda) o'tmagan hujj
 
 ### `POST /ettn-documents/{id}/sign-challenge` · `POST /ettn-documents/{id}/submit-signed`
 
-**Maqsad**: chiquvchi e-TTN'ni (§13 `post` yaratgan) E-IMZO bilan imzolash va operatorga yuborish — oqim §19 `sign-challenge`/`submit-signed` bilan bir xil (`{document_hash, challenge_id}` → `{challenge_id, signature_pkcs7}`). `submit-signed` muvaffaqiyatli bo'lsa `status="sending"`, `outbox_jobs(kind="ettn_send")` → operator ro'yxatga olgach `status="registered"`, `operator_doc_id` va `transfers.ettn_ref` to'ldiriladi. `received`/`registered` holatdagi hujjat uchun `sign-challenge` tasdiq/rad payload'ini qaytaradi (`?action=accept|reject`) — imzo `accept`/`reject` tanasida yuboriladi.
+**Maqsad**: chiquvchi e-TTN'ni (§13 `post` yaratgan) E-IMZO bilan imzolash va operatorga yuborish — oqim §19 `sign-challenge`/`submit-signed` bilan bir xil (`{document_hash, challenge_id}` → `{challenge_id, signature_pkcs7}`). `submit-signed` muvaffaqiyatli bo'lsa `202 {id, status:"sending", signed_at}`, `outbox_jobs(kind="ettn_send")` (jo'natuvchining PKCS#7 imzosi bilan) → operator ro'yxatga olgach `status="registered"`, `operator_doc_id` va `transfers.ettn_ref` to'ldiriladi. `received`/`registered` holatdagi hujjat uchun `sign-challenge` tasdiq/rad payload'ini qaytaradi (`?action=accept|reject`) — imzo `accept`/`reject` tanasida yuboriladi.
 **Ruxsat**: `einvoice.sign`.
 **Xatolar**: `404 NOT_FOUND` (`params.resource="ettn_document"`), `409 DOC_INVALID_STATE` (`submit-signed` — `pending_signature`/`failed`dan tashqari holat), `422 EIMZO_SIGN_FAILED`, `503 EINVOICE_PROVIDER_UNAVAILABLE`.
 
@@ -1029,7 +1032,7 @@ Avval imzolash shart — `sign-challenge`/`submit-signed` (pastda) o'tmagan hujj
 **Ruxsat**: `purchases.receive` (kiruvchi) / `transfer.receive` (ichki); imzo — `einvoice.sign`.
 **So'rov**: `accept` — `{challenge_id, signature_pkcs7}`; `reject` — `{reason: string, challenge_id, signature_pkcs7}`.
 **Javob**: `202 {status:"queued"}` → `status="accepted"`/`"rejected"`.
-**Xatolar**: `404 NOT_FOUND`, `409 DOC_INVALID_STATE` (`received`/`registered`dan tashqari holat yoki birlashtirilgan EHF+TTN), `422 EIMZO_SIGN_FAILED`.
+**Xatolar**: `404 NOT_FOUND`, `409 DOC_INVALID_STATE` (`received`/`registered`dan tashqari holat, birlashtirilgan EHF+TTN — `params.reason="combined_with_einvoice"`, ichki ko'chirish hali qabul qilinmagan — `params.reason="transfer_not_received"`), `422 EIMZO_SIGN_FAILED`.
 
 **Idempotentlik**: `Idempotency-Key` majburiy (barcha yozuvchi amallar).
 **Offline**: yo'q — operator va E-IMZO online talab qiladi; offline ko'chirish uchun e-TTN internet qaytgach, tashishdan oldin (§13).

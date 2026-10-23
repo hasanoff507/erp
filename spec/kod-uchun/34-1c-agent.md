@@ -149,7 +149,7 @@ Faqat shu ro'yxat; yangi paket — PR'da asoslash va litsenziya tekshiruvi bilan
 | `BouncyCastle.Cryptography` (2.x) | Ed25519 imzo/tekshirish, sof managed | MIT | NSec/libsodium — taqiq (native, net48 emas) |
 | `Serilog`, `Serilog.Sinks.File`, `Serilog.Formatting.Compact` | Aylanuvchi JSON-qator loglar (§9.1) | Apache-2.0 | — |
 | `QRCoder` | Ulash kodi QR'i (`verification_uri_complete`) | MIT | Faqat supervisor |
-| Test: `xunit`, `xunit.runner.visualstudio`, `Shouldly`, `NSubstitute` | Testlar | Apache/BSD/MIT | FluentAssertions 8+ — taqiq (tijoriy litsenziya) |
+| Test: `xunit`, `xunit.runner.visualstudio`, `Shouldly`, `NSubstitute`, `Microsoft.NET.Test.Sdk` (`dotnet test` xosti) | Testlar | Apache/BSD/MIT | FluentAssertions 8+ — taqiq (tijoriy litsenziya) |
 
 **Taqiqlangan:** ILMerge/Costura/ConfuserEx va har qanday paketlovchi/obfuskator; native DLL olib keladigan paketlar; `Velopack` (Win7 qo'llovi tasdiqlanmagan); telemetriya SDK'lari (Sentry agentda yo'q — xatolar A-06 orqali).
 
@@ -164,7 +164,7 @@ Faqat shu ro'yxat; yangi paket — PR'da asoslash va litsenziya tekshiruvi bilan
 
 | Qadam | Qayerda | Nima |
 |---|---|---|
-| 1. Build + unit testlar | CI (`windows-2022`) | `Release`, imzosiz artefakt |
+| 1. Build + unit testlar | CI (`windows-latest`) | `Release`, imzosiz artefakt |
 | 2. Authenticode | Imzolash PK'si (OV sertifikat, qaror #38; kalit — apparat tokenda yoki CA bulut imzolash xizmatida, 26 #105) | `signtool sign /fd sha256 /tr <RFC3161 TSA> /td sha256 /n "<noshir>"` — `ErpOneCAgent.exe`, `OneCWorker.x86.exe`, `OneCWorker.x64.exe`, `Erp1C.*.dll`, uchinchi tomon DLL'lari (imzosizlari) |
 | 3. O'rnatuvchi | Imzolash PK'si | `ISCC.exe` (`SignTool=` direktivasi bilan — setup va `unins000.exe` ham imzolanadi) |
 | 4. Tekshiruv | Imzolash PK'si | `signtool verify /pa /all` har faylga; noshir nomi `ExpectedPublisher` ga teng |
@@ -506,7 +506,7 @@ sequenceDiagram
 | `slow_down` | `interval += 5` |
 | `expired_token` | «Kod muddati tugadi» + [Yangi kod] (yangi device_authorization, **o'sha** kalit juftligi bilan) |
 | `access_denied` | Egasi BO-22 da so'rovni rad etdi (W-04 «Rad etish» → `app.onec_device_auth_deny`, `33` §10.3) — «Ulash rad etildi» + [Yangi kod] |
-| `429 RATE_LIMITED` | «Juda ko'p urinish — 1 soatdan keyin» (`Retry-After` bo'lsa shuni ko'rsatish) |
+| `429` (`{"error":"slow_down","error_description":"rate_limited"}`) | «Juda ko'p urinish — 1 soatdan keyin» (`Retry-After` bo'lsa shuni ko'rsatish) |
 | Tarmoq xatosi | §7.8 backoff, kod amal qilish muddati ichida |
 | `200` | Saqlash: `agent_id`, `agent_client_id`, `tenant_name`, `keyset`; access token xotirada (§5.4) |
 
@@ -1541,7 +1541,7 @@ Har vazifa yakuni bo'yicha bildirishnoma **yo'q** (natija Telegram va BO-23 da �
 
 | Ish | Runner | Qadamlar |
 |---|---|---|
-| `agent-build` (har PR, `agent-1c/**` yoki `shared/**` o'zgarsa) | GitHub `windows-2022` | restore (lock fayl bilan) → `SchemaHash` tekshiruvi → build x86/x64/AnyCPU `Release` → unit testlar → qora ro'yxat grep (§8.1.2) → Inno compile (imzosiz) → artefakt |
+| `agent-build` (har PR, `agent-1c/**` yoki `shared/**` o'zgarsa) | GitHub `windows-latest` | restore (lock fayl bilan) → `SchemaHash` tekshiruvi → build x86/x64/AnyCPU `Release` → unit testlar → qora ro'yxat grep (§8.1.2) → artefakt; Inno compile (imzosiz) — o'rnatuvchi tarqatila boshlaganda (26 #105), hozir CI'da yo'q |
 | `agent-integration` (tunda, qo'lda) | self-hosted `onec` | §12.4 |
 | `agent-release` (teg `agent-v*`) | Imzolash PK'si (qo'lda tasdiq) | §2.5 qadamlari 2–6 |
 
@@ -1597,7 +1597,7 @@ Qaror #60: do'kon Windows kompyuteridagi **bitta** lokal dastur — «Do'kon age
 | Vazifa xavfsizligi | Har vazifa — §7.5 dagi kabi Ed25519 JWS (`knd` claim), `payload_sha256`, muddat, mahalliy jurnal (§8.14); har modulning o'z `kind` oq ro'yxati; noma'lum `kind` → rad |
 | Jarayon | Supervisor — tarmoq, sirlar, UI, rejalashtirish; har qurilma o'z yo'lagida (`DeviceLane` — qurilma bo'yicha FIFO), 1C `BaseLane` lari bilan bloklashmaydi: 1C'ga uzun yozish chek chiqarishni kechiktirmaydi |
 | 1C moduli chegaralari | O'zgarmaydi: 13 turli oq ro'yxat, COM metodlari oq ro'yxati, uch qulf (`33` §3.1); yangi modullar 1C COM'ga tegmaydi |
-| Lokal kanal | Qaror #60: agent `127.0.0.1:<port>` da lokal API beradi — POS (PWA) shu PK'dan internet uzilganda ham chek chiqarishi, bank karta terminalidan to'lov olishi (qaror #71) va xom printerga chop etishi uchun. Yo'llar (`/v1/status`, `/v1/pair`, `/v1/fiscal/*`, `/v1/card/*`, `/v1/print/raw`), so'rov/javob sxemalari, standart port `47110` va xato shakli — yagona ta'rif `21-integratsiyalar.md` §16.1; himoya — `21` §16: faqat loopback, `Origin` oq ro'yxati (`https://app.<domen>`), CORS/Private Network Access javobi faqat shu `Origin` uchun, qurilmaga bog'langan lokal token (tray'dagi 6 raqamli bir martalik kod → `POST /v1/pair {code, device_id}` → 256-bit token, `device_id` bilan juft holda DPAPI ostida; tray «Ulangan kassalar»dan o'chiriladi). Agent javob bermasa POS «Fiskal modul ulanmagan» holatida chekni yopmaydi (`24-frontend-arxitekturasi.md` §6.4). 1C moduli lokal API'dan foydalanmaydi |
+| Lokal kanal | Qaror #60: agent `127.0.0.1:<port>` da lokal API beradi — POS (PWA) shu PK'dan internet uzilganda ham chek chiqarishi, bank karta terminalidan to'lov olishi (qaror #71) va xom printerga chop etishi uchun. Yo'llar (`/v1/status`, `/v1/pair`, `/v1/fiscal/*`, `/v1/card/*`, `/v1/print/raw`), so'rov/javob sxemalari, standart port `47110` va xato shakli — yagona ta'rif `21-integratsiyalar.md` §16.1; himoya — `21` §16: faqat loopback, `Origin` oq ro'yxati (`https://app.<domen>`), CORS/Private Network Access javobi faqat shu `Origin` uchun, qurilmaga bog'langan lokal token (tray'dagi 6 raqamli bir martalik kod → `POST /v1/pair {code, device_id}` → 256-bit token, `device_id` bilan juft holda DPAPI ostida (`local-pairs.json`); har so'rovda `Authorization: Bearer` + `X-Device-Id`; tray «Ulangan kassalar»dan o'chiriladi). Server — `127.0.0.1` ga bog'langan TCP tinglovchidagi minimal HTTP/1.1 (`HttpListener`/URL ACL emas — admin kerak emas, boshqa interfeysda port ochilmaydi), `Host` sarlavhasi ham faqat loopback nomi (DNS rebinding'ga qarshi); tekshiruv tartibi va kodlar — `21` §16.1 «Kanal qoidalari»; ruxsat etilgan `Origin` lar va portlar ro'yxati build'ga kompilyatsiya qilinadi (`AgentAppOrigins`, `AgentLocalPorts`; DEV build'da `settings.local_api.dev_origins` qo'shiladi). Agent javob bermasa POS «Fiskal modul ulanmagan» holatida chekni yopmaydi (`24-frontend-arxitekturasi.md` §6.4). 1C moduli lokal API'dan foydalanmaydi |
 | Kod tuzilishi | Har modul alohida loyiha (`Erp1C.*` yonida); fiskal modul kodi — alohida, kam o'zgaradigan paket (VMQ-943 2-ilova 6-band: fiskal qism o'zgarsa qayta xulosa); karta terminali — `Erp1C.CardTerminal` (kontrakt, holat mashinasi, jurnal) + har vendor uchun alohida drayver loyihasi (§14.4) |
 | Kod-imzolash | O'sha OV Authenticode va imzoli manifest (§2.5, §4.4); pilot tarqatish sharti — 26 #105 |
 
@@ -1637,17 +1637,17 @@ Ikki xil kanal — aralashtirilmaydi:
 
 | `kind` | Vazifa | Payload | Natija |
 |---|---|---|---|
-| `fiscal.status` | FM holati: `fm_state`, yuborilmagan cheklar soni, eng eski yuborilmagan chek vaqti, OFD tasdig'ini olgan cheklar (har 5 daqiqa) | `{cash_register_id}` | `{cash_register_id, fm_state, pending_count, oldest_unacked_at, acked:[{fm_terminal_id, fm_receipt_seq, acked_at}]}` → `cash_registers.fm_state`, `fm_receipts_pending`, `last_unacked_receipt_at`; `acked[]` → `fiscal_receipts.ofd_acked_at` |
-| `fiscal.resend_unsent` | Yuborilmagan cheklarni qayta yuborish (40 soatda server avtomatik qo'yadi, BO-14'da qo'lda ham) | `{cash_register_id}` | `ResendResult {sent, failed, acked:[…]}` |
-| `fiscal.zreport` | Smena POS'siz yopilganda Z-hisobotni FM'dan olish | `{cash_register_id, shift_id}` | `ZReport` → `fiscal_receipts(kind='z_report')` |
-| `print.raw` | Back-office'dan LAN printerga chop etish | `{printer_local_id, data_base64, encoding: "cp866"\|"raster"}` | yuborildi / printer xatosi |
+| `fiscal.status` | FM holati: `fm_state`, yuborilmagan cheklar soni, eng eski yuborilmagan chek vaqti, OFD tasdig'ini olgan cheklar (har 5 daqiqa) | `{cash_register_id, local_id}` | `{cash_register_id, fm_state, pending_count, oldest_unacked_at, acked:[{fm_terminal_id, fm_receipt_seq, acked_at}]}` (`acked[]` — oldingi natijalarda yuborilmagan tasdiqlar) → `cash_registers.fm_state`, `fm_receipts_pending`, `last_unacked_receipt_at`; `acked[]` → `fiscal_receipts.ofd_acked_at` |
+| `fiscal.resend_unsent` | Yuborilmagan cheklarni qayta yuborish (40 soatda server avtomatik qo'yadi, BO-14'da qo'lda ham) | `{cash_register_id, local_id}` | `ResendResult {cash_register_id, sent, failed, acked:[…]}` |
+| `fiscal.zreport` | Smena POS'siz yopilganda Z-hisobotni FM'dan olish (FM'da smena ochiq bo'lsa agent uni yopadi, aks holda oxirgi Z-hisobotni beradi) | `{cash_register_id, local_id, shift_id}` | `ZReport {cash_register_id, shift_id, fm_terminal_id, z_number, totals:{sale, return, by_payment_form} (tiyin), closed_at}` → `fiscal_receipts(kind='z_report')` |
+| `print.raw` | Back-office'dan LAN printerga chop etish | `{printer_local_id, data_base64, encoding: "cp866"\|"raster"}` | `{status:"sent", printer_local_id, bytes}` / `failed` `PRINTER_UNREACHABLE` yoki `NOT_FOUND` (`retryable_hint=false`) |
 | `scale.plu_upload` | PLU ro'yxatini yorliqli taroziga yuklash (CAS TCP 20304, Shtrih-Print UDP 1111) — **MVP'dan keyin** (MVP'da PLU CSV eksport) | `{scale_local_id, items:[{plu, name, price, barcode_prefix}]}` | yuklangan qatorlar soni / xato |
-| `card.status` | Karta terminallari holati (`health`) va jurnalda hal qilinmagan `unknown` urinishlarni terminaldan aniqlash (har 5 daqiqa) | `{card_terminal_ids?:[]}` | `{terminals:[{card_terminal_id, local_id, status, tid, last_tx_at}], unresolved:[CardTxResult]}` → `card_terminals.health_status`; `unresolved[]` → `card_terminal_transactions` (`resolved_by='status_query'`) |
-| `card.settlement` | Smena POS'siz yopilganda yoki kun oxirida terminal settlement'i | `{card_terminal_id, shift_id?}` | `SettlementResult` → `card_terminal_settlements` (server `expected_*`/`variance`/`status` ni hisoblaydi) |
+| `card.status` | Karta terminallari holati (`health`) va jurnalda hal qilinmagan `unknown` urinishlarni terminaldan aniqlash (har 5 daqiqa) | `{terminals:[{card_terminal_id, local_id}]}` (bo'sh — agentdagi barcha terminallar) | `{terminals:[{card_terminal_id, local_id, status, tid, last_tx_at}], unresolved:[CardTxResult + resolved_by + local_id]}` → `card_terminals.health_status`; `unresolved[]` (holat so'rovi bilan hal qilingan, har biri bir marta) → `card_terminal_transactions` (`resolved_by='status_query'`) |
+| `card.settlement` | Smena POS'siz yopilganda yoki kun oxirida terminal settlement'i | `{card_terminal_id, local_id, shift_id?}` | `SettlementResult {card_terminal_id, local_id, tid, batch_no, count, total_tiyin, refund_count, refund_total_tiyin, by_scheme[], settled_at}` → `card_terminal_settlements` (server `expected_*`/`variance`/`status` ni hisoblaydi) |
 
-**Karta terminali bog'lanishi:** `card.*` vazifasi payload'idagi `card_terminal_id` — `card_terminals.agent_id` shu agent bo'lgan terminal; agent vazifani `card_terminals.local_id` qurilmasida bajaradi. `card.*` vazifasi to'lov (`purchase`/`refund`/`void`) bajarmaydi — ular faqat lokal API orqali.
+**Karta terminali bog'lanishi:** `card.*` vazifasi payload'idagi `card_terminal_id` — `card_terminals.agent_id` shu agent bo'lgan terminal; agent server id'larini bilmaydi, vazifani payload'dagi `local_id` (= `card_terminals.local_id`) qurilmasida bajaradi. `card.*` vazifasi to'lov (`purchase`/`refund`/`void`) bajarmaydi — ular faqat lokal API orqali.
 
-**Kassa bog'lanishi:** `fiscal.*` vazifasi payload'idagi `cash_register_id` kassasi agentga `cash_registers.fiscal_agent_id` (shu agent) va `cash_registers.fiscal_local_device_id` (`capabilities.fiscal.devices[].local_id`) orqali bog'langan; agent vazifani shu `local_id` qurilmasida bajaradi.
+**Kassa bog'lanishi:** `fiscal.*` vazifasi payload'idagi `cash_register_id` kassasi agentga `cash_registers.fiscal_agent_id` (shu agent) va `cash_registers.fiscal_local_device_id` (`capabilities.fiscal.devices[].local_id`) orqali bog'langan; server shu `local_id` ni payload'ga qo'yadi va agent vazifani shu qurilmada bajaradi (payload'da `local_id` bo'lmasa — POS'ning `/v1/fiscal/*` chaqiruvlaridagi `CashRegisterRef` dan o'rganilgan `cash_register_id → local_id` jurnali, u ham bo'lmasa `failed FISCAL_PROVIDER_ERROR`, `field="payload.local_id"`).
 
 Kassadagi jonli og'irlik agent vazifasi emas — desktop Chrome'da Web Serial (MVP'dan keyin, `24-frontend-arxitekturasi.md` §6.3); vaznli shtrix kod prefiksi (EAN-13) — do'kon sozlamasi, POS tomonda.
 
@@ -1667,7 +1667,7 @@ Vazifa: POS'ning `CardTerminalPort` chaqiruvlarini (`21-integratsiyalar.md` §9.
 | `POST /v1/card/refund`, `/void` | `original_rrn` yoki `original_attempt_id` (jurnaldan RRN olinadi); ≤ 60 s |
 | `GET /v1/card/tx/{attempt_id}` | Jurnaldan; holat `unknown` bo'lsa — drayver `GetStatusAsync`, qo'llamasa `GetLastTransactionAsync` (ERN/summa/vaqt bo'yicha moslash), natija jurnalga (`resolved_by='status_query'`) |
 | `POST /v1/card/cancel-pending` | Drayver `CancelPendingAsync` (qo'llamasa `not_cancellable`) |
-| `POST /v1/card/settlement` | Drayver `SettlementAsync`; natija jurnalga va keyingi `results` outbox orqali serverga |
+| `POST /v1/card/settlement` | Drayver `SettlementAsync`; natija jurnalga; serverga POS yozadi (`POST /api/v1/card-terminal-settlements`, `18` §16a.6), POS yopiq bo'lsa — `card.settlement` vazifa natijasi |
 
 **Drayver plug-in modeli**:
 ```csharp
@@ -1693,9 +1693,9 @@ public interface ICardTerminalDriver
 **Qoidalar**:
 - **Avtomatik takrorlash yo'q**: `PurchaseAsync` bir `attempt_id` uchun bir martadan ortiq chaqirilmaydi (jurnal yozuvi `sent` bo'lgach — hech qachon); taymaut/uzilish → `unknown`. `HealthAsync`, `GetStatusAsync`, `SettlementAsync` — 3 martagacha, 2 s oraliq.
 - **Taymautlar**: ulanish 5 s; `purchase` 120 s; `refund`/`void` 60 s; `health` 3 s.
-- **`DeviceLane`**: har terminal — o'z FIFO yo'lagi; bir vaqtda bitta tranzaksiya, kutayotgan so'rov bo'lsa yangi `purchase` → `409 CARD_TERMINAL_BUSY` (navbatga qo'yilmaydi — kassir bir vaqtda ikki to'lov boshlamasligi kerak). Fiskal va printer yo'laklari bilan bloklashmaydi.
+- **`DeviceLane`**: har terminal — o'z FIFO yo'lagi; bir vaqtda bitta tranzaksiya, bajarilayotgan yoki kutayotgan tranzaksiya bo'lsa yangi `purchase` → `409 CARD_TERMINAL_BUSY` (navbatga qo'yilmaydi — kassir bir vaqtda ikki to'lov boshlamasligi kerak); `refund`/`void`/`settlement` va qisqa amallar (`health`, holat so'rovi) FIFO navbatda kutadi. Fiskal va printer yo'laklari (har qurilma — o'z `DeviceLane`) bilan bloklashmaydi. Agent `unknown` urinish bo'yicha terminalni bloklamaydi — yangi xaridni bloklash (`CARD_OUTCOME_UNKNOWN`) POS va server qoidasi (`21` §9.4), chunki menejer yopishi faqat serverda bo'ladi.
 - **Tarmoq**: terminal manzili faqat sozlamadagi xususiy LAN IP (RFC 1918) va port; ixtiyoriy host yo'q; terminal topish (POS-16 «Uskunalar sozlamasi») — foydalanuvchi IP kiritadi yoki drayver qo'llasa lokal subnetda tor skan (faqat drayver portlari).
-- **Jurnal** `card_journal.jsonl` (DPAPI'siz, lekin sirsiz): `attempt_id`, `kind`, `local_id`, `amount_tiyin`, `status`, `rrn`, `approval_code`, `card_mask`, `card_scheme`, `tid`, `tx_at`, `resolved_by`; **to'liq PAN, track, CVV, PIN-blok hech qachon** — drayver bunday maydon qaytarsa umumiy qatlam uni tashlaydi va `card_mask` ga normallashtiradi; Serilog'da ham shu `SecretMasker` (§9.2) qoidasi. Saqlash — 90 kun.
+- **Jurnal** `card_journal.jsonl` (DPAPI'siz, lekin sirsiz; har qator — urinishning to'liq holati, `fsync` bilan; holatlar `created` → `sent` → `done`): `attempt_id`, `kind`, `local_id`, `amount_tiyin`, `status`, `rrn`, `approval_code`, `card_mask`, `card_scheme`, `tid`, `tx_at`, `resolved_by`, javobning HTTP holati va kodi (bir xil `attempt_id` ga aynan o'sha javob qaytadi), asl urinish va `void` bog'lanishi; **to'liq PAN, track, CVV, PIN-blok hech qachon** — drayver bunday maydon qaytarsa umumiy qatlam uni tashlaydi va `card_mask` ga normallashtiradi; Serilog'da ham shu `SecretMasker` (§9.2) qoidasi. Saqlash — 90 kun.
 - **Sirlar**: vendor kredensiali (bo'lsa) — DPAPI `CurrentUser` (§5.1); serverga chiqmaydi.
 - **Settlement**: POS smena yopilishida `/v1/card/settlement` chaqiradi; POS yopiq bo'lsa server `card.settlement` vazifasini qo'yadi (§14.3 (b)).
 

@@ -2,7 +2,8 @@
 
 ``POST`` / ``PATCH`` (draft) — ``purchases.receive``; ``post`` / ``cancel`` — ``purchases.post``
 (qaror #49); reads — ``stock.view``. Every write needs ``Idempotency-Key`` (17 §6). ``from-einvoice``
-is Bosqich 5.
+(``purchases.receive``) prefills a draft from an accepted incoming e-invoice (ACC-07: invoice line amounts
+kept).
 """
 
 from __future__ import annotations
@@ -20,7 +21,12 @@ from app.core.auth.principal import Principal
 from app.core.money import PercentStr, PriceStr, QtyStr
 from app.core.permissions import BranchScope, PermissionGrant, current_branch_scope, require_permission
 from app.modules.purchasing.api.purchase_orders import SupplierRef, purchasing_module
-from app.modules.purchasing.application.goods_receipts import ReceiptInput, ReceiptLineInput
+from app.modules.purchasing.application.goods_receipts import (
+    EInvoiceLineProduct,
+    FromEInvoiceInput,
+    ReceiptInput,
+    ReceiptLineInput,
+)
 from app.modules.purchasing.application.ports import DocFilter
 from app.modules.purchasing.application.purchase_orders import scope_branches
 
@@ -77,6 +83,27 @@ class ReceiptIn(BaseModel):
     comment: Text | None = None
 
 
+class EInvoiceLineProductIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    line_no: int = Field(ge=1, description="e-invoice payload line_no")
+    product_id: UUID
+
+
+class FromEInvoiceIn(BaseModel):
+    """19 §8 ``from-einvoice``: everything else comes from the accepted e-invoice; ``lines`` maps invoice
+    lines the
+    server could not match (by ``product_id``, barcode or a unique MXIK code) to catalogue products."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    warehouse_id: UUID
+    doc_date: date | None = Field(
+        default=None, description="Receipt date; default — the current business day"
+    )
+    lines: list[EInvoiceLineProductIn] = Field(default_factory=list, max_length=1000)
+
+
 class ReceiptCancel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -104,7 +131,9 @@ class ReceiptLineOut(BaseModel):
     vat_rate: str
     vat_exemption_code: str | None
     vat_amount: str = Field(description="ROUND_HALF_UP(net_amount × vat_rate / 100, 2)")
-    net_amount: str = Field(description="ROUND_HALF_UP(qty × cost, 2)")
+    net_amount: str = Field(
+        description="ROUND_HALF_UP(qty × cost, 2); from-einvoice lines — the invoice amount"
+    )
     total_amount: str
     expiry_date: str | None
     discrepancy_reason: DiscrepancyReason | None
@@ -240,6 +269,35 @@ async def create_goods_receipt(
 ) -> dict[str, Any]:
     gr = await purchasing_module(request).goods_receipts.create(actor, scope, _input(body), _ip(request))
     response.headers["Location"] = f"{request.url.path}/{gr['id']}"
+    return gr
+
+
+@router.post(
+    "/goods-receipts/from-einvoice/{einvoice_id}",
+    operation_id="purchasing_create_goods_receipt_from_einvoice",
+    response_model=ReceiptOut,
+    status_code=201,
+)
+async def create_goods_receipt_from_einvoice(
+    request: Request,
+    response: Response,
+    einvoice_id: UUID,
+    body: FromEInvoiceIn,
+    actor: Actor,
+    scope: Scope,
+    _: CanReceive,
+) -> dict[str, Any]:
+    data = FromEInvoiceInput(
+        warehouse_id=body.warehouse_id,
+        doc_date=body.doc_date,
+        lines=[EInvoiceLineProduct(ln.line_no, ln.product_id) for ln in body.lines],
+    )
+    gr = await purchasing_module(request).goods_receipts.from_einvoice(
+        actor, scope, einvoice_id, data, _ip(request)
+    )
+    response.headers["Location"] = (
+        f"{request.url.path.rsplit('/goods-receipts', 1)[0]}/goods-receipts/{gr['id']}"
+    )
     return gr
 
 

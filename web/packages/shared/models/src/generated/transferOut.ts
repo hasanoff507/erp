@@ -4,7 +4,7 @@
  * ERP API
  * OpenAPI spec version: 0.1.0
  */
-import type { EttnOut } from './ettnOut.ts';
+import type { AppModulesInventoryApiTransfersEttnOut } from './appModulesInventoryApiTransfersEttnOut.ts';
 import type { TransferLineOut } from './transferLineOut.ts';
 import type { TransferOutStatus } from './transferOutStatus.ts';
 import type { TransferOutTransportMode } from './transferOutTransportMode.ts';
@@ -23,7 +23,7 @@ export interface TransferOut {
   vehicle_plate: string | null;
   driver_name: string | null;
   ettn_ref: string | null;
-  ettn: EttnOut | null;
+  ettn: AppModulesInventoryApiTransfersEttnOut | null;
   /** status=sent longer than settings.transfer_overdue_hours (QT-M06-05) */
   is_overdue: boolean;
   comment: string | null;

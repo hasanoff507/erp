@@ -2,7 +2,8 @@
  * «Soliq hisob-kitobi (ST)» card of BO-07 (07 BO-07 lines «Soliq hisob-kitobi (ST)» bloki; 20 #8a–#8d):
  * status, document, kind, period, base, rate, amount, posting (Dt/Kt with account names); «Qoralama
  * hisoblash» (`accounting.post`), «O'tkazish» (confirm «{davr} uchun {amount} so'm provodka yoziladi»;
- * the server recomputes), «Bekor qilish» (reason). Months only; a turnover-tax payer settles per branch.
+ * the server recomputes), «Bekor qilish» (reason), «o'tkazishdan keyingi 6410 qoldig'i» (trial balance 6410
+ * row, unsigned with its side, per tax type). Months only; a turnover-tax payer settles per branch.
  */
 import { useUnit } from "effector-react";
 import { Calculator, CheckCircle2, CircleAlert, Hourglass, Send, X } from "lucide-react";
@@ -26,6 +27,7 @@ import {
   type Tone,
 } from "@shared/ui";
 
+import { sidedBalance } from "#/shared/lib/balances.ts";
 import { ReasonDialog } from "#/shared/ui/ReasonDialog.tsx";
 
 import { $period } from "../../model/index.ts";
@@ -38,6 +40,8 @@ import {
   $stError,
   $stStatus,
   $taxKinds,
+  $balance6410,
+  $taxBalanceEnabled,
   cancelSettlementFx,
   createBody,
   createSettlementFx,
@@ -46,6 +50,7 @@ import {
   postingOf,
   stNoticeDismissed,
   stReloadRequested,
+  type Balance6410,
   type TaxKind,
   type TaxSettlement,
 } from "../model/index.ts";
@@ -73,6 +78,8 @@ export function TaxSettlementCard({ monthLabel }: { monthLabel: (period: string)
     activeBranch,
     branches,
     kinds,
+    balance6410,
+    showBalance,
   ] = useUnit([
     $period,
     $isMonthPeriod,
@@ -86,6 +93,8 @@ export function TaxSettlementCard({ monthLabel }: { monthLabel: (period: string)
     $activeBranchId,
     $branches,
     $taxKinds,
+    $balance6410,
+    $taxBalanceEnabled,
   ]);
   const [create, post, cancel, reload, dismiss] = useUnit([
     createSettlementFx,
@@ -214,6 +223,8 @@ export function TaxSettlementCard({ monthLabel }: { monthLabel: (period: string)
         </ul>
       )}
 
+      {showBalance && isMonth ? <Balance6410View row={balance6410} /> : null}
+
       {lastPosted ? (
         <Banner
           tone={lastPosted.recalculated ? "warning" : "success"}
@@ -301,5 +312,38 @@ export function TaxSettlementCard({ monthLabel }: { monthLabel: (period: string)
         }}
       />
     </Card>
+  );
+}
+
+/** «O'tkazishdan keyingi 6410 qoldig'i» (07 BO-07): closing balance of 6410 and its split by tax type. */
+function Balance6410View({ row }: { row: Balance6410 | null }) {
+  const { t } = useTranslation("finance");
+  const total = sidedBalance(row?.closing_balance ?? "0.00");
+  return (
+    <div className="flex flex-col gap-1.5 rounded-xl border border-border bg-muted px-3 py-2.5" data-testid="balance-6410">
+      <div className="flex flex-wrap items-baseline gap-2">
+        <span className="text-[13px] font-semibold">{t("vat.settlement.balance6410")}</span>
+        <span className="grow" />
+        <span className="text-[15px] font-extrabold tabular-nums" data-testid="balance-6410-amount">
+          {money2(total.amount)}
+        </span>
+        <span className="text-[12px] text-foreground-secondary">{t(`balances.side.${total.side}`)}</span>
+      </div>
+      {row?.by_tax_type && row.by_tax_type.length > 0 ? (
+        <ul className="flex flex-col gap-0.5 text-[12px] text-foreground-secondary">
+          {row.by_tax_type.map((tt) => {
+            const b = sidedBalance(tt.closing_balance);
+            return (
+              <li key={tt.tax_type} className="flex justify-between gap-2">
+                <span>{t(`vat.settlement.taxTypes.${tt.tax_type}`, { defaultValue: tt.tax_type })}</span>
+                <span className="tabular-nums">
+                  {money2(b.amount)} · {t(`balances.side.${b.side}`)}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+    </div>
   );
 }

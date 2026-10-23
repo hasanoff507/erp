@@ -16,7 +16,8 @@ transaction, 23 §2.1):
    ``fiscal.send_failed`` (BO-14 "Qayta urinish" → :meth:`FiscalReceiptQueries.retry`).
 
 **Monitor** (cron ``fiscal_unacked_monitor``, every 5 min): per register the oldest receipt with
-``ofd_acked_at IS NULL``; at 24 / 40 / 46 / 48 h one M18 event ``offline_48h`` per (receipt, stage);
+``ofd_acked_at IS NULL``; at 24 / 40 / 46 / 48 h one M18 event ``offline_48h`` per (receipt, stage); from
+40 h a register bound to a store agent gets one ``fiscal.resend_unsent`` task per oldest receipt (21 §16);
 the 48 h block start / end is audited (``fiscal.offline_48h_blocked`` / ``fiscal.offline_48h_unblocked``)
 and ``cash_registers.last_unacked_receipt_at`` mirrors the oldest unacked receipt.
 """
@@ -24,7 +25,7 @@ and ``cash_registers.last_unacked_receipt_at`` mirrors the oldest unacked receip
 from __future__ import annotations
 
 import base64
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Final, Protocol
@@ -39,6 +40,7 @@ from app.core.error_codes import ErrorCode
 from app.core.errors import AppError
 from app.core.idempotency import stage_response
 from app.core.permissions import BranchScope
+from app.modules.integrations.fiscal.application.metrics import OFD_SEND
 from app.modules.integrations.fiscal.application.ports import (
     CashRegisterRef,
     ClaimedJob,
@@ -62,6 +64,9 @@ from app.modules.integrations.fiscal.domain.rules import (
 log = structlog.get_logger(__name__)
 
 NOTIFY_KIND: Final = "offline_48h"
+RESEND_STAGE: Final = 40
+
+ResendRequester = Callable[[AsyncSession, UUID, UUID, str], Awaitable[object]]
 
 
 class EventRecorderPort(Protocol):
@@ -101,6 +106,12 @@ class OfdSendService:
 
     async def run(self, tenant_id: UUID, receipt_id: UUID | None = None) -> SendOutcome | None:
         """Process the job of ``receipt_id`` (or the oldest due one); ``None`` when nothing is due."""
+        outcome = await self._run(tenant_id, receipt_id)
+        if outcome is not None:
+            OFD_SEND.labels(outcome.status).inc()
+        return outcome
+
+    async def _run(self, tenant_id: UUID, receipt_id: UUID | None) -> SendOutcome | None:
         async with self._sf() as s, tenant_transaction(s, tenant_id):
             job_id = await self._repo.job_of(s, receipt_id) if receipt_id is not None else None
             if receipt_id is not None and job_id is None:
@@ -166,7 +177,11 @@ class OfdSendService:
     ) -> SendOutcome:
         async with self._sf() as s, tenant_transaction(s, tenant_id):
             await self._repo.get(s, receipt.id, lock=True)
-            await self._repo.set_fiscalized(s, receipt.id, result)
+            if receipt.kind == "z_report":  # the Z number is not a receipt number (uq_fiscal_fm_seq)
+                fm_z = {"z_number": result.fm_receipt_seq, "fiscal_sign": result.fiscal_sign}
+                await self._repo.set_z_fiscalized(s, receipt.id, result.terminal_id, result.fiscal_at, fm_z)
+            else:
+                await self._repo.set_fiscalized(s, receipt.id, result)
             if result.ofd_acked_at is not None:
                 await acknowledge(self._repo, s, receipt, result.ofd_acked_at)
             await self._repo.finish_job(s, job.id, "done", None)
@@ -238,10 +253,12 @@ class UnackedMonitor:
         session_factory: async_sessionmaker[AsyncSession],
         repo: FiscalRepository,
         events: EventRecorderPort,
+        resend: ResendRequester | None = None,
     ) -> None:
         self._sf = session_factory
         self._repo = repo
         self._events = events
+        self._resend = resend
 
     async def run(self, tenant_id: UUID, now: datetime | None = None) -> MonitorReport:
         at = now or datetime.now(UTC)
@@ -263,6 +280,9 @@ class UnackedMonitor:
                             f"offline_48h:{register_id}:{cur[0]}:{stage}",
                         )  # fmt: skip
                         events += int(written)
+                    if stage is not None and stage >= RESEND_STAGE and self._resend is not None:
+                        # 21 §16: from 40 h the server asks the store agent to resend (one task per receipt)
+                        await self._resend(s, tenant_id, register_id, str(cur[0]))
                 was_blocked = is_blocked(prev, at)
                 now_blocked = is_blocked(cur_at, at)
                 if now_blocked and not (was_blocked and prev == cur_at):

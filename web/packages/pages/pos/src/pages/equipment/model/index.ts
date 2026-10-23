@@ -7,7 +7,7 @@
  */
 import { attach, combine, createEffect, createEvent, createStore, sample } from "effector";
 
-import { AGENT_TOKEN_KEY, createAgentClient, type AgentClient } from "@shared/lib/agent";
+import type { AgentClient } from "@shared/lib/agent";
 import {
   DEFAULT_PRINTER_SETTINGS,
   PrinterError,
@@ -36,6 +36,7 @@ import {
 } from "@shared/state/device";
 
 import { $posDevice } from "#/entities/pos-session/index.ts";
+import { posAgentClient } from "#/shared/lib/device-runtime.ts";
 
 import { CATALOG_VIEW_KEY, printerFormErrors, type CatalogView } from "./lib.ts";
 
@@ -53,17 +54,7 @@ export interface EquipmentDeps {
   rasterizer?: Rasterizer;
 }
 
-let agentClient: AgentClient | null = null;
-/** Do'kon agenti client of the POS (token in erp-device, hw-api.md §1). */
-export function posAgentClient(): AgentClient {
-  agentClient ??= createAgentClient({
-    tokenStore: {
-      get: () => deviceSettings.get<string>(AGENT_TOKEN_KEY).then((t) => t ?? null),
-      set: (t) => (t ? deviceSettings.set(AGENT_TOKEN_KEY, t) : deviceSettings.remove(AGENT_TOKEN_KEY)),
-    },
-  });
-  return agentClient;
-}
+export { posAgentClient };
 
 function defaultDeps(): EquipmentDeps {
   return {

@@ -263,7 +263,7 @@ export const VAT_INTERNAL_PATH = "/app/tax/vat";
 /**
  * Where an item's link goes for this user: «Sozlamalar» → the first Settings tab the user may open
  * (same order and permissions as the Settings tab bar); «QQS va davlat hisoboti» → the BO-07 tab for a
- * `tax.vat.view` holder (BO-10 «Davlat hisoboti bilan solishtirish» is a later stage); every other item →
+ * `tax.vat.view` holder (BO-10 «Davlat hisoboti bilan solishtirish»); every other item →
  * its route.
  */
 export function navItemTarget(item: NavItem, granted: GrantedAccess): string {

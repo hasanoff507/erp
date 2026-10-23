@@ -1,0 +1,84 @@
+{
+  "description": "A-03 task envelope signed with the onec_task key (33 §9.4, 34 §7.5). Verify the JWS over the received seg0.seg1 bytes with `task_key.public_jwk`; check every claim against the envelope and the token context; psh == sha256(JCS(payload)).",
+  "task_key": {
+    "kid": "0192f0c4-7a00-7000-8000-000000000001",
+    "private_seed_hex": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+    "public_jwk": {
+      "kty": "OKP",
+      "crv": "Ed25519",
+      "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+      "kid": "0192f0c4-7a00-7000-8000-000000000001"
+    }
+  },
+  "token_context": {
+    "tenant_id": "0192f0c4-7a00-7000-8000-0000000000aa",
+    "agent_id": "0192f0c4-7a00-7000-8000-0000000000bb"
+  },
+  "now_unix_valid": 1792087362,
+  "now_unix_expired": 1792087813,
+  "envelope": {
+    "task_id": "0192f0c4-7a00-7000-8000-0000000000cc",
+    "kind": "fiscal.status",
+    "purpose": "device_service",
+    "base_id": null,
+    "local_id": null,
+    "attempt": 1,
+    "lease_id": "0192f0c4-7a00-7000-8000-0000000000dd",
+    "lease_until": "2026-10-15T18:03:42Z",
+    "timeout_s": 60,
+    "payload": {
+      "cash_register_id": "0192f0c4-7a00-7000-8000-000000000123"
+    },
+    "payload_sha256": "fc1691e8f8e3a08d47c5fe74360706a26132bb7845569267b979440276650cfa",
+    "kid": "0192f0c4-7a00-7000-8000-000000000001",
+    "signature": "eyJhbGciOiJFZERTQSIsInR5cCI6Im9uZWMtdGFzaytqd3QiLCJraWQiOiIwMTkyZjBjNC03YTAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMDEifQ.eyJpc3MiOiJ1cm46ZXJwOm9uZWMiLCJhdWQiOiJ1cm46ZXJwOm9uZWMtYWdlbnQ6MDE5MmYwYzQtN2EwMC03MDAwLTgwMDAtMDAwMDAwMDAwMGJiIiwidGlkIjoiMDE5MmYwYzQtN2EwMC03MDAwLTgwMDAtMDAwMDAwMDAwMGNjIiwiYXR0IjoxLCJsaWQiOiIwMTkyZjBjNC03YTAwLTcwMDAtODAwMC0wMDAwMDAwMDAwZGQiLCJ0ZW4iOiIwMTkyZjBjNC03YTAwLTcwMDAtODAwMC0wMDAwMDAwMDAwYWEiLCJhaWQiOiIwMTkyZjBjNC03YTAwLTcwMDAtODAwMC0wMDAwMDAwMDAwYmIiLCJiaWQiOm51bGwsImtuZCI6ImZpc2NhbC5zdGF0dXMiLCJwc2giOiJmYzE2OTFlOGY4ZTNhMDhkNDdjNWZlNzQzNjA3MDZhMjYxMzJiYjc4NDU1NjkyNjdiOTc5NDQwMjc2NjUwY2ZhIiwiaWF0IjoxNzkyMDg3MzMyLCJleHAiOjE3OTIwODc2OTJ9.3Zac1MPMbYNoj0-nfK5UQGo2XBQzRW7MMRgcfwF7GFwINCv0z5RRm7wkigK-IaPxvCTitZZDj4pI94FsahWxDg"
+  },
+  "expected_header": {
+    "alg": "EdDSA",
+    "typ": "onec-task+jwt",
+    "kid": "0192f0c4-7a00-7000-8000-000000000001"
+  },
+  "expected_claims": {
+    "iss": "urn:erp:onec",
+    "aud": "urn:erp:onec-agent:0192f0c4-7a00-7000-8000-0000000000bb",
+    "tid": "0192f0c4-7a00-7000-8000-0000000000cc",
+    "att": 1,
+    "lid": "0192f0c4-7a00-7000-8000-0000000000dd",
+    "ten": "0192f0c4-7a00-7000-8000-0000000000aa",
+    "aid": "0192f0c4-7a00-7000-8000-0000000000bb",
+    "bid": null,
+    "knd": "fiscal.status",
+    "psh": "fc1691e8f8e3a08d47c5fe74360706a26132bb7845569267b979440276650cfa",
+    "iat": 1792087332,
+    "exp": 1792087692
+  },
+  "negative": [
+    {
+      "name": "payload_tampered",
+      "payload": {
+        "cash_register_id": "0192f0c4-7a00-7000-8000-000000000124"
+      },
+      "expect_reason": "payload_hash"
+    },
+    {
+      "name": "wrong_agent",
+      "token_agent_id": "0192f0c4-7a00-7000-8000-0000000000ee",
+      "expect_reason": "agent"
+    },
+    {
+      "name": "wrong_tenant",
+      "token_tenant_id": "0192f0c4-7a00-7000-8000-0000000000ef",
+      "expect_reason": "tenant"
+    },
+    {
+      "name": "signature_flipped",
+      "signature": "eyJhbGciOiJFZERTQSIsInR5cCI6Im9uZWMtdGFzaytqd3QiLCJraWQiOiIwMTkyZjBjNC03YTAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMDEifQ.eyJpc3MiOiJ1cm46ZXJwOm9uZWMiLCJhdWQiOiJ1cm46ZXJwOm9uZWMtYWdlbnQ6MDE5MmYwYzQtN2EwMC03MDAwLTgwMDAtMDAwMDAwMDAwMGJiIiwidGlkIjoiMDE5MmYwYzQtN2EwMC03MDAwLTgwMDAtMDAwMDAwMDAwMGNjIiwiYXR0IjoxLCJsaWQiOiIwMTkyZjBjNC03YTAwLTcwMDAtODAwMC0wMDAwMDAwMDAwZGQiLCJ0ZW4iOiIwMTkyZjBjNC03YTAwLTcwMDAtODAwMC0wMDAwMDAwMDAwYWEiLCJhaWQiOiIwMTkyZjBjNC03YTAwLTcwMDAtODAwMC0wMDAwMDAwMDAwYmIiLCJiaWQiOm51bGwsImtuZCI6ImZpc2NhbC5zdGF0dXMiLCJwc2giOiJmYzE2OTFlOGY4ZTNhMDhkNDdjNWZlNzQzNjA3MDZhMjYxMzJiYjc4NDU1NjkyNjdiOTc5NDQwMjc2NjUwY2ZhIiwiaWF0IjoxNzkyMDg3MzMyLCJleHAiOjE3OTIwODc2OTJ9.3Zac1MPMbYNoj0-nfK5UQGo2XBQzRW7MMRgcfwF7GFwINCv0z5RRm7wkigK-IaPxvCTitZZDj4pI94FsahWxDw",
+      "expect_reason": "signature"
+    },
+    {
+      "name": "unknown_kid",
+      "kid": "0192f0c4-7a00-7000-8000-000000000099",
+      "expect_reason": "signature"
+    }
+  ]
+}

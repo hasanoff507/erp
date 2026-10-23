@@ -17,7 +17,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-from typing import Any, Literal
+from typing import Any, Literal, Protocol
 from uuid import UUID
 
 from sqlalchemy import text
@@ -31,7 +31,7 @@ from app.core.money import money_str, price_str, qty_str
 from app.core.permissions import BranchScope
 from app.modules.reports.application.ports import Branches, ReportsRepository, SalesAgg, SalesGroup, StockRow
 from app.modules.reports.application.summary import SummaryService
-from app.modules.reports.domain.alerts import build_alerts
+from app.modules.reports.domain.alerts import RULES, build_alerts
 from app.modules.reports.domain.daily_summary import ZERO, average, m2
 from app.modules.reports.domain.periods import (
     DashboardPeriod,
@@ -92,10 +92,25 @@ def _sales_row(agg: SalesAgg | None, key: str, label: str | None) -> dict[str, A
     }
 
 
+class AlertSource(Protocol):
+    """Another slice's BO-02 alert counts (contracts/accounting.md: b5-fiscal ``fiscal_alerts``, b5-edocs
+    ``einvoice_alerts``) — ``{alert type: count}``; a known type overrides the reports module's own count."""
+
+    async def __call__(
+        self, s: AsyncSession, tenant_id: UUID, branch_ids: tuple[UUID, ...] | None
+    ) -> Mapping[str, int]: ...
+
+
 class ReportsService:
-    def __init__(self, session_factory: async_sessionmaker[AsyncSession], repo: ReportsRepository) -> None:
+    def __init__(
+        self,
+        session_factory: async_sessionmaker[AsyncSession],
+        repo: ReportsRepository,
+        alert_sources: Sequence[AlertSource] = (),
+    ) -> None:
         self._sf = session_factory
         self._repo = repo
+        self._alert_sources = tuple(alert_sources)
         self.summary = SummaryService(repo)
 
     async def _read(self, s: AsyncSession) -> None:
@@ -141,6 +156,11 @@ class ReportsService:
                 s, sc.branch_ids, datetime.now(UTC) - timedelta(hours=FISCAL_UNACKED_HOURS)
             )
             tenant_counts = await self._repo.tenant_counts(s) if sc.unrestricted else {}
+            overrides: dict[str, int] = {}
+            for source in self._alert_sources:
+                for kind, value in (await source(s, actor.tenant_id, sc.branch_ids)).items():
+                    if kind in RULES and (kind == "fiscal_unacked" or sc.unrestricted):
+                        overrides[kind] = int(value)
         overdue_count, overdue_amount = self.summary.overdue(open_docs, day)
         debtors = {d.counterparty_id for d in open_docs}
         receivable = sum((d.open_amount for d in open_docs), ZERO)
@@ -165,6 +185,7 @@ class ReportsService:
             "expiring_lots": (expiring, None),
             "pending_approvals": (visible_approvals, None),
             **{k: (v, None) for k, v in tenant_counts.items()},
+            **{k: (v, None) for k, v in overrides.items()},
         }
         alerts = build_alerts(counts, granted, sc.unrestricted)
         previous_total = sum((a.gross_sales - a.returns_total for a in previous), ZERO)
@@ -180,6 +201,7 @@ class ReportsService:
             "avg_receipt": _m(total.avg_receipt),
             "previous_total_sales": _m(previous_total),
             "net_profit": _m(total.net_profit) if finance else None,
+            "expenses_total": _m(total.expenses) if finance else None,  # US-M11-03, QT-M11-04
             "cash_on_hand": _m(total.cash_on_hand),
             "by_branch": [
                 {

@@ -11,6 +11,8 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.cash.domain.bank_matching import Batch
+
 
 @dataclass(frozen=True, slots=True)
 class SettlementRow:
@@ -64,6 +66,15 @@ class CardTx:
 
 
 class BankSettlementRepository(Protocol):
+    async def open_terminal_batches(
+        self, s: AsyncSession, branch_id: UUID, identifiers: Sequence[str], up_to: date
+    ) -> list[Batch]:
+        """Batches of the terminals with these TID/MID, ``business_date ≤ up_to``, not ``failed``, without a
+        bank settlement and outside every open draft's ``settled_from … settled_to`` (13 §2.18a)."""
+        ...
+
+    async def link_batches(self, s: AsyncSession, batch_ids: Sequence[UUID], settlement_id: UUID) -> None: ...
+
     # tenant / references
     async def tenant_bank(self, s: AsyncSession) -> tuple[str | None, str | None]:
         """``(settings.bank_account, settings.payment_org_commission_account)``."""

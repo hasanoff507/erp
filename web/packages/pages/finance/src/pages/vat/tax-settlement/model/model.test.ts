@@ -61,6 +61,7 @@ const summary = (period: string, regime: "vat" | "turnover" = "vat"): VatSummary
   net_vat: "36000.00",
   pending_credit_red_invoices: null,
   pending_credit_pct: null,
+  pending_credit_invoices: null,
   turnover_base: null,
   turnover_rate_pct: null,
   turnover_amount: null,

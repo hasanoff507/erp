@@ -306,6 +306,26 @@ CREATE TABLE platform.card_bin_rules (
 );
 ```
 
+Do'kon agentiga beriladigan imzoli artefaktlar (`0028a fiscal_edocs`, append-only; `33-1c-integratsiya.md` §9.4, A-08, A-09): `agent_update` ildiz kaliti **oflayn** saqlanadi — uning maxfiy qismi serverda ham, `signing_keys` da ham yo'q (shuning uchun `signing_keys` da `purpose='agent_update'` qatori yaratilmaydi). Ops CLI (`scripts/auth_ops.py sign-task-keyset`, `publish-agent-manifest`) ildiz kalitini fayldan o'qib imzolaydi va natijani shu jadvalga yozadi (`erp_migrator`); ilova faqat o'qiydi. `task_keyset` — `onec_task` ochiq kalitlari to'plami (compact JWS, `version` = `ver`); `update_manifest` — kanal bo'yicha manifest baytlari (base64) va Ed25519 imzosi. `kid` — ildiz ochiq JWK'sining RFC 7638 thumbprint'i. Joriy artefakt — eng katta `version` (`task_keyset` — butun son, manifest — SemVer).
+
+```sql
+-- 0028a fiscal_edocs
+CREATE TABLE platform.agent_signed_artifacts (
+  id          UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  kind        TEXT NOT NULL CHECK (kind IN ('task_keyset','update_manifest')),
+  channel     TEXT NULL CHECK (channel IN ('stable','pilot')),
+  version     TEXT NOT NULL CHECK (length(version) BETWEEN 1 AND 64), -- task_keyset: ver; update_manifest: SemVer
+  body        TEXT NOT NULL,      -- task_keyset: compact JWS; update_manifest: base64(manifest JSON baytlari)
+  signature   TEXT NULL,          -- update_manifest: base64(Ed25519 imzo); task_keyset: NULL (imzo JWS ichida)
+  kid         TEXT NOT NULL,      -- agent_update ildiz kalitining RFC 7638 thumbprint'i
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK ((kind = 'update_manifest') = (channel IS NOT NULL)),
+  CHECK ((kind = 'update_manifest') = (signature IS NOT NULL)),
+  UNIQUE NULLS NOT DISTINCT (kind, channel, version)
+);
+GRANT SELECT ON platform.agent_signed_artifacts TO erp_app;
+```
+
 `platform_admins` — `app.users`ga FK bergani uchun 2.3-bo'limdan keyin (`users` yaratilgandan so'ng) joylashtiriladi.
 
 ### 2.2 `auth` sxemasi — login/token jadvallari
@@ -1089,6 +1109,81 @@ CREATE UNIQUE INDEX uq_card_terminals_default ON app.card_terminals (cash_regist
 CREATE INDEX idx_card_terminals_register ON app.card_terminals (tenant_id, cash_register_id) WHERE status = 'active';
 ```
 
+Checkout'ning provayder protokoli holati (`0028a fiscal_edocs`, append-only; `18-api-kassa.md` §16.4, `21-integratsiyalar.md` §9): `payment_checkouts.provider_data` — provayder webhook'i talab qiladigan, `status` bilan ifodalanmaydigan maydonlar: Click — `prepare_id` (`merchant_prepare_id`); Payme — `state` (`1`/`2`/`-1`/`-2`), `time` (Payme yaratgan vaqt, ms), `create_time`/`perform_time`/`cancel_time` (ms), `reason`; Uzum — `state` (`CREATED`/`CONFIRMED`/`REVERSED`), `trans_time`/`confirm_time`/`reverse_time` (ms), `payment_source`; Uzum dinamik QR — `payment_link`, `qr_status`; hammasida — `qr_payload`/`checkout_url` (§16.2 javobi, takroriy so'rovga shu qaytadi). Karta ma'lumoti (PAN, niqob) va mijoz telefoni yozilmaydi.
+
+```sql
+-- 0028a fiscal_edocs
+ALTER TABLE app.payment_checkouts ADD COLUMN provider_data JSONB NOT NULL DEFAULT '{}'::jsonb;
+```
+
+```sql
+-- 0028a down
+ALTER TABLE app.payment_checkouts DROP COLUMN IF EXISTS provider_data;
+```
+
+Bulut printerlar va chop etish ishlari navbati (`0028a fiscal_edocs`, append-only; qaror #21, `24-frontend-arxitekturasi.md` §6.1, `20-api-moliya-admin.md` #40m–#40s): `cloud_printers` — filialga bog'langan Star CloudPRNT / Epson Server Direct Print printeri; printer serverni o'zi so'raydi (`/print/cloudprnt`, `/print/epson-sdp`) va HTTP Basic bilan (`username` = printer `id`, `password` = maxfiy kalit) tanishtiriladi — foydalanuvchi sessiyasisiz. Maxfiy kalit (32 bayt tasodifiy, base64url) faqat yaratish/almashtirish javobida bir marta ko'rsatiladi, bazada faqat `secret_hash` = SHA-256 hex; tenant `app.cloud_printer_by_secret` (4.5) orqali aniqlanadi, keyingi o'qish/yozish — oddiy RLS ostida. `print_jobs` — veb-kassa `CloudPrintAdapter` navbatga qo'ygan 1 bitli raster (`id` — klient UUIDv7, idempotentlik kaliti); `data` faqat `queued`/`printing` holatida saqlanadi, yakuniy holatda `NULL` qilinadi (chek tasviri serverda qolmaydi).
+
+```sql
+-- 0028a fiscal_edocs
+CREATE TABLE app.cloud_printers (
+  id               UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id        UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id        UUID NOT NULL REFERENCES app.branches(id),
+  name             TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 100),
+  protocol         TEXT NOT NULL CHECK (protocol IN ('star_cloudprnt','epson_sdp')),
+  model            TEXT NULL CHECK (model IS NULL OR length(model) <= 100), -- 'Star TSP143IV', 'Epson TM-m30III'
+  secret_hash      TEXT NOT NULL CHECK (secret_hash ~ '^[0-9a-f]{64}$'),   -- SHA-256(maxfiy kalit), kalitning o'zi saqlanmaydi
+  status           TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','disabled','archived')),
+  printer_mac      TEXT NULL,          -- Star so'rovidagi printerMAC (oxirgi), ma'lumot uchun
+  last_poll_at     TIMESTAMPTZ NULL,   -- oxirgi so'rov — "onlayn" belgisi (60 s ichida)
+  last_status      TEXT NULL,          -- printer xabar qilgan holat (Star statusCode, Epson natija kodi), ≤ 200 belgi
+  created_by       UUID NOT NULL REFERENCES app.users(id),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  version          INT NOT NULL DEFAULT 1
+);
+CREATE INDEX idx_cloud_printers_branch ON app.cloud_printers (tenant_id, branch_id) WHERE status <> 'archived';
+CREATE TRIGGER trg_set_updated_at BEFORE UPDATE ON app.cloud_printers
+  FOR EACH ROW EXECUTE FUNCTION app.set_updated_at();
+ALTER TABLE app.cloud_printers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE app.cloud_printers FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation ON app.cloud_printers
+  USING (tenant_id = app.current_tenant_id()) WITH CHECK (tenant_id = app.current_tenant_id());
+GRANT SELECT, INSERT, UPDATE ON app.cloud_printers TO erp_app;
+
+CREATE TABLE app.print_jobs (
+  id               UUID PRIMARY KEY,   -- klient UUIDv7 (idempotentlik kaliti)
+  tenant_id        UUID NOT NULL REFERENCES app.tenants(id),
+  branch_id        UUID NOT NULL REFERENCES app.branches(id),
+  cloud_printer_id UUID NOT NULL REFERENCES app.cloud_printers(id),
+  kind             TEXT NOT NULL CHECK (kind IN ('receipt','test','label')),
+  width_dots       INT NOT NULL CHECK (width_dots BETWEEN 8 AND 1024),
+  height_dots      INT NOT NULL CHECK (height_dots BETWEEN 1 AND 20000),
+  data             BYTEA NULL,         -- 1 bit/piksel, qator = ceil(width_dots/8) bayt, MSB — chap, 1 — qora
+  data_sha256      TEXT NOT NULL CHECK (data_sha256 ~ '^[0-9a-f]{64}$'), -- takroriy POST mazmuni solishtiriladi
+  status           TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','printing','done','failed')),
+  result_code      TEXT NULL,          -- printer natijasi (Star DELETE code, Epson code) yoki 'expired'
+  attempts         INT NOT NULL DEFAULT 0 CHECK (attempts >= 0), -- printer ishni necha marta olgan
+  expires_at       TIMESTAMPTZ NOT NULL, -- shu vaqtgacha olinmagan 'queued' ish → 'failed' ('expired')
+  device_id        UUID NULL REFERENCES app.devices(id),
+  created_by       UUID NOT NULL REFERENCES app.users(id),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  printing_at      TIMESTAMPTZ NULL,
+  finished_at      TIMESTAMPTZ NULL,
+  CHECK ((status IN ('queued','printing')) = (data IS NOT NULL)),
+  CHECK ((status IN ('done','failed')) = (finished_at IS NOT NULL))
+);
+CREATE INDEX idx_print_jobs_queue ON app.print_jobs (cloud_printer_id, id) WHERE status IN ('queued','printing');
+CREATE TRIGGER trg_set_updated_at BEFORE UPDATE ON app.print_jobs
+  FOR EACH ROW EXECUTE FUNCTION app.set_updated_at();
+ALTER TABLE app.print_jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE app.print_jobs FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation ON app.print_jobs
+  USING (tenant_id = app.current_tenant_id()) WITH CHECK (tenant_id = app.current_tenant_id());
+GRANT SELECT, INSERT, UPDATE ON app.print_jobs TO erp_app;
+```
+
 ### 2.6 Hujjatlar
 
 **Umumiy sarlavha** (`11-malumotlar-modeli.md` §6, yagona ro'yxat) — har bir hujjat jadvalida takrorlanadi: `id, tenant_id, branch_id, number, temp_number, doc_date, status, created_by, created_at, updated_at, posted_at, cancelled_at, cancelled_by, cancel_reason, client_event_id, device_id, comment`, `UNIQUE (tenant_id, device_id, temp_number)`, `UNIQUE (tenant_id, client_event_id)`. `shifts` bundan mustasno — raqamlanmaydi (11-bo'lim), o'z maxsus sarlavhasiga ega.
@@ -1491,6 +1586,21 @@ CREATE TABLE app.receipt_lines (
   created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (receipt_id, line_no)
 );
+```
+
+E-fakturadan kirim qatori summasi (`0028a fiscal_edocs`, append-only; `19-api-ombor.md` §8 `from-einvoice`): `receipt_lines.net_amount` — EHF qatorining QQSsiz summasi, **asosiy qiymat** (`vat_amount` ham EHF'dan); `cost` undan hosila (`ROUND_HALF_UP(net_amount / qty, 4)`, faqat ko'rsatish uchun). `NULL` — qo'lda kirim: summa `ROUND_HALF_UP(qty × cost, 2)`. Partiya qiymati, `Dt inv_acct` va kreditorlik shu summadan olinadi — katta miqdorda 4 kasrli narxdan qayta hisoblash EHF summasidan tiyinga farq qilmaydi.
+
+```sql
+-- 0028a fiscal_edocs
+ALTER TABLE app.receipt_lines ADD COLUMN net_amount NUMERIC(18,2) NULL CHECK (net_amount IS NULL OR net_amount >= 0);
+```
+
+```sql
+-- 0028a down
+ALTER TABLE app.receipt_lines DROP COLUMN IF EXISTS net_amount;
+```
+
+```sql
 
 CREATE TABLE app.supplier_returns (
   id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
@@ -1530,6 +1640,23 @@ CREATE TABLE app.supplier_return_lines (
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (supplier_return_id, line_no)
 );
+```
+
+Markirovka kodlari qoralamada (`0028a fiscal_edocs`, append-only; `21-integratsiyalar.md` §4, `19-api-ombor.md` §12, §15): yetkazib beruvchiga qaytarish va hisobdan chiqarish qoralamasidagi markirovkalangan qatorning kodlari `marking_codes` massivida saqlanadi (soni = `qty`); `post`da ular CRPT xabarnomasi uchun `MarkingPort` hook'iga beriladi va `marking_codes` jadvalida holati o'zgaradi (`returned_to_supplier` / `written_off`, `last_doc_id` = hujjat). Markirovkasiz qatorda — bo'sh massiv.
+
+```sql
+-- 0028a fiscal_edocs
+ALTER TABLE app.supplier_return_lines ADD COLUMN marking_codes TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE app.write_off_lines ADD COLUMN marking_codes TEXT[] NOT NULL DEFAULT '{}';
+```
+
+```sql
+-- 0028a down
+ALTER TABLE app.write_off_lines DROP COLUMN IF EXISTS marking_codes;
+ALTER TABLE app.supplier_return_lines DROP COLUMN IF EXISTS marking_codes;
+```
+
+```sql
 
 CREATE TABLE app.transfers (
   id               UUID PRIMARY KEY DEFAULT app.uuidv7(),
@@ -2611,6 +2738,34 @@ CREATE TABLE app.ettn_documents (
   CHECK (direction = 'in' OR einvoice_id IS NOT NULL OR transfer_id IS NOT NULL),
   CHECK (transport_type <> 'warehouse_to_warehouse' OR transfer_id IS NOT NULL)
 );
+```
+
+E-IMZO imzolari (`0028a fiscal_edocs`, append-only; `21-integratsiyalar.md` §5, `19-api-ombor.md` §8a/§19/§20, `18-api-kassa.md` §14a): `edoc_signatures` — brauzerda E-IMZO bilan qo'yilgan har bir PKCS#7 imzo (`submit-signed`, e-TTN `accept`/`reject`) hujjatga bog'lanib saqlanadi; `document_hash` — `sign-challenge` qaytargan imzolanadigan mazmun xeshi (SHA-256 hex), operatorga yuborishda (`outbox_jobs` `einvoice_send`/`einvoice_accept`/`ettn_send`/`ettn_accept`/`poa_send`) hujjatning **oxirgi** imzosi olinadi, eskilari audit uchun qoladi. Ilova faqat `INSERT` qiladi.
+
+```sql
+-- 0028a fiscal_edocs
+CREATE TABLE app.edoc_signatures (
+  id                 UUID PRIMARY KEY DEFAULT app.uuidv7(),
+  tenant_id          UUID NOT NULL REFERENCES app.tenants(id),
+  entity             TEXT NOT NULL CHECK (entity IN ('einvoices','ettn_documents','powers_of_attorney')),
+  entity_id          UUID NOT NULL,
+  action             TEXT NOT NULL CHECK (action IN ('sign','accept','reject')),
+  document_hash      TEXT NOT NULL,
+  signature_pkcs7    TEXT NOT NULL, -- base64 PKCS#7 (attached), E-IMZO brauzerda yaratgan
+  certificate_serial TEXT NULL,
+  signer_tin         TEXT NULL,     -- sertifikatdagi STIR/JShShIR (tekshiruv natijasi)
+  signed_by          UUID NOT NULL REFERENCES app.users(id),
+  signed_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_edoc_signatures_entity ON app.edoc_signatures (tenant_id, entity, entity_id);
+ALTER TABLE app.edoc_signatures ENABLE ROW LEVEL SECURITY;
+ALTER TABLE app.edoc_signatures FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation ON app.edoc_signatures
+  USING (tenant_id = app.current_tenant_id()) WITH CHECK (tenant_id = app.current_tenant_id());
+GRANT SELECT, INSERT ON app.edoc_signatures TO erp_app;
+```
+
+```sql
 
 CREATE TABLE app.state_reports (
   id                 UUID PRIMARY KEY DEFAULT app.uuidv7(),
@@ -2926,6 +3081,37 @@ CREATE TABLE app.doc_sequences (
 );
 ```
 
+Integratsiya kalitlarining yozish yo'li (`0028a fiscal_edocs`, append-only; `20-api-moliya-admin.md` #40a/#40d/#40e, `18-api-kassa.md` §16.4): `kind` ga `didox` qo'shiladi (Didox operatori — tenantning o'z login/paroli; hamkor tokeni platforma konfiguratsiyasida). `ciphertext` — `EnvelopeCipher` tokeni (`v1.<kek_version>...`, aad = `tenant_secrets:<tenant_id>:<kind>:<cash_register_id|->`), `key_version` — shu KEK versiyasi. `lookup_hash` — webhook'ni tenantga bog'lash uchun kredensial barmoq izi (yuqori entropiyali sirdan SHA-256; sirning o'zi emas): `payme` — `sha256("payme:Paycom:" ‖ key)`, `uzum` — `sha256("uzum:" ‖ login ‖ ":" ‖ password)`, boshqalarda `NULL`; webhook tenantni `app.payments_tenant_by_credential` (4.5) orqali topadi. `key_last4` — BO-14 da ko'rsatiladigan kalit oxiri (`crpt`), `last_ok_at`/`last_error`/`last_error_at` — shu kalit bilan oxirgi tashqi chaqiruv natijasi (BO-14 holati; xato matnida sir yo'q).
+
+```sql
+-- 0028a fiscal_edocs
+ALTER TABLE app.tenant_secrets DROP CONSTRAINT tenant_secrets_kind_check;
+ALTER TABLE app.tenant_secrets ADD CONSTRAINT tenant_secrets_kind_check
+  CHECK (kind IN ('faktura_uz','didox','crpt','click','payme','uzum','uzqr','fiscal_partner','eimzo',
+                  'card_terminal_vendor'));
+ALTER TABLE app.tenant_secrets ADD COLUMN lookup_hash BYTEA NULL;
+ALTER TABLE app.tenant_secrets ADD COLUMN key_last4 TEXT NULL;
+ALTER TABLE app.tenant_secrets ADD COLUMN last_ok_at TIMESTAMPTZ NULL;
+ALTER TABLE app.tenant_secrets ADD COLUMN last_error TEXT NULL;
+ALTER TABLE app.tenant_secrets ADD COLUMN last_error_at TIMESTAMPTZ NULL;
+CREATE UNIQUE INDEX uq_tenant_secrets_lookup ON app.tenant_secrets (kind, lookup_hash) WHERE lookup_hash IS NOT NULL;
+```
+
+```sql
+-- 0028a down
+REVOKE SELECT (tenant_id, kind, lookup_hash) ON app.tenant_secrets FROM erp_system;
+DROP INDEX IF EXISTS app.uq_tenant_secrets_lookup;
+ALTER TABLE app.tenant_secrets DROP COLUMN IF EXISTS last_error_at;
+ALTER TABLE app.tenant_secrets DROP COLUMN IF EXISTS last_error;
+ALTER TABLE app.tenant_secrets DROP COLUMN IF EXISTS last_ok_at;
+ALTER TABLE app.tenant_secrets DROP COLUMN IF EXISTS key_last4;
+ALTER TABLE app.tenant_secrets DROP COLUMN IF EXISTS lookup_hash;
+ALTER TABLE app.tenant_secrets DROP CONSTRAINT IF EXISTS tenant_secrets_kind_check;
+ALTER TABLE app.tenant_secrets ADD CONSTRAINT tenant_secrets_kind_check
+  CHECK (kind IN ('faktura_uz','crpt','click','payme','uzum','uzqr','fiscal_partner','eimzo',
+                  'card_terminal_vendor')) NOT VALID;
+```
+
 `sync_exceptions.kind` ga ikki tur qo'shiladi (`0027a web_pos`, append-only; `16-offline-sync.md` §5): `actor_unverified` — online voqeaning `actor_user_id`/tasdiqlovchisi shu qurilma sessiyasiga PIN bilan bog'lanmagan (`15-xavfsizlik-va-audit.md` §2.3a), `late_in_closed_shift` — smena yopilgandan keyin qabul qilingan hujjat (`18-api-kassa.md` §3.2).
 
 ```sql
@@ -2946,6 +3132,29 @@ ALTER TABLE app.sync_exceptions ADD CONSTRAINT sync_exceptions_kind_check CHECK 
     'debt_limit_exceeded_offline','approval_limit_exceeded_offline','receipt_seq_conflict',
     'debt_overpayment_offline','debt_allocation_mismatch','late_in_closed_period','cost_unknown',
     'count_late_move','card_result_mismatch','card_orphan_transaction'));
+```
+
+`sync_exceptions.kind` ga `marking_code_duplicate` qo'shiladi (`0028a fiscal_edocs`, append-only; `16-offline-sync.md` §5, §7): FM allaqachon imzolagan (`fiscal_result` bor) chekda tenantda avval sotilgan markirovka kodi — voqea qabul qilinadi, kod birinchi sotuvda qoladi, Egasi/Buxgalterga M18 `marking_alert`.
+
+```sql
+-- 0028a fiscal_edocs
+ALTER TABLE app.sync_exceptions DROP CONSTRAINT sync_exceptions_kind_check;
+ALTER TABLE app.sync_exceptions ADD CONSTRAINT sync_exceptions_kind_check CHECK (kind IN ('price_mismatch','archived_product','stock_negative',
+    'debt_limit_exceeded_offline','approval_limit_exceeded_offline','receipt_seq_conflict',
+    'debt_overpayment_offline','debt_allocation_mismatch','late_in_closed_period','cost_unknown',
+    'count_late_move','card_result_mismatch','card_orphan_transaction',
+    'actor_unverified','late_in_closed_shift','marking_code_duplicate'));
+```
+
+```sql
+-- 0028a down
+DELETE FROM app.sync_exceptions WHERE kind = 'marking_code_duplicate';
+ALTER TABLE app.sync_exceptions DROP CONSTRAINT IF EXISTS sync_exceptions_kind_check;
+ALTER TABLE app.sync_exceptions ADD CONSTRAINT sync_exceptions_kind_check CHECK (kind IN ('price_mismatch','archived_product','stock_negative',
+    'debt_limit_exceeded_offline','approval_limit_exceeded_offline','receipt_seq_conflict',
+    'debt_overpayment_offline','debt_allocation_mismatch','late_in_closed_period','cost_unknown',
+    'count_late_move','card_result_mismatch','card_orphan_transaction',
+    'actor_unverified','late_in_closed_shift'));
 ```
 
 **Hujjat raqami generatori** (aniqlashtirish #12 — 11-model faqat `K-01-2026-000154` namunasini beradi, to'liq `doc_type` kod jadvali ro'yxatlanmagan):
@@ -3023,14 +3232,14 @@ BEGIN
 END $$;
 ```
 
-`updated_at`siz (faqat INSERT yoki o'zgarmas qator): `onec_task_results`, `auth.onec_device_authorizations` (0028); `onec_metadata_snapshots`, `onec_export_item_sources`, `onec_events`, `onec_agent_logs` (0029).
+`updated_at`siz (faqat INSERT yoki o'zgarmas qator): `onec_task_results`, `auth.onec_device_authorizations` (0028); `onec_agent_logs` (0028a); `onec_metadata_snapshots`, `onec_export_item_sources`, `onec_events` (0029).
 
 ### 2.11 1C integratsiyasi (`onec_*`)
 
 Do'kon agenti va 1C integratsiya moduli jadvallari — manba `33-1c-integratsiya.md` §5. Jami **19 jadval**: `app` sxemasida 18 ta (`tenant_id NOT NULL`, oddiy `tenant_isolation` RLS) + `auth.onec_device_authorizations` (RFC 8628 device grant; tenant tasdiqqacha noma'lum, shuning uchun `auth` sxemasida, faqat `SECURITY DEFINER` funksiyalar orqali). Ikki Alembic revizion (6.1-bo'lim, qaror #66):
 
 - **`0028 store_agent` (Bosqich 5)** — Do'kon agenti umumiy registri (nomi 33 bilan moslik uchun `onec_` prefiksli): `onec_agents`, `onec_agent_tasks`, `onec_task_results`, `auth.onec_device_authorizations` + `cash_registers.fiscal_agent_id` FK'i (`fk_cr_fiscal_agent`). Agentni ulash, token, imzoli vazifa navbati, fiskal ko'prik/printer xizmat vazifalari shu revizionga tayanadi; `onec_agent_tasks` ning 1C ga ishora qiluvchi ustunlari (`base_id`, `batch_id`, `item_id`, `ref_create_request_id`, `reconciliation_id`) FK'siz yaratiladi.
-- **`0029 onec_integration` (Bosqich 7)** — qolgan 15 ta 1C ga xos jadval (`onec_bases` … `onec_agent_logs`), `onec_forbid_namespace_change` trigger'i va kechiktirilgan FK'lar, jumladan `onec_agent_tasks` ga `fk_oat_base`, `fk_oat_batch`, `fk_oat_item`, `fk_oat_ref_create`, `fk_oat_reconciliation`.
+- **`0029 onec_integration` (Bosqich 7)** — qolgan 14 ta 1C ga xos jadval (`onec_bases` … `onec_events`; `onec_agent_logs` — `0028a`), `onec_forbid_namespace_change` trigger'i va kechiktirilgan FK'lar, jumladan `onec_agent_tasks` ga `fk_oat_base`, `fk_oat_batch`, `fk_oat_item`, `fk_oat_ref_create`, `fk_oat_reconciliation`.
 
 Istisno (1.3-bo'limdan): 1C hujjat vaqti (`onec_export_items.doc_time`, `onec_object_refs.onec_date`) — `TIMESTAMP` (zonasiz, Asia/Tashkent mahalliy vaqti — 1C `Дата` shunday saqlaydi). DDL izohlaridagi `§` havolalari — `33-1c-integratsiya.md` bo'limlari («FK §5.21» — shu bo'lim oxiridagi kechiktirilgan FK bloki).
 
@@ -3171,6 +3380,21 @@ CREATE UNIQUE INDEX uq_onec_tasks_one_leased_per_base ON app.onec_agent_tasks (b
 CREATE UNIQUE INDEX uq_onec_tasks_one_leased_agent_level ON app.onec_agent_tasks (agent_id)
   WHERE status = 'leased' AND base_id IS NULL;
 CREATE INDEX idx_onec_tasks_item ON app.onec_agent_tasks (item_id) WHERE item_id IS NOT NULL;
+```
+
+Vazifa dedupe kaliti (`0028a fiscal_edocs`, append-only; `AgentTaskPort.enqueue(..., dedupe_key)`, `23-backend-arxitekturasi.md` §4.2): davriy xizmat vazifasi (masalan har 5 daqiqalik `fiscal.status`) agent oflayn bo'lsa navbatda to'planmasligi uchun — shu agentda shu `dedupe_key` li `queued`/`leased` vazifa bor bo'lsa yangisi yozilmaydi, mavjudining `id`si qaytadi. Yakuniy holatdagi vazifa kalitni bo'shatadi.
+
+```sql
+-- 0028a fiscal_edocs
+ALTER TABLE app.onec_agent_tasks ADD COLUMN dedupe_key TEXT NULL
+  CHECK (dedupe_key IS NULL OR length(dedupe_key) BETWEEN 1 AND 200);
+CREATE UNIQUE INDEX uq_onec_tasks_dedupe ON app.onec_agent_tasks (agent_id, dedupe_key)
+  WHERE dedupe_key IS NOT NULL AND status IN ('queued','leased');
+```
+
+```sql
+-- 0028a down
+ALTER TABLE app.onec_agent_tasks DROP COLUMN IF EXISTS dedupe_key;
 ```
 
 #### `onec_task_results`
@@ -3769,15 +3993,16 @@ CREATE INDEX idx_onec_events_base ON app.onec_events (tenant_id, base_id, at DES
 
 #### `onec_agent_logs`
 
-Agent `POST /onec-agent/logs` (A-06) bilan yuborgan maskalangan log yozuvlari.
+Agent `POST /onec-agent/logs` (A-06) bilan yuborgan maskalangan log yozuvlari. Do'kon agenti umumiy registriga tegishli (A-06, W-08 — Bosqich 5), shuning uchun `0028a fiscal_edocs` da yaratiladi; `base_id` FK'i (`fk_onec_logs_base` → `onec_bases`) — `0029` da (kechiktirilgan FK). Bosqich 5 da `base_id` doim `NULL` yoziladi (1C bazalari yo'q).
 
 ```sql
+-- 0028a fiscal_edocs
 CREATE TABLE app.onec_agent_logs (
   id              UUID PRIMARY KEY DEFAULT app.uuidv7(),
   tenant_id       UUID NOT NULL REFERENCES app.tenants(id),
   agent_id        UUID NOT NULL REFERENCES app.onec_agents(id),
   client_log_id   UUID NOT NULL,          -- agent beradi (takror yuborishda dedupe)
-  base_id         UUID NULL REFERENCES app.onec_bases(id),
+  base_id         UUID NULL,              -- FK fk_onec_logs_base (0029)
   task_id         UUID NULL,
   at              TIMESTAMPTZ NOT NULL,   -- agent vaqti (server_time ofseti bilan tuzatilgan)
   level           TEXT NOT NULL CHECK (level IN ('debug','info','warn','error')),
@@ -3788,6 +4013,11 @@ CREATE TABLE app.onec_agent_logs (
   UNIQUE (agent_id, client_log_id)
 );
 CREATE INDEX idx_onec_agent_logs_agent_time ON app.onec_agent_logs (agent_id, at DESC);
+ALTER TABLE app.onec_agent_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE app.onec_agent_logs FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation ON app.onec_agent_logs
+  USING (tenant_id = app.current_tenant_id()) WITH CHECK (tenant_id = app.current_tenant_id());
+GRANT SELECT, INSERT, DELETE ON app.onec_agent_logs TO erp_app;
 ```
 
 #### Kechiktirilgan FK
@@ -3795,6 +4025,7 @@ CREATE INDEX idx_onec_agent_logs_agent_time ON app.onec_agent_logs (agent_id, at
 Aylana bog'liqliklar (`onec_agent_tasks` ↔ `onec_reconciliations`, `onec_export_items` ↔ `onec_object_refs` va h.k.) — `0029 onec_integration` revizionida, barcha jadvallar yaratilgandan keyin. O'qish vazifalari 30 kundan keyin `onec_cleanup` bilan o'chiriladi — ularga ishora qiluvchi uzoq yashovchi jadvallarning `task_id` FK'lari `ON DELETE SET NULL`:
 
 ```sql
+-- 0029 onec_integration
 ALTER TABLE app.onec_metadata_snapshots  ADD CONSTRAINT fk_onec_meta_task        FOREIGN KEY (task_id)           REFERENCES app.onec_agent_tasks(id) ON DELETE SET NULL;
 ALTER TABLE app.onec_export_items        ADD CONSTRAINT fk_onec_items_object_ref FOREIGN KEY (object_ref_id)     REFERENCES app.onec_object_refs(id);
 ALTER TABLE app.onec_export_items        ADD CONSTRAINT fk_onec_items_last_task  FOREIGN KEY (last_task_id)      REFERENCES app.onec_agent_tasks(id);
@@ -3807,6 +4038,8 @@ ALTER TABLE app.onec_agent_tasks         ADD CONSTRAINT fk_oat_batch            
 ALTER TABLE app.onec_agent_tasks         ADD CONSTRAINT fk_oat_item              FOREIGN KEY (item_id)               REFERENCES app.onec_export_items(id);
 ALTER TABLE app.onec_agent_tasks         ADD CONSTRAINT fk_oat_ref_create        FOREIGN KEY (ref_create_request_id) REFERENCES app.onec_ref_create_requests(id);
 ALTER TABLE app.onec_agent_tasks         ADD CONSTRAINT fk_oat_reconciliation    FOREIGN KEY (reconciliation_id)     REFERENCES app.onec_reconciliations(id);
+-- onec_agent_logs (0028a da FK'siz yaratilgan)
+ALTER TABLE app.onec_agent_logs          ADD CONSTRAINT fk_onec_logs_base        FOREIGN KEY (base_id)               REFERENCES app.onec_bases(id);
 ```
 
 RLS uchligi — 4.2-bo'lim, grantlar — 4.4, `updated_at` trigger'lari — 2.10, `SECURITY DEFINER` funksiyalar — 4.5.
@@ -3945,7 +4178,7 @@ BEGIN
 END $$;
 ```
 
-`0029 onec_integration` — 15 jadval:
+`0029 onec_integration` — 14 jadval (`onec_agent_logs` — `0028a`, o'z blokida):
 
 ```sql
 -- 0029 onec_integration
@@ -3955,7 +4188,7 @@ BEGIN
   FOREACH t IN ARRAY ARRAY['onec_bases','onec_settings','onec_branch_bindings','onec_metadata_snapshots',
     'onec_catalog_items','onec_mappings','onec_value_mappings','onec_ref_create_requests','onec_export_batches',
     'onec_export_items','onec_export_item_sources','onec_object_refs',
-    'onec_reconciliations','onec_events','onec_agent_logs'] LOOP
+    'onec_reconciliations','onec_events'] LOOP
     EXECUTE format('ALTER TABLE app.%I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('ALTER TABLE app.%I FORCE ROW LEVEL SECURITY', t);
     EXECUTE format('CREATE POLICY tenant_isolation ON app.%I USING (tenant_id = app.current_tenant_id()) WITH CHECK (tenant_id = app.current_tenant_id())', t);
@@ -4002,7 +4235,7 @@ CREATE POLICY memberships_scope ON app.memberships
 
 ### 4.4 Global/platforma jadvallari — RLS o'rniga GRANT cheklovi
 
-`plans`, `addons`, `units`, `oauth_clients`, `signing_keys`, `label_templates`, `marking_product_groups`, `terms_versions`, `turnover_tax_rates`, `fx_rates`, `card_bin_rules` — `tenant_id`siz, RLS **yoqilmaydi**; o'rniga faqat `SELECT` beriladi (yozish — faqat `erp_migrator`/admin yo'li orqali). `platform_admins` — `erp_app`ga **umuman** grant yo'q (platforma admin BFF alohida, yuqori ishonchli yo'l orqali ishlaydi, `15-xavfsizlik-va-audit.md` §3.4).
+`plans`, `addons`, `units`, `oauth_clients`, `signing_keys`, `label_templates`, `marking_product_groups`, `terms_versions`, `turnover_tax_rates`, `fx_rates`, `card_bin_rules`, `agent_signed_artifacts` (0028a) — `tenant_id`siz, RLS **yoqilmaydi**; o'rniga faqat `SELECT` beriladi (yozish — faqat `erp_migrator`/admin yo'li orqali). `platform_admins` — `erp_app`ga **umuman** grant yo'q (platforma admin BFF alohida, yuqori ishonchli yo'l orqali ishlaydi, `15-xavfsizlik-va-audit.md` §3.4).
 
 ```sql
 GRANT SELECT ON platform.plans, platform.addons, platform.units,
@@ -4052,7 +4285,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON
   app.onec_bases, app.onec_settings, app.onec_branch_bindings, app.onec_metadata_snapshots,
   app.onec_catalog_items, app.onec_mappings, app.onec_value_mappings, app.onec_ref_create_requests,
   app.onec_export_batches, app.onec_export_items, app.onec_export_item_sources, app.onec_object_refs,
-  app.onec_reconciliations, app.onec_events, app.onec_agent_logs
+  app.onec_reconciliations, app.onec_events
   TO erp_app;
 ```
 
@@ -5228,6 +5461,9 @@ $$;
 -- 0028: funksiyalar ichida o'qiladigan app jadvali (erp_system — BYPASSRLS, lekin jadval grant'i baribir kerak)
 GRANT SELECT ON app.onec_agents TO erp_system;
 
+-- egalikni topshirish uchun vaqtincha (0027 juftligi bilan bir xil; blok oxirida REVOKE)
+GRANT CREATE ON SCHEMA app TO erp_system;
+
 ALTER FUNCTION app.onec_device_auth_start(text, text, jsonb, text, text, text, text, text, inet) OWNER TO erp_system;
 ALTER FUNCTION app.onec_device_auth_lookup(text) OWNER TO erp_system;
 ALTER FUNCTION app.onec_device_auth_approve(text, uuid, uuid, uuid) OWNER TO erp_system;
@@ -5248,6 +5484,59 @@ GRANT EXECUTE ON FUNCTION app.onec_device_auth_approve(text, uuid, uuid, uuid) T
 GRANT EXECUTE ON FUNCTION app.onec_device_auth_deny(text, uuid) TO erp_app;
 GRANT EXECUTE ON FUNCTION app.onec_device_auth_poll(text) TO erp_app;
 GRANT EXECUTE ON FUNCTION app.onec_agent_credentials(text) TO erp_app;
+
+REVOKE CREATE ON SCHEMA app FROM erp_system;
+```
+
+#### Bulut printer so'rovi funksiyasi (`0028a fiscal_edocs`)
+
+Printer so'rov yo'llari (`/print/cloudprnt`, `/print/epson-sdp` — `20-api-moliya-admin.md` #40r/#40s) foydalanuvchi sessiyasisiz keladi: tenant printer `id` + maxfiy kalit xeshi bo'yicha shu funksiya bilan aniqlanadi (faqat `active` printer), keyin so'rov oddiy `tenant_transaction` (RLS) ichida ishlaydi. Naqsh yuqoridagi bilan bir xil.
+
+```sql
+-- 0028a fiscal_edocs
+GRANT CREATE ON SCHEMA app TO erp_system;
+
+CREATE OR REPLACE FUNCTION app.cloud_printer_by_secret(p_printer_id uuid, p_secret_hash text)
+RETURNS TABLE (tenant_id uuid, branch_id uuid, protocol text) LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = app, pg_temp AS $$
+  SELECT p.tenant_id, p.branch_id, p.protocol FROM app.cloud_printers p
+  WHERE p.id = p_printer_id AND p.secret_hash = p_secret_hash AND p.status = 'active';
+$$;
+
+GRANT SELECT ON app.cloud_printers TO erp_system;
+ALTER FUNCTION app.cloud_printer_by_secret(uuid, text) OWNER TO erp_system;
+REVOKE ALL ON FUNCTION app.cloud_printer_by_secret(uuid, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION app.cloud_printer_by_secret(uuid, text) TO erp_app;
+
+REVOKE CREATE ON SCHEMA app FROM erp_system;
+```
+
+#### Do'kon to'lov webhook'i — kredensial bo'yicha tenant (`0028a fiscal_edocs`)
+
+Payme (JSON-RPC, `Authorization: Basic Paycom:<key>`) va Uzum Merchant API (`Authorization: Basic <login>:<password>`) webhook'lari tenant kontekstisiz keladi va `GetStatement`/`/check` kabi so'rovlarda checkout havolasi bo'lmasligi mumkin: tenant avval kredensial barmoq izi (`tenant_secrets.lookup_hash`, 2.9) bo'yicha shu funksiya bilan aniqlanadi — imzo tekshiruvi har qanday checkout ma'lumotidan oldin; keyin checkout oddiy RLS ostida o'qiladi. Click (`sign_string` MD5) va dinamik UzQR — `payments_checkout_by_ref` / `payments_checkout_by_provider_tx` orqali. `erp_system`ga faqat kerakli ustunlar (`ciphertext` emas).
+
+```sql
+-- 0028a fiscal_edocs
+GRANT CREATE ON SCHEMA app TO erp_system;
+
+CREATE OR REPLACE FUNCTION app.payments_tenant_by_credential(p_kind text, p_lookup_hash bytea)
+RETURNS TABLE (tenant_id uuid) LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = app, pg_temp AS $$
+  SELECT s.tenant_id FROM app.tenant_secrets s
+  WHERE s.kind = p_kind AND s.kind IN ('payme','uzum') AND s.lookup_hash = p_lookup_hash;
+$$;
+
+GRANT SELECT (tenant_id, kind, lookup_hash) ON app.tenant_secrets TO erp_system;
+ALTER FUNCTION app.payments_tenant_by_credential(text, bytea) OWNER TO erp_system;
+REVOKE ALL ON FUNCTION app.payments_tenant_by_credential(text, bytea) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION app.payments_tenant_by_credential(text, bytea) TO erp_app;
+
+REVOKE CREATE ON SCHEMA app FROM erp_system;
+```
+
+```sql
+-- 0028a down
+DROP FUNCTION IF EXISTS app.payments_tenant_by_credential(text, bytea);
 ```
 
 `0029 onec_integration`:
@@ -5340,7 +5629,9 @@ INSERT INTO platform.oauth_clients (client_id, client_type, name, allowed_grant_
 -- VALUES ('EdDSA', 'access', :pub, :enc_priv, 'active', now());
 -- INSERT INTO platform.signing_keys (algorithm, purpose, public_key, private_key_encrypted, status, activated_at)
 -- VALUES ('EdDSA', 'license', :pub2, :enc_priv2, 'active', now());
--- 1C integratsiya moduli yoqilgan muhitda (qaror #36–#38) xuddi shu tartibda 'onec_task' va 'agent_update' kalitlari ham yaratiladi.
+-- Do'kon agenti (qaror #60, #66): xuddi shu tartibda 'onec_task' kaliti (auth_ops rotate-signing-key --purpose onec_task).
+-- 'agent_update' ildiz kaliti signing_keys'ga yozilmaydi — oflayn saqlanadi; u bilan imzolangan task_keyset va
+-- yangilanish manifestlari platform.agent_signed_artifacts'da (2.1, 0028a; 33-1c-integratsiya.md §9.4).
 ```
 
 ### 5.2 Tenant-provisioning shabloni (har ro'yxatdan o'tishda qo'llaniladi, global emas)
@@ -5411,13 +5702,13 @@ INSERT INTO app.warehouses (tenant_id, branch_id, name, type, inventory_account)
 
 ### 6.1 Alembic revizion rejasi
 
-Revizionlardan oldin — DBA bootstrap (0-bo'lim: rollar, parollar, `GRANT erp_system TO erp_migrator`, `search_path`, `erp_migrator` egaligidagi baza); barcha revizionlar `erp_migrator` bilan ishlaydi. Revizionlar zanjiri chiziqli: `0001` → … → `0027` → `0027a` → `0027b` → `0028` → `0029`; `0027a web_pos` (Bosqich 3, veb-kassa) va `0027b debts_finance` (Bosqich 4: qarz daftari, xarajatlar, bank tushumi, hisobotlar, Telegram) — **append-only** revizionlar: oldingi revizionlar qo'llangan bazaga faqat qo'shimcha o'zgarishlar (yangi ustun/jadval, funksiya imzosi); `0028 store_agent` ning `down_revision` — `0027b`.
+Revizionlardan oldin — DBA bootstrap (0-bo'lim: rollar, parollar, `GRANT erp_system TO erp_migrator`, `search_path`, `erp_migrator` egaligidagi baza); barcha revizionlar `erp_migrator` bilan ishlaydi. Revizionlar zanjiri chiziqli: `0001` → … → `0027` → `0027a` → `0027b` → `0028` → `0028a` → `0029`; `0027a web_pos` (Bosqich 3, veb-kassa), `0027b debts_finance` (Bosqich 4: qarz daftari, xarajatlar, bank tushumi, hisobotlar, Telegram) va `0028a fiscal_edocs` (Bosqich 5: fiskal, e-hujjatlar, markirovka, to'lov checkout'lari, bulut printer) — **append-only** revizionlar: oldingi revizionlar qo'llangan bazaga faqat qo'shimcha o'zgarishlar (yangi ustun/jadval, funksiya imzosi); `0028 store_agent` ning `down_revision` — `0027b`, `0028a` niki — `0028`, `0029` niki — `0028a`.
 
 **SQL fayllar shu hujjatdan generatsiya qilinadi** (`backend/scripts/gen_migration_sql.py` → `backend/alembic/sql/NNNN_<nom>.{up,down}.sql`; `--check` rejimi CI'da drift'ni ushlaydi). Har ` ```sql ` bloki revizionga quyidagi tartibda biriktiriladi:
 1. Blokning birinchi qatori — marker izoh: `-- NNNN <nom>` (masalan `-- 0015 registers`, `-- 0027 boshida`) — butun blok shu revizionga; `-- DBA bootstrap` — revizion emas (0-bo'lim, `initdb.sh`); `-- namuna` — DDL emas, misol.
 2. Markersiz blok — bo'lim sarlavhasi bo'yicha: 0, 1.1–1.4 → `0001`; 2.1–2.9 → har bayonot o'z jadvalining revizioniga (quyidagi jadval; jadvaldan keyin yozilgan kechiktirilgan FK/indeks — FK bog'langan eng kech jadval revizioniga), `app.next_doc_number()` → `0019`; 2.11 → `0028`/`0029`; 4.1–4.4 → `0026`; 4.5 → `0027`; 5 (seed) va 6.2 (CI) — revizion emas.
-3. `0027a`/`0027b` bloklari faqat marker bilan: `-- 0027a web_pos` / `-- 0027b debts_finance` (up) va `-- 0027a down` / `-- 0027b down` (down skriptiga so'zma-so'z — `DROP COLUMN`, funksiyaning oldingi tanasi va h.k., avtomatik chiqarib bo'lmaydigan teskari bayonotlar); har blok o'zgartirgan jadval bo'limida, `CREATE TABLE`dan keyin turadi.
-4. `0028`/`0029` bloklari tegishli bosqichgacha generatsiya qilinmaydi.
+3. `0027a`/`0027b`/`0028a` bloklari faqat marker bilan: `-- 0027a web_pos` / `-- 0027b debts_finance` / `-- 0028a fiscal_edocs` (up) va `-- 0027a down` / `-- 0027b down` / `-- 0028a down` (down skriptiga so'zma-so'z — `DROP COLUMN`, funksiyaning oldingi tanasi va h.k., avtomatik chiqarib bo'lmaydigan teskari bayonotlar); har blok o'zgartirgan jadval bo'limida, `CREATE TABLE`dan keyin turadi.
+4. `0028` — 2.11-bo'limdagi markersiz `0028` jadvallari (quyidagi jadval) avval, so'ng `-- 0028 store_agent` markerli bloklar (trigger, RLS, grant, funksiyalar — ular jadvallardan yuqorida yozilgan); `0029` bloklari Bosqich 7 gacha generatsiya qilinmaydi.
 
 | № | Revizion | Mazmuni |
 |---|---|---|
@@ -5451,7 +5742,8 @@ Revizionlardan oldin — DBA bootstrap (0-bo'lim: rollar, parollar, `GRANT erp_s
 | 0027a | `web_pos` | Bosqich 3 (veb-kassa) — append-only o'zgarishlar: qurilmaga bog'langan login va POS uchun qo'shimchalar (blok markerlari `-- 0027a web_pos` / `-- 0027a down`, mazmuni — bloklarning o'zida) |
 | 0027b | `debts_finance` | Bosqich 4 (qarz daftari, xarajatlar, bank tushumi, hisobotlar, Telegram) — append-only o'zgarishlar (blok markerlari `-- 0027b debts_finance` / `-- 0027b down`, mazmuni — bloklarning o'zida) |
 | 0028 | `store_agent` | Do'kon agenti umumiy registri (2.11-bo'lim, qaror #66): `app.onec_agents` (+`capabilities`), `app.onec_agent_tasks` (1C ustunlari FK'siz; fiskal/printer/tarozi/karta terminali xizmat vazifalari — `card.status`, `card.settlement` (qaror #71), `purpose='device_service'`), `app.onec_task_results`, `auth.onec_device_authorizations`; `fk_cr_fiscal_agent` (`cash_registers.fiscal_agent_id` → `onec_agents`), `fk_ct_agent` (`card_terminals.agent_id` → `onec_agents`, qaror #71); `updated_at` trigger'lari (2.10, 2 jadval); RLS uchligi (4.2, 3 jadval); grantlar (4.4); 6 ta `SECURITY DEFINER` funksiya (`onec_device_auth_start/lookup/approve/poll/deny`, `onec_agent_credentials`; 4.5). `0002`/`0007` dagi `devices`, `signing_keys`, `cash_registers` ga bog'liq. Bosqich 5 |
-| 0029 | `onec_integration` | 1C integratsiyasi (2.11-bo'lim, `33-1c-integratsiya.md` §5): 15 ta `app.onec_*` jadval (FK tartibida: `onec_bases` → `onec_settings`, `onec_branch_bindings`, `onec_metadata_snapshots`, `onec_catalog_items`, `onec_mappings`, `onec_value_mappings`, `onec_ref_create_requests` → `onec_export_batches` → `onec_export_items` → `onec_export_item_sources`, `onec_object_refs` → `onec_reconciliations`, `onec_events`, `onec_agent_logs`); `onec_forbid_namespace_change` trigger'i; kechiktirilgan FK'lar, jumladan `onec_agent_tasks` ga `fk_oat_base`, `fk_oat_batch`, `fk_oat_item`, `fk_oat_ref_create`, `fk_oat_reconciliation`; `updated_at` trigger'lari (2.10, 11 jadval); RLS uchligi (4.2, 15 jadval); grantlar (4.4); `onec_tenants_due` (4.5). `onec_metadata_snapshots`/`onec_reconciliations`/`onec_events` `task_id` FK'lari `ON DELETE SET NULL` (o'qish vazifalari 30 kunda tozalanadi). `0018` dagi `attachments`ga bog'liq. Bosqich 7 |
+| 0028a | `fiscal_edocs` | Bosqich 5 append-only deltalari (`-- 0028a fiscal_edocs` bloklari, har biri o'zgartirgan jadval bo'limida): fiskal, e-faktura/e-TTN/e-ishonchnoma (`edoc_signatures` — E-IMZO imzolari, `receipt_lines.net_amount` — EHF qator summasi), markirovka, to'lov checkout'lari (`payment_checkouts.provider_data`; `tenant_secrets` — `didox` turi, `lookup_hash`/`key_last4`/`last_ok_at`/`last_error`/`last_error_at`, `uq_tenant_secrets_lookup`, `app.payments_tenant_by_credential`) va bulut printer (`cloud_printers`, `print_jobs`, `app.cloud_printer_by_secret`) uchun qo'shimcha ustun/jadvallar; Do'kon agenti: `onec_agent_logs` (A-06/W-08, `0029` dan ko'chirilgan), `onec_agent_tasks.dedupe_key`, `platform.agent_signed_artifacts` (oflayn ildiz kalit bilan imzolangan `task_keyset` va yangilanish manifestlari). Bosqich 5 |
+| 0029 | `onec_integration` | 1C integratsiyasi (2.11-bo'lim, `33-1c-integratsiya.md` §5): 14 ta `app.onec_*` jadval (FK tartibida: `onec_bases` → `onec_settings`, `onec_branch_bindings`, `onec_metadata_snapshots`, `onec_catalog_items`, `onec_mappings`, `onec_value_mappings`, `onec_ref_create_requests` → `onec_export_batches` → `onec_export_items` → `onec_export_item_sources`, `onec_object_refs` → `onec_reconciliations`, `onec_events`); `onec_forbid_namespace_change` trigger'i; kechiktirilgan FK'lar, jumladan `onec_agent_tasks` ga `fk_oat_base`, `fk_oat_batch`, `fk_oat_item`, `fk_oat_ref_create`, `fk_oat_reconciliation` va `onec_agent_logs` ga `fk_onec_logs_base`; `updated_at` trigger'lari (2.10, 11 jadval); RLS uchligi (4.2, 14 jadval); grantlar (4.4); `onec_tenants_due` (4.5). `onec_metadata_snapshots`/`onec_reconciliations`/`onec_events` `task_id` FK'lari `ON DELETE SET NULL` (o'qish vazifalari 30 kunda tozalanadi). `0018` dagi `attachments`ga bog'liq. Bosqich 7 |
 
 Seed (5-bo'lim) — **Alembic revizion emas** (`23-backend-arxitekturasi.md` §11: "bazani versiyalash bilan aralashtirmaslik uchun"), `migrate` konteyneridan keyin alohida `python -m scripts.seed global` bosqichi (`erp_migrator` ulanishi bilan — `platform.*` jadvallariga faqat u yozadi, 4.4), faqat 5.1 (global) qismini ishga tushiradi (idempotent, `ON CONFLICT DO NOTHING`); 5.2 (tenant-provisioning) — har signup'da ilova kodi tomonidan.
 
@@ -5469,7 +5761,8 @@ WITH exempt AS (
     'auth.user_credentials', 'auth.otp_challenges', 'auth.login_attempts',
     'auth.authorization_codes', 'auth.refresh_tokens', 'auth.sessions',
     'auth.onec_device_authorizations', -- 1C agent device grant: tenant tasdiqqacha noma'lum, faqat SECURITY DEFINER orqali
-    'app.user_identities'
+    'app.user_identities',
+    'platform.agent_signed_artifacts' -- 0028a: oflayn imzolangan agent artefaktlari, global, erp_app faqat SELECT
   ]) AS qualified_name
 )
 SELECT

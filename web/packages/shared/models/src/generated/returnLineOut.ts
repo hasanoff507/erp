@@ -20,6 +20,7 @@ export interface ReturnLineOut {
   vat_amount: string;
   /** ROUND_HALF_UP(qty × cost, 2) */
   net_amount: string;
+  marking_codes: string[];
   /** Settlement value with the supplier (net; + VAT share when the receipt was in the turnover regime) */
   invoice_amount: string;
 }

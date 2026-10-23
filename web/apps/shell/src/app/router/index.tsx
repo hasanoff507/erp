@@ -18,6 +18,7 @@ import {
 } from "@pages/billing";
 import { ImportProductsFlow, routes as catalogRoutes } from "@pages/catalog";
 import { routes as debtsRoutes } from "@pages/debts";
+import { routes as edocsRoutes } from "@pages/edocs";
 import { routes as financeRoutes } from "@pages/finance";
 import { routes as onecRoutes } from "@pages/onec";
 import { routes as posRoutes } from "@pages/pos";
@@ -53,6 +54,7 @@ const backOfficeRoutes: RouteObject[] = [
   ...warehouseRoutes,
   ...debtsRoutes,
   ...financeRoutes,
+  ...edocsRoutes,
   ...settingsRoutes,
   ...billingRoutes,
   ...aiAssistantRoutes,

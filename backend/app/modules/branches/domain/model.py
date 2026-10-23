@@ -64,3 +64,27 @@ def register_allowance(included: int, extra: int) -> int:
 def fiscal_pair_ok(agent_id: object | None, local_device_id: str | None) -> bool:
     """qaror #66: ``fiscal_agent_id`` and ``fiscal_local_device_id`` are set together or cleared together."""
     return (agent_id is None) == (local_device_id is None)
+
+
+def fiscal_binding_issue(
+    agent: tuple[str, object] | None, local_device_id: str, device_taken: bool
+) -> tuple[str, str] | None:
+    """20 #40 / 34 §14.2: the agent exists in the tenant, is ``active``, has ``capabilities.fiscal.enabled``
+    and lists ``local_device_id`` in ``capabilities.fiscal.devices[].local_id``; one FM serves one register.
+    ``agent`` = ``(status, capabilities)``. Returns ``(field, message_key)`` of the first problem."""
+    if agent is None:
+        return "fiscal_agent_id", "validation.not_found"
+    status, caps = agent
+    if status != "active":
+        return "fiscal_agent_id", "validation.fiscal_agent_inactive"
+    fiscal = caps.get("fiscal") if isinstance(caps, dict) else None
+    if not isinstance(fiscal, dict) or fiscal.get("enabled") is not True:
+        return "fiscal_agent_id", "validation.fiscal_capability_disabled"
+    devices = fiscal.get("devices")
+    items = devices if isinstance(devices, list) else []
+    ids = {str(d.get("local_id")) for d in items if isinstance(d, dict)}
+    if local_device_id not in ids:
+        return "fiscal_local_device_id", "validation.fiscal_local_device_unknown"
+    if device_taken:
+        return "fiscal_local_device_id", "validation.fiscal_local_device_taken"
+    return None

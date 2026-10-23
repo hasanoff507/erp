@@ -42,6 +42,7 @@ from tests.support.card import (
     tx_body,
 )
 from tests.support.catalog import Env, catalog_app, catalog_settings, make_shop
+from tests.support.devices import card_capabilities, insert_agent
 
 __all__ = ["card_env_fixture"]
 
@@ -75,8 +76,10 @@ async def test_card_terminals_create_list_default_and_audit(env: Env) -> None:
 
 async def test_card_terminals_validation_rules(env: Env) -> None:
     cs = await card_shop(env)
+    devices = [{"local_id": f"term-{i}", "driver": "rahmat_lan", "host": "192.168.1.50"} for i in (1, 2)]
+    agent_id = await insert_agent(env, cs, capabilities=card_capabilities(*devices))  # B5: binding is checked
     base: dict[str, Any] = {"branch_id": str(cs.branch_id), "name": "Humo P3", "vendor": "humo",
-                            "adapter": "agent_ecr", "driver": "rahmat_lan", "agent_id": str(uuid7()),
+                            "adapter": "agent_ecr", "driver": "rahmat_lan", "agent_id": str(agent_id),
                             "local_id": "term-1", "host": "192.168.1.50", "port": 8080, "tid": "TID00001"}  # fmt: skip
 
     async def post(body: dict[str, Any]) -> Any:

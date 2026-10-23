@@ -14,8 +14,8 @@ from app.core.errors import AppError, install_error_handlers
 from app.core.middleware import RequestContextMiddleware
 
 
-def test_catalog_has_207_codes_with_errors_keys() -> None:
-    assert len(ErrorCode) == 207  # 17 §15: 126 general + 81 ONEC_*
+def test_catalog_has_209_codes_with_errors_keys() -> None:
+    assert len(ErrorCode) == 209  # 17 §15: 128 general + 81 ONEC_*
     assert sum(1 for c in ErrorCode if c.startswith("ONEC_")) == 81
     for code, spec in ERROR_SPECS.items():
         assert spec.message_key.startswith(("errors.", "warnings.")), code

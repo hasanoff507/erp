@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type {
+  AppModulesIntegrationsTenantKeysApiRouterIntegrationOut,
   BranchCreate,
   BranchCreatedOut,
   BranchDetailOut,
@@ -22,6 +23,8 @@ import type {
   CashRegistersListParams,
   ConsentIn,
   ConsentOut,
+  DeleteTenantIntegrationParams,
+  IntegrationKeysIn,
   ListBranchesParams,
   ListSyncExceptionsParams,
   SyncExceptionPage,
@@ -279,6 +282,33 @@ export const reviewSyncException = (
     },
       options);
     }
+  /**
+ * @summary Put Tenant Integration
+ */
+export const putTenantIntegration = (
+    provider: string,
+    integrationKeysIn: IntegrationKeysIn,
+ options?: SecondParameter<typeof apiRequest<AppModulesIntegrationsTenantKeysApiRouterIntegrationOut>>,) => {
+      return apiRequest<AppModulesIntegrationsTenantKeysApiRouterIntegrationOut>(
+      {url: `/api/v1/tenant/integrations/${provider}`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: integrationKeysIn
+    },
+      options);
+    }
+  /**
+ * @summary Delete Tenant Integration
+ */
+export const deleteTenantIntegration = (
+    provider: string,
+    params?: DeleteTenantIntegrationParams,
+ options?: SecondParameter<typeof apiRequest<void>>,) => {
+      return apiRequest<void>(
+      {url: `/api/v1/tenant/integrations/${provider}`, method: 'DELETE',
+        params
+    },
+      options);
+    }
   export type ListBranchesResult = NonNullable<Awaited<ReturnType<typeof listBranches>>>
 export type CreateBranchResult = NonNullable<Awaited<ReturnType<typeof createBranch>>>
 export type GetBranchResult = NonNullable<Awaited<ReturnType<typeof getBranch>>>
@@ -297,3 +327,5 @@ export type TenantTaxRegimesCreateResult = NonNullable<Awaited<ReturnType<typeof
 export type TenantConsentsCreateResult = NonNullable<Awaited<ReturnType<typeof tenantConsentsCreate>>>
 export type ListSyncExceptionsResult = NonNullable<Awaited<ReturnType<typeof listSyncExceptions>>>
 export type ReviewSyncExceptionResult = NonNullable<Awaited<ReturnType<typeof reviewSyncException>>>
+export type PutTenantIntegrationResult = NonNullable<Awaited<ReturnType<typeof putTenantIntegration>>>
+export type DeleteTenantIntegrationResult = NonNullable<Awaited<ReturnType<typeof deleteTenantIntegration>>>

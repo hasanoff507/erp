@@ -16,4 +16,11 @@ export interface WriteOffLineIn {
   /** expired_return is created by returns only (qaror #48) — 422 here */
   reason: WriteOffLineInReason;
   gift_kind?: WriteOffLineInGiftKind;
+  /**
+     * Marked products: exactly qty in-stock codes (21 §4)
+     * @maxItems 100000
+     * @items.minLength 1
+     * @items.maxLength 512
+     */
+  marking_codes?: string[];
 }

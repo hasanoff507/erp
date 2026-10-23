@@ -1,0 +1,70 @@
+{
+  "description": "RFC 8785 JCS cases: parse `input`, canonicalise, expect `canonical` bytes and `sha256`.",
+  "source": "https://www.rfc-editor.org/rfc/rfc8785",
+  "cases": [
+    {
+      "name": "rfc8785_3_2_2",
+      "note": "RFC 8785 §3.2.2 example",
+      "input": "{\"numbers\":[333333333.33333329,1E30,4.50,2e-3,0.000000000000000000000000001],\"string\":\"\\u20ac$\\u000F\\u000aA'\\u0042\\u0022\\u005c\\\\\\\"\\/\",\"literals\":[null,true,false]}",
+      "canonical": "{\"literals\":[null,true,false],\"numbers\":[333333333.3333333,1e+30,4.5,0.002,1e-27],\"string\":\"€$\\u000f\\nA'B\\\"\\\\\\\\\\\"/\"}",
+      "canonical_utf8_hex": "7b226c69746572616c73223a5b6e756c6c2c747275652c66616c73655d2c226e756d62657273223a5b3333333333333333332e333333333333332c31652b33302c342e352c302e3030322c31652d32375d2c22737472696e67223a22e282ac245c75303030665c6e4127425c225c5c5c5c5c222f227d",
+      "sha256": "2d5e01a318d0f0879ab568c4be289c8b1f64ef8921a53c6277d5e069978baacb"
+    },
+    {
+      "name": "rfc8785_3_2_3_sorting",
+      "note": "RFC 8785 §3.2.3 — member order by UTF-16 code units (surrogate pair sorts below U+FB33)",
+      "input": "{\"\\u20ac\":\"Euro Sign\",\"\\r\":\"Carriage Return\",\"\\ufb33\":\"Hebrew Letter Dalet With Dagesh\",\"1\":\"One\",\"\\ud83d\\ude00\":\"Emoji: Grinning Face\",\"\\u0080\":\"Control\",\"\\u00f6\":\"Latin Small Letter O With Diaeresis\"}",
+      "canonical": "{\"\\r\":\"Carriage Return\",\"1\":\"One\",\"\":\"Control\",\"ö\":\"Latin Small Letter O With Diaeresis\",\"€\":\"Euro Sign\",\"😀\":\"Emoji: Grinning Face\",\"דּ\":\"Hebrew Letter Dalet With Dagesh\"}",
+      "canonical_utf8_hex": "7b225c72223a2243617272696167652052657475726e222c2231223a224f6e65222c22c280223a22436f6e74726f6c222c22c3b6223a224c6174696e20536d616c6c204c6574746572204f205769746820446961657265736973222c22e282ac223a224575726f205369676e222c22f09f9880223a22456d6f6a693a204772696e6e696e672046616365222c22efacb3223a22486562726577204c65747465722044616c6574205769746820446167657368227d",
+      "sha256": "5e321556d22018a9656991a9e94f77ec175fa193e52a2429d312f8419ec8b08c"
+    },
+    {
+      "name": "empty_object",
+      "note": "empty object",
+      "input": "{}",
+      "canonical": "{}",
+      "canonical_utf8_hex": "7b7d",
+      "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+    },
+    {
+      "name": "empty_array",
+      "note": "empty array",
+      "input": "[]",
+      "canonical": "[]",
+      "canonical_utf8_hex": "5b5d",
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "name": "nested_payload",
+      "note": "whitespace removed, nested objects sorted, arrays keep order",
+      "input": "{ \"cash_register_id\": \"0192f0c4-7a00-7000-8000-000000000123\", \"shift_id\": null,\n  \"b\": {\"z\": 1, \"a\": [3, 2, 1], \"m\": {\"y\": true, \"x\": false}}, \"a\": -42 }",
+      "canonical": "{\"a\":-42,\"b\":{\"a\":[3,2,1],\"m\":{\"x\":false,\"y\":true},\"z\":1},\"cash_register_id\":\"0192f0c4-7a00-7000-8000-000000000123\",\"shift_id\":null}",
+      "canonical_utf8_hex": "7b2261223a2d34322c2262223a7b2261223a5b332c322c315d2c226d223a7b2278223a66616c73652c2279223a747275657d2c227a223a317d2c22636173685f72656769737465725f6964223a2230313932663063342d376130302d373030302d383030302d303030303030303030313233222c2273686966745f6964223a6e756c6c7d",
+      "sha256": "7bf4db7acebb0d4412863ad5a74b4f593fc4a6e0773eedaa6f8e190be2fdfd1c"
+    },
+    {
+      "name": "unicode_and_controls",
+      "note": "non-ASCII literal UTF-8, U+0001/U+001F as \\u00xx (lowercase), DEL and '/' literal",
+      "input": "{\"name\":\"Ўзбекистон — «Do'kon» ʻ\",\"ctl\":\"\\u0001\\u001f\\u007f\",\"tab\":\"a\\tb\",\"slash\":\"/\"}",
+      "canonical": "{\"ctl\":\"\\u0001\\u001f\",\"name\":\"Ўзбекистон — «Do'kon» ʻ\",\"slash\":\"/\",\"tab\":\"a\\tb\"}",
+      "canonical_utf8_hex": "7b2263746c223a225c75303030315c75303031667f222c226e616d65223a22d08ed0b7d0b1d0b5d0bad0b8d181d182d0bed0bd20e2809420c2ab446f276b6f6ec2bb20cabb222c22736c617368223a222f222c22746162223a22615c7462227d",
+      "sha256": "9e3b93836ce44fdc919fbe79b94b7ba631c3aaa52747fc2a7a61afecda5f38fe"
+    },
+    {
+      "name": "integers",
+      "note": "safe integers",
+      "input": "{\"max\":9007199254740991,\"min\":-9007199254740991,\"zero\":0,\"neg_zero\":-0}",
+      "canonical": "{\"max\":9007199254740991,\"min\":-9007199254740991,\"neg_zero\":0,\"zero\":0}",
+      "canonical_utf8_hex": "7b226d6178223a393030373139393235343734303939312c226d696e223a2d393030373139393235343734303939312c226e65675f7a65726f223a302c227a65726f223a307d",
+      "sha256": "96a1ccd5675e940148eaec6b32f4ba5b36f74c67c1267f64c6e25ae334d6ea60"
+    },
+    {
+      "name": "numbers_es6",
+      "note": "ECMAScript Number→String",
+      "input": "[1e21,1e-7,0.000001,1.2345678901234568e20,5e-324,-1.5,100]",
+      "canonical": "[1e+21,1e-7,0.000001,123456789012345680000,5e-324,-1.5,100]",
+      "canonical_utf8_hex": "5b31652b32312c31652d372c302e3030303030312c3132333435363738393031323334353638303030302c35652d3332342c2d312e352c3130305d",
+      "sha256": "e034866cbe3e27a01b3353a15fc7c132301cd2ccf82aeda831c214ecd7ced72a"
+    }
+  ]
+}

@@ -133,7 +133,13 @@ async def test_metadata_and_jwks_rfc8414(world: World, settings) -> None:  # typ
         meta = (await client.get("/.well-known/oauth-authorization-server")).json()
         assert meta["issuer"] == ISSUER
         assert meta["code_challenge_methods_supported"] == ["S256"]
-        assert meta["grant_types_supported"] == ["authorization_code", "refresh_token"]
+        # client_credentials + device_code: the store agent only (14 §2.3, Bosqich 5)
+        assert meta["grant_types_supported"] == [
+            "authorization_code",
+            "refresh_token",
+            "client_credentials",
+            "urn:ietf:params:oauth:grant-type:device_code",
+        ]
         assert "implicit" not in json.dumps(meta) and "password" not in meta["grant_types_supported"]
         jwks = (await client.get("/.well-known/jwks.json")).json()
         assert jwks["keys"] and all(k["kty"] == "OKP" and k["crv"] == "Ed25519" for k in jwks["keys"])

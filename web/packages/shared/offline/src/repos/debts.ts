@@ -312,7 +312,7 @@ export async function createQuickCustomer(
 
 // --- debt payment (18 §12.2) -----------------------------------------------------------------------------
 
-export type DebtPaymentMethod = "cash" | "card" | "uzqr";
+export type DebtPaymentMethod = "cash" | "card" | "uzqr" | "click" | "payme" | "uzum";
 
 export interface DebtPaymentInput {
   id?: string;
@@ -330,8 +330,16 @@ export interface DebtPaymentInput {
   card?:
     | { mode: "integrated"; cardResult: Record<string, unknown> }
     | { mode: "manual"; manualReason: string; approval: Record<string, unknown> | null };
-  /** method=uzqr (static only — the cashier confirms, online). */
+  /** method=uzqr static — the cashier confirms, online; optional payment number. */
   terminalRef?: string | null;
+  /**
+   * B5 (POS-13, 18 §12.2/§16): dynamic UzQR / Click / Payme / Uzum — the CONFIRMED checkout (online only).
+   * uzqr with a checkout → `qr_type="dynamic"`.
+   */
+  checkout?: { checkoutRef: string; providerTxId: string } | null;
+  /** B5 local bridge: the number the FM signed and its answer (18 §12.2 `fiscal_result`, qaror #68). */
+  receiptSeq?: number | null;
+  fiscalResult?: Record<string, unknown> | null;
   allocation: DebtAllocationResult;
 }
 
@@ -343,7 +351,7 @@ export function debtPaymentPayload(input: DebtPaymentInput): Record<string, unkn
     branch_id: input.branchId,
     cash_register_id: input.cashRegisterId,
     shift_id: input.shiftId,
-    receipt_seq: null, // enqueueEvent writes it (opts.receiptSeq)
+    receipt_seq: input.receiptSeq ?? null, // else enqueueEvent writes it (opts.receiptSeq)
     is_offline: input.isOffline,
     offline_since: input.isOffline ? input.offlineSince : null,
     amount: input.amount,
@@ -352,7 +360,8 @@ export function debtPaymentPayload(input: DebtPaymentInput): Record<string, unkn
     comment: input.comment?.trim() ? input.comment.trim().slice(0, 1000) : null,
     allocations: input.allocation.allocations,
     fiscal_lines: input.allocation.fiscal_lines,
-    fiscal_result: null, // server-side fiscalisation (qaror #68), as the sale
+    // local bridge: the FM's answer; otherwise null — server-side fiscalisation (qaror #68), as the sale
+    fiscal_result: input.fiscalResult ?? null,
   };
   if (input.method === "card" && input.card) {
     if (input.card.mode === "integrated") {
@@ -364,9 +373,14 @@ export function debtPaymentPayload(input: DebtPaymentInput): Record<string, unkn
       out.card_manual_approval = input.card.approval;
     }
   }
-  if (input.method === "uzqr") {
+  if (input.method === "uzqr" && !input.checkout) {
     out.qr_type = "static";
     out.terminal_ref = input.terminalRef?.trim() ? input.terminalRef.trim().slice(0, 40) : null;
+  }
+  if (input.checkout && input.method !== "cash" && input.method !== "card") {
+    if (input.method === "uzqr") out.qr_type = "dynamic";
+    out.checkout_ref = input.checkout.checkoutRef;
+    out.provider_tx_id = input.checkout.providerTxId;
   }
   return out;
 }
@@ -388,10 +402,12 @@ export async function enqueueDebtPayment(
   opts: { actorUserId: string; clientEventId?: string; removeCardAttemptIds?: string[] },
 ): Promise<EnqueueResult & { payload: Record<string, unknown> }> {
   const payload = debtPaymentPayload(input);
+  const reserved = typeof input.receiptSeq === "number";
   const result = await enqueueEvent("debt_payment.created", payload, {
     actorUserId: opts.actorUserId,
     ...(opts.clientEventId ? { clientEventId: opts.clientEventId } : {}),
-    receiptSeq: { cashRegisterId: input.cashRegisterId, shiftId: input.shiftId },
+    // a local-bridge receipt already has its number (reserveReceiptSeq) — it is in the payload
+    ...(reserved ? {} : { receiptSeq: { cashRegisterId: input.cashRegisterId, shiftId: input.shiftId } }),
     ...(opts.removeCardAttemptIds?.length ? { removeCardAttemptIds: opts.removeCardAttemptIds } : {}),
   });
   return { ...result, payload: { ...payload, receipt_seq: result.receiptSeq } };

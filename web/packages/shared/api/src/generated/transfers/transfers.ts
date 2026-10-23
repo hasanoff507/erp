@@ -5,8 +5,20 @@
  * OpenAPI spec version: 0.1.0
  */
 import type {
+  AcceptIn,
+  AppModulesIntegrationsEinvoiceApiEttnDocumentsEttnOut,
+  AppModulesIntegrationsEinvoiceApiEttnDocumentsRejectIn,
   EmptyBody,
+  EttnDetail,
+  EttnPage,
+  EttnSignChallengeParams,
+  ListEttnDocumentsParams,
   ListTransfersParams,
+  ManualIn,
+  Queued,
+  Sending,
+  SignChallenge,
+  SubmitSigned,
   TransferCancel,
   TransferCreate,
   TransferOut,
@@ -112,6 +124,101 @@ export const cancelTransfer = (
     },
       options);
     }
+  /**
+ * @summary List Ettn Documents
+ */
+export const listEttnDocuments = (
+    params?: ListEttnDocumentsParams,
+ options?: SecondParameter<typeof apiRequest<EttnPage>>,) => {
+      return apiRequest<EttnPage>(
+      {url: `/api/v1/ettn-documents`, method: 'GET',
+        params
+    },
+      options);
+    }
+  /**
+ * @summary Get Ettn Document
+ */
+export const getEttnDocument = (
+    ettnId: string,
+ options?: SecondParameter<typeof apiRequest<EttnDetail>>,) => {
+      return apiRequest<EttnDetail>(
+      {url: `/api/v1/ettn-documents/${ettnId}`, method: 'GET'
+    },
+      options);
+    }
+  /**
+ * @summary Ettn Sign Challenge
+ */
+export const ettnSignChallenge = (
+    ettnId: string,
+    emptyBodyNull?: EmptyBody | null,
+    params?: EttnSignChallengeParams,
+ options?: SecondParameter<typeof apiRequest<SignChallenge>>,) => {
+      return apiRequest<SignChallenge>(
+      {url: `/api/v1/ettn-documents/${ettnId}/sign-challenge`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: emptyBodyNull,
+        params
+    },
+      options);
+    }
+  /**
+ * @summary Ettn Submit Signed
+ */
+export const ettnSubmitSigned = (
+    ettnId: string,
+    submitSigned: SubmitSigned,
+ options?: SecondParameter<typeof apiRequest<Sending>>,) => {
+      return apiRequest<Sending>(
+      {url: `/api/v1/ettn-documents/${ettnId}/submit-signed`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: submitSigned
+    },
+      options);
+    }
+  /**
+ * @summary Register Ettn Manual
+ */
+export const registerEttnManual = (
+    ettnId: string,
+    manualIn: ManualIn,
+ options?: SecondParameter<typeof apiRequest<AppModulesIntegrationsEinvoiceApiEttnDocumentsEttnOut>>,) => {
+      return apiRequest<AppModulesIntegrationsEinvoiceApiEttnDocumentsEttnOut>(
+      {url: `/api/v1/ettn-documents/${ettnId}/register-manual`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: manualIn
+    },
+      options);
+    }
+  /**
+ * @summary Accept Ettn
+ */
+export const acceptEttn = (
+    ettnId: string,
+    acceptIn: AcceptIn,
+ options?: SecondParameter<typeof apiRequest<Queued>>,) => {
+      return apiRequest<Queued>(
+      {url: `/api/v1/ettn-documents/${ettnId}/accept`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: acceptIn
+    },
+      options);
+    }
+  /**
+ * @summary Reject Ettn
+ */
+export const rejectEttn = (
+    ettnId: string,
+    appModulesIntegrationsEinvoiceApiEttnDocumentsRejectIn: AppModulesIntegrationsEinvoiceApiEttnDocumentsRejectIn,
+ options?: SecondParameter<typeof apiRequest<Queued>>,) => {
+      return apiRequest<Queued>(
+      {url: `/api/v1/ettn-documents/${ettnId}/reject`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: appModulesIntegrationsEinvoiceApiEttnDocumentsRejectIn
+    },
+      options);
+    }
   export type CreateTransferResult = NonNullable<Awaited<ReturnType<typeof createTransfer>>>
 export type ListTransfersResult = NonNullable<Awaited<ReturnType<typeof listTransfers>>>
 export type GetTransferResult = NonNullable<Awaited<ReturnType<typeof getTransfer>>>
@@ -119,3 +226,10 @@ export type PostTransferResult = NonNullable<Awaited<ReturnType<typeof postTrans
 export type SendTransferResult = NonNullable<Awaited<ReturnType<typeof sendTransfer>>>
 export type ReceiveTransferResult = NonNullable<Awaited<ReturnType<typeof receiveTransfer>>>
 export type CancelTransferResult = NonNullable<Awaited<ReturnType<typeof cancelTransfer>>>
+export type ListEttnDocumentsResult = NonNullable<Awaited<ReturnType<typeof listEttnDocuments>>>
+export type GetEttnDocumentResult = NonNullable<Awaited<ReturnType<typeof getEttnDocument>>>
+export type EttnSignChallengeResult = NonNullable<Awaited<ReturnType<typeof ettnSignChallenge>>>
+export type EttnSubmitSignedResult = NonNullable<Awaited<ReturnType<typeof ettnSubmitSigned>>>
+export type RegisterEttnManualResult = NonNullable<Awaited<ReturnType<typeof registerEttnManual>>>
+export type AcceptEttnResult = NonNullable<Awaited<ReturnType<typeof acceptEttn>>>
+export type RejectEttnResult = NonNullable<Awaited<ReturnType<typeof rejectEttn>>>

@@ -40,6 +40,9 @@ class ReturnLineIn(BaseModel):
     receipt_line_id: UUID
     lot_id: UUID = Field(description="The lot created from that receipt line")
     qty: QtyStr = Field(description="> 0, ≤ lot qty_left − blocked_qty")
+    marking_codes: list[Annotated[str, StringConstraints(min_length=1, max_length=512)]] = Field(
+        default_factory=list, max_length=100000, description="Marked products: exactly qty in-stock codes"
+    )
 
 
 class ReturnIn(BaseModel):
@@ -74,6 +77,7 @@ class ReturnLineOut(BaseModel):
     cost: str = Field(description="Derived: the receipt line's unit cost (without VAT)")
     vat_amount: str = Field(description="Derived: this quantity's share of the receipt line VAT")
     net_amount: str = Field(description="ROUND_HALF_UP(qty × cost, 2)")
+    marking_codes: list[str]
     invoice_amount: str = Field(
         description="Settlement value with the supplier (net; + VAT share when the receipt was in the "
         "turnover regime)"
@@ -97,8 +101,10 @@ class ReturnHeaderOut(BaseModel):
     net_total: str
     vat_total: str
     invoice_total: str = Field(description="Payable decrease written on post")
-    vat_adjustment_status: Literal["awaiting_einvoice", "not_required"] | None = Field(
-        description="awaiting_einvoice — the input-VAT decrease waits for the supplier's additional e-invoice"
+    vat_adjustment_status: Literal["awaiting_einvoice", "adjusted", "not_required"] | None = Field(
+        description="awaiting_einvoice — the input-VAT decrease waits for the supplier's additional "
+        "e-invoice; "
+        "adjusted — written when that e-invoice was accepted (13 §2.20)"
     )
     created_by: UUID
     created_by_name: str | None
@@ -160,7 +166,10 @@ async def create_supplier_return(
         receipt_id=body.receipt_id,
         doc_date=body.doc_date,
         reason=body.reason,
-        lines=[ReturnLineInput(ln.receipt_line_id, ln.lot_id, Decimal(ln.qty)) for ln in body.lines],
+        lines=[
+            ReturnLineInput(ln.receipt_line_id, ln.lot_id, Decimal(ln.qty), tuple(ln.marking_codes))
+            for ln in body.lines
+        ],
         comment=body.comment,
     )
     sr = await purchasing_module(request).supplier_returns.create(actor, scope, data, _ip(request))

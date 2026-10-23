@@ -44,6 +44,7 @@ from app.core.money import money, qty
 from app.core.permissions import BranchScope
 from app.modules.accounting.application.posting import LedgerPoster
 from app.modules.accounting.domain.entries import LedgerLine, VatMove
+from app.modules.integrations.marking.application.hooks import MarkedLine
 from app.modules.inventory.application.doc_support import (
     check_doc_date,
     decode_cursor,
@@ -85,6 +86,7 @@ class WriteOffLineInput:
     reason: str
     gift_kind: str | None = None
     lot_id: UUID | None = None
+    marking_codes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,6 +101,8 @@ class WriteOffLine:
     reason: str
     gift_kind: str | None
     cost_amount: Decimal
+    marking_codes: tuple[str, ...] = ()
+    is_marked: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,6 +163,24 @@ class WriteOffRepository(Protocol):
     async def consume_approval(self, s: AsyncSession, approval_id: UUID) -> None: ...
     async def vat_payer(self, s: AsyncSession, on: date) -> bool: ...
     async def vat_rates(self, s: AsyncSession, product_ids: Sequence[UUID]) -> dict[UUID, Decimal]: ...
+    async def marked_products(self, s: AsyncSession, product_ids: Sequence[UUID]) -> set[UUID]: ...
+
+
+class MarkingHooksPort(Protocol):
+    """Contract ``marking.md`` §3/§4 (b5-marking) — called inside the posting transaction."""
+
+    async def on_write_off_posted(
+        self,
+        s: AsyncSession,
+        tenant_id: UUID,
+        write_off_id: UUID,
+        *,
+        lines: Sequence[Any],
+        actor_user_id: UUID | None = None,
+    ) -> UUID | None: ...
+    async def on_codes_document_cancelled(
+        self, s: AsyncSession, tenant_id: UUID, doc_id: UUID, *, actor_user_id: UUID | None = None
+    ) -> None: ...
 
 
 class RetailPrices(Protocol):
@@ -202,6 +224,7 @@ def write_off_json(doc: WriteOff, approval: Approval | None = None) -> dict[str,
                 "reason": ln.reason,
                 "gift_kind": ln.gift_kind,
                 "cost_amount": m2(ln.cost_amount),
+                "marking_codes": list(ln.marking_codes),
             }
             for ln in doc.lines
         ],
@@ -218,6 +241,7 @@ class WriteOffService:
         poster: LedgerPoster,
         prices: RetailPrices,
         events: EventRecorderPort,
+        marking: MarkingHooksPort | None = None,
     ) -> None:
         self._sf = session_factory
         self._docs = docs
@@ -226,6 +250,7 @@ class WriteOffService:
         self._poster = poster
         self._prices = prices
         self._events = events
+        self._marking = marking
 
     # --- create -----------------------------------------------------------------------------------
     async def create(
@@ -249,6 +274,8 @@ class WriteOffService:
             if responsible_user_id is not None and not await self._docs.active_member(s, responsible_user_id):
                 raise invalid("responsible_user_id", "validation.member_not_active")
             await self._check_products(s, [ln.product_id for ln in lines])
+            marked = await self._docs.marked_products(s, [ln.product_id for ln in lines])
+            codes = [_line_codes(i, ln, ln.product_id in marked) for i, ln in enumerate(lines)]
             for index, ln in enumerate(lines):
                 if ln.lot_id is not None:
                     lot = await self._repo.lot(s, ln.lot_id)
@@ -279,6 +306,7 @@ class WriteOffService:
                         "qty": qty(ln.qty),
                         "reason": ln.reason,
                         "gift_kind": ln.gift_kind if ln.reason == "gift" else None,
+                        "marking_codes": codes[n - 1],
                     }
                     for n, ln in enumerate(lines, start=1)
                 ],
@@ -330,6 +358,15 @@ class WriteOffService:
                 s, tenant_id=actor.tenant_id, branch_id=doc.branch_id, table=DOC_TYPE, year=doc.doc_date.year
             )
             await self._docs.mark_posted(s, doc.id, number, txn.at, costs)
+            marked_lines = [
+                MarkedLine(index=i, product_id=ln.product_id, qty=ln.qty, codes=ln.marking_codes)
+                for i, ln in enumerate(doc.lines)
+                if ln.is_marked and ln.marking_codes  # a returns-made draft carries no codes (no CRPT notice)
+            ]
+            if marked_lines and self._marking is not None:  # contract marking.md §3 (CRPT write-off)
+                await self._marking.on_write_off_posted(
+                    s, actor.tenant_id, doc.id, lines=marked_lines, actor_user_id=actor.user_id
+                )
             await record_audit(
                 s,
                 tenant_id=actor.tenant_id,
@@ -550,6 +587,10 @@ class WriteOffService:
                     ],
                 )
                 await self._poster.reverse_document(s, actor.tenant_id, DOC_TYPE, doc.id)
+                if self._marking is not None and any(ln.marking_codes for ln in doc.lines):
+                    await self._marking.on_codes_document_cancelled(
+                        s, actor.tenant_id, doc.id, actor_user_id=actor.user_id
+                    )
             await self._docs.mark_cancelled(s, doc.id, actor.user_id, reason)
             await record_audit(
                 s,
@@ -633,6 +674,24 @@ class WriteOffService:
         for index, pid in enumerate(product_ids):
             if pid not in flags:
                 raise invalid(f"lines[{index}].product_id", "validation.product_not_found")
+
+
+def _line_codes(index: int, ln: WriteOffLineInput, is_marked: bool) -> list[str]:
+    """Marked lines carry exactly ``qty`` distinct codes for the CRPT write-off notice (21 §4); the marking
+    hook
+    checks on ``post`` that they are in stock."""
+    codes = list(ln.marking_codes)
+    field = f"lines[{index}].marking_codes"
+    if not is_marked:
+        if codes:
+            raise invalid(field, "validation.marking_not_required")
+        return []
+    quantity = qty(ln.qty)
+    if quantity != quantity.to_integral_value() or Decimal(len(codes)) != quantity:
+        raise invalid(field, "validation.marking_count_mismatch")
+    if len(set(codes)) != len(codes):
+        raise invalid(field, "validation.duplicate")
+    return codes
 
 
 def _estimate_line(doc: WriteOff, ln: WriteOffLine) -> EstimateLine:

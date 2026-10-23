@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass
 from typing import Any
 from uuid import UUID
@@ -27,10 +28,13 @@ from app.modules.branches.application.common import (
 from app.modules.branches.application.ports import BranchRepository, CashRegisterRepository, CashRegisterRow
 from app.modules.branches.domain.model import (
     EXTRA_REGISTER_ADDON,
+    fiscal_binding_issue,
     fiscal_pair_ok,
     register_allowance,
     tashkent_today,
 )
+
+FiscalBoundHook = Callable[[AsyncSession, UUID, UUID], Awaitable[object]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,10 +116,12 @@ class CashRegistersService:
         session_factory: async_sessionmaker[AsyncSession],
         registers: CashRegisterRepository,
         branches: BranchRepository,
+        on_fiscal_bound: FiscalBoundHook | None = None,
     ) -> None:
         self._sf = session_factory
         self._registers = registers
         self._branches = branches
+        self._on_fiscal_bound = on_fiscal_bound
 
     async def list_registers(
         self, actor: Principal, allowed: tuple[UUID, ...], branch_id: UUID | None, include_archived: bool
@@ -193,10 +199,16 @@ class CashRegistersService:
                 row.fiscal_agent_id,
                 row.fiscal_local_device_id,
             ):
-                if patch.fiscal_agent_id is not None and not await self._registers.fiscal_agent_exists(
-                    s, patch.fiscal_agent_id
-                ):
-                    raise invalid("fiscal_agent_id", "validation.not_found")
+                if patch.fiscal_agent_id is not None and patch.fiscal_local_device_id is not None:
+                    issue = fiscal_binding_issue(
+                        await self._registers.fiscal_agent(s, patch.fiscal_agent_id),
+                        patch.fiscal_local_device_id,
+                        await self._registers.fiscal_device_taken(
+                            s, patch.fiscal_agent_id, patch.fiscal_local_device_id, register_id
+                        ),
+                    )
+                    if issue is not None:
+                        raise invalid(*issue)
                 fields["fiscal_agent_id"] = patch.fiscal_agent_id
                 fields["fiscal_local_device_id"] = patch.fiscal_local_device_id
             version = row.version
@@ -213,6 +225,9 @@ class CashRegistersService:
                     after=fields,
                     ip=ip,
                 )
+                if fields.get("fiscal_agent_id") is not None and self._on_fiscal_bound is not None:
+                    # 21 §16: the new binding learns the FM state at once (fiscal.status agent task)
+                    await self._on_fiscal_bound(s, actor.tenant_id, register_id)
             result = CashRegisterUpdated(
                 id=register_id,
                 name=fields.get("name", row.name),

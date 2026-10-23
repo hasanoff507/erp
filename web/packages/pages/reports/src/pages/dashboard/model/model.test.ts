@@ -40,6 +40,7 @@ function dashboard(patch: Partial<Dashboard> = {}): Dashboard {
     avg_receipt: "50000.00",
     previous_total_sales: "3800000.00",
     net_profit: "900000.00",
+    expenses_total: "350000.00",
     cash_on_hand: "2100000.00",
     by_branch: [
       {

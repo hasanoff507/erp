@@ -6,8 +6,10 @@ Summary of a period (``YYYY-MM``):
 * ``regime=vat``: ``output_vat`` / ``input_vat`` = Σ ``vat_moves.vat_amount`` by kind in the period,
   ``net_vat = output − input`` (13 §4.2). VAT is a tenant figure (1 tenant = 1 STIR, qaror #31) —
   ``branch_id`` does not narrow it. ``pending_credit_red_invoices`` — incoming e-invoices of the period
-  with ``risk_flag IN ('red','unknown')`` and VAT whose credit is not opened yet (no ``vat_moves`` row,
-  13 §2.8); ``pending_credit_pct`` = that pending VAT ÷ (input VAT + pending VAT) × 100;
+  with ``risk_flag IN ('red','unknown')`` and VAT whose credit is not (fully) opened yet (13 §2.8 — the
+  pending part = invoice VAT − Σ its input ``vat_moves``); ``pending_credit_pct`` = that pending VAT ÷
+  (input VAT + pending VAT) × 100; ``pending_credit_invoices[]`` — the invoices themselves, shown
+  separately with ``credit_status`` ``pending``/``partial`` (US-M10-03, QT-M10-04, BO-07);
 * ``regime=turnover``: per branch ``base = (9020 − 9040 − 9050) + 9390 + 8530`` of the period's ledger
   (13 §4.3); the tobacco share (9020/9040/9050 lines of ``turnover_tax_group='tobacco'`` products) at the
   ``tobacco`` rate, the rest at the branch rate (``branches.wiring.turnover_rate_on``; YaTT — the whole base
@@ -65,6 +67,25 @@ class VatMoveRow:
 RegimeRange = tuple[date, date, str]  # (from, to inclusive, 'vat' | 'turnover')
 
 
+@dataclass(frozen=True, slots=True)
+class PendingCreditInvoice:
+    """Incoming red/``unknown`` e-invoice whose VAT credit is not (fully) opened yet (13 §2.8, US-M10-03)."""
+
+    einvoice_id: UUID
+    number: str | None
+    doc_date: date | None
+    counterparty_id: UUID
+    counterparty_name: str
+    risk_flag: str
+    total_amount: Decimal
+    vat_amount: Decimal
+    credited_vat: Decimal
+
+    @property
+    def pending_vat(self) -> Decimal:
+        return self.vat_amount - self.credited_vat
+
+
 class VatRepository(Protocol):
     async def regime_on(self, s: AsyncSession, on: date) -> str: ...
 
@@ -74,7 +95,9 @@ class VatRepository(Protocol):
 
     async def vat_totals(self, s: AsyncSession, period: date) -> tuple[Decimal, Decimal]: ...
 
-    async def pending_credit(self, s: AsyncSession, start: date, end: date) -> tuple[int, Decimal]: ...
+    async def pending_credit_invoices(
+        self, s: AsyncSession, start: date, end: date
+    ) -> list[PendingCreditInvoice]: ...
 
     async def turnover_bases(
         self, s: AsyncSession, start: date, end: date, branch_ids: tuple[UUID, ...] | None
@@ -257,6 +280,7 @@ class VatService:
                 "net_vat": None,
                 "pending_credit_red_invoices": None,
                 "pending_credit_pct": None,
+                "pending_credit_invoices": None,
                 "turnover_base": None,
                 "turnover_rate_pct": None,
                 "turnover_amount": None,
@@ -266,7 +290,9 @@ class VatService:
             # unrestricted user
             if regime == "vat" or ("vat" in in_force and not restricted):
                 output, input_ = await self._repo.vat_totals(s, period)
-                count, pending = await self._repo.pending_credit(s, period, end)
+                invoices = await self._repo.pending_credit_invoices(s, period, end)
+                count = len(invoices)
+                pending = sum((i.pending_vat for i in invoices), ZERO)
                 denominator = input_ + pending
                 pct = ZERO if denominator <= 0 else (pending * 100 / denominator)
                 body.update(
@@ -275,6 +301,22 @@ class VatService:
                     net_vat=_m2(output - input_),
                     pending_credit_red_invoices=count,
                     pending_credit_pct=_m2(pct),
+                    pending_credit_invoices=[
+                        {
+                            "einvoice_id": str(i.einvoice_id),
+                            "number": i.number,
+                            "doc_date": None if i.doc_date is None else i.doc_date.isoformat(),
+                            "counterparty_id": str(i.counterparty_id),
+                            "counterparty_name": i.counterparty_name,
+                            "risk_flag": i.risk_flag,
+                            "total_amount": _m2(i.total_amount),
+                            "vat_amount": _m2(i.vat_amount),
+                            "credited_vat": _m2(i.credited_vat),
+                            "pending_vat": _m2(i.pending_vat),
+                            "credit_status": "partial" if i.credited_vat > 0 else "pending",
+                        }
+                        for i in invoices
+                    ],
                 )
             if regime == "vat":
                 settlement = await self._repo.settlement_id(s, period, "vat_offset", None)

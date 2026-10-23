@@ -5,8 +5,15 @@
  * OpenAPI spec version: 0.1.0
  */
 import type {
+  AppModulesIntegrationsEinvoiceApiEinvoicesRejectIn,
+  CancelIn,
+  EInvoiceDetail,
+  EInvoicePage,
   EmptyBody,
+  FromEInvoiceIn,
+  ListEinvoicesParams,
   ListGoodsReceiptsParams,
+  ListPowersOfAttorneyParams,
   ListPurchaseOrdersParams,
   ListSupplierOpenDocumentsParams,
   ListSupplierPaymentsParams,
@@ -22,6 +29,11 @@ import type {
   PoOut,
   PoPage,
   PoUpdate,
+  PoaIn,
+  PoaOut,
+  PoaPage,
+  PoaState,
+  Queued,
   ReceiptCancel,
   ReceiptIn,
   ReceiptOut,
@@ -30,7 +42,12 @@ import type {
   ReturnCancel,
   ReturnIn,
   ReturnOut,
-  ReturnPage
+  ReturnPage,
+  RiskFlagIn,
+  RiskFlagOut,
+  SignChallenge,
+  Signed,
+  SubmitSigned
 } from '@shared/models/generated';
 
 import { apiRequest } from '../../_base/instance.ts';
@@ -139,6 +156,20 @@ export const createGoodsReceipt = (
       {url: `/api/v1/goods-receipts`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: receiptIn
+    },
+      options);
+    }
+  /**
+ * @summary Create Goods Receipt From Einvoice
+ */
+export const createGoodsReceiptFromEinvoice = (
+    einvoiceId: string,
+    fromEInvoiceIn: FromEInvoiceIn,
+ options?: SecondParameter<typeof apiRequest<ReceiptOut>>,) => {
+      return apiRequest<ReceiptOut>(
+      {url: `/api/v1/goods-receipts/from-einvoice/${einvoiceId}`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: fromEInvoiceIn
     },
       options);
     }
@@ -321,6 +352,177 @@ export const cancelSupplierPayment = (
     },
       options);
     }
+  /**
+ * @summary List Einvoices
+ */
+export const listEinvoices = (
+    params?: ListEinvoicesParams,
+ options?: SecondParameter<typeof apiRequest<EInvoicePage>>,) => {
+      return apiRequest<EInvoicePage>(
+      {url: `/api/v1/einvoices`, method: 'GET',
+        params
+    },
+      options);
+    }
+  /**
+ * @summary Get Einvoice
+ */
+export const getEinvoice = (
+    einvoiceId: string,
+ options?: SecondParameter<typeof apiRequest<EInvoiceDetail>>,) => {
+      return apiRequest<EInvoiceDetail>(
+      {url: `/api/v1/einvoices/${einvoiceId}`, method: 'GET'
+    },
+      options);
+    }
+  /**
+ * @summary Set Risk Flag
+ */
+export const setEinvoiceRiskFlag = (
+    einvoiceId: string,
+    riskFlagIn: RiskFlagIn,
+ options?: SecondParameter<typeof apiRequest<RiskFlagOut>>,) => {
+      return apiRequest<RiskFlagOut>(
+      {url: `/api/v1/einvoices/${einvoiceId}/risk-flag`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: riskFlagIn
+    },
+      options);
+    }
+  /**
+ * @summary Accept Einvoice
+ */
+export const acceptEinvoice = (
+    einvoiceId: string,
+    emptyBodyNull?: EmptyBody | null,
+ options?: SecondParameter<typeof apiRequest<Queued>>,) => {
+      return apiRequest<Queued>(
+      {url: `/api/v1/einvoices/${einvoiceId}/accept`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: emptyBodyNull
+    },
+      options);
+    }
+  /**
+ * @summary Reject Einvoice
+ */
+export const rejectEinvoice = (
+    einvoiceId: string,
+    appModulesIntegrationsEinvoiceApiEinvoicesRejectIn: AppModulesIntegrationsEinvoiceApiEinvoicesRejectIn,
+ options?: SecondParameter<typeof apiRequest<Queued>>,) => {
+      return apiRequest<Queued>(
+      {url: `/api/v1/einvoices/${einvoiceId}/reject`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: appModulesIntegrationsEinvoiceApiEinvoicesRejectIn
+    },
+      options);
+    }
+  /**
+ * @summary Einvoice Sign Challenge
+ */
+export const einvoiceSignChallenge = (
+    einvoiceId: string,
+    emptyBodyNull?: EmptyBody | null,
+ options?: SecondParameter<typeof apiRequest<SignChallenge>>,) => {
+      return apiRequest<SignChallenge>(
+      {url: `/api/v1/einvoices/${einvoiceId}/sign-challenge`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: emptyBodyNull
+    },
+      options);
+    }
+  /**
+ * @summary Einvoice Submit Signed
+ */
+export const einvoiceSubmitSigned = (
+    einvoiceId: string,
+    submitSigned: SubmitSigned,
+ options?: SecondParameter<typeof apiRequest<Signed>>,) => {
+      return apiRequest<Signed>(
+      {url: `/api/v1/einvoices/${einvoiceId}/submit-signed`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: submitSigned
+    },
+      options);
+    }
+  /**
+ * @summary Create Power Of Attorney
+ */
+export const createPowerOfAttorney = (
+    poaIn: PoaIn,
+ options?: SecondParameter<typeof apiRequest<PoaOut>>,) => {
+      return apiRequest<PoaOut>(
+      {url: `/api/v1/powers-of-attorney`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: poaIn
+    },
+      options);
+    }
+  /**
+ * @summary List Powers Of Attorney
+ */
+export const listPowersOfAttorney = (
+    params?: ListPowersOfAttorneyParams,
+ options?: SecondParameter<typeof apiRequest<PoaPage>>,) => {
+      return apiRequest<PoaPage>(
+      {url: `/api/v1/powers-of-attorney`, method: 'GET',
+        params
+    },
+      options);
+    }
+  /**
+ * @summary Get Power Of Attorney
+ */
+export const getPowerOfAttorney = (
+    poaId: string,
+ options?: SecondParameter<typeof apiRequest<PoaOut>>,) => {
+      return apiRequest<PoaOut>(
+      {url: `/api/v1/powers-of-attorney/${poaId}`, method: 'GET'
+    },
+      options);
+    }
+  /**
+ * @summary Poa Sign Challenge
+ */
+export const poaSignChallenge = (
+    poaId: string,
+    emptyBodyNull?: EmptyBody | null,
+ options?: SecondParameter<typeof apiRequest<SignChallenge>>,) => {
+      return apiRequest<SignChallenge>(
+      {url: `/api/v1/powers-of-attorney/${poaId}/sign-challenge`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: emptyBodyNull
+    },
+      options);
+    }
+  /**
+ * @summary Poa Submit Signed
+ */
+export const poaSubmitSigned = (
+    poaId: string,
+    submitSigned: SubmitSigned,
+ options?: SecondParameter<typeof apiRequest<PoaState>>,) => {
+      return apiRequest<PoaState>(
+      {url: `/api/v1/powers-of-attorney/${poaId}/submit-signed`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: submitSigned
+    },
+      options);
+    }
+  /**
+ * @summary Cancel Power Of Attorney
+ */
+export const cancelPowerOfAttorney = (
+    poaId: string,
+    cancelIn: CancelIn,
+ options?: SecondParameter<typeof apiRequest<PoaState>>,) => {
+      return apiRequest<PoaState>(
+      {url: `/api/v1/powers-of-attorney/${poaId}/cancel`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: cancelIn
+    },
+      options);
+    }
   export type ListPurchaseOrdersResult = NonNullable<Awaited<ReturnType<typeof listPurchaseOrders>>>
 export type CreatePurchaseOrderResult = NonNullable<Awaited<ReturnType<typeof createPurchaseOrder>>>
 export type GetPurchaseOrderResult = NonNullable<Awaited<ReturnType<typeof getPurchaseOrder>>>
@@ -329,6 +531,7 @@ export type SendPurchaseOrderResult = NonNullable<Awaited<ReturnType<typeof send
 export type CancelPurchaseOrderResult = NonNullable<Awaited<ReturnType<typeof cancelPurchaseOrder>>>
 export type ListGoodsReceiptsResult = NonNullable<Awaited<ReturnType<typeof listGoodsReceipts>>>
 export type CreateGoodsReceiptResult = NonNullable<Awaited<ReturnType<typeof createGoodsReceipt>>>
+export type CreateGoodsReceiptFromEinvoiceResult = NonNullable<Awaited<ReturnType<typeof createGoodsReceiptFromEinvoice>>>
 export type GetGoodsReceiptResult = NonNullable<Awaited<ReturnType<typeof getGoodsReceipt>>>
 export type UpdateGoodsReceiptResult = NonNullable<Awaited<ReturnType<typeof updateGoodsReceipt>>>
 export type PostGoodsReceiptResult = NonNullable<Awaited<ReturnType<typeof postGoodsReceipt>>>
@@ -343,3 +546,16 @@ export type ListSupplierPaymentsResult = NonNullable<Awaited<ReturnType<typeof l
 export type CreateSupplierPaymentResult = NonNullable<Awaited<ReturnType<typeof createSupplierPayment>>>
 export type GetSupplierPaymentResult = NonNullable<Awaited<ReturnType<typeof getSupplierPayment>>>
 export type CancelSupplierPaymentResult = NonNullable<Awaited<ReturnType<typeof cancelSupplierPayment>>>
+export type ListEinvoicesResult = NonNullable<Awaited<ReturnType<typeof listEinvoices>>>
+export type GetEinvoiceResult = NonNullable<Awaited<ReturnType<typeof getEinvoice>>>
+export type SetEinvoiceRiskFlagResult = NonNullable<Awaited<ReturnType<typeof setEinvoiceRiskFlag>>>
+export type AcceptEinvoiceResult = NonNullable<Awaited<ReturnType<typeof acceptEinvoice>>>
+export type RejectEinvoiceResult = NonNullable<Awaited<ReturnType<typeof rejectEinvoice>>>
+export type EinvoiceSignChallengeResult = NonNullable<Awaited<ReturnType<typeof einvoiceSignChallenge>>>
+export type EinvoiceSubmitSignedResult = NonNullable<Awaited<ReturnType<typeof einvoiceSubmitSigned>>>
+export type CreatePowerOfAttorneyResult = NonNullable<Awaited<ReturnType<typeof createPowerOfAttorney>>>
+export type ListPowersOfAttorneyResult = NonNullable<Awaited<ReturnType<typeof listPowersOfAttorney>>>
+export type GetPowerOfAttorneyResult = NonNullable<Awaited<ReturnType<typeof getPowerOfAttorney>>>
+export type PoaSignChallengeResult = NonNullable<Awaited<ReturnType<typeof poaSignChallenge>>>
+export type PoaSubmitSignedResult = NonNullable<Awaited<ReturnType<typeof poaSubmitSigned>>>
+export type CancelPowerOfAttorneyResult = NonNullable<Awaited<ReturnType<typeof cancelPowerOfAttorney>>>

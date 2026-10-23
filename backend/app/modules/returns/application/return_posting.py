@@ -200,8 +200,10 @@ class ReturnPostingHandler:
                 )  # fmt: skip
             if ln.expired:
                 for pc in ln.pieces:
+                    codes = [ln.src.marking_code] if ln.src.marking_code else []  # → CRPT on post (21 §4)
                     write_off.append({"product_id": ln.product.id, "lot_id": pc.lot_id, "qty": pc.qty,
-                                      "cost_amount": money(pc.qty * pc.unit_cost)})  # fmt: skip
+                                      "cost_amount": money(pc.qty * pc.unit_cost),
+                                      "marking_codes": codes})  # fmt: skip
             line_rows.append(
                 {
                     "id": line_id, "tenant_id": ctx.tenant_id, "return_id": p.id, "line_no": ln.index + 1,

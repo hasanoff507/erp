@@ -4,6 +4,7 @@
  * ERP API
  * OpenAPI spec version: 0.1.0
  */
+import type { PendingCreditInvoiceOut } from './pendingCreditInvoiceOut.ts';
 import type { VatSummaryOutRegime } from './vatSummaryOutRegime.ts';
 
 export interface VatSummaryOut {
@@ -14,6 +15,7 @@ export interface VatSummaryOut {
   net_vat: string | null;
   pending_credit_red_invoices: number | null;
   pending_credit_pct: string | null;
+  pending_credit_invoices: PendingCreditInvoiceOut[] | null;
   turnover_base: string | null;
   turnover_rate_pct: string | null;
   turnover_amount: string | null;

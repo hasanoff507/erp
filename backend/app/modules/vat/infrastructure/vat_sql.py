@@ -10,7 +10,13 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.vat.application.vat import BranchBase, RegimeRange, VatMoveRow, split_regimes
+from app.modules.vat.application.vat import (
+    BranchBase,
+    PendingCreditInvoice,
+    RegimeRange,
+    VatMoveRow,
+    split_regimes,
+)
 
 ZERO = Decimal("0.00")
 _BASE_ACCOUNTS = "('9020','9040','9050','9390','8530')"
@@ -61,21 +67,27 @@ class SqlVatRepository:
         ).one()
         return _d(row[0]), _d(row[1])
 
-    async def pending_credit(self, s: AsyncSession, start: date, end: date) -> tuple[int, Decimal]:
-        row = (
-            await s.execute(
-                text(
-                    "SELECT count(*), COALESCE(sum(e.vat_amount), 0) FROM app.einvoices e "
-                    "WHERE e.direction = 'in' AND e.risk_flag IN ('red','unknown') "
-                    "AND e.status NOT IN ('cancelled','rejected','draft') AND COALESCE(e.vat_amount, 0) > 0 "
-                    "AND e.doc_date BETWEEN :a AND :e "
-                    "AND NOT EXISTS (SELECT 1 FROM app.vat_moves v WHERE v.einvoice_id = e.id AND v.kind = "
-                    "'input')"
-                ),
-                {"a": start, "e": end},
-            )
-        ).one()
-        return int(row[0]), _d(row[1])
+    async def pending_credit_invoices(
+        self, s: AsyncSession, start: date, end: date
+    ) -> list[PendingCreditInvoice]:
+        rows = await s.execute(
+            text(
+                "SELECT e.id, e.number, e.doc_date, e.counterparty_id, c.name, e.risk_flag, "
+                "COALESCE(e.total_amount, 0), e.vat_amount, "
+                "COALESCE((SELECT sum(v.vat_amount) FROM app.vat_moves v WHERE v.einvoice_id = e.id "
+                "AND v.kind = 'input'), 0) AS credited "
+                "FROM app.einvoices e JOIN app.counterparties c ON c.id = e.counterparty_id "
+                "WHERE e.direction = 'in' AND e.risk_flag IN ('red','unknown') "
+                "AND e.status NOT IN ('cancelled','rejected','draft') AND COALESCE(e.vat_amount, 0) > 0 "
+                "AND e.doc_date BETWEEN :a AND :e ORDER BY e.doc_date, e.id"
+            ),
+            {"a": start, "e": end},
+        )
+        out = [
+            PendingCreditInvoice(r[0], r[1], r[2], r[3], r[4], r[5], _d(r[6]), _d(r[7]), _d(r[8]))
+            for r in rows
+        ]
+        return [i for i in out if i.pending_vat > 0]
 
     async def turnover_bases(
         self, s: AsyncSession, start: date, end: date, branch_ids: tuple[UUID, ...] | None

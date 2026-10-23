@@ -83,6 +83,53 @@ class ReturnedSoFar:
     vat: Decimal
 
 
+@dataclass(frozen=True, slots=True)
+class EInvoiceSource:
+    """An incoming e-invoice for ``from-einvoice`` (19 §8)."""
+
+    id: UUID
+    direction: str
+    status: str
+    counterparty_id: UUID
+    doc_date: date | None
+    payload: Mapping[str, Any]
+    ettn_ref: str | None
+    active_receipt_id: UUID | None
+
+
+class MarkingHooksPort(Protocol):
+    """Contract ``marking.md`` (b5-marking) — called inside the posting transaction."""
+
+    async def on_goods_receipt_posted(
+        self,
+        s: AsyncSession,
+        tenant_id: UUID,
+        receipt_id: UUID,
+        *,
+        doc_date: date,
+        shipped_on: date | None = None,
+        actor_user_id: UUID | None = None,
+    ) -> UUID | None: ...
+    async def on_goods_receipt_cancelled(
+        self, s: AsyncSession, tenant_id: UUID, receipt_id: UUID, *, actor_user_id: UUID | None = None
+    ) -> None: ...
+    async def acceptance(
+        self, s: AsyncSession, receipt_id: UUID, *, now: datetime | None = None
+    ) -> dict[str, Any] | None: ...
+    async def on_supplier_return_posted(
+        self,
+        s: AsyncSession,
+        tenant_id: UUID,
+        return_id: UUID,
+        *,
+        lines: Sequence[Any],
+        actor_user_id: UUID | None = None,
+    ) -> UUID | None: ...
+    async def on_codes_document_cancelled(
+        self, s: AsyncSession, tenant_id: UUID, doc_id: UUID, *, actor_user_id: UUID | None = None
+    ) -> None: ...
+
+
 class GoodsReceiptRepository(Protocol):
     async def get(self, s: AsyncSession, receipt_id: UUID, *, lock: bool = False) -> GoodsReceipt | None: ...
     async def list_page(
@@ -97,6 +144,11 @@ class GoodsReceiptRepository(Protocol):
     async def regime_on(self, s: AsyncSession, day: date) -> Regime: ...
     async def advance_balance(self, s: AsyncSession, supplier_id: UUID) -> Decimal: ...
     async def poa_number(self, s: AsyncSession, poa_id: UUID) -> tuple[bool, str | None]: ...
+    async def einvoice_source(self, s: AsyncSession, einvoice_id: UUID) -> EInvoiceSource | None: ...
+    async def product_by_code(
+        self, s: AsyncSession, *, barcode: str | None, mxik: str | None
+    ) -> UUID | None: ...
+    async def shipped_on(self, s: AsyncSession, receipt_id: UUID) -> date | None: ...
     async def foreign_codes(self, s: AsyncSession, receipt_id: UUID, codes: Sequence[str]) -> list[str]: ...
     async def replace_codes(
         self, s: AsyncSession, tenant_id: UUID, receipt_id: UUID, rows: Sequence[Mapping[str, Any]]

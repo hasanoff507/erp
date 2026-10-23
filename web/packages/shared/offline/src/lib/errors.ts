@@ -11,7 +11,9 @@ export type OfflineErrorCode =
   | "DEVICE_NOT_REGISTERED"
   | "DEVICE_REVOKED"
   | "UNKNOWN_EVENT_TYPE"
-  | "VALIDATION_ERROR";
+  | "VALIDATION_ERROR"
+  /** B5 local bridge: the FM already signed a different request for this document (fiscal/reservation.ts). */
+  | "FISCAL_RESULT_PENDING";
 
 export class OfflineError extends Error {
   readonly code: OfflineErrorCode;

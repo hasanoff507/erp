@@ -29,7 +29,7 @@ export interface ReturnOut {
   vat_total: string;
   /** Payable decrease written on post */
   invoice_total: string;
-  /** awaiting_einvoice — the input-VAT decrease waits for the supplier's additional e-invoice */
+  /** awaiting_einvoice — the input-VAT decrease waits for the supplier's additional e-invoice; adjusted — written when that e-invoice was accepted (13 §2.20) */
   vat_adjustment_status: ReturnOutVatAdjustmentStatus;
   created_by: string;
   created_by_name: string | null;

@@ -8,5 +8,11 @@ import type { CrptOutStatus } from './crptOutStatus.ts';
 
 export interface CrptOut {
   status: CrptOutStatus;
+  connected_at?: string | null;
+  /** Last successful call with this key */
+  last_ok_at?: string | null;
+  /** Last error text (never a secret) */
+  last_error?: string | null;
+  last_error_at?: string | null;
   key_last4: string | null;
 }

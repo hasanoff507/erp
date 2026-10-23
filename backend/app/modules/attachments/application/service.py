@@ -30,6 +30,7 @@ from app.modules.attachments.domain.rules import (
     CONTENT_TYPES,
     EXTENSIONS,
     MAX_BYTES,
+    SERVER_KIND_READ,
     UPLOAD_PERMISSIONS,
     URL_TTL_S,
     matches_magic,
@@ -149,6 +150,65 @@ class AttachmentService:
             stage_response(body, 201)
         return body
 
+    async def upload_in_transaction(
+        self,
+        session: AsyncSession,
+        actor: Principal,
+        kind: str,
+        filename: str | None,
+        content_type: str | None,
+        content: bytes,
+        ip: str | None,
+    ) -> dict[str, Any]:
+        """Store an attachment using a caller-owned tenant transaction.
+
+        This is for documents that must commit their attachment reference, audit event, and
+        idempotent response together. The caller must already be inside ``tenant_transaction``
+        and stages the response for the enclosing document request.
+        """
+        self.check_kind(kind)
+        ctype = normalize_type(content_type)
+        if ctype not in CONTENT_TYPES[kind]:
+            raise _unsupported(ctype, kind)
+        if len(content) > MAX_BYTES[ctype]:
+            raise AppError(ErrorCode.FILE_TOO_LARGE, params={"max_bytes": MAX_BYTES[ctype]})
+        if not content or not matches_magic(ctype, content):
+            raise _unsupported(ctype, kind)
+        attachment_id = uuid7()
+        key = f"tenants/{actor.tenant_id}/attachments/{attachment_id}.{EXTENSIONS[ctype]}"
+        await self._storage.put(key, content, ctype)
+        await self._repo.insert(
+            session,
+            {
+                "id": attachment_id,
+                "tenant_id": actor.tenant_id,
+                "s3_key": key,
+                "content_type": ctype,
+                "original_name": (filename or "")[:255] or None,
+                "sha256": hashlib.sha256(content).hexdigest(),
+                "kind": kind,
+                "size_bytes": len(content),
+                "uploaded_by": actor.user_id,
+            },
+        )
+        await record_audit(
+            session,
+            tenant_id=actor.tenant_id,
+            user_id=actor.user_id,
+            action="attachment.uploaded",
+            entity="attachments",
+            entity_id=attachment_id,
+            ip=ip,
+            device_id=actor.device_id,
+            after={"kind": kind, "content_type": ctype, "size_bytes": len(content)},
+        )
+        return {
+            "id": attachment_id,
+            "url": self.signed_url(actor.tenant_id, attachment_id),
+            "content_type": ctype,
+            "size_bytes": len(content),
+        }
+
     async def load(self, actor: Principal, attachment_id: UUID) -> AttachmentRow:
         async with self._sf() as s, tenant_transaction(s, actor.tenant_id, user_id=actor.user_id):
             row = await self._repo.get(s, attachment_id)
@@ -163,7 +223,7 @@ class AttachmentService:
             async with self._sf() as s, tenant_transaction(s, actor.tenant_id, user_id=actor.user_id):
                 if await self._repo.bank_statement_ref(s, row.id):
                     return BANK_STATEMENT_READ
-        return UPLOAD_PERMISSIONS.get(row.kind, ())
+        return UPLOAD_PERMISSIONS.get(row.kind) or SERVER_KIND_READ.get(row.kind, ())
 
     def describe(self, tenant_id: UUID, row: AttachmentRow) -> dict[str, Any]:
         return {

@@ -24,6 +24,20 @@ Period = Annotated[str, Query(pattern=r"^\d{4}-\d{2}$", description="YYYY-MM")]
 DocType = Literal["sales", "goods_receipts", "returns", "supplier_returns", "write_offs", "supplier_payments"]
 
 
+class PendingCreditInvoiceOut(BaseModel):
+    einvoice_id: UUID
+    number: str | None
+    doc_date: str | None
+    counterparty_id: UUID
+    counterparty_name: str
+    risk_flag: Literal["red", "unknown"]
+    total_amount: str
+    vat_amount: str
+    credited_vat: str
+    pending_vat: str
+    credit_status: Literal["pending", "partial"]
+
+
 class VatSummaryOut(BaseModel):
     period: str
     regime: Literal["vat", "turnover"]
@@ -32,6 +46,7 @@ class VatSummaryOut(BaseModel):
     net_vat: str | None
     pending_credit_red_invoices: int | None
     pending_credit_pct: str | None
+    pending_credit_invoices: list[PendingCreditInvoiceOut] | None
     turnover_base: str | None
     turnover_rate_pct: str | None
     turnover_amount: str | None

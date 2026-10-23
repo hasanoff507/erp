@@ -8,7 +8,13 @@ from uuid import UUID
 
 from app.core.config import Settings, get_settings
 from app.core.db.session import Database, TenantContextError
-from app.modules.integrations.fiscal.wiring import ofd_send_service, unacked_monitor
+from app.modules.integrations.fiscal.wiring import (
+    LOCAL_BRIDGE,
+    agent_status_sweep,
+    ofd_send_service,
+    provider_ack_poller,
+    unacked_monitor,
+)
 
 
 def _tenant(raw: object) -> UUID:
@@ -49,3 +55,23 @@ async def fiscal_unacked_monitor(
     at = datetime.fromisoformat(now) if now else None
     report = await unacked_monitor(db.session_factory).run(_tenant(tenant_id), at)
     return report.as_json()
+
+
+async def fiscal_agent_status(
+    ctx: dict[str, Any], *, tenant_id: object = None, now: str | None = None
+) -> dict[str, int]:
+    """Every 5 min: ``fiscal.status`` for each register bound to a store agent (21 §1, §16; 23 §4.2)."""
+    db: Database = ctx["db"]
+    at = datetime.fromisoformat(now) if now else None
+    return await agent_status_sweep(db.session_factory).run(_tenant(tenant_id), at)
+
+
+async def fiscal_ack_poll(ctx: dict[str, Any], *, tenant_id: object = None) -> dict[str, int]:
+    """Every 5 min, server-side providers: ``resend_unsent`` → ``acked[]`` → ``ofd_acked_at`` (DoD-05)."""
+    settings = _settings(ctx)
+    if settings.fiscal_provider in LOCAL_BRIDGE:  # the store agent reports acks (fiscal.status)
+        return {"registers": 0, "acked": 0, "failed": 0}
+    db: Database = ctx["db"]
+    return await provider_ack_poller(db.session_factory, settings, ctx.get("fiscal_port")).run(
+        _tenant(tenant_id)
+    )

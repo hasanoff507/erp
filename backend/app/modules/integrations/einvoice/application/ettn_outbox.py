@@ -7,7 +7,9 @@ business transaction, 23 §2.1 step 5):
    (``status IN ('queued','retry') AND next_run_at ≤ now()``, or a ``running`` job whose worker died
    ``STALE_RUNNING`` ago) → ``running``, ``attempts + 1``; the e-TTN → ``sending``. An e-TTN that is
    no longer sendable (cancelled with its transfer, already registered) closes the job as ``done``.
-2. ``EInvoicePort.send_ettn(ettn_id, payload)`` — ``ettn_id`` is the operator idempotency key.
+2. ``EInvoicePort.send_ettn(ettn_id, payload, signature)`` — ``ettn_id`` is the operator idempotency key;
+   ``signature`` — the sender's newest E-IMZO signature (``edoc_signatures``; ``None`` only on the fake
+   operator's unsigned auto-send, 27 B2). The port is the tenant's (``EInvoicePortProvider``).
 3. *record* (second transaction): ``registered`` → e-TTN ``registered`` + ``operator_doc_id``,
    ``transfers.ettn_ref = operator_doc_id``, job ``done``; a permanent failure (``auth`` /
    ``validation`` or ``ETtnResult.status='failed'``) → e-TTN and job ``failed`` + ``last_error`` +
@@ -30,7 +32,7 @@ import random
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 from uuid import UUID
 
 import structlog
@@ -40,8 +42,11 @@ from app.core.audit import record_audit
 from app.core.db.session import tenant_transaction
 from app.modules.integrations.einvoice.application.ports import (
     EInvoicePort,
+    EInvoicePortProvider,
     EInvoiceProviderError,
     ETtnResult,
+    Pkcs7Signature,
+    StaticPortProvider,
 )
 from app.modules.integrations.einvoice.domain.retry import exhausted, retry_delay
 
@@ -69,6 +74,10 @@ class EttnRow:
 class EttnOutboxRepository(Protocol):
     async def claim(self, s: AsyncSession, job_id: UUID | None) -> ClaimedJob | None: ...
     async def ettn(self, s: AsyncSession, ettn_id: UUID) -> EttnRow | None: ...
+    async def signature(self, s: AsyncSession, ettn_id: UUID) -> Pkcs7Signature | None:
+        """The sender's newest E-IMZO signature (``edoc_signatures``, 21 §5); ``None`` — unsigned."""
+        ...
+
     async def lock_transfer(self, s: AsyncSession, transfer_id: UUID) -> None: ...
     async def lock_job(self, s: AsyncSession, job_id: UUID) -> None: ...
     async def set_ettn(
@@ -114,13 +123,15 @@ class EttnOutboxService:
         self,
         session_factory: async_sessionmaker[AsyncSession],
         repo: EttnOutboxRepository,
-        port: EInvoicePort,
+        port: EInvoicePort | EInvoicePortProvider,
         *,
         rand: Callable[[], float] = random.random,
     ) -> None:
         self._sf = session_factory
         self._repo = repo
-        self._port = port
+        self._ports: EInvoicePortProvider = (
+            cast(EInvoicePortProvider, port) if hasattr(port, "for_tenant") else StaticPortProvider(port)
+        )
         self._rand = rand
 
     async def run(self, tenant_id: UUID, job_id: UUID | None = None) -> Outcome | None:
@@ -136,8 +147,10 @@ class EttnOutboxService:
                 await self._repo.finish(s, job.id, "done", note)
                 return Outcome(job.id, "skipped", ettn.status if ettn else None)
             await self._repo.set_ettn(s, ettn.id, "sending", operator_doc_id=None, last_error=None)
+            signature = await self._repo.signature(s, ettn.id)
         try:
-            result = await self._port.send_ettn(ettn.id, ettn.payload)
+            port = await self._ports.for_tenant(tenant_id)
+            result = await port.send_ettn(ettn.id, ettn.payload, signature)
         except EInvoiceProviderError as exc:
             if exc.kind == "transient":
                 return await self._transient(tenant_id, job, ettn, str(exc))
@@ -203,9 +216,13 @@ class EttnOutboxService:
             await self._repo.set_ettn(s, ettn.id, status, operator_doc_id=None, last_error=error)
             await self._repo.finish(s, job.id, "failed", error)
             await record_audit(
-                s, tenant_id=tenant_id, action="ettn.send_failed", entity="ettn_documents", entity_id=ettn.id,
+                s,
+                tenant_id=tenant_id,
+                action="ettn.send_failed",
+                entity="ettn_documents",
+                entity_id=ettn.id,
                 after={"job_id": str(job.id), "attempts": job.attempts, "error": error},
-            )  # fmt: skip
+            )
         log.warning("ettn_send_failed", job_id=str(job.id), ettn_id=str(ettn.id), error=error)
         return Outcome(job.id, "failed", status)
 

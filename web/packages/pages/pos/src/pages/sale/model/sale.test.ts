@@ -218,6 +218,7 @@ describe("payment validation (07 POS-03)", () => {
         dueDate: null,
         debtApproval: null,
         uzqrRef: "",
+        uzqrType: "static" as const,
         comment: "",
         debtOverLimitConfirmed: false,
         electronic: null,

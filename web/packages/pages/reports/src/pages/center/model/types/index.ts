@@ -1,4 +1,5 @@
 import type {
+  BalanceSheetOut,
   CashHistoryItem,
   CashMovementOut,
   CashRegisterOut,
@@ -7,8 +8,10 @@ import type {
   ProfitAndLossOut,
   SalesReportOut,
   ShiftOut,
+  StockAsOfOut,
   StockReportOut,
   TopProductsOut,
+  TrialBalanceOut,
   VatMoveOut,
   VatMovePage,
 } from "@shared/models";
@@ -25,11 +28,15 @@ export type StockReport = StockReportOut;
 export type ProfitAndLoss = ProfitAndLossOut;
 export type DiscountReport = DiscountReportOut;
 export type DebtsAging = DebtsAgingOut;
+export type TrialBalance = TrialBalanceOut;
+export type BalanceSheet = BalanceSheetOut;
+export type StockAsOf = StockAsOfOut;
 
 /**
  * 07 BO-09 catalogue — the reports that open (Bosqich 3: «Kassa / smena tarixi», «QQS registri
  * (qaytarishlar bilan)»; Bosqich 4: savdo, top tovarlar, kassirlar, ombor qoldig'i (konsolidatsiya),
- * kam qolgan tovarlar, foyda va zarar, chegirmalar va marja, qarzdorlik muddati). The rest of the
+ * kam qolgan tovarlar, foyda va zarar, chegirmalar va marja, qarzdorlik muddati; Bosqich 5 (M11): sinov
+ * balansi, buxgalteriya balansi, ombor qoldig'i sana holatiga (`doc_date`, ACC-09)). The rest of the
  * catalogue is «Tez orada».
  */
 export type ReportKey =
@@ -42,7 +49,10 @@ export type ReportKey =
   | "low-stock"
   | "profit-and-loss"
   | "discounts"
-  | "debts-aging";
+  | "debts-aging"
+  | "trial-balance"
+  | "balance-sheet"
+  | "stock-as-of";
 export const REPORT_KEYS: readonly ReportKey[] = [
   "cash-history",
   "vat-returns",
@@ -54,6 +64,9 @@ export const REPORT_KEYS: readonly ReportKey[] = [
   "profit-and-loss",
   "discounts",
   "debts-aging",
+  "trial-balance",
+  "balance-sheet",
+  "stock-as-of",
 ];
 
 /** Reports read from `/reports/*` with the shared period / branch filters. */
@@ -130,7 +143,10 @@ export type ReportRequest =
   | { kind: "stock"; branchId: string | null; belowMinOnly: boolean; search: string }
   | { kind: "profit-and-loss"; range: DateRange; branchId: string | null }
   | { kind: "discounts"; range: DateRange; branchId: string | null; groupBy: DiscountsGroupBy }
-  | { kind: "debts-aging"; asOf: string; branchId: string | null; direction: AgingDirection };
+  | { kind: "debts-aging"; asOf: string; branchId: string | null; direction: AgingDirection }
+  | { kind: "trial-balance"; period: string; branchId: string | null }
+  | { kind: "balance-sheet"; asOf: string; branchId: string | null }
+  | { kind: "stock-as-of"; asOf: string; branchId: string | null };
 
 export type ReportData =
   | { kind: "sales"; data: SalesReport }
@@ -138,7 +154,10 @@ export type ReportData =
   | { kind: "stock"; data: StockReport }
   | { kind: "profit-and-loss"; data: ProfitAndLoss }
   | { kind: "discounts"; data: DiscountReport }
-  | { kind: "debts-aging"; data: DebtsAging };
+  | { kind: "debts-aging"; data: DebtsAging }
+  | { kind: "trial-balance"; data: TrialBalance }
+  | { kind: "balance-sheet"; data: BalanceSheet }
+  | { kind: "stock-as-of"; data: StockAsOf };
 
 export interface ReportResult {
   /** `requestKey` of the request it answers. */
@@ -163,4 +182,7 @@ export const REPORT_ACCESS: Record<ReportKey, ReportRequirement> = {
   "profit-and-loss": { permission: "reports.finance.view" },
   discounts: { permission: "reports.finance.view" },
   "debts-aging": { anyOf: ["reports.finance.view", "debts.approve"] },
+  "trial-balance": { permission: "reports.finance.view" },
+  "balance-sheet": { permission: "reports.finance.view" },
+  "stock-as-of": { permission: "reports.finance.view" },
 };

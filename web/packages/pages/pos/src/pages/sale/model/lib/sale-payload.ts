@@ -5,13 +5,21 @@
  * sent by the device: an integrated payment carries only `card_result` (the server fills rrn / mask / type);
  * a manual card carries only amount + `manual_reason` (+ `card_manual_approval`). `receipt_seq` is assigned by
  * `enqueueEvent` (`opts.receiptSeq`) when the receipt has a non-debt part; a debt-only sale sends `null`.
+ * B5: dynamic UzQR / Click / Payme / Uzum parts carry the confirmed checkout (`checkout_ref` + `provider_tx_id`,
+ * 18 §16); in the local-bridge mode the FM-signed `receipt_seq` + `fiscal_result` come in `ctx` (qaror #68).
  */
 import type { Money } from "@shared/lib/money";
 
 import type { ApprovalRef, DraftTotals } from "#/entities/receipt-draft/index.ts";
 import { isPositive, sumMoney } from "#/entities/receipt-draft/index.ts";
 
-export type PayMethod = "cash" | "card" | "uzqr" | "debt";
+export type PayMethod = "cash" | "card" | "uzqr" | "click" | "payme" | "uzum" | "debt";
+
+/** A confirmed provider checkout (18 §16.3 `confirmed`). */
+export interface CheckoutRef {
+  checkoutRef: string;
+  providerTxId: string;
+}
 
 export type CardPart =
   | { mode: "integrated"; attemptId: string; cardResult: Record<string, unknown> }
@@ -28,6 +36,8 @@ export interface PaymentPart {
   card?: CardPart;
   /** static UzQR — optional payment number from the customer's phone (≤ 40). */
   terminalRef?: string | null;
+  /** B5: dynamic UzQR / Click / Payme / Uzum — the confirmed checkout. */
+  checkout?: CheckoutRef | null;
   /** debt — promise date (ISO day) and the over-limit approval (online). */
   dueDate?: string | null;
   debtApproval?: ApprovalRef | null;
@@ -46,6 +56,9 @@ export interface SaleContext {
   delivery: "printed" | "electronic";
   deliveryReason: "printer_failure" | "customer_request" | null;
   comment?: string | null;
+  /** B5 local bridge: the number the FM signed and its answer (else the outbox numbers, server fiscalises). */
+  receiptSeq?: number | null;
+  fiscalResult?: Record<string, unknown> | null;
 }
 
 export type SalePayload = Record<string, unknown> & {
@@ -89,9 +102,14 @@ function paymentJson(part: PaymentPart): Record<string, unknown> {
       out.card_manual_approval = approvalJson(part.card.approval);
     }
   }
-  if (part.method === "uzqr") {
+  if (part.method === "uzqr" && !part.checkout) {
     out.qr_type = "static";
     out.terminal_ref = part.terminalRef?.trim() ? part.terminalRef.trim() : null;
+  }
+  if (part.checkout && part.method !== "cash" && part.method !== "card" && part.method !== "debt") {
+    if (part.method === "uzqr") out.qr_type = "dynamic";
+    out.checkout_ref = part.checkout.checkoutRef;
+    out.provider_tx_id = part.checkout.providerTxId;
   }
   if (part.method === "debt") {
     out.due_date = part.dueDate ?? null;
@@ -137,9 +155,11 @@ export function buildSalePayload(
     branch_id: ctx.branchId,
     cash_register_id: ctx.cashRegisterId,
     shift_id: ctx.shiftId,
-    receipt_seq: null, // enqueueEvent writes it (opts.receiptSeq) for a receipt with a non-debt part
+    // local bridge: the FM-signed number; else enqueueEvent writes it (opts.receiptSeq) for a non-debt part
+    receipt_seq: ctx.receiptSeq ?? null,
     credit_receipt_seq: null,
-    fiscal_result: null, // B3: server-side (fake / partner cloud) fiscalisation, qaror #68
+    // local bridge: the FM answer (qaror #68); else null — server-side (fake / partner cloud) fiscalisation
+    fiscal_result: ctx.fiscalResult ?? null,
     delivery: fiscalReceipt ? ctx.delivery : "printed",
     delivery_reason: fiscalReceipt && ctx.delivery === "electronic" ? ctx.deliveryReason : null,
     temp_number: ctx.tempNumber,

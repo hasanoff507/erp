@@ -21,13 +21,27 @@ export type AlertGroup = "sales" | "stock" | "debts" | "system" | "other";
 export const ALERT_GROUPS: readonly { group: AlertGroup; kinds: readonly string[] }[] = [
   {
     group: "sales",
-    kinds: ["cash_variance", "over_limit_action", "offline_48h", "card_settlement_mismatch"],
+    kinds: [
+      "cash_variance",
+      "over_limit_action",
+      "offline_48h",
+      "card_settlement_mismatch",
+      "marking_alert",
+      "late_in_closed_period",
+    ],
   },
-  { group: "stock", kinds: ["low_stock", "expiry_soon"] },
+  { group: "stock", kinds: ["low_stock", "expiry_soon", "marking_acceptance_due"] },
   { group: "debts", kinds: ["debt_due_today", "debt_aging_60", "debt_limit_exceeded_offline"] },
   {
     group: "system",
-    kinds: ["state_report_diff", "subscription_due", "subscription_grace", "recurring_expense_due"],
+    kinds: [
+      "state_report_diff",
+      "subscription_due",
+      "subscription_grace",
+      "recurring_expense_due",
+      "onec_agent_paired",
+      "onec_base_error",
+    ],
   },
 ];
 

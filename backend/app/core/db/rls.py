@@ -22,6 +22,8 @@ RLS_EXEMPT_TABLES: Final[tuple[str, ...]] = (
     "auth.authorization_codes", "auth.refresh_tokens", "auth.sessions",
     "auth.onec_device_authorizations",
     "app.user_identities",
+    # --- B5 agent --- (0028a: pre-signed store-agent artefacts, global, SELECT-only for erp_app)
+    "platform.agent_signed_artifacts",
 )  # fmt: skip
 
 # 0027 — 29 functions (12 §4.5, §6.2); 0028 adds 6 and 0029 adds 1 in later stages
@@ -45,6 +47,20 @@ SECURITY_DEFINER_FUNCTIONS_0027A_DEVICE_AUTH: Final[tuple[str, ...]] = (
     "auth_set_pin_local_hash", "auth_pin_state", "auth_staff_pin_states", "auth_family_revoked",
     "auth_session_family", "auth_revoke_device", "auth_member_elsewhere",
 )  # fmt: skip
+
+# 0028 store_agent — Do'kon agenti pairing (RFC 8628 device grant) and agent credentials (12 §4.5)
+SECURITY_DEFINER_FUNCTIONS_0028: Final[tuple[str, ...]] = (
+    "onec_device_auth_start", "onec_device_auth_lookup", "onec_device_auth_approve",
+    "onec_device_auth_poll", "onec_device_auth_deny", "onec_agent_credentials",
+)  # fmt: skip
+
+# --- B5 payments ---
+# 0028a fiscal_edocs — shop payment webhooks: tenant by Payme/Uzum credential fingerprint (12 §4.5)
+SECURITY_DEFINER_FUNCTIONS_0028A_PAYMENTS: Final[tuple[str, ...]] = ("payments_tenant_by_credential",)
+
+# --- B5 devices ---
+# 0028a fiscal_edocs — cloud printer poll authentication (12 §4.5 "Bulut printer so'rovi funksiyasi")
+SECURITY_DEFINER_FUNCTIONS_0028A_DEVICES: Final[tuple[str, ...]] = ("cloud_printer_by_secret",)
 
 _TABLES_WITHOUT_RLS = text(
     """

@@ -599,11 +599,9 @@ async def test_marking_codes_kept_exactly(env: Env) -> None:
     assert [(r["code"], r["status"]) for r in stored] == [(c, "pending_verification") for c in codes]
     posted = await post_gr(env.client, shop, draft["id"])
     assert posted.status_code == 200, posted.text
-    assert posted.json()["marking_acceptance"] == {
-        "status": "pending",
-        "due_at": None,
-        "deadline_kind": "72_hours",
-    }
+    acceptance = posted.json()["marking_acceptance"]  # B5: the CRPT acceptance job's deadline (marking.md §1)
+    assert (acceptance["status"], acceptance["deadline_kind"]) == ("pending", "72_hours")
+    assert acceptance["due_at"] is not None
     stored = await rows(env, shop.tenant_id, "SELECT status FROM app.marking_codes")
     assert {r["status"] for r in stored} == {"in_stock"}
     dup = await create_receipt(

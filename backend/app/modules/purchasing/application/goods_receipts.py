@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import base64
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -40,7 +40,7 @@ from app.core.doc_numbers import next_doc_number
 from app.core.error_codes import ErrorCode
 from app.core.errors import AppError, ErrorDetail
 from app.core.idempotency import stage_response
-from app.core.money import money_str, percent, percent_str, price, price_str, qty, qty_str
+from app.core.money import money, money_str, percent, percent_str, price, price_str, qty, qty_str
 from app.core.permissions import BranchScope
 from app.modules.accounting.application.posting import LedgerPoster
 from app.modules.accounting.domain.calendar import business_today
@@ -52,6 +52,7 @@ from app.modules.purchasing.application.po_receipts import PurchaseOrderReceipts
 from app.modules.purchasing.application.ports import (
     DocFilter,
     GoodsReceiptRepository,
+    MarkingHooksPort,
     ProductRef,
     PurchaseOrderRepository,
 )
@@ -85,6 +86,19 @@ class ReceiptLineInput:
     expiry_date: date | None = None
     marking_codes: tuple[str, ...] | None = None
     discrepancy_reason: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class EInvoiceLineProduct:
+    line_no: int
+    product_id: UUID
+
+
+@dataclass(frozen=True, slots=True)
+class FromEInvoiceInput:
+    warehouse_id: UUID
+    doc_date: date | None = None
+    lines: Sequence[EInvoiceLineProduct] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -240,6 +254,7 @@ class GoodsReceiptService:
         stock: StockService,
         poster: LedgerPoster,
         debts: DebtRegister,
+        marking: MarkingHooksPort | None = None,
     ) -> None:
         self._sf = session_factory
         self._repo = repo
@@ -249,6 +264,7 @@ class GoodsReceiptService:
         self._stock = stock
         self._poster = poster
         self._debts = debts
+        self._marking = marking
 
     @property
     def repo(self) -> GoodsReceiptRepository:
@@ -271,7 +287,7 @@ class GoodsReceiptService:
             if gr is None:
                 raise not_found()
             check_read_scope(scope, gr.branch_id)
-        return receipt_json(gr)
+            return await self._json(s, gr)
 
     # --- create / replace draft -------------------------------------------------------------------
     async def create(
@@ -291,7 +307,7 @@ class GoodsReceiptService:
                 s, tenant_id=actor.tenant_id, user_id=actor.user_id, action="goods_receipt.created",
                 entity=DOC_TYPE, entity_id=receipt_id, ip=ip, after=_audit(head, lines),
             )  # fmt: skip
-            body = receipt_json(await self._load(s, receipt_id))
+            body = await self._json(s, await self._load(s, receipt_id))
             stage_response(body, 201)
         return body
 
@@ -305,6 +321,9 @@ class GoodsReceiptService:
             gr = await self._locked(s, scope, receipt_id)
             _require_draft(gr)
             head, lines, codes = await self._prepare(s, scope, data, receipt_id, actor.tenant_id)
+            if gr.source == "einvoice":  # ACC-07: unchanged e-invoice lines keep the invoice amounts
+                head["source"] = "einvoice"
+                _keep_einvoice_amounts(gr, lines)
             await self._repo.update(s, receipt_id, head)
             await self._repo.replace_lines(s, receipt_id, lines)
             await self._register_codes(s, actor.tenant_id, receipt_id, codes)
@@ -313,7 +332,7 @@ class GoodsReceiptService:
                 entity=DOC_TYPE, entity_id=receipt_id, ip=ip,
                 before={"lines": gr.line_count, "total": money_str(gr.total)}, after=_audit(head, lines),
             )  # fmt: skip
-            body = receipt_json(await self._load(s, receipt_id))
+            body = await self._json(s, await self._load(s, receipt_id))
             stage_response(body)
         return body
 
@@ -332,12 +351,17 @@ class GoodsReceiptService:
             txn, lots = await self._post_in(s, actor.tenant_id, gr)
             if gr.po_id is not None:
                 await self._po.refresh_status(s, gr.po_id)
+            if self._marking is not None:  # contract marking.md §1: CRPT acceptance job (19 §8)
+                await self._marking.on_goods_receipt_posted(
+                    s, actor.tenant_id, gr.id, doc_date=gr.doc_date,
+                    shipped_on=await self._repo.shipped_on(s, gr.id), actor_user_id=actor.user_id,
+                )  # fmt: skip
             await record_audit(
                 s, tenant_id=actor.tenant_id, user_id=actor.user_id, action="goods_receipt.posted",
                 entity=DOC_TYPE, entity_id=receipt_id, ip=ip, before={"status": gr.status},
                 after={"status": "posted", "total": money_str(gr.total), "lots": len(lots)},
             )  # fmt: skip
-            body = receipt_json(await self._load(s, receipt_id))
+            body = await self._json(s, await self._load(s, receipt_id))
             body["lots_created"] = [
                 {
                     "lot_id": str(res.lot_id),
@@ -417,6 +441,10 @@ class GoodsReceiptService:
                 await txn.reverse_receipt(DOC_TYPE, gr.id)  # 409 LOT_ALREADY_CONSUMED
                 await self._poster.reverse_document(s, actor.tenant_id, DOC_TYPE, gr.id)
                 await self._debts.reverse(s, actor.tenant_id, DOC_TYPE, gr.id)
+                if self._marking is not None:
+                    await self._marking.on_goods_receipt_cancelled(
+                        s, actor.tenant_id, gr.id, actor_user_id=actor.user_id
+                    )
             await self._repo.update(
                 s, receipt_id,
                 {"status": "cancelled", "cancelled_at": datetime.now(UTC), "cancelled_by": actor.user_id,
@@ -430,13 +458,124 @@ class GoodsReceiptService:
                 entity=DOC_TYPE, entity_id=receipt_id, ip=ip, before={"status": gr.status},
                 after={"status": "cancelled", "reason": reason},
             )  # fmt: skip
-            body = receipt_json(await self._load(s, receipt_id))
+            body = await self._json(s, await self._load(s, receipt_id))
             stage_response(body)
         if txn is not None:
             await self._stock.after_commit(txn)
         return body
 
+    # --- from-einvoice (19 §8, ACC-07) ---------------------------------------------------------------
+    async def from_einvoice(
+        self,
+        actor: Principal,
+        scope: BranchScope,
+        einvoice_id: UUID,
+        data: FromEInvoiceInput,
+        ip: str | None,
+    ) -> dict[str, Any]:
+        """A draft prefilled from an **accepted** incoming e-invoice: supplier, lines, matched products,
+        marking codes and the combined e-TTN number. The invoice line ``net_amount``/``vat_amount`` are kept
+        as they are (``receipt_lines.net_amount``, ACC-07); ``cost`` is derived (``net / qty``, 4 dp)."""
+        doc_date = data.doc_date or business_today()
+        check_doc_date(doc_date)
+        receipt_id = uuid7()
+        async with self._sf() as s, tenant_transaction(s, actor.tenant_id, user_id=actor.user_id):
+            src = await self._repo.einvoice_source(s, einvoice_id)
+            if src is None or src.direction != "in":
+                raise AppError(ErrorCode.NOT_FOUND, params={"resource": "einvoice"})
+            if src.status != "accepted":
+                raise AppError(ErrorCode.EINVOICE_NOT_ACCEPTED, params={"status": src.status})
+            if src.active_receipt_id is not None:
+                raise AppError(
+                    ErrorCode.EINVOICE_ALREADY_LINKED, params={"receipt_id": str(src.active_receipt_id)}
+                )
+            await self._directory.require_supplier(s, src.counterparty_id)
+            branch_id = await self._warehouse_branch(s, scope, data.warehouse_id)
+            raw_lines = list(src.payload.get("lines") or [])
+            if not raw_lines:
+                raise _invalid("lines", "validation.required")
+            overrides = {o.line_no: o.product_id for o in data.lines}
+            picked: list[tuple[int, UUID, Mapping[str, Any]]] = []
+            for index, ln in enumerate(raw_lines):
+                line_no = int(ln.get("line_no") or index + 1)
+                product_id = overrides.get(line_no) or _uuid_or_none(ln.get("product_id"))
+                if product_id is None:
+                    product_id = await self._repo.product_by_code(
+                        s, barcode=ln.get("barcode"), mxik=ln.get("mxik")
+                    )
+                if product_id is None:
+                    raise _invalid(f"lines[{index}].product_id", "validation.einvoice_line_unmatched")
+                picked.append((index, product_id, ln))
+            products = await self._repo.products(s, [p for _, p, _ in picked])
+            rows: list[dict[str, Any]] = []
+            codes: list[dict[str, Any]] = []
+            seen: set[str] = set()
+            for index, product_id, ln in picked:
+                product = products.get(product_id)
+                if product is None:
+                    raise _invalid(f"lines[{index}].product_id", "validation.product_not_found")
+                if product.archived:
+                    raise AppError(ErrorCode.RESOURCE_ARCHIVED, params={"resource": "product"})
+                quantity, net, vat = (
+                    qty(ln["qty"]),
+                    money(ln["net_amount"]),
+                    money(ln.get("vat_amount") or "0"),
+                )
+                rate = percent(ln.get("vat_rate") or "0")
+                if quantity <= 0 or net < 0 or vat < 0:
+                    raise _invalid(f"lines[{index}].qty", "validation.positive")
+                if rate not in ALLOWED_VAT_RATES:
+                    raise _invalid(f"lines[{index}].vat_rate", "validation.vat_rate_invalid")
+                line_in = ReceiptLineInput(
+                    product_id=product_id,
+                    qty=quantity,
+                    marking_codes=tuple(ln.get("marking_codes") or ()) or None,
+                )
+                for code in _codes(index, line_in, product, quantity, seen):
+                    codes.append({"id": uuid7(), "code": code, "product_id": product_id})
+                rows.append(
+                    {"id": uuid7(), "tenant_id": actor.tenant_id, "receipt_id": receipt_id,
+                     "line_no": index + 1, "product_id": product_id, "qty": quantity,
+                     "cost": price(net / quantity), "vat_rate": rate,
+                     "vat_exemption_code": ln.get("vat_exemption_code") if rate == 0 else None,
+                     "vat_amount": vat, "expiry_date": None, "discrepancy_reason": None, "net_amount": net}
+                )  # fmt: skip
+            if codes:
+                taken = await self._repo.foreign_codes(s, receipt_id, [c["code"] for c in codes])
+                if taken:
+                    raise AppError(
+                        ErrorCode.MARKING_CODE_INVALID,
+                        params={"reason": "already_registered", "codes": sorted(taken)[:20]},
+                    )
+            head = {
+                "id": receipt_id, "tenant_id": actor.tenant_id, "branch_id": branch_id, "doc_date": doc_date,
+                "supplier_id": src.counterparty_id, "po_id": None, "warehouse_id": data.warehouse_id,
+                "paid_immediately": False, "kind": "purchase", "source": "einvoice", "einvoice_id": src.id,
+                "ettn_ref": src.ettn_ref, "poa_id": None, "poa_number": src.payload.get("doverennost_number"),
+                "comment": None, "created_by": actor.user_id,
+            }  # fmt: skip
+            await self._repo.insert(s, head)
+            await self._repo.replace_lines(s, receipt_id, rows)
+            await self._register_codes(s, actor.tenant_id, receipt_id, codes)
+            await record_audit(
+                s, tenant_id=actor.tenant_id, user_id=actor.user_id, action="goods_receipt.created",
+                entity=DOC_TYPE, entity_id=receipt_id, ip=ip,
+                after={**_audit(head, rows), "source": "einvoice", "einvoice_id": str(src.id)},
+            )  # fmt: skip
+            body = await self._json(s, await self._load(s, receipt_id))
+            stage_response(body, 201)
+        return body
+
     # --- helpers ----------------------------------------------------------------------------------
+    async def _json(self, s: AsyncSession, gr: GoodsReceipt) -> dict[str, Any]:
+        """19 §8 body; ``marking_acceptance`` of a posted receipt comes from the CRPT acceptance job."""
+        body = receipt_json(gr)
+        if gr.status == "posted" and self._marking is not None:
+            acceptance = await self._marking.acceptance(s, gr.id)
+            if acceptance is not None:
+                body["marking_acceptance"] = acceptance
+        return body
+
     async def _register_codes(
         self, s: AsyncSession, tenant_id: UUID, receipt_id: UUID, codes: Sequence[dict[str, Any]]
     ) -> None:
@@ -636,3 +775,21 @@ def _audit(head: dict[str, Any], lines: Sequence[dict[str, Any]]) -> dict[str, A
             for r in lines
         ],
     }  # fmt: skip
+
+
+def _uuid_or_none(value: Any) -> UUID | None:
+    try:
+        return UUID(str(value)) if value else None
+    except ValueError:
+        return None
+
+
+def _keep_einvoice_amounts(gr: GoodsReceipt, rows: Sequence[dict[str, Any]]) -> None:
+    """``PATCH`` of a from-einvoice draft (ACC-07): a line with the same product, quantity, cost and VAT rate
+    as before keeps the e-invoice ``net_amount``/``vat_amount``; a changed line is recomputed."""
+    old = {(ln.product_id, ln.qty, ln.cost, ln.vat_rate): ln for ln in gr.lines if ln.net_amount is not None}
+    for row in rows:
+        before = old.pop((row["product_id"], row["qty"], row["cost"], row["vat_rate"]), None)
+        if before is not None:
+            row["net_amount"] = before.net_amount
+            row["vat_amount"] = before.vat_amount

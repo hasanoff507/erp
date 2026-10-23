@@ -1,0 +1,36 @@
+{
+  "description": "task_keyset JWS signed by the OFFLINE agent_update root key (33 §9.4, 34 §5.5). root kid = RFC 7638 thumbprint of the root public JWK. Agent: alg/typ/kid in RootKeys, signature, exp > now, ver >= stored ver, keys[] OKP/Ed25519 with 32-byte x.",
+  "root_key": {
+    "kid": "FtIu-VbGrfe_KB6CH7GNwODB72MNxj_ml11dEvO-7kk",
+    "private_seed_hex": "4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb",
+    "public_jwk": {
+      "kty": "OKP",
+      "crv": "Ed25519",
+      "x": "PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw"
+    },
+    "thumbprint_input": "{\"crv\":\"Ed25519\",\"kty\":\"OKP\",\"x\":\"PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw\"}",
+    "thumbprint": "FtIu-VbGrfe_KB6CH7GNwODB72MNxj_ml11dEvO-7kk"
+  },
+  "now_unix_valid": 1760503600,
+  "task_keyset": "eyJhbGciOiJFZERTQSIsInR5cCI6Im9uZWMtdGFzay1rZXlzZXQrand0Iiwia2lkIjoiRnRJdS1WYkdyZmVfS0I2Q0g3R053T0RCNzJNTnhqX21sMTFkRXZPLTdrayJ9.eyJ2ZXIiOjMsImlhdCI6MTc2MDUwMDAwMCwiZXhwIjoxNzc2MDUyMDAwLCJrZXlzIjpbeyJraWQiOiIwMTkyZjBjNC03YTAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMDEiLCJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6IjExcVlBWUt4Q3JmVlNfN1R5V1FIT2c3aGN2UGFwaU1scndJYWFQY0hVUm8iLCJuYmYiOjE3NjA0MTM2MDAsImV4cCI6MTc2ODI3NjAwMH1dfQ.TWtGjMR1Ua3Jpp70DtnremNIEX30h6cgJyOH51dVrCpCyMSTDLGswg30uh6H--PPqAaM0oytwpHfo81oXB3WBQ",
+  "expected_header": {
+    "alg": "EdDSA",
+    "typ": "onec-task-keyset+jwt",
+    "kid": "FtIu-VbGrfe_KB6CH7GNwODB72MNxj_ml11dEvO-7kk"
+  },
+  "expected_payload": {
+    "ver": 3,
+    "iat": 1760500000,
+    "exp": 1776052000,
+    "keys": [
+      {
+        "kid": "0192f0c4-7a00-7000-8000-000000000001",
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "nbf": 1760413600,
+        "exp": 1768276000
+      }
+    ]
+  }
+}

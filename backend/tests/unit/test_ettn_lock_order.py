@@ -75,6 +75,9 @@ class RecordingOutboxRepo:
         e = self._ettn
         return EttnRow(e.id, e.transfer_id, self._status, e.payload)
 
+    async def signature(self, s: AsyncSession, ettn_id: UUID) -> None:
+        return None  # unsigned (fake operator auto-send)
+
     async def lock_transfer(self, s: AsyncSession, transfer_id: UUID) -> None:
         self.calls.append("transfer")
 

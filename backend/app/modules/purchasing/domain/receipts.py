@@ -3,6 +3,9 @@
 Amounts (19 §8): ``lines[].cost`` is the unit cost **without VAT** (4 dp). Per line
 ``net = ROUND_HALF_UP(qty × cost, 2)``, ``vat = ROUND_HALF_UP(net × vat_rate / 100, 2)``
 (``receipt_lines.vat_amount``); document totals are the sums of the rounded lines (13 §5.3).
+A line made from an e-invoice (``from-einvoice``, ACC-07) keeps the invoice line amounts:
+``receipt_lines.net_amount`` / ``vat_amount`` are authoritative, ``cost = ROUND_HALF_UP(net / qty, 4)``
+is derived for display only.
 
 Posting (:func:`receipt_posting`), ``credit`` = ``6010`` (credit purchase) or ``5110`` (paid at once,
 13 §2.8 — bank only in Bosqich 2):
@@ -79,10 +82,11 @@ class ReceiptLine:
     lot_id: UUID | None = None
     lot_qty_left: Decimal | None = None
     returned_qty: Decimal = ZERO_QTY
+    net_amount: Decimal | None = None  # ACC-07: the e-invoice line amount (from-einvoice) is authoritative
 
     @property
     def net(self) -> Decimal:
-        return line_net(self.qty, self.cost)
+        return self.net_amount if self.net_amount is not None else line_net(self.qty, self.cost)
 
     @property
     def total(self) -> Decimal:

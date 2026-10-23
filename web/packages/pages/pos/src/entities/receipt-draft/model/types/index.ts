@@ -26,6 +26,8 @@ export interface DraftLine {
   vatRate: string;
   vatExemptionCode: string | null;
   mxik: string | null;
+  /** B5: `products.package_code` (PackageCode of the fiscal item, 21 §1) — absent in drafts saved before B5. */
+  packageCode?: string | null;
   barcode: string | null;
   /** DataMatrix raw value (GS separators kept) — marked goods only, qty is always "1.000". */
   markingCode: string | null;

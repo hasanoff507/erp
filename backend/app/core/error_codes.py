@@ -74,6 +74,7 @@ class ErrorCode(StrEnum):
     FISCAL_SEND_FAILED = "FISCAL_SEND_FAILED"
     FISCAL_OFFLINE_48H_BLOCKED = "FISCAL_OFFLINE_48H_BLOCKED"
     FISCAL_DEVICE_LOCKED = "FISCAL_DEVICE_LOCKED"
+    FISCAL_PROVIDER_ERROR = "FISCAL_PROVIDER_ERROR"
     MARKING_CODE_INVALID = "MARKING_CODE_INVALID"
     MARKING_CODE_ALREADY_SOLD = "MARKING_CODE_ALREADY_SOLD"
     MARKING_PRICE_UNKNOWN_OFFLINE = "MARKING_PRICE_UNKNOWN_OFFLINE"
@@ -139,6 +140,7 @@ class ErrorCode(StrEnum):
     INTERNAL_ERROR = "INTERNAL_ERROR"
     NOTIFY_CONSENT_REQUIRED = "NOTIFY_CONSENT_REQUIRED"
     AGENT_CAPABILITY_DISABLED = "AGENT_CAPABILITY_DISABLED"
+    PRINTER_UNREACHABLE = "PRINTER_UNREACHABLE"
     ONEC_AGENT_OFFLINE = "ONEC_AGENT_OFFLINE"
     ONEC_AGENT_REVOKED = "ONEC_AGENT_REVOKED"
     ONEC_AGENT_UPDATE_REQUIRED = "ONEC_AGENT_UPDATE_REQUIRED"
@@ -291,6 +293,7 @@ ERROR_SPECS: Final[dict[ErrorCode, ErrorSpec]] = {
     ErrorCode.FISCAL_SEND_FAILED: ErrorSpec("Fiskal/markirovka", 502, "errors.fiscal_send_failed"),
     ErrorCode.FISCAL_OFFLINE_48H_BLOCKED: ErrorSpec("Fiskal/markirovka", 409, "errors.fiscal_offline_48h_blocked"),
     ErrorCode.FISCAL_DEVICE_LOCKED: ErrorSpec("Fiskal/markirovka", 409, "errors.fiscal_device_locked"),
+    ErrorCode.FISCAL_PROVIDER_ERROR: ErrorSpec("Fiskal/markirovka", 502, "errors.fiscal_provider_error"),
     ErrorCode.MARKING_CODE_INVALID: ErrorSpec("Fiskal/markirovka", 422, "errors.marking_code_invalid"),
     ErrorCode.MARKING_CODE_ALREADY_SOLD: ErrorSpec("Fiskal/markirovka", 409, "errors.marking_code_already_sold"),
     ErrorCode.MARKING_PRICE_UNKNOWN_OFFLINE: ErrorSpec("Fiskal/markirovka", 422, "errors.marking_price_unknown_offline"),
@@ -356,6 +359,7 @@ ERROR_SPECS: Final[dict[ErrorCode, ErrorSpec]] = {
     ErrorCode.INTERNAL_ERROR: ErrorSpec("Fayl/umumiy", 500, "errors.internal_error"),
     ErrorCode.NOTIFY_CONSENT_REQUIRED: ErrorSpec("Fayl/umumiy", 422, "errors.notify_consent_required"),
     ErrorCode.AGENT_CAPABILITY_DISABLED: ErrorSpec("Do'kon agenti", 409, "errors.agent_capability_disabled"),
+    ErrorCode.PRINTER_UNREACHABLE: ErrorSpec("Do'kon agenti", 503, "errors.printer_unreachable"),
     ErrorCode.ONEC_AGENT_OFFLINE: ErrorSpec("1C integratsiyasi", 202, "warnings.onec.agent_offline"),
     ErrorCode.ONEC_AGENT_REVOKED: ErrorSpec("1C integratsiyasi", 403, "errors.onec.agent_revoked"),
     ErrorCode.ONEC_AGENT_UPDATE_REQUIRED: ErrorSpec("1C integratsiyasi", 426, "errors.onec.agent_update_required"),

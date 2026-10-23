@@ -12,6 +12,7 @@ from app.core.config import Settings
 from app.core.db.session import Database
 from app.modules.accounting.wiring import ledger_poster
 from app.modules.debts.wiring import counterparty_directory, debt_register
+from app.modules.integrations.marking.wiring import marking_hooks
 from app.modules.inventory.wiring import stock_service
 from app.modules.purchasing.application.goods_receipts import GoodsReceiptService
 from app.modules.purchasing.application.module import PurchasingModule
@@ -57,6 +58,7 @@ def build_purchasing_module(settings: Settings, db: Database) -> PurchasingModul
             stock,
             ledger_poster(),
             debt_register(),
+            marking_hooks(),
         ),
         supplier_returns=SupplierReturnService(
             db.session_factory,
@@ -65,6 +67,7 @@ def build_purchasing_module(settings: Settings, db: Database) -> PurchasingModul
             stock,
             ledger_poster(),
             debt_register(),
+            marking_hooks(),
         ),
     )
 

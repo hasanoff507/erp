@@ -1,7 +1,8 @@
 /**
  * BO-02 KPI cards (07, mockup Bo02Dashboard): savdo (kecha / o'tgan davr bilan), cheklar (o'rtacha
  * chek), mijozlar qarzi (qarzdorlar, muddati o'tganlar), ombor qiymati (kam qolgan tovarlar) and
- * «Sof foyda» (US-M15-03: tushum − tannarx − xarajatlar; `reports.finance.view`). A card the user has
+ * «Sof foyda» (US-M15-03: tushum − tannarx − xarajatlar; US-M11-03 — the period's expenses in the note;
+ * `reports.finance.view`). A card the user has
  * no right to (the API sends `null`) is not shown; each card opens its screen.
  */
 import { ChartColumn, Package, Receipt, TrendingUp, Users } from "lucide-react";
@@ -97,7 +98,10 @@ export function Kpis({ data, period }: { data: Dashboard; period: DashboardPerio
       value: formatMoney(data.net_profit),
       icon: TrendingUp,
       tone: "success",
-      note: t("dashboard.kpi.netProfitNote"),
+      note:
+        data.expenses_total === null
+          ? t("dashboard.kpi.netProfitNote")
+          : t("dashboard.kpi.expensesNote", { amount: formatMoney(data.expenses_total) }),
     });
   }
 

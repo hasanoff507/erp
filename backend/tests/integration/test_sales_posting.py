@@ -183,15 +183,15 @@ async def test_qt_m01_13_dynamic_uzqr_needs_confirmed_checkout(env: Env) -> None
         env.db, pos.tenant_id,
         "INSERT INTO app.payment_checkouts (checkout_ref, tenant_id, branch_id, cash_register_id, provider, qr_type, "
         "amount, provider_tx_id, status, confirmed_at, expires_at, created_by) VALUES (:r, :t, :b, :c, 'uzqr', "
-        "'dynamic', 12000, 'tx-1', 'pending', NULL, now() + interval '1 day', :u)",
-        r=ref, t=pos.tenant_id, b=pos.branch_id, c=pos.register_id, u=pos.shop.user_ids["cashier"],
+        "'dynamic', 12000, :x, 'pending', NULL, now() + interval '1 day', :u)",
+        x=f"tx-{ref.hex}", r=ref, t=pos.tenant_id, b=pos.branch_id, c=pos.register_id, u=pos.shop.user_ids["cashier"],
     )  # fmt: skip
     pay = {
         "method": "uzqr",
         "amount": "12000.00",
         "qr_type": "dynamic",
         "checkout_ref": str(ref),
-        "provider_tx_id": "tx-1",
+        "provider_tx_id": f"tx-{ref.hex}",
     }
     pending = await deliver(env, pos, "sale.created", sale_payload(pos, [sale_line(product)], [pay]))
     assert pending.code == "PAYMENT_NOT_CONFIRMED"

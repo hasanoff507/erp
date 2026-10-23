@@ -1,6 +1,6 @@
 import type { ApiError } from "@shared/api";
 import type {
-  EttnOutStatus,
+  AppModulesInventoryApiTransfersEttnOutStatus,
   ReceiveLineIn,
   TransferCreate,
   TransferLineOut,
@@ -12,7 +12,7 @@ import type {
 export type Transfer = TransferOut;
 export type TransferLine = TransferLineOut;
 export type TransferStatus = TransferOutStatus;
-export type EttnStatus = EttnOutStatus;
+export type EttnStatus = AppModulesInventoryApiTransfersEttnOutStatus;
 export type { TransferCreate, TransferPage, ReceiveLineIn };
 
 /** 19 §13 statuses in list-filter order. */

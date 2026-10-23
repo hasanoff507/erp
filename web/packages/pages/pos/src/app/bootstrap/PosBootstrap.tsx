@@ -60,6 +60,7 @@ import {
   cardPaymentRestored,
   cardRecoveryRequested,
 } from "#/features/card-payment/index.ts";
+import { fiscalBindingRefreshed } from "#/features/local-fiscal/index.ts";
 import { downloadOutboxExport } from "#/pages/sync-status/ui/page/Page.tsx";
 import { posAgentClient } from "#/shared/lib/device-runtime.ts";
 import { recordPosPath } from "#/shared/lib/pos-history.ts";
@@ -84,6 +85,7 @@ export function startPosRuntime(): void {
   void catalog.warmUp().catch(() => undefined);
   agentProbeConfigured(() => posAgentClient().probe());
   agentPollingStarted();
+  fiscalBindingRefreshed(); // B5: local-bridge mode from the register's BO-12 binding (21 §16)
   if (getSyncStatus().deviceRevoked) revokedShown();
 }
 

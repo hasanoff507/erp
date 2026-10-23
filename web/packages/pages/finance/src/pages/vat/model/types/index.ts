@@ -1,6 +1,7 @@
 import type {
   ListVatMovesDocType,
   ListVatMovesKind,
+  PendingCreditInvoiceOut,
   VatMoveOut,
   VatMovePage,
   VatSummaryOut,
@@ -8,6 +9,8 @@ import type {
 
 export type VatSummary = VatSummaryOut;
 export type VatMove = VatMoveOut;
+/** A red / unknown inbound e-invoice whose VAT credit is not (fully) confirmed yet (20 #1, US-M10-03). */
+export type PendingCreditInvoice = PendingCreditInvoiceOut;
 export type { VatMovePage };
 export type MoveKind = Exclude<ListVatMovesKind, null>;
 export type MoveDocType = Exclude<ListVatMovesDocType, null>;
@@ -41,6 +44,10 @@ export interface SummaryView {
   inputVat: string | null;
   netVat: string | null;
   pendingRedInvoices: number | null;
+  /** «Riskli kiruvchi e-fakturalar»: the period's red / unknown invoices with VAT still pending (all months). */
+  pendingCreditInvoices: readonly PendingCreditInvoice[];
+  /** Σ `pending_vat` of those invoices — «Kutilayotgan QQS krediti» (`null` — not a VAT payer). */
+  pendingCreditTotal: string | null;
   /** Share of the period's input VAT (only for a single month — not additive). */
   pendingCreditPct: string | null;
   turnoverBase: string | null;

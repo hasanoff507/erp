@@ -92,6 +92,11 @@ export function SummaryCards() {
           ) : null}
         </div>
         <p className="text-small text-foreground-secondary">{t("vat.credit.hint")}</p>
+        {summary.pendingCreditTotal !== null ? (
+          <p className="text-[20px] font-extrabold tabular-nums" data-testid="vat-credit-total">
+            {money2(summary.pendingCreditTotal)}
+          </p>
+        ) : null}
         <p className="text-[14px] font-semibold">
           {summary.pendingRedInvoices === null
             ? t("vat.credit.none")

@@ -13,9 +13,11 @@ from __future__ import annotations
 
 import ipaddress
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Final, Literal
+from typing import Any, Final, Literal
 
 TxStatus = Literal["pending", "approved", "declined", "unknown", "voided"]
 PortStatus = Literal["approved", "declined", "cancelled", "timeout", "unknown", "error"]
@@ -34,6 +36,8 @@ CAPABILITIES: Final = (
 
 FINAL: Final[frozenset[str]] = frozenset({"approved", "declined", "voided"})
 UNRESOLVED: Final[frozenset[str]] = frozenset({"pending", "unknown"})
+HEALTH_STATUSES: Final = frozenset({"online", "busy", "offline", "error"})  # agent card.status values
+TASHKENT: Final = timezone(timedelta(hours=5))  # Asia/Tashkent, no DST
 ORPHAN_AFTER_HOURS: Final = 24  # 16 §2.1: approved purchase without a document → card_orphan_transaction
 
 MASK_RE: Final = re.compile(r"^[0-9]{4}\*+[0-9]{4}$")
@@ -138,3 +142,20 @@ def private_ipv4(host: str) -> bool:
     return any(
         address in ipaddress.ip_network(net) for net in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
     )
+
+
+def capability_enabled(capabilities: Mapping[str, Any], family: str) -> bool:
+    """34 §14.2: ``capabilities.<family>.enabled is True`` (anything else — disabled)."""
+    block = capabilities.get(family)
+    return isinstance(block, Mapping) and block.get("enabled") is True
+
+
+def capability_devices(capabilities: Mapping[str, Any], family: str) -> list[Mapping[str, Any]]:
+    block = capabilities.get(family)
+    devices = block.get("devices") if isinstance(block, Mapping) else None
+    return [d for d in devices if isinstance(d, Mapping)] if isinstance(devices, list) else []
+
+
+def tashkent_date(moment: datetime) -> date:
+    """Business date of a terminal event (Asia/Tashkent, UTC+5 all year)."""
+    return moment.astimezone(TASHKENT).date()

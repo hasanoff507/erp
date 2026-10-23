@@ -1,7 +1,7 @@
 /**
  * «Ortiqcha to'lovlar» (07 BO-06, qaror #67): customer · unallocated amount · date · Kt 6310, and the
  * actions (`accounting.post`): «Qaytarish» (RefundDialog — a 6310 cash movement from an open shift) and
- * «Keyingi qarzga hisoblash» (disabled — Bosqich 5, `ledger_adjustments`). Online only.
+ * «Keyingi qarzga hisoblash» (OffsetDialog — `ledger_adjustments` Dt 6310 / Kt 4010). Online only.
  */
 import { useUnit } from "effector-react";
 import { HandCoins } from "lucide-react";
@@ -13,6 +13,7 @@ import { $isOnline } from "@shared/state/network";
 import { Button, Icon, StatusChip } from "@shared/ui";
 
 import { loadOverpaymentsFx, type Overpayment } from "../model/index.ts";
+import { OffsetDialog } from "./OffsetDialog.tsx";
 import { RefundDialog } from "./RefundDialog.tsx";
 
 export interface OverpaymentsBlockProps {
@@ -22,13 +23,18 @@ export interface OverpaymentsBlockProps {
   version: number;
   /** `accounting.post` + `cash.withdraw` — «Qaytarish» (07 BO-06). */
   canRefund: boolean;
+  /** `accounting.post` — «Keyingi qarzga hisoblash» (07 BO-06, B5-T14). */
+  canOffset: boolean;
+  /** The debt changed (offset posted) — the page re-reads its lists. */
+  onChanged?: () => void;
 }
 
-export function OverpaymentsBlock({ names, version, canRefund }: OverpaymentsBlockProps) {
+export function OverpaymentsBlock({ names, version, canRefund, canOffset, onChanged }: OverpaymentsBlockProps) {
   const { t } = useTranslation("debts");
   const online = useUnit($isOnline);
   const [rows, setRows] = useState<Overpayment[] | null>(null);
   const [refunding, setRefunding] = useState<Overpayment | null>(null);
+  const [offsetting, setOffsetting] = useState<Overpayment | null>(null);
   const [reloads, setReloads] = useState(0);
   useEffect(() => {
     let alive = true;
@@ -61,21 +67,32 @@ export function OverpaymentsBlock({ names, version, canRefund }: OverpaymentsBlo
             <span className="text-[12px] text-muted-foreground">
               {formatDateTime(r.createdAt)} · {t("overpay.account")}
             </span>
-            {canRefund ? (
+            {canRefund || canOffset ? (
               <span className="mt-2 flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={!online || !r.counterpartyId}
-                  title={r.counterpartyId ? undefined : t("overpay.refund.noCustomer")}
-                  onClick={() => setRefunding(r)}
-                  data-testid={`overpay-refund-${r.id}`}
-                >
-                  {t("overpay.refund.action")}
-                </Button>
-                <Button size="sm" variant="ghost" disabled title={t("overpay.offset.later")}>
-                  {t("overpay.offset.action")}
-                </Button>
+                {canRefund ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={!online || !r.counterpartyId}
+                    title={r.counterpartyId ? undefined : t("overpay.refund.noCustomer")}
+                    onClick={() => setRefunding(r)}
+                    data-testid={`overpay-refund-${r.id}`}
+                  >
+                    {t("overpay.refund.action")}
+                  </Button>
+                ) : null}
+                {canOffset ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={!online || !r.counterpartyId}
+                    title={r.counterpartyId ? undefined : t("overpay.refund.noCustomer")}
+                    onClick={() => setOffsetting(r)}
+                    data-testid={`overpay-offset-${r.id}`}
+                  >
+                    {t("overpay.offset.action")}
+                  </Button>
+                ) : null}
               </span>
             ) : null}
           </li>
@@ -88,6 +105,17 @@ export function OverpaymentsBlock({ names, version, canRefund }: OverpaymentsBlo
           customer={customer(refunding)}
           onClose={() => setRefunding(null)}
           onDone={() => setReloads((n) => n + 1)}
+        />
+      ) : null}
+      {offsetting ? (
+        <OffsetDialog
+          row={offsetting}
+          customer={customer(offsetting)}
+          onClose={() => setOffsetting(null)}
+          onDone={() => {
+            setReloads((n) => n + 1);
+            onChanged?.();
+          }}
         />
       ) : null}
     </section>

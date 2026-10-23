@@ -120,6 +120,14 @@ export {
   type FiscalLadder,
   type FiscalLadderLevel,
 } from "./fiscal/ladder.ts";
+// --- B5 local-bridge fiscal receipts (w-pos) ---
+export {
+  fiscalReservations,
+  rememberFiscalResult,
+  releaseReservation,
+  reserveReceiptSeq,
+  type FiscalReservation,
+} from "./fiscal/reservation.ts";
 
 export {
   logout,

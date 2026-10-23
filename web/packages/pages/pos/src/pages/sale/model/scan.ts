@@ -70,6 +70,7 @@ export function toLine(
     vatRate: rate ? price4(rate).slice(0, -2) : "0.00",
     vatExemptionCode: str(view.product.vat_exemption_code),
     mxik: str(view.product.mxik_code),
+    packageCode: str(view.product.package_code),
     barcode: extra.barcode ?? null,
     markingCode: extra.markingCode ?? null,
     markingWarning: extra.markingWarning ?? false,

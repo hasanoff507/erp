@@ -168,4 +168,21 @@ describe("agentClient (21 §16, 24 §6.4)", () => {
     const offline = await createAgentClient({ tokenStore: memoryStore("x"), fetch: fail }).probe();
     expect(offline).toMatchObject({ status: "offline", version: null, card_terminals: [] });
   });
+
+  it("B5: every authenticated call carries X-Device-Id; pairing sends none (agent-local-api.md §1)", async () => {
+    const fetch = vi.fn((_url: RequestInfo | URL, _init?: RequestInit) => Promise.resolve(json(200, STATUS)));
+    const client = createAgentClient({
+      tokenStore: memoryStore("tok"),
+      deviceId: () => Promise.resolve("0190a000-0000-7000-8000-0000000000d1"),
+      fetch,
+    });
+    await client.status();
+    const headers = fetch.mock.calls[0]?.[1]?.headers as Record<string, string>;
+    expect(headers["X-Device-Id"]).toBe("0190a000-0000-7000-8000-0000000000d1");
+    fetch.mockImplementationOnce(() => Promise.resolve(json(200, { local_token: "L2", expires_at: null })));
+    await client.pair("654321", "0190a000-0000-7000-8000-0000000000d1");
+    const pairHeaders = fetch.mock.calls[1]?.[1]?.headers as Record<string, string>;
+    expect(pairHeaders["X-Device-Id"]).toBeUndefined();
+    expect(pairHeaders.Authorization).toBeUndefined();
+  });
 });

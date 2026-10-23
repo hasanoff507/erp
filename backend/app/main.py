@@ -23,7 +23,9 @@ from app.core.telemetry import install_telemetry, observe_engine
 from app.modules.access.api import approval_requests as approval_requests_api
 from app.modules.access.api import roles as access_roles_api
 from app.modules.access.wiring import build_access_module
+from app.modules.accounting.api import adjustments as accounting_adjustments_api
 from app.modules.accounting.api import ledger as accounting_ledger_api
+from app.modules.accounting.assembly import attach_b5_services
 from app.modules.accounting.wiring import build_accounting_module
 from app.modules.attachments.api import router as attachments_api
 from app.modules.attachments.wiring import UPLOAD_LIMIT as ATTACHMENT_UPLOAD_LIMIT
@@ -55,7 +57,22 @@ from app.modules.imports.api import router as imports_api
 from app.modules.imports.wiring import build_imports_module
 from app.modules.integrations.card_terminal.api import router as card_terminal_api
 from app.modules.integrations.card_terminal.wiring import build_card_terminal_module
+from app.modules.integrations.cloud_print.api import printer_poll as cloud_print_poll_api
+from app.modules.integrations.cloud_print.api import router as cloud_print_api
+from app.modules.integrations.cloud_print.wiring import build_cloud_print_module
+from app.modules.integrations.einvoice.api import einvoices as edocs_einvoices_api
+from app.modules.integrations.einvoice.api import ettn_documents as edocs_ettn_api
+from app.modules.integrations.einvoice.api import powers_of_attorney as edocs_poa_api
+from app.modules.integrations.einvoice.wiring import build_edocs_module
 from app.modules.integrations.fiscal.api import fiscal_receipts as fiscal_receipts_api
+from app.modules.integrations.fiscal.api import fiscal_registers as fiscal_registers_api
+from app.modules.integrations.fiscal.wiring import fiscal_register_queries
+from app.modules.integrations.marking.api import marking as marking_api
+from app.modules.integrations.marking.wiring import build_marking_module
+from app.modules.integrations.payments.api import router as payments_api
+from app.modules.integrations.payments.wiring import build_payments_module
+from app.modules.integrations.tenant_keys.api import router as tenant_keys_api
+from app.modules.integrations.tenant_keys.wiring import build_tenant_integrations
 from app.modules.inventory.api import stock as inventory_stock_api
 from app.modules.inventory.api import stock_counts as inventory_stock_counts_api
 from app.modules.inventory.api import transfers as inventory_transfers_api
@@ -63,6 +80,9 @@ from app.modules.inventory.api import write_offs as inventory_write_offs_api
 from app.modules.inventory.wiring import build_inventory_module
 from app.modules.notifications.api import router as notifications_api
 from app.modules.notifications.wiring import build_notifications_module
+from app.modules.onec_integration.api import router_agent as onec_agent_router
+from app.modules.onec_integration.api import router_web as onec_web_router
+from app.modules.onec_integration.wiring import build_onec_agents_module
 from app.modules.pricing.api import router as pricing_api
 from app.modules.pricing.wiring import build_pricing_module
 from app.modules.purchasing.api import goods_receipts as purchasing_goods_receipts_api
@@ -70,8 +90,14 @@ from app.modules.purchasing.api import purchase_orders as purchasing_purchase_or
 from app.modules.purchasing.api import supplier_payments as purchasing_supplier_payments_api
 from app.modules.purchasing.api import supplier_returns as purchasing_supplier_returns_api
 from app.modules.purchasing.wiring import build_purchasing_module, build_supplier_payments
+from app.modules.reports.api import accounting_reports as accounting_reports_api
 from app.modules.reports.api import reports as reports_api
-from app.modules.reports.wiring import build_reports_service
+from app.modules.reports.api import state_reports as state_reports_api
+from app.modules.reports.wiring import (
+    build_accounting_reports_service,
+    build_reports_service,
+    build_state_reports_service,
+)
 from app.modules.returns.api import returns as returns_api
 from app.modules.returns.wiring import build_returns_queries
 from app.modules.sales.api import sales as sales_api
@@ -145,12 +171,33 @@ def create_app(
         # --- B4 expenses ---
         app.state.expenses = build_expenses_module(settings, db)
         app.state.attachments = build_attachments(settings, db)  # 17 §12 (BO-17 receipt photo)
+        app.state.state_reports = build_state_reports_service(db, app.state.attachments)
         # --- B4 bank ---
         # bank settlements + statement import live in app.state.cash (build_cash_module, BO-24)
         # --- B4 reports ---
         app.state.reports = build_reports_service(db)
         # --- B4 telegram ---
         app.state.notifications = build_notifications_module(settings, db, lambda: app.state.redis)
+        # Bosqich 5 modules (one anchor per slice — add your app.state lines right under your anchor)
+        # --- B5 agent-auth ---
+        # --- B5 agent ---
+        app.state.onec_agents = build_onec_agents_module(
+            settings, db, lambda: app.state.redis, auth.agent_grants
+        )
+        # --- B5 fiscal ---
+        app.state.fiscal_registers = fiscal_register_queries(db.session_factory)  # BO-14 fiscal tab
+        # --- B5 edocs ---
+        app.state.edocs = build_edocs_module(settings, db, lambda: app.state.redis)
+        # --- B5 marking ---
+        app.state.marking = build_marking_module(settings, db)  # 18 §15 POST /marking-codes/verify
+        # --- B5 payments ---
+        app.state.payments = build_payments_module(settings, db)  # 18 §16 checkouts + webhooks
+        app.state.tenant_integrations = build_tenant_integrations(settings, db)  # 20 #40d/#40e
+        # --- B5 accounting ---
+        attach_b5_services(app.state.accounting, db)
+        app.state.accounting_reports = build_accounting_reports_service(db)
+        # --- B5 devices ---
+        app.state.cloud_print = build_cloud_print_module(settings, db)
         app.state.readiness = ReadinessProbe(
             gating={"postgres": postgres_check(db, alembic_head()), "redis": redis_check(redis)},
         )
@@ -193,8 +240,15 @@ def create_app(
             f"{settings.api_prefix}/import-jobs": settings.import_max_bytes + MULTIPART_MARGIN,
             # --- B4 expenses --- (17 §12 POST /attachments, multipart: PDF ≤ 20 MB)
             f"{settings.api_prefix}/attachments": ATTACHMENT_UPLOAD_LIMIT + MULTIPART_MARGIN,
+            # --- B5 BO-10 --- (20 #3, PDF/Excel report upload, max 5 MB)
+            f"{settings.api_prefix}/state-reports": state_reports_api.UPLOAD_LIMIT + MULTIPART_MARGIN,
             # --- B4 bank --- (20 #55g statement import, multipart)
             f"{settings.api_prefix}/bank-settlements/imports": settings.import_max_bytes + MULTIPART_MARGIN,
+            # --- B5 upload paths --- (add one line per multipart endpoint, owner slice in a comment)
+            # b5-agent: A-07 diagnostics zip (≤ 20 MB) and A-06 log batches (≤ 500 entries)
+            f"{settings.api_prefix}/onec-agent/diagnostics": settings.agent_diagnostics_max_bytes
+            + MULTIPART_MARGIN,
+            f"{settings.api_prefix}/onec-agent/logs": 10 * 1024 * 1024,
         },
     )
     if settings.cors_origins:
@@ -264,6 +318,29 @@ def create_app(
     app.include_router(reports_api.router, prefix=settings.api_prefix)
     # --- B4 telegram routers ---
     app.include_router(notifications_api.router, prefix=settings.api_prefix)  # 20 #66–#71 + bot webhook
+    # Bosqich 5 routers (one anchor per slice — add include_router lines right under your anchor)
+    # --- B5 agent-auth routers ---
+    # --- B5 agent routers ---
+    app.include_router(onec_agent_router.router, prefix=settings.api_prefix)  # A-01, A-03…A-10 (33 §9.3)
+    app.include_router(onec_web_router.router, prefix=settings.api_prefix)  # W-01…W-05, W-07, W-08
+    # --- B5 fiscal routers ---
+    app.include_router(fiscal_registers_api.router, prefix=settings.api_prefix)  # 18 §14.3–§14.4
+    # --- B5 edocs routers ---
+    app.include_router(edocs_einvoices_api.router, prefix=settings.api_prefix)  # 19 §19, 18 §14a
+    app.include_router(edocs_ettn_api.router, prefix=settings.api_prefix)  # 19 §20
+    app.include_router(edocs_poa_api.router, prefix=settings.api_prefix)  # 19 §8a
+    # --- B5 marking routers ---
+    app.include_router(marking_api.router, prefix=settings.api_prefix)  # 18 §15 (B5-EP-18#36)
+    # --- B5 payments routers ---
+    app.include_router(payments_api.router, prefix=settings.api_prefix)  # 18 §16 (#37–#39)
+    app.include_router(tenant_keys_api.router, prefix=settings.api_prefix)  # 20 #40d/#40e
+    # --- B5 accounting routers ---
+    app.include_router(accounting_adjustments_api.router, prefix=settings.api_prefix)
+    app.include_router(accounting_reports_api.router, prefix=settings.api_prefix)
+    app.include_router(state_reports_api.router, prefix=settings.api_prefix)
+    # --- B5 devices routers ---
+    app.include_router(cloud_print_api.router, prefix=settings.api_prefix)
+    app.include_router(cloud_print_poll_api.router)  # /print/cloudprnt, /print/epson-sdp (no session)
     return app
 
 

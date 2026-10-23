@@ -27,6 +27,7 @@ from app.core.config import Settings
 from app.core.db.session import Database
 from app.modules.accounting.wiring import ledger_poster
 from app.modules.integrations.einvoice.wiring import ETTN_SEND_JOB, ettn_auto_send
+from app.modules.integrations.marking.wiring import marking_hooks
 from app.modules.inventory.application.module import InventoryModule
 from app.modules.inventory.application.openings import (
     OpeningImportAdapter,
@@ -207,6 +208,7 @@ def write_off_service(
         ledger_poster(),
         current_price_reader(),
         event_recorder(),
+        marking_hooks(),
     )
 
 

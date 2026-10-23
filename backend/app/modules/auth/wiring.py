@@ -19,6 +19,7 @@ from app.core.secrets import EnvelopeCipher
 from app.modules.access.wiring import provision_system_roles
 from app.modules.auth.application.actor import ActorBindings
 from app.modules.auth.application.admin_users import AdminUsersService
+from app.modules.auth.application.agent_grants import AgentGrantPolicy, AgentGrantService
 from app.modules.auth.application.bff import BffService
 from app.modules.auth.application.credentials import CredentialService
 from app.modules.auth.application.device_cookie import DeviceCookieSigner
@@ -39,6 +40,7 @@ from app.modules.auth.application.subscription import SubscriptionStatusService
 from app.modules.auth.application.tokens import ClientRegistry, TokenPolicy, TokenService
 from app.modules.auth.domain.constants import PURPOSE_ACCESS
 from app.modules.auth.infrastructure.admin_repositories import MembershipAdminRepository
+from app.modules.auth.infrastructure.agent_repository import AgentAuthRepository
 from app.modules.auth.infrastructure.google_oidc import GoogleOidcAdapter
 from app.modules.auth.infrastructure.repositories import AuthRepository, ClientRow
 from app.modules.auth.infrastructure.signup_repository import IdentityRepository, SignupRepository
@@ -64,11 +66,13 @@ __all__ = [
     "PinVerifier",
     "StaffPinRow",
     "StaffPinSnapshot",
+    "build_agent_grants",
     "build_auth_module",
     "build_auth_store",
     "build_cipher",
     "hash_password",
     "pin_verifier",
+    "signing_key_ring",
     "staff_pin_snapshot",
 ]
 
@@ -112,6 +116,8 @@ class AuthModule:
     pin: PinService
     device_cookies: DeviceCookieSigner
     actors: ActorBindings
+    # --- B5 agent-auth ---
+    agent_grants: AgentGrantService
 
 
 def build_auth_store(db: Database) -> AuthStore:
@@ -350,7 +356,7 @@ def build_auth_module(settings: Settings, db: Database, redis: Callable[[], Redi
     return AuthModule(
         settings, repo, cipher, ring, codec, clients, revocation, subscriptions, login, tokens, server, bff,
         gateway, admin_users, cookies, profiles, otp, otp_outbox, signup, credentials, google, pin,
-        device_cookies, actors,
+        device_cookies, actors, build_agent_grants(settings, db, codec, redis),
     )  # fmt: skip
 
 
@@ -391,3 +397,26 @@ def pin_verifier(settings: Settings, db: Database, redis: Callable[[], Redis]) -
 def staff_pin_snapshot() -> StaffPinSnapshot:
     """Staff + local PIN verifiers of a branch for the ``permissions`` pull scope (b3-sync, 16 §3.2)."""
     return StaffPinSnapshot(SqlStaffSnapshotStore())
+
+
+# --- B5 agent-auth ---
+def build_agent_grants(
+    settings: Settings, db: Database, codec: AccessTokenCodec, redis: Callable[[], Redis]
+) -> AgentGrantService:
+    """Store-agent device grant + ``private_key_jwt`` (14 §2.3); also the reader of the signed artefacts."""
+    policy = AgentGrantPolicy(
+        access_ttl_s=settings.agent_access_token_ttl_s,
+        device_auth_per_ip_hour=settings.agent_device_auth_per_ip_hour,
+        verification_uri=settings.agent_verification_uri or f"{settings.issuer}/app/settings/onec/pair",
+    )
+    return AgentGrantService(
+        AgentAuthRepository(db.session_factory), codec, redis, policy, issuer=settings.issuer
+    )
+
+
+def signing_key_ring(settings: Settings, db: Database, purpose: str) -> SigningKeyRing:
+    """``platform.signing_keys`` ring of one purpose (``onec_task`` for the dispatcher, 33 §9.4)."""
+    return SigningKeyRing(
+        AuthRepository(db.session_factory), build_cipher(settings), purpose=purpose,
+        overlap_s=settings.signing_key_overlap_s,
+    )  # fmt: skip

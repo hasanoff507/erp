@@ -32,7 +32,11 @@ from app.modules.integrations.card_terminal.application.ports import (
     TerminalRow,
 )
 from app.modules.integrations.card_terminal.application.transactions import invalid, iso
-from app.modules.integrations.card_terminal.domain.model import private_ipv4
+from app.modules.integrations.card_terminal.domain.model import (
+    capability_devices,
+    capability_enabled,
+    private_ipv4,
+)
 
 ENTITY: Final = "card_terminals"
 FAKE_CAPABILITIES: Final[Mapping[str, bool]] = {
@@ -189,6 +193,8 @@ class CardTerminalService:
         host = row.get("host")
         if host is not None and not private_ipv4(str(host)):
             raise invalid("host", "validation.private_ipv4_required")
+        if adapter == "agent_ecr" and row.get("status", "active") == "active":
+            await self._validate_agent_binding(s, row)
         status = row.get("status", "active")
         tid = row.get("tid")
         if adapter != "fake" and status == "active" and not tid:
@@ -208,3 +214,31 @@ class CardTerminalService:
             raise invalid("cash_register_id", "validation.cash_register_not_in_branch")
         if row.get("is_default") and register is None:
             raise invalid("is_default", "validation.card_terminal_default_needs_register")
+
+    async def _validate_agent_binding(self, s: AsyncSession, row: Mapping[str, Any]) -> None:
+        """BO-12 terminal ↔ agent binding (18 §16a.5, 34 §14.2): an active agent of this tenant with
+        ``capabilities.card_terminal.enabled``; ``local_id`` among its ``card_terminal.devices[]``; the
+        device's reported ``host`` (when given) is the allow-list — the terminal ``host`` must equal it."""
+        agent = await self._repo.agent(s, row["agent_id"])
+        if agent is None:
+            raise invalid("agent_id", "validation.card_terminal_agent_not_found")
+        if agent.status != "active":
+            raise invalid("agent_id", "validation.card_terminal_agent_revoked")
+        if not capability_enabled(agent.capabilities, "card_terminal"):
+            raise AppError(
+                ErrorCode.AGENT_CAPABILITY_DISABLED,
+                params={"agent_id": str(agent.id), "kind": "card", "family": "card_terminal"},
+            )
+        device = next(
+            (
+                d
+                for d in capability_devices(agent.capabilities, "card_terminal")
+                if d.get("local_id") == row["local_id"]
+            ),
+            None,
+        )
+        if device is None:
+            raise invalid("local_id", "validation.card_terminal_local_unknown")
+        reported_host = device.get("host")
+        if reported_host and str(reported_host) != str(row.get("host")):
+            raise invalid("host", "validation.card_terminal_host_mismatch")

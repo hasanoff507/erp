@@ -6,9 +6,10 @@ from here — never from ``branches.infrastructure``. Signatures are a cross-mod
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
+from typing import Any
 from uuid import UUID
 
 from redis.asyncio import Redis
@@ -32,6 +33,7 @@ from app.modules.branches.infrastructure.repositories import (
     SqlWarehouseRepository,
 )
 from app.modules.branches.infrastructure.tenant import SqlTenantSettingsRepository
+from app.modules.integrations.fiscal.wiring import request_fiscal_status
 
 __all__ = [
     "ActivityType",
@@ -53,6 +55,13 @@ class BranchesModule:
     tenant_settings: TenantSettingsService
 
 
+async def _integration_status(s: AsyncSession) -> Mapping[str, Any]:
+    """20 #40a BO-14 integrations: the tenant_keys read model (lazy: tenant_keys → auth → branches)."""
+    from app.modules.integrations.tenant_keys.wiring import integration_status
+
+    return await integration_status(s)
+
+
 def build_branches_module(db: Database, redis: Callable[[], Redis]) -> BranchesModule:
     sf = db.session_factory
     branch_repo = SqlBranchRepository()
@@ -65,14 +74,16 @@ def build_branches_module(db: Database, redis: Callable[[], Redis]) -> BranchesM
 
     return BranchesModule(
         branches=BranchesService(sf, branch_repo, SqlWarehouseRepository()),
-        cash_registers=CashRegistersService(sf, SqlCashRegisterRepository(), branch_repo),
+        cash_registers=CashRegistersService(
+            sf, SqlCashRegisterRepository(), branch_repo, on_fiscal_bound=request_fiscal_status
+        ),
         devices=DevicesService(
             sf,
             SqlDeviceRepository(),
             device_revoked,
             pin_lookback_days=get_settings().pin_revoke_lookback_days,
         ),
-        tenant_settings=TenantSettingsService(sf, SqlTenantSettingsRepository()),
+        tenant_settings=TenantSettingsService(sf, SqlTenantSettingsRepository(), _integration_status),
     )
 
 

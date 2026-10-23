@@ -60,8 +60,15 @@ def _entry(row: Row[Any]) -> StoredEntry:
     )
 
 
+# One advisory lock per tenant guards month closing (20 #15): every posting holds it SHARED from its first
+# period check to COMMIT, ``POST /period-closings`` takes it EXCLUSIVE (try-lock, never queued).
+PERIOD_LOCK_KEY = "hashtextextended('erp.period_close:' || current_setting('app.tenant_id'), 0)"
+_LOCK_SHARED = text(f"SELECT pg_advisory_xact_lock_shared({PERIOD_LOCK_KEY})")
+
+
 class SqlLedgerRepository:
     async def last_closed_period(self, s: AsyncSession) -> date | None:
+        await s.execute(_LOCK_SHARED)
         value: date | None = (await s.execute(text("SELECT max(period) FROM app.period_closings"))).scalar()
         return value
 

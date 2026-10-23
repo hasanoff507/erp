@@ -2,6 +2,8 @@
  * Do'kon agenti local API client — 21 §16 / §16.1, 24 §6.4. `http://127.0.0.1:<port>/v1/*`, device-bound
  * local token (`Authorization: Bearer`), AbortController timeouts, error shape `{code, message_key, params?}`.
  * The token is stored by the caller (erp-device, never sent to the server) through `AgentTokenStore`.
+ * Every authenticated call also carries `X-Device-Id: <devices.id>` — the agent accepts a token only with the
+ * device it was paired with (21 §16 Himoya (c), .claude-scratch/b5/contracts/agent-local-api.md §1).
  * Contract: .claude-scratch/b3/contracts/hw-api.md §1.
  */
 import { getRuntimeConfig } from "#/runtime-config/index.ts";
@@ -11,6 +13,8 @@ export const AGENT_TOKEN_KEY = "agent.local_token";
 export const AGENT_DEFAULT_TIMEOUT_MS = 10_000;
 export const AGENT_STATUS_TIMEOUT_MS = 3_000;
 export const AGENT_PRINT_TIMEOUT_MS = 15_000;
+/** Header naming the POS device (`devices.id`) the local token was paired with (21 §16). */
+export const AGENT_DEVICE_HEADER = "X-Device-Id";
 
 export interface AgentTokenStore {
   get(): Promise<string | null>;
@@ -128,6 +132,11 @@ export interface AgentRequestOptions {
 
 export interface AgentClientOptions {
   tokenStore: AgentTokenStore;
+  /**
+   * `devices.id` of this POS (`X-Device-Id`, 21 §16). Without it the agent answers 401 → `unpaired`;
+   * re-pairing then binds the token to this device.
+   */
+  deviceId?: () => Promise<string | null> | string | null;
   port?: number;
   /** Override the whole origin (tests). Default `http://127.0.0.1:<port>`. */
   baseUrl?: string;
@@ -170,6 +179,8 @@ export function createAgentClient(options: AgentClientOptions): AgentClient {
       const token = await options.tokenStore.get();
       if (!token) throw new AgentError("unpaired", "AGENT_NOT_PAIRED");
       headers.Authorization = `Bearer ${token}`;
+      const deviceId = await options.deviceId?.();
+      if (deviceId) headers[AGENT_DEVICE_HEADER] = deviceId;
     }
     if (body !== undefined) headers["Content-Type"] = "application/json";
 

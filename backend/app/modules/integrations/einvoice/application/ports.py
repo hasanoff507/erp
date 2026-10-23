@@ -1,7 +1,10 @@
-"""``EInvoicePort`` — the e-invoice operator boundary (21 §2; e-TTN §3, e-ishonchnoma §6, STIR lookup 19 §9).
+"""``EInvoicePort`` — the e-invoice operator boundary (21 §2; e-TTN §3, e-ishonchnoma §6, STIR lookup 19 §9),
+and ``SignaturePort`` — server-side verification of the browser's E-IMZO PKCS#7 (21 §5).
 
 One port covers every operator document (EHF, e-TTN, e-ishonchnoma) and the company lookup; the MVP
-operator is Faktura.uz, Didox is a second adapter of the same port (21 §2 "Operator tanlovi").
+operator is Faktura.uz, Didox is a second adapter of the same port (21 §2 "Operator tanlovi"). The real
+operator works with the **tenant's own** credentials (``tenant_secrets``), so workers obtain the port per
+tenant through :class:`EInvoicePortProvider`.
 
 Rules shared by every adapter:
 
@@ -26,6 +29,8 @@ RiskFlag = Literal["green", "red", "unknown"]
 EInvoiceStatus = Literal["draft", "signed", "sent", "received", "accepted", "rejected", "cancelled"]
 OperatorSendStatus = Literal["sent", "failed"]
 ETtnSendStatus = Literal["registered", "failed"]
+PoaStatus = Literal["sent", "accepted", "rejected"]
+ResponseAction = Literal["accept", "reject"]
 
 
 class EInvoiceProviderError(Exception):
@@ -42,7 +47,7 @@ class EInvoiceProviderError(Exception):
 
 @dataclass(frozen=True, slots=True)
 class Pkcs7Signature:
-    """Detached/attached E-IMZO PKCS#7 made in the browser (21 §5); the key never reaches the server."""
+    """Attached E-IMZO PKCS#7 made in the browser (21 §5); the key never reaches the server."""
 
     signed_content: str  # base64 PKCS#7
     certificate_serial: str | None = None
@@ -63,7 +68,13 @@ class CompanyInfo:
 
 @dataclass(frozen=True, slots=True)
 class IncomingInvoice:
-    """One inbox document from ``fetch_incoming`` (21 §2: ``factura_type``, ``related_operator_doc_id``)."""
+    """One inbox document from ``fetch_incoming`` (21 §2: ``factura_type``, ``related_operator_doc_id``).
+
+    ``payload`` is the operator document normalised by the adapter to the ``einvoices.payload`` shape
+    (``number``, ``doc_date``, ``seller``, ``buyer``, ``lines[]`` with ``name``/``mxik``/``barcode``/
+    ``unit_code``/``qty``/``net_amount``/``vat_rate``/``vat_amount``/``marking_codes``, ``total_amount``,
+    ``vat_amount``, optional ``ettn`` for a combined EHF+TTN).
+    """
 
     operator_doc_id: str
     factura_type: str
@@ -73,6 +84,7 @@ class IncomingInvoice:
     status: EInvoiceStatus
     updated_at: datetime
     payload: Mapping[str, Any] = field(default_factory=dict)
+    risk_flag: RiskFlag = "unknown"  # Didox ``scoring``; Faktura.uz has no such field (26 #47)
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,6 +102,14 @@ class PoaResult:
     number: str | None
     operator_doc_id: str | None
     error: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class PoaState:
+    """The supplier's answer to a sent e-ishonchnoma (polled, 19 §8a)."""
+
+    status: PoaStatus
+    reason: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,15 +136,32 @@ class EInvoicePort(Protocol):
 
     async def fetch_incoming(self, updated_from: datetime) -> list[IncomingInvoice]: ...
 
-    async def sign_and_accept(self, einvoice_id: UUID, signature: Pkcs7Signature) -> EInvoiceResult: ...
+    async def sign_and_accept(
+        self, einvoice_id: UUID, signature: Pkcs7Signature, *, operator_doc_id: str | None = None
+    ) -> EInvoiceResult: ...
 
-    async def send_outgoing(self, einvoice_id: UUID, signature: Pkcs7Signature) -> EInvoiceResult: ...
+    async def reject_incoming(
+        self,
+        einvoice_id: UUID,
+        reason: str,
+        signature: Pkcs7Signature | None = None,
+        *,
+        operator_doc_id: str | None = None,
+    ) -> EInvoiceResult: ...
+
+    async def send_outgoing(
+        self, einvoice_id: UUID, signature: Pkcs7Signature, *, payload: Mapping[str, Any] | None = None
+    ) -> EInvoiceResult: ...
 
     async def get_status(self, operator_doc_id: str) -> EInvoiceStatus: ...
 
     async def get_risk_flag(self, operator_doc_id: str) -> RiskFlag: ...
 
-    async def send_power_of_attorney(self, poa_id: UUID, signed_payload: Pkcs7Signature) -> PoaResult: ...
+    async def send_power_of_attorney(
+        self, poa_id: UUID, signed_payload: Pkcs7Signature, *, payload: Mapping[str, Any] | None = None
+    ) -> PoaResult: ...
+
+    async def get_power_of_attorney_status(self, operator_doc_id: str) -> PoaState: ...
 
     async def send_ettn(
         self,
@@ -140,3 +177,52 @@ class EInvoicePort(Protocol):
         adapter / operators that sign server-side.
         """
         ...
+
+    async def respond_ettn(
+        self,
+        ettn_id: UUID,
+        operator_doc_id: str,
+        action: ResponseAction,
+        signature: Pkcs7Signature,
+        reason: str | None = None,
+    ) -> EInvoiceResult:
+        """The receiver's signed accept/reject of an e-TTN (19 §20) → ``accepted`` / ``rejected``."""
+        ...
+
+
+class EInvoicePortProvider(Protocol):
+    """The operator adapter bound to one tenant's credentials (``tenant_secrets``)."""
+
+    async def for_tenant(self, tenant_id: UUID) -> EInvoicePort: ...
+
+
+@dataclass(frozen=True, slots=True)
+class StaticPortProvider:
+    """Every tenant uses the same adapter (fake operator; tests)."""
+
+    port: EInvoicePort
+
+    async def for_tenant(self, tenant_id: UUID) -> EInvoicePort:
+        del tenant_id
+        return self.port
+
+
+# --- E-IMZO server-side verification (21 §5) ---------------------------------------------------------
+class SignatureUnavailableError(Exception):
+    """The verification service (E-IMZO-SERVER) cannot be reached / is not contracted (26 #118)."""
+
+
+@dataclass(frozen=True, slots=True)
+class SignatureCheck:
+    valid: bool
+    signer_tin: str | None = None
+    certificate_serial: str | None = None
+    reason: str | None = None  # bad_format | content_mismatch | certificate_expired | …
+
+
+class SignaturePort(Protocol):
+    """Verify an **attached** PKCS#7 whose signed content must equal ``expected_content``.
+
+    Real adapter: E-IMZO-SERVER (contract + VPN key — 26 #118); fake: local/test/staging only."""
+
+    async def verify_attached(self, pkcs7_b64: str, expected_content: bytes) -> SignatureCheck: ...

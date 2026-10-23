@@ -6,12 +6,13 @@
  */
 
 /**
- * awaiting_einvoice — the input-VAT decrease waits for the supplier's additional e-invoice
+ * awaiting_einvoice — the input-VAT decrease waits for the supplier's additional e-invoice; adjusted — written when that e-invoice was accepted (13 §2.20)
  */
 export type ReturnHeaderOutVatAdjustmentStatus = typeof ReturnHeaderOutVatAdjustmentStatus[keyof typeof ReturnHeaderOutVatAdjustmentStatus] | null;
 
 
 export const ReturnHeaderOutVatAdjustmentStatus = {
   awaiting_einvoice: 'awaiting_einvoice',
+  adjusted: 'adjusted',
   not_required: 'not_required',
 } as const;

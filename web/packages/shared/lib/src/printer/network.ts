@@ -33,6 +33,13 @@ export async function agentRawPrint(
     if (e instanceof AgentError) {
       if (e.kind === "unpaired") throw new PrinterError("agent_unpaired", "agent_raw", e);
       if (e.kind === "timeout") throw new PrinterError("timeout", "agent_raw", e);
+      // 21 §16.1: 404 NOT_FOUND — the printer is not in the agent's list; 503 PRINTER_UNREACHABLE
+      if (e.kind === "http" && e.status === 404) {
+        throw new PrinterError("printer_not_registered", "agent_raw", e);
+      }
+      if (e.kind === "http" && (e.status === 503 || e.code === "PRINTER_UNREACHABLE")) {
+        throw new PrinterError("printer_unreachable", "agent_raw", e);
+      }
       if (e.kind === "http") throw new PrinterError("write_failed", "agent_raw", e);
     }
     throw new PrinterError("agent_unavailable", "agent_raw", e);

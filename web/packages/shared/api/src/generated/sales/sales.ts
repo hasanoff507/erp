@@ -5,12 +5,26 @@
  * OpenAPI spec version: 0.1.0
  */
 import type {
+  AppModulesIntegrationsEinvoiceApiEinvoicesRejectIn,
+  CancelOut,
+  CheckoutIn,
+  CheckoutOut,
+  EInvoiceCreate,
+  EInvoiceDetail,
+  EmptyBody,
   FiscalReceiptOut,
   FiscalReceiptPage,
+  FiscalRegisterList,
+  FiscalResendBody,
+  FiscalResendOut,
   FiscalRetryBody,
   FiscalRetryOut,
+  FromReceiptIn,
   ListFiscalReceiptsParams,
   ListSalesParams,
+  MarkingVerifyIn,
+  MarkingVerifyOut,
+  Queued,
   SaleOut,
   SalePage
 } from '@shared/models/generated';
@@ -81,8 +95,133 @@ export const retryFiscalReceipt = (
     },
       options);
     }
+  /**
+ * @summary List Fiscal Registers
+ */
+export const listFiscalRegisters = (
+
+ options?: SecondParameter<typeof apiRequest<FiscalRegisterList>>,) => {
+      return apiRequest<FiscalRegisterList>(
+      {url: `/api/v1/fiscal-registers`, method: 'GET'
+    },
+      options);
+    }
+  /**
+ * @summary Resend Fiscal Unsent
+ */
+export const resendFiscalUnsent = (
+    registerId: string,
+    fiscalResendBodyNull?: FiscalResendBody | null,
+ options?: SecondParameter<typeof apiRequest<FiscalResendOut>>,) => {
+      return apiRequest<FiscalResendOut>(
+      {url: `/api/v1/cash-registers/${registerId}/fiscal-resend`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: fiscalResendBodyNull
+    },
+      options);
+    }
+  /**
+ * @summary Create Einvoice
+ */
+export const createEinvoice = (
+    eInvoiceCreate: EInvoiceCreate,
+ options?: SecondParameter<typeof apiRequest<EInvoiceDetail>>,) => {
+      return apiRequest<EInvoiceDetail>(
+      {url: `/api/v1/einvoices`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: eInvoiceCreate
+    },
+      options);
+    }
+  /**
+ * @summary Create Einvoice From Receipt
+ */
+export const createEinvoiceFromReceipt = (
+    fromReceiptIn: FromReceiptIn,
+ options?: SecondParameter<typeof apiRequest<EInvoiceDetail>>,) => {
+      return apiRequest<EInvoiceDetail>(
+      {url: `/api/v1/einvoices/from-receipt`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: fromReceiptIn
+    },
+      options);
+    }
+  /**
+ * @summary Send Einvoice
+ */
+export const sendEinvoice = (
+    einvoiceId: string,
+    emptyBodyNull?: EmptyBody | null,
+ options?: SecondParameter<typeof apiRequest<Queued>>,) => {
+      return apiRequest<Queued>(
+      {url: `/api/v1/einvoices/${einvoiceId}/send`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: emptyBodyNull
+    },
+      options);
+    }
+  /**
+ * @summary Cancel Einvoice
+ */
+export const cancelEinvoice = (
+    einvoiceId: string,
+    appModulesIntegrationsEinvoiceApiEinvoicesRejectIn: AppModulesIntegrationsEinvoiceApiEinvoicesRejectIn,
+ options?: SecondParameter<typeof apiRequest<CancelOut>>,) => {
+      return apiRequest<CancelOut>(
+      {url: `/api/v1/einvoices/${einvoiceId}/cancel`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: appModulesIntegrationsEinvoiceApiEinvoicesRejectIn
+    },
+      options);
+    }
+  /**
+ * @summary Verify Marking Code
+ */
+export const verifyMarkingCode = (
+    markingVerifyIn: MarkingVerifyIn,
+ options?: SecondParameter<typeof apiRequest<MarkingVerifyOut>>,) => {
+      return apiRequest<MarkingVerifyOut>(
+      {url: `/api/v1/marking-codes/verify`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: markingVerifyIn
+    },
+      options);
+    }
+  /**
+ * @summary Create Payment Checkout
+ */
+export const createPaymentCheckout = (
+    checkoutIn: CheckoutIn,
+ options?: SecondParameter<typeof apiRequest<CheckoutOut>>,) => {
+      return apiRequest<CheckoutOut>(
+      {url: `/api/v1/payments/checkouts`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: checkoutIn
+    },
+      options);
+    }
+  /**
+ * @summary Get Payment Checkout
+ */
+export const getPaymentCheckout = (
+    checkoutRef: string,
+ options?: SecondParameter<typeof apiRequest<CheckoutOut>>,) => {
+      return apiRequest<CheckoutOut>(
+      {url: `/api/v1/payments/checkouts/${checkoutRef}`, method: 'GET'
+    },
+      options);
+    }
   export type ListSalesResult = NonNullable<Awaited<ReturnType<typeof listSales>>>
 export type GetSaleResult = NonNullable<Awaited<ReturnType<typeof getSale>>>
 export type ListFiscalReceiptsResult = NonNullable<Awaited<ReturnType<typeof listFiscalReceipts>>>
 export type GetFiscalReceiptResult = NonNullable<Awaited<ReturnType<typeof getFiscalReceipt>>>
 export type RetryFiscalReceiptResult = NonNullable<Awaited<ReturnType<typeof retryFiscalReceipt>>>
+export type ListFiscalRegistersResult = NonNullable<Awaited<ReturnType<typeof listFiscalRegisters>>>
+export type ResendFiscalUnsentResult = NonNullable<Awaited<ReturnType<typeof resendFiscalUnsent>>>
+export type CreateEinvoiceResult = NonNullable<Awaited<ReturnType<typeof createEinvoice>>>
+export type CreateEinvoiceFromReceiptResult = NonNullable<Awaited<ReturnType<typeof createEinvoiceFromReceipt>>>
+export type SendEinvoiceResult = NonNullable<Awaited<ReturnType<typeof sendEinvoice>>>
+export type CancelEinvoiceResult = NonNullable<Awaited<ReturnType<typeof cancelEinvoice>>>
+export type VerifyMarkingCodeResult = NonNullable<Awaited<ReturnType<typeof verifyMarkingCode>>>
+export type CreatePaymentCheckoutResult = NonNullable<Awaited<ReturnType<typeof createPaymentCheckout>>>
+export type GetPaymentCheckoutResult = NonNullable<Awaited<ReturnType<typeof getPaymentCheckout>>>

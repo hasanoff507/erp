@@ -141,3 +141,14 @@ def test_sec01_branch_restricted_recipient_skips_tenant_wide_debt_events() -> No
         assert not sees_branch(restricted, None, kind)
     assert sees_branch(restricted, branch, "low_stock") and sees_branch(restricted, None, "low_stock")
     assert not sees_branch(restricted, uuid4(), "low_stock")
+
+
+def test_b5_offline_stage_int_and_fm_locked_render_as_text() -> None:
+    assert "40 soat (qizil)" in render_event("offline_48h", {"stage": 40}, "uz")
+    assert "фискальный модуль заблокирован" in render_event("offline_48h", {"stage": "fm_locked"}, "ru")
+
+
+def test_b5_agent_kinds_render_and_have_audience() -> None:
+    text = render_event("onec_agent_paired", {"name": "DOKON-PC", "state": "connected"}, "uz")
+    assert "Do'kon agenti" in text and "DOKON-PC" in text and "connected" in text
+    assert "Предупреждение агента" in render_event("onec_base_error", {"reason": "machine_hash"}, "ru")

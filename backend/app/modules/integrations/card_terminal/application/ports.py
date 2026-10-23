@@ -246,7 +246,35 @@ class OrphanRow:
     created_at: datetime
 
 
+@dataclass(frozen=True, slots=True)
+class AgentRow:
+    """A Do'kon agent as the card slice needs it (``app.onec_agents``; 34 §14.2 ``capabilities``)."""
+
+    id: UUID
+    device_id: UUID
+    status: str  # active | revoked
+    capabilities: Mapping[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class SweepTerminal:
+    """An active ``agent_ecr`` terminal whose agent can take ``card.*`` tasks."""
+
+    id: UUID
+    agent_id: UUID
+    local_id: str
+    branch_id: UUID
+
+
 class CardRepository(Protocol):
+    # Do'kon agent (read-only; 0028 store_agent)
+    async def agent(self, s: AsyncSession, agent_id: UUID) -> AgentRow | None: ...
+    async def agent_terminals(self, s: AsyncSession, agent_id: UUID) -> list[TerminalRow]: ...
+    async def settlement_sweep_terminals(
+        self, s: AsyncSession, business_date: date
+    ) -> list[SweepTerminal]: ...
+    async def status_sweep_agents(self, s: AsyncSession) -> list[UUID]: ...
+    async def update_health(self, s: AsyncSession, terminal_id: UUID, health_status: str) -> None: ...
     # terminals
     async def terminal(
         self, s: AsyncSession, terminal_id: UUID, *, lock: bool = False

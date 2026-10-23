@@ -19,6 +19,7 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.cash.application.bank_settlements_ports import CardTx, SettlementFilter, SettlementRow
+from app.modules.cash.domain.bank_matching import Batch
 
 _COLUMNS = (
     "id, branch_id, number, doc_date, status, source, method, settled_from, settled_to, gross_amount, "
@@ -328,6 +329,36 @@ class SqlBankSettlementRepository:
                 {"sid": settlement_id, "ids": list(tx_ids)},
             )
 
+    async def open_terminal_batches(
+        self, s: AsyncSession, branch_id: UUID, identifiers: Sequence[str], up_to: date
+    ) -> list[Batch]:
+        if not identifiers:
+            return []
+        rows = await s.execute(
+            text(
+                "SELECT c.id, c.business_date, c.net_total FROM app.card_terminal_settlements c "
+                "JOIN app.card_terminals t ON t.id = c.card_terminal_id "
+                "WHERE c.branch_id = :b AND c.bank_settlement_id IS NULL AND c.status <> 'failed' "
+                "AND c.business_date <= :d AND (t.tid IN :ids OR t.mid IN :ids) "
+                "AND NOT EXISTS (SELECT 1 FROM app.bank_settlements x WHERE x.branch_id = c.branch_id "
+                "AND x.method = 'card' AND x.status = 'draft' "
+                "AND c.business_date BETWEEN x.settled_from AND x.settled_to) "
+                "ORDER BY c.business_date, c.id"
+            ).bindparams(bindparam("ids", expanding=True)),
+            {"b": branch_id, "d": up_to, "ids": list(identifiers)},
+        )
+        return [Batch(r[0], r[1], Decimal(r[2])) for r in rows]
+
+    async def link_batches(self, s: AsyncSession, batch_ids: Sequence[UUID], settlement_id: UUID) -> None:
+        if batch_ids:
+            await s.execute(
+                text(
+                    "UPDATE app.card_terminal_settlements SET bank_settlement_id = :sid, updated_at = now() "
+                    "WHERE id IN :ids AND bank_settlement_id IS NULL"
+                ).bindparams(bindparam("ids", expanding=True)),
+                {"sid": settlement_id, "ids": list(batch_ids)},
+            )
+
     async def link_terminal_batches(self, s: AsyncSession, row: SettlementRow) -> int:
         """13 §2.18a: the terminal settlement batches of the RRN-linked purchases, else the branch's open
         batches of ``settled_from … settled_to``, get ``bank_settlement_id``."""
@@ -339,6 +370,8 @@ class SqlBankSettlementRepository:
                 "t.bank_settlement_id = :sid)"
                 " OR (NOT EXISTS (SELECT 1 FROM app.card_terminal_transactions t WHERE "
                 "t.bank_settlement_id = :sid)"
+                "     AND NOT EXISTS (SELECT 1 FROM app.card_terminal_settlements b WHERE "
+                "b.bank_settlement_id = :sid)"
                 "     AND c.business_date BETWEEN :f AND :t))"
             ),
             {"sid": row.id, "b": row.branch_id, "f": row.settled_from, "t": row.settled_to},

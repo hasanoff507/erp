@@ -12,9 +12,10 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any, Final, Literal, Protocol
+from urllib.parse import parse_qs, urlsplit
 from uuid import UUID
 
 import structlog
@@ -34,6 +35,7 @@ from app.modules.integrations.fiscal.application.ports import (
     FiscalPort,
     FiscalRepository,
 )
+from app.modules.integrations.fiscal.domain.boundary import BoundaryError, fiscal_sign, terminal_id
 from app.modules.integrations.fiscal.domain.rules import is_blocked
 
 log = structlog.get_logger(__name__)
@@ -42,7 +44,11 @@ OFD_SEND_JOB: Final = "fiscal_ofd_send"
 OFD_SWEEP_JOB: Final = "fiscal_ofd_sweep"
 MONITOR_JOB: Final = "fiscal_unacked_monitor"
 SERVER_SIDE: Final = frozenset({"fake", "partner_cloud"})
+LOCAL_BRIDGE: Final = frozenset({"multikassa_local", "fiscaldrive_local"})
 _RESULT_KEYS: Final = ("fm_terminal_id", "fm_receipt_seq", "fiscal_sign", "qr_url", "fiscal_at")
+
+
+ZReportRequester = Callable[[AsyncSession, UUID, UUID, UUID, UUID], Awaitable[object]]
 
 
 class JobEnqueuer(Protocol):
@@ -78,13 +84,33 @@ def parse_fiscal_result(raw: Mapping[str, Any]) -> dict[str, Any]:
         raise _invalid("fiscal_result.fm_receipt_seq", "validation.int_parsing") from None
     if seq <= 0:
         raise _invalid("fiscal_result.fm_receipt_seq", "validation.greater_than")
+    try:  # B5 local bridge: the FM requisites must be well formed (21 §1 FiscalResult, §16.1)
+        terminal = terminal_id(raw["fm_terminal_id"], "fiscal_result.fm_terminal_id")
+        sign = fiscal_sign(raw["fiscal_sign"], "fiscal_result.fiscal_sign")
+    except BoundaryError as exc:
+        raise _invalid(exc.field, exc.message_key) from None
+    qr = str(raw["qr_url"])[:500]
+    if not qr_matches(qr, terminal, seq, sign):
+        raise _invalid("fiscal_result.qr_url", "validation.fiscal_result_qr_mismatch")
     return {
-        "fm_terminal_id": str(raw["fm_terminal_id"])[:64],
+        "fm_terminal_id": terminal,
         "fm_receipt_seq": seq,
-        "fiscal_sign": str(raw["fiscal_sign"])[:64],
-        "qr_url": str(raw["qr_url"])[:500],
+        "fiscal_sign": sign,
+        "qr_url": qr,
         "fiscal_at": _parse_dt(raw["fiscal_at"]),
     }
+
+
+def qr_matches(qr: str, terminal: str, seq: int, sign: str) -> bool:
+    """An ``https://ofd.soliq.uz/check?t=&r=&c=&s=`` link must carry this receipt's requisites; another
+    operator's link format is kept as is (21 §1: the fiscal requisites stay in the operator's format)."""
+    parts = urlsplit(qr)
+    if parts.scheme != "https":
+        return False
+    if parts.netloc != "ofd.soliq.uz" or parts.path != "/check":
+        return True
+    q = parse_qs(parts.query)
+    return q.get("t") == [terminal] and q.get("r") == [str(seq)] and q.get("s") == [sign]
 
 
 class FiscalServiceImpl:
@@ -94,11 +120,13 @@ class FiscalServiceImpl:
         port: FiscalPort,
         provider: str,
         queue: JobEnqueuer | None,
+        zreport: ZReportRequester | None = None,
     ) -> None:
         self._repo = repo
         self._port = port
         self._provider = provider
         self._queue = queue
+        self._zreport = zreport
 
     @property
     def provider(self) -> str:
@@ -195,6 +223,9 @@ class FiscalServiceImpl:
         await self._repo.insert_receipt(s, row)
         if result is None and self.server_side:
             await self._repo.insert_job(s, tenant_id, receipt_id)
+        elif result is None and kind == "z_report" and self._zreport is not None:
+            # local bridge: the FM's Z-report comes back through the store agent (21 §16 fiscal.zreport)
+            await self._zreport(s, tenant_id, cash_register_id, shift_id, receipt_id)
         return FiscalReceiptRef(
             id=receipt_id,
             status=row["status"],

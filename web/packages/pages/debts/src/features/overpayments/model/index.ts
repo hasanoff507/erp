@@ -8,11 +8,21 @@
  *   (Dt 6310 / Kt 5010). The server also needs `cash.withdraw`; over the user's limit it answers
  *   `202 {status:'draft', approval_request_id}` (BO-16 approval posts it). A posted refund of the whole excess
  *   marks the exception reviewed (`POST /sync-exceptions/{id}/review`) so it cannot be paid back twice;
- * - «Keyingi qarzga hisoblash» (`ledger_adjustments` Dt 6310 / Kt 4010) — Bosqich 5 (B5-T14).
+ * - «Keyingi qarzga hisoblash» — `POST /ledger-adjustments {branch_id, doc_date: today, account_dt:'6310',
+ *   account_kt:'4010', amount ≤ unallocated, comment, analytics:{counterparty_id}}` (20 #10, 13 §2.14 (b),
+ *   B5-T14): the advance is set off against the customer's open debt, no cash moves. The server refuses more than
+ *   the customer's 6310 balance or receivable (`validation.adjustment_exceeds_balance`, `params.available`).
+ *   Offsetting the whole excess marks the exception reviewed, like a full refund.
  */
 import { api, type ApiError } from "@shared/api";
 import { compareMoney, isMoney, money, type Money } from "@shared/lib/money";
-import type { CashMovementIn, CashRegisterOut, ShiftListItem, SyncExceptionOut } from "@shared/models";
+import type {
+  CashMovementIn,
+  CashRegisterOut,
+  LedgerAdjustmentIn,
+  ShiftListItem,
+  SyncExceptionOut,
+} from "@shared/models";
 
 import { apiFx, readAllPages } from "#/shared/lib/effect.ts";
 
@@ -170,4 +180,77 @@ export const submitRefundFx = apiFx<RefundRequest, RefundResult>(async ({ row, f
     }
   }
   return { status: "posted", approvalRequestId: null, reviewed };
+});
+
+// --- «Keyingi qarzga hisoblash» (Dt 6310 / Kt 4010) ---------------------------------------------------
+
+export interface OffsetForm {
+  amount: string;
+  comment: string;
+  branchId: string;
+}
+
+export type OffsetField = keyof OffsetForm;
+export type OffsetErrors = Partial<Record<OffsetField, string>>;
+
+export function validateOffset(form: OffsetForm, unallocated: Money): OffsetErrors {
+  const errors: OffsetErrors = {};
+  if (!form.amount.trim() || !isMoney(form.amount)) {
+    errors.amount = "validation.required";
+  } else if (compareMoney(money(form.amount), "0.00" as Money) <= 0) {
+    errors.amount = "validation.must_be_positive";
+  } else if (compareMoney(money(form.amount), money(unallocated)) > 0) {
+    errors.amount = "debts:overpay.offset.exceeds";
+  }
+  if (!form.comment.trim()) errors.comment = "validation.required";
+  if (!form.branchId) errors.branchId = "validation.required";
+  return errors;
+}
+
+export function toOffsetBody(row: Overpayment, form: OffsetForm, today: string): LedgerAdjustmentIn {
+  return {
+    branch_id: form.branchId,
+    doc_date: today,
+    account_dt: "6310",
+    account_kt: "4010",
+    amount: money(form.amount),
+    comment: form.comment.trim(),
+    analytics: { counterparty_id: row.counterpartyId ?? "" },
+  };
+}
+
+/** `validation.adjustment_exceeds_balance` → the amount the server allows (`params.available`). */
+export function offsetAvailable(error: ApiError): Money | null {
+  if (!error.details.some((d) => d.messageKey === "validation.adjustment_exceeds_balance")) return null;
+  const available = error.params.available;
+  return typeof available === "string" && isMoney(available) ? money(available) : null;
+}
+
+export interface OffsetRequest {
+  row: Overpayment;
+  form: OffsetForm;
+  today: string;
+}
+
+export interface OffsetResult {
+  number: string | null;
+  /** The exception was closed (the whole excess set off). */
+  reviewed: boolean;
+}
+
+export const submitOffsetFx = apiFx<OffsetRequest, OffsetResult>(async ({ row, form, today }) => {
+  const body = toOffsetBody(row, form, today);
+  const posted = await api.accounting.createLedgerAdjustment(body);
+  let reviewed = false;
+  if (compareMoney(body.amount as Money, money(row.unallocated)) === 0) {
+    try {
+      await api.branches.reviewSyncException(row.id, {
+        review_note: `offset 6310→4010: ledger_adjustment ${posted.number ?? posted.id}, ${body.amount}`,
+      });
+      reviewed = true;
+    } catch {
+      // the offset is posted; the row stays until it is reviewed (BO-14)
+    }
+  }
+  return { number: posted.number, reviewed };
 });

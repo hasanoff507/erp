@@ -199,12 +199,10 @@ class SqlReturnsRepository:
         await s.execute(
             text(
                 "INSERT INTO app.write_off_lines (id, tenant_id, write_off_id, line_no, product_id, "
-                "lot_id, qty, "
-                "reason, cost_amount) VALUES (:id, :tenant_id, :write_off_id, :line_no, :product_id, "
-                ":lot_id, :qty, "
-                ":reason, :cost_amount)"
+                "lot_id, qty, reason, cost_amount, marking_codes) VALUES (:id, :tenant_id, :write_off_id, "
+                ":line_no, :product_id, :lot_id, :qty, :reason, :cost_amount, CAST(:marking_codes AS text[]))"
             ),
-            [dict(r) for r in lines],
+            [{"marking_codes": [], **dict(r)} for r in lines],
         )
 
     # --- queries ------------------------------------------------------------------------------------

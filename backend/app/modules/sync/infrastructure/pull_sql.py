@@ -556,7 +556,11 @@ class SqlPullReader:
         if ctx.cash_register_id is not None:
             register = (
                 await s.execute(
-                    text("SELECT id, name, kind FROM app.cash_registers WHERE id = :cr"),
+                    text(
+                        "SELECT id, name, kind, fiscal_agent_id, fiscal_local_device_id "
+                        "FROM app.cash_registers "
+                        "WHERE id = :cr"
+                    ),
                     {"cr": ctx.cash_register_id},
                 )
             ).first()
@@ -611,7 +615,14 @@ class SqlPullReader:
             "branch": {"id": str(branch.id), "code": branch.code, "name": branch.name},
             "cash_register": None
             if register is None
-            else {"id": str(register.id), "name": register.name, "kind": register.kind},
+            else {
+                "id": str(register.id),
+                "name": register.name,
+                "kind": register.kind,
+                # BO-12 local-bridge binding (21 §16): the POS picks the agent FM offline by local_id
+                "fiscal_agent_id": _u(register.fiscal_agent_id),
+                "fiscal_local_device_id": register.fiscal_local_device_id,
+            },
             "discount_rules": [
                 {
                     "id": str(r.id),

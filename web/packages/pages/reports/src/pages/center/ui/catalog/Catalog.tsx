@@ -2,8 +2,8 @@
  * BO-09 catalogue (07 BO-09, mockup Bo09Hisobotlar): report cards grouped Savdo / Ombor / Moliya / Soliq;
  * a report the user has no right to is not shown. Built: Bosqich 3 — «Kassa / smena tarixi», «QQS
  * registri (qaytarishlar bilan)»; Bosqich 4 — kunlik savdo, top tovarlar, kassirlar bo'yicha savdo,
- * ombor qoldig'i, kam qolgan tovarlar, foyda va zarar, chegirmalar va marja, qarzdorlik muddati. The
- * rest carry the «Tez orada» chip (not clickable).
+ * ombor qoldig'i, kam qolgan tovarlar, foyda va zarar, chegirmalar va marja, qarzdorlik muddati; Bosqich 5 —
+ * sinov balansi, buxgalteriya balansi, ombor qoldig'i (sana holatiga). The rest carry the «Tez orada» chip.
  */
 import { ChevronRight, Hourglass } from "lucide-react";
 
@@ -18,8 +18,6 @@ type CatalogKey =
   | ReportKey
   | "stock-moves"
   | "count-diffs"
-  | "trial-balance"
-  | "balance-sheet"
   | "vat-form"
   | "turnover-form"
   | "financial-form";
@@ -47,6 +45,7 @@ export const CATALOG: readonly { group: GroupKey; items: readonly CatalogItem[] 
       { key: "stock-moves", requires: STOCK },
       item("low-stock"),
       { key: "count-diffs", requires: STOCK },
+      item("stock-as-of"),
     ],
   },
   {
@@ -54,8 +53,8 @@ export const CATALOG: readonly { group: GroupKey; items: readonly CatalogItem[] 
     items: [
       item("profit-and-loss"),
       item("discounts"),
-      { key: "trial-balance", requires: FINANCE },
-      { key: "balance-sheet", requires: FINANCE },
+      item("trial-balance"),
+      item("balance-sheet"),
       item("debts-aging"),
     ],
   },

@@ -234,7 +234,13 @@ class CashRegisterRepository(Protocol):
 
     async def archive_cash_register(self, session: AsyncSession, register_id: UUID) -> datetime: ...
 
-    async def fiscal_agent_exists(self, session: AsyncSession, agent_id: UUID) -> bool: ...
+    async def fiscal_agent(self, session: AsyncSession, agent_id: UUID) -> tuple[str, object] | None:
+        """``(status, capabilities)`` of a store agent (``app.onec_agents``) of this tenant."""
+        ...
+
+    async def fiscal_device_taken(
+        self, session: AsyncSession, agent_id: UUID, local_device_id: str, register_id: UUID
+    ) -> bool: ...
 
 
 class DeviceRepository(Protocol):

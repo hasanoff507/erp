@@ -3,12 +3,15 @@
  * MONTH (a quarter has no ST document) — the period's tax settlements, «Qoralama hisoblash» (the server
  * computes base / amount: `vat_offset` = Σ input VAT → Dt 6410 / Kt 4410; `turnover_tax` = the vat-summary
  * figure → Dt 9430|9820 / Kt 6410, per branch), «O'tkazish» (the server recomputes; `recalculated`),
- * «Bekor qilish» (reason). sample() only (24 §2).
+ * «Bekor qilish» (reason); «o'tkazishdan keyingi 6410 qoldig'i» — the 6410 row of
+ * `GET /reports/trial-balance?period=&account=6410` (20 #11: `closing_balance` debit-positive — a liability is
+ * negative and shown unsigned as «kredit qoldiq»; `by_tax_type`), re-read after every post / cancel; needs
+ * `reports.finance.view` (`taxBalanceEnabled`). sample() only (24 §2).
  */
 import { combine, createEvent, createStore, merge, sample } from "effector";
 
 import { api, type ApiError } from "@shared/api";
-import type { SettlementIn, SettlementOut, SettlementPosted } from "@shared/models";
+import type { SettlementIn, SettlementOut, SettlementPosted, TrialBalanceRow } from "@shared/models";
 
 import { apiFx, type LoadStatus } from "#/shared/lib/effect.ts";
 
@@ -139,3 +142,37 @@ sample({
   fn: () => undefined,
   target: stReloadRequested,
 });
+
+// --- «O'tkazishdan keyingi 6410 qoldig'i» (20 #11) ------------------------------------------------------
+export type Balance6410 = TrialBalanceRow;
+export const taxBalanceEnabled = createEvent<boolean>();
+
+/** The 6410 row of the month's trial balance (`null` — no movement and no balance on 6410). */
+export const load6410Fx = apiFx<string, Balance6410 | null>(async (period) => {
+  const tb = await api.reports.getTrialBalance({ period, account: "6410" });
+  return tb.rows.find((r) => r.account === "6410") ?? null;
+});
+
+export const $taxBalanceEnabled = createStore(false);
+export const $balance6410 = createStore<Balance6410 | null>(null, { skipVoid: false });
+export const $balance6410Status = createStore<LoadStatus>("idle");
+
+$taxBalanceEnabled.on(taxBalanceEnabled, (_, on) => on);
+sample({
+  clock: [periodChanged, stReloadRequested],
+  source: { enabled: $taxBalanceEnabled, period: $period },
+  filter: ({ enabled, period }) => enabled && isMonth(period),
+  fn: ({ period }) => period,
+  target: load6410Fx,
+});
+const loaded6410 = sample({
+  clock: load6410Fx.done,
+  source: $period,
+  filter: (period, { params }) => period === params,
+  fn: (_, { result }) => result,
+});
+$balance6410.on(loaded6410, (_, row) => row).reset(periodChanged);
+$balance6410Status
+  .on(load6410Fx, () => "loading")
+  .on(loaded6410, () => "idle")
+  .on(load6410Fx.fail, () => "error");

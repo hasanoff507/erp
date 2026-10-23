@@ -5,6 +5,7 @@ Everything runs inside the caller's tenant transaction (RLS + explicit ``tenant_
 
 from __future__ import annotations
 
+import json
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Final
@@ -141,7 +142,11 @@ _ARCHIVE_REGISTER = text(
 _REGISTER_COLUMNS: Final = frozenset({"name", "fiscal_agent_id", "fiscal_local_device_id"})
 # onec_agents arrives with the Do'kon agenti (migration 0028, Bosqich 5); until then no agent can exist
 _AGENTS_TABLE = text("SELECT to_regclass('app.onec_agents') IS NOT NULL")
-_AGENT_EXISTS = text("SELECT 1 FROM app.onec_agents WHERE id = :id")
+_AGENT = text("SELECT status, capabilities FROM app.onec_agents WHERE id = :id")
+_DEVICE_TAKEN = text(
+    "SELECT 1 FROM app.cash_registers WHERE fiscal_agent_id = :a AND fiscal_local_device_id = :l "
+    "AND id <> :r AND archived_at IS NULL"
+)
 
 
 def _update_sql(table: str, allowed: frozenset[str], fields: dict[str, Any]) -> Any:
@@ -430,7 +435,18 @@ class SqlCashRegisterRepository:
         value: datetime = (await session.execute(_ARCHIVE_REGISTER, {"id": register_id})).scalar_one()
         return value
 
-    async def fiscal_agent_exists(self, session: AsyncSession, agent_id: UUID) -> bool:
+    async def fiscal_agent(self, session: AsyncSession, agent_id: UUID) -> tuple[str, object] | None:
+        """``(status, capabilities)`` of a store agent of this tenant (RLS), ``None`` when unknown."""
         if not (await session.execute(_AGENTS_TABLE)).scalar_one():
-            return False
-        return (await session.execute(_AGENT_EXISTS, {"id": agent_id})).first() is not None
+            return None
+        row = (await session.execute(_AGENT, {"id": agent_id})).first()
+        if row is None:
+            return None
+        caps = row[1]
+        return str(row[0]), json.loads(caps) if isinstance(caps, str) else caps
+
+    async def fiscal_device_taken(
+        self, session: AsyncSession, agent_id: UUID, local_device_id: str, register_id: UUID
+    ) -> bool:
+        params = {"a": agent_id, "l": local_device_id, "r": register_id}
+        return (await session.execute(_DEVICE_TAKEN, params)).first() is not None

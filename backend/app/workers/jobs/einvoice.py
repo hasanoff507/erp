@@ -6,7 +6,7 @@ from typing import Any
 
 from app.core.db.session import Database
 from app.core.queue import SaqJobQueue
-from app.modules.integrations.einvoice.wiring import ETTN_SWEEP_JOB
+from app.modules.integrations.einvoice.wiring import DOC_SWEEP_JOB, ETTN_SWEEP_JOB, POLL_JOB
 
 
 async def einvoice_ettn_sweep_fanout(ctx: dict[str, Any]) -> dict[str, int]:
@@ -15,3 +15,20 @@ async def einvoice_ettn_sweep_fanout(ctx: dict[str, Any]) -> dict[str, int]:
 
     db: Database = ctx["db"]
     return {"tenants": await fan_out(db, SaqJobQueue(ctx["worker"].queue), ETTN_SWEEP_JOB)}
+
+
+async def einvoice_doc_sweep_fanout(ctx: dict[str, Any]) -> dict[str, int]:
+    """Every minute: per tenant, the due signed e-document jobs (einvoice_send/accept, poa_send, "
+    "ettn_accept)."""
+    from app.workers.cron import fan_out
+
+    db: Database = ctx["db"]
+    return {"tenants": await fan_out(db, SaqJobQueue(ctx["worker"].queue), DOC_SWEEP_JOB)}
+
+
+async def einvoice_poll_fanout(ctx: dict[str, Any]) -> dict[str, int]:
+    """Every 10 minutes: per tenant, the operator inbox / status poll (21 §2)."""
+    from app.workers.cron import fan_out
+
+    db: Database = ctx["db"]
+    return {"tenants": await fan_out(db, SaqJobQueue(ctx["worker"].queue), POLL_JOB)}

@@ -18,7 +18,7 @@ export interface ReceiptLineOut {
   vat_exemption_code: string | null;
   /** ROUND_HALF_UP(net_amount × vat_rate / 100, 2) */
   vat_amount: string;
-  /** ROUND_HALF_UP(qty × cost, 2) */
+  /** ROUND_HALF_UP(qty × cost, 2); from-einvoice lines — the invoice amount */
   net_amount: string;
   total_amount: string;
   expiry_date: string | null;

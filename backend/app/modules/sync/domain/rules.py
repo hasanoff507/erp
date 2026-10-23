@@ -56,6 +56,7 @@ NOTIFY_KINDS: Final[dict[str, str]] = {
     "debt_limit_exceeded_offline": "debt_limit_exceeded_offline",
     "approval_limit_exceeded_offline": "over_limit_action",
     "actor_unverified": "over_limit_action",
+    "late_in_closed_period": "late_in_closed_period",  # 16 §3.4, qaror #69 — Buxgalterga M18
 }
 
 # 16 §5 — the CHECK list of app.sync_exceptions.kind
@@ -65,6 +66,7 @@ EXCEPTION_KINDS: Final = frozenset(
         "approval_limit_exceeded_offline", "receipt_seq_conflict", "debt_overpayment_offline",
         "debt_allocation_mismatch", "late_in_closed_period", "cost_unknown", "count_late_move",
         "card_result_mismatch", "card_orphan_transaction", "actor_unverified", "late_in_closed_shift",
+        "marking_code_duplicate",
     }
 )  # fmt: skip
 

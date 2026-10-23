@@ -41,8 +41,10 @@ from app.modules.cash.application.contracts import ShiftGuard
 from app.modules.debts.application.register import DebtRegister
 from app.modules.debts.domain.register import DebtMoveInput
 from app.modules.integrations.card_terminal.application.contracts import CardPayments
+from app.modules.integrations.einvoice.application.hooks import EInvoiceHooksPort
 from app.modules.integrations.fiscal.application.contracts import FiscalReceiptRef, FiscalService
 from app.modules.integrations.fiscal.domain.rules import payment_form
+from app.modules.integrations.marking.application.hooks import MarkingHooks
 from app.modules.inventory.application.stock import CostPosting, StockService
 from app.modules.sales.application.payloads import (
     ApprovalRefPayload,
@@ -73,6 +75,7 @@ CHECKOUT_METHODS: Final = frozenset({"click", "payme", "uzum"})
 LOCAL_PROVIDERS: Final = frozenset({"multikassa_local", "fiscaldrive_local"})
 STANDING_TOLERANCE: Final = Decimal("0.01")
 LATE_SYNC: Final = timedelta(minutes=1)
+DUPLICATE_KIND: Final = "marking_code_duplicate"  # sync_exceptions kind (B3 F-5, 16 §5)
 
 
 def invalid(field: str, key: str) -> AppError:
@@ -170,6 +173,8 @@ class Deps:
     shifts: ShiftGuard
     approvals: ApprovalGate
     cards: CardPayments
+    marking: MarkingHooks
+    einvoices: EInvoiceHooksPort
 
 
 class SalePostingHandler:
@@ -217,13 +222,28 @@ class SalePostingHandler:
             )
             if taken and not signed:  # no receipt with a duplicate code is ever fiscalized (18 §4.2)
                 raise AppError(ErrorCode.MARKING_CODE_ALREADY_SOLD, params={"codes": sorted(taken)[:20]})
-            if taken:  # signed already: the sale happened — accept, audit, flag for review (16 §7)
+            if taken:  # signed already: the sale happened — accept, audit, flag, M18 (16 §7, B3 F-5)
                 out.warn(ErrorCode.MARKING_CODE_ALREADY_SOLD.value)
                 await record_audit(
                     s, tenant_id=ctx.tenant_id, user_id=ctx.actor_user_id, action="marking.verify_failed",
                     entity="sales", entity_id=p.id, device_id=ctx.device_id,
                     after={"reason": "duplicate_code", "codes": sorted(taken)[:20],
                            "client_event_id": str(ctx.client_event_id)},
+                )  # fmt: skip
+                out.flag(DUPLICATE_KIND, p.id, codes=sorted(taken)[:20], fiscal_signed=True)
+                await d.marking.on_signed_duplicate(
+                    s, ctx.tenant_id, p.id, branch_id=p.branch_id, device_id=ctx.device_id, codes=taken
+                )
+            sold = [c for c, _ in codes if c and c not in taken]
+            if p.is_offline and sold:  # 16 §7: CRPT check once online (MARKING_PRECHECK != off) + audit
+                await d.marking.on_offline_sale(
+                    s, ctx.tenant_id, p.id, branch_id=p.branch_id, codes=sold,
+                    precheck_mode=str(policy.settings.get("marking_precheck") or "warn"),
+                )  # fmt: skip
+                await record_audit(
+                    s, tenant_id=ctx.tenant_id, user_id=ctx.actor_user_id, action="marking.offline_sold",
+                    entity="sales", entity_id=p.id, device_id=ctx.device_id,
+                    after={"codes": sold[:20], "price_source": "cache", "created_at": iso(at)},
                 )  # fmt: skip
 
         # --- registers -----------------------------------------------------------------------------
@@ -313,6 +333,8 @@ class SalePostingHandler:
             vat_payer=policy.vat_payer, discount_posting=_discount_posting(policy.settings), analytics=base,
         )  # fmt: skip
         await d.poster.post(s, ctx.tenant_id, DOC_TYPE, p.id, ledger, vat)
+        if debt_total > 0 and p.counterparty_id is not None:  # US-M01-06: B2B credit sale → e-invoice draft
+            await d.einvoices.on_b2b_credit_sale_posted(s, ctx.tenant_id, p.id)
 
         # --- fiscal receipt(s) ----------------------------------------------------------------------
         receipts: list[FiscalReceiptRef] = []
@@ -604,7 +626,9 @@ class SalePostingHandler:
                 and found.provider == pay.method
                 and found.cash_register_id == p.cash_register_id
                 and money(found.amount) == money(to_decimal(pay.amount))
-                and (found.provider_tx_id is None or found.provider_tx_id == pay.provider_tx_id)
+                # a confirmed checkout always carries the provider transaction it was paid by (18 §16.4)
+                and found.provider_tx_id is not None
+                and found.provider_tx_id == pay.provider_tx_id
             )
             if not ok:
                 raise AppError(

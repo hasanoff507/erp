@@ -33,6 +33,11 @@ _TITLES: Final[dict[str, tuple[str, str]]] = {
     "card_settlement_mismatch": ("💳 Terminal hisoboti farqi", "💳 Расхождение сверки терминала"),
     "recurring_expense_due": ("🧾 Takroriy xarajat vaqti keldi", "🧾 Пора оплатить регулярный расход"),
     "daily_report": ("📊 Kunlik hisobot", "📊 Ежедневный отчёт"),
+    "marking_alert": ("🏷 Markirovka kodi muammosi", "🏷 Проблема с кодом маркировки"),
+    "marking_acceptance_due": ("🏷 Markirovka qabul muddati", "🏷 Срок приёмки маркировки"),
+    "late_in_closed_period": ("📅 Yopilgan davrga kech chek", "📅 Поздний чек в закрытый период"),
+    "onec_agent_paired": ("🖥 Do'kon agenti", "🖥 Агент магазина"),
+    "onec_base_error": ("⚠ Do'kon agenti ogohlantirishi", "⚠ Предупреждение агента магазина"),
 }
 
 # payload field → (uz label, ru label, format) — rendered in this order when present
@@ -57,6 +62,9 @@ _FIELDS: Final[tuple[tuple[str, str, str, str], ...]] = (
     ("due_date", "To'lov sanasi", "Срок оплаты", "text"),
     ("stage", "Bosqich", "Этап", "stage"),
     ("oldest_unacked_at", "Eng eski yuborilmagan chek", "Самый старый неотправленный чек", "text"),
+    ("number", "Hujjat", "Документ", "text"),  # B5 marking
+    ("reason", "Sabab", "Причина", "text"),  # B5 marking
+    ("state", "Holat", "Состояние", "text"),  # B5 agent: connected / disconnected
 )
 
 _STAGES: Final[dict[str, tuple[str, str]]] = {
@@ -65,6 +73,12 @@ _STAGES: Final[dict[str, tuple[str, str]]] = {
     "46h": ("46 soat — 2 soatdan keyin blok", "46 часов — блок через 2 часа"),
     "48h": ("48 soat — fiskal blok", "48 часов — фискальная блокировка"),
     "cleared": ("tiklandi", "восстановлено"),
+    "due_soon": ("muddat yaqinlashmoqda (24 soatdan kam)", "срок истекает (меньше 24 часов)"),  # B5 marking
+    "overdue": ("muddat o'tdi", "срок истёк"),  # B5 marking
+    "fm_locked": (
+        "fiskal modul bloklandi — chek chiqmaydi",
+        "фискальный модуль заблокирован — чек не выдаётся",
+    ),  # B5
 }
 
 
@@ -103,7 +117,10 @@ def _value(fmt: str, raw: Any, lang: Lang) -> str:
     if fmt == "qty":
         return fmt_qty(raw)
     if fmt == "stage":
-        return _STAGES.get(str(raw), (str(raw), str(raw)))[_i(lang)]
+        key = (
+            f"{raw}h" if isinstance(raw, int) and not isinstance(raw, bool) else str(raw)
+        )  # monitor: 24/40/46/48
+        return _STAGES.get(key, (str(raw), str(raw)))[_i(lang)]
     return str(raw)
 
 

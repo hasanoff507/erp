@@ -122,6 +122,10 @@ async def test_snapshot_contains_every_scope_with_the_contract_shapes(env: SyncE
     assert limits[str(pos.user_id)]["discount.give"] is None
     assert page["shift"]["open_shift"] is None and page["shift"]["cash_register_id"] == str(pos.register_id)
     settings = page["settings"]
+    assert settings["cash_register"]["id"] == str(pos.register_id)
+    # BO-12 local-bridge binding travels to the POS (unbound register: both null)
+    assert settings["cash_register"]["fiscal_agent_id"] is None
+    assert settings["cash_register"]["fiscal_local_device_id"] is None
     assert [r["name"] for r in settings["discount_rules"]] == ["Aksiya"]
     assert (
         settings["card_manual_fallback"] == "manager_approval"

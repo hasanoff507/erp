@@ -8,11 +8,24 @@ postings — sales, returns, shift close), :func:`build_card_terminal_module` (R
 
 from __future__ import annotations
 
+import importlib
+from collections.abc import Awaitable, Callable, Mapping
+from typing import Any, cast
+from uuid import UUID
+
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import Settings
 from app.core.db.session import Database
 from app.modules.access.wiring import approval_gate
+from app.modules.integrations.card_terminal.application.agent_tasks import (
+    SETTLEMENT_KIND,
+    STATUS_KIND,
+    AgentTasks,
+    CardAgentService,
+    TaskResult,
+    TaskView,
+)
 from app.modules.integrations.card_terminal.application.contracts import CardPayments
 from app.modules.integrations.card_terminal.application.module import CardTerminalModule
 from app.modules.integrations.card_terminal.application.orphans import OrphanSweep
@@ -27,13 +40,22 @@ from app.modules.integrations.card_terminal.infrastructure.uzqr_stub import Uzqr
 from app.modules.notifications.wiring import event_recorder
 
 CARD_ORPHAN_SWEEP_JOB = "card_orphan_sweep"  # SAQ job: one tenant's orphan approved purchases (23 §4)
+CARD_STATUS_SWEEP_JOB = "card_status_sweep"  # SAQ job: card.status for every capable agent (23 §4.2)
+CARD_SETTLEMENT_SWEEP_JOB = "card_settlement_sweep"  # SAQ job: card.settlement at 23:30 Tashkent (23 §4.2)
+
+TaskHandler = Callable[[AsyncSession, UUID, UUID, Any, Any], Awaitable[None]]
 
 __all__ = [
     "CARD_ORPHAN_SWEEP_JOB",
+    "CARD_SETTLEMENT_SWEEP_JOB",
+    "CARD_STATUS_SWEEP_JOB",
+    "CardAgentService",
     "CardPayments",
     "CardTerminalModule",
     "FakeCardTerminalAdapter",
+    "agent_task_handlers",
     "build_card_terminal_module",
+    "card_agent_service",
     "card_payments",
     "fake_card_terminal",
     "orphan_sweep",
@@ -79,3 +101,46 @@ def fake_card_terminal(settings: Settings) -> FakeCardTerminalAdapter:
 def uzqr_port(settings: Settings) -> UzqrPort:
     """Dynamic UzQR — stub until Bosqich 5 (21 §9.1, 26 #49)."""
     return UzqrStubAdapter()
+
+
+def _agent_tasks() -> AgentTasks:
+    """The agent slice's ``AgentTaskPort`` (contracts/agent-tasks.md §1), resolved at call time: the agent
+    wiring imports this module's ``agent_task_handlers`` (no import cycle at module load)."""
+    module = importlib.import_module("app.modules.onec_integration.wiring")
+    return cast(AgentTasks, module.agent_tasks())
+
+
+def card_agent_service(
+    settings: Settings | None,
+    session_factory: async_sessionmaker[AsyncSession],
+    tasks: AgentTasks | None = None,
+) -> CardAgentService:
+    """``card.status`` / ``card.settlement`` enqueue + result handling (qaror #71, 23 §4.2)."""
+    repo = SqlCardRepository()
+    return CardAgentService(session_factory, repo, tasks or _agent_tasks(), _settlement_writer(repo))
+
+
+def agent_task_handlers(settings: Settings, db: Database) -> Mapping[str, TaskHandler]:
+    """Result handlers registered with the agent slice (contracts/agent-tasks.md §2)."""
+    service = CardAgentService(
+        db.session_factory, SqlCardRepository(), _NoEnqueue(), _settlement_writer(SqlCardRepository())
+    )
+
+    async def status(
+        s: AsyncSession, tenant_id: UUID, agent_id: UUID, task: TaskView, result: TaskResult
+    ) -> None:
+        await service.handle_status(s, tenant_id, agent_id, task, result)
+
+    async def settlement(
+        s: AsyncSession, tenant_id: UUID, agent_id: UUID, task: TaskView, result: TaskResult
+    ) -> None:
+        await service.handle_settlement(s, tenant_id, agent_id, task, result)
+
+    return {STATUS_KIND: status, SETTLEMENT_KIND: settlement}
+
+
+class _NoEnqueue:
+    """Result handlers never enqueue."""
+
+    async def enqueue(self, *args: Any, **kwargs: Any) -> UUID:
+        raise RuntimeError("result handlers do not enqueue agent tasks")

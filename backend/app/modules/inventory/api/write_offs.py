@@ -49,6 +49,11 @@ class WriteOffLineIn(BaseModel):
         description="expired_return is created by returns only (qaror #48) — 422 here"
     )
     gift_kind: Literal["promo_justified", "other"] | None = None
+    marking_codes: list[Annotated[str, StringConstraints(min_length=1, max_length=512)]] = Field(
+        default_factory=list,
+        max_length=100000,
+        description="Marked products: exactly qty in-stock codes (21 §4)",
+    )
 
 
 class WriteOffCreate(BaseModel):
@@ -83,6 +88,7 @@ class WriteOffLineOut(BaseModel):
     reason: str
     gift_kind: str | None
     cost_amount: str
+    marking_codes: list[str]
 
 
 class WriteOffOut(BaseModel):
@@ -126,7 +132,9 @@ async def create_write_off(
         warehouse_id=body.warehouse_id,
         doc_date=body.doc_date,
         lines=[
-            WriteOffLineInput(ln.product_id, Decimal(ln.qty), ln.reason, ln.gift_kind, ln.lot_id)
+            WriteOffLineInput(
+                ln.product_id, Decimal(ln.qty), ln.reason, ln.gift_kind, ln.lot_id, tuple(ln.marking_codes)
+            )
             for ln in body.lines
         ],
         responsible_user_id=body.responsible_user_id,

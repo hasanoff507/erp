@@ -4,7 +4,8 @@
  * QT-M16-04), «QQS registri (qaytarishlar bilan)». Bosqich 4: «Kunlik savdo», «Kassirlar bo'yicha
  * savdo» (US-M12-01), «Top tovarlar» (US-M12-02), «Ombor qoldig'i» / «Kam qolgan tovarlar»
  * (US-M04-03), «Foyda va zarar» (US-M15-03), «Chegirmalar va marja» (US-M03-03), «Qarzdorlik muddati»;
- * filters — period and branch («Barcha filiallar» = consolidated, US-M14-01). PDF/Excel export and the
+ * filters — period and branch («Barcha filiallar» = consolidated, US-M14-01). Bosqich 5 (M11, US-M11-02):
+ * «Sinov balansi», «Buxgalteriya balansi», «Ombor qoldig'i (sana holatiga)». PDF/Excel export and the
  * export queue are Bosqich 6 (20 #22/#23 `POST /reports/{kod}/export`, `GET /reports/export-jobs/{id}`;
  * B6-EP-20#22/#23), for BO-09 and BO-03 alike. The open report lives in `?report=`. Offline: the last loaded report
  * stays visible. useEffect only fires the mount and the URL → model sync (24 §2).
@@ -24,6 +25,7 @@ import { Banner, Button, Card, Icon, NoPermissionState } from "@shared/ui";
 import { REPORT_ACCESS, isReportKey, pageMounted, reportOpened, type ReportKey } from "../../model/index.ts";
 import { CashHistory } from "../cash-history/CashHistory.tsx";
 import { Catalog } from "../catalog/Catalog.tsx";
+import { BalanceSheetReport, StockAsOfReport, TrialBalanceReport } from "../reports/AccountingReports.tsx";
 import { AgingReport } from "../reports/AgingReport.tsx";
 import { DiscountsReport } from "../reports/DiscountsReport.tsx";
 import { PnlReport } from "../reports/PnlReport.tsx";
@@ -53,6 +55,12 @@ function ReportView({ report }: { report: ReportKey }): ReactNode {
       return <DiscountsReport />;
     case "debts-aging":
       return <AgingReport />;
+    case "trial-balance":
+      return <TrialBalanceReport />;
+    case "balance-sheet":
+      return <BalanceSheetReport />;
+    case "stock-as-of":
+      return <StockAsOfReport />;
   }
 }
 

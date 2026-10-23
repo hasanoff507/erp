@@ -55,6 +55,8 @@ class ReturnLine:
     vat_amount: Decimal
     product_name: str | None = None
     unit_code: str | None = None
+    marking_codes: tuple[str, ...] = ()
+    is_marked: bool = False
 
     @property
     def net(self) -> Decimal:
@@ -85,6 +87,7 @@ class SupplierReturn:
     cancelled_at: datetime | None
     cancel_reason: str | None
     receipt_regime: str = "vat"  # tax regime in force on the receipt's doc_date (13 §4.3)
+    vat_adjusted: bool = False  # row 2 written on the supplier's accepted additional EHF (13 §2.20)
     lines: tuple[ReturnLine, ...] = field(default_factory=tuple)
     line_count: int = 0
     net_total: Decimal = ZERO

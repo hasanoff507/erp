@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.core.db.base import uuid7
 from app.core.db.rls import (
     SECURITY_DEFINER_FUNCTIONS_0027,
+    SECURITY_DEFINER_FUNCTIONS_0028,
     app_grants_on_auth,
     missing_security_definer_functions,
     tables_without_rls,
@@ -24,10 +25,16 @@ from tests.support.bootstrap import MIGRATOR_PASSWORD, bootstrap_database, downg
 pytestmark = pytest.mark.db
 
 
-async def test_head_is_0027b(migrated_db: MigratedDb, migrator_engine: AsyncEngine) -> None:
+async def test_head_is_0028a(migrated_db: MigratedDb, migrator_engine: AsyncEngine) -> None:
     async with migrator_engine.connect() as conn:
         version = (await conn.execute(text("SELECT version_num FROM public.alembic_version"))).scalar()
-    assert version == alembic_head() == "0027b"
+    assert version == alembic_head() == "0028a"
+
+
+async def test_security_definer_functions_of_0028_exist(migrator_engine: AsyncEngine) -> None:
+    async with migrator_engine.connect() as conn:
+        assert await missing_security_definer_functions(conn, SECURITY_DEFINER_FUNCTIONS_0028) == []
+        assert len(SECURITY_DEFINER_FUNCTIONS_0028) == 6  # 12 §6.2
 
 
 async def test_every_tenant_table_has_forced_rls_and_a_policy(migrator_engine: AsyncEngine) -> None:

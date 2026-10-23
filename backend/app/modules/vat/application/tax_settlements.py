@@ -45,6 +45,7 @@ from app.core.errors import AppError, ErrorDetail
 from app.core.idempotency import stage_response
 from app.core.money import money, money_str, percent, percent_str
 from app.core.permissions import BranchScope
+from app.modules.accounting.application.ports import TaxReadiness
 from app.modules.accounting.application.posting import LedgerPoster
 from app.modules.accounting.domain.calendar import business_today, period_label
 from app.modules.accounting.domain.entries import LedgerLine
@@ -346,6 +347,36 @@ class TaxSettlementService:
             body = settlement_json(await self._load(s, row.id))
             stage_response(body)
         return body
+
+    # --- B5-T16: period-closing readiness (13 §5.1, §2.26; 20 #16) ----------------------------------------
+    async def readiness(self, s: AsyncSession, tenant_id: UUID, period: date) -> TaxReadiness:
+        """``tax_settlement_missing`` — a regime in force in the month has no ``posted`` settlement where
+        one is due (VAT: the period has creditable input VAT; turnover: a branch has a non-zero base);
+        ``tax_settlement_stale`` — a ``posted`` settlement whose amount ≠ the figure recomputed now (a
+        document dated in the month was posted or cancelled afterwards; the Accountant re-creates it)."""
+        end = month_end(period)
+        posted = await self._repo.list_page(
+            s, SettlementFilter(branch_ids=None, period=period, status="posted"), None, 1000
+        )
+        stale: list[tuple[UUID, str, UUID | None, Decimal, Decimal]] = []
+        for row in posted:
+            current = await self._figures(s, tenant_id, row.tax_kind, period, row.branch_id)
+            if current.amount != row.amount:
+                branch = None if row.tax_kind == "vat_offset" else row.branch_id
+                stale.append((row.id, row.tax_kind, branch, row.amount, current.amount))
+        ranges = await self._vat.regime_ranges(s, period, end)
+        missing = False
+        if any(r == "vat" for _, _, r in ranges) and not any(x.tax_kind == "vat_offset" for x in posted):
+            _, vat = await self._repo.vat_input(s, period)
+            missing = vat > 0
+        settled = {x.branch_id for x in posted if x.tax_kind == "turnover_tax"}
+        for start, stop, regime in ranges:
+            if regime != "turnover" or missing:
+                continue
+            for b in await self._vat.turnover_bases(s, start, stop, None):
+                if b.base != 0 and b.branch_id not in settled:
+                    missing = True
+        return TaxReadiness(missing=missing, stale=stale)
 
     # --- helpers ----------------------------------------------------------------------------------
     async def _figures(

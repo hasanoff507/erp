@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>Erp1C.Agent</RootNamespace>
+    <AssemblyName>ErpOneCAgent</AssemblyName>
+    <Prefer32Bit>false</Prefer32Bit>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="Serilog.Formatting.Compact" />
+    <PackageReference Include="QRCoder" />
+    <PackageReference Include="System.Text.Json" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Security" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Erp1C.Core\Erp1C.Core.csproj" />
+    <ProjectReference Include="..\Erp1C.Fiscal\Erp1C.Fiscal.csproj" />
+    <ProjectReference Include="..\Erp1C.Devices\Erp1C.Devices.csproj" />
+    <ProjectReference Include="..\Erp1C.CardTerminal\Erp1C.CardTerminal.csproj" />
+    <ProjectReference Include="..\Erp1C.CardTerminal.Drivers.Fake\Erp1C.CardTerminal.Drivers.Fake.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyMetadata Include="AgentChannel" Value="$(AgentChannel)" />
+    <AssemblyMetadata Include="AgentServerBase" Value="$(AgentServerBase)" />
+    <AssemblyMetadata Include="AgentAppOrigins" Value="$(AgentAppOrigins)" />
+    <AssemblyMetadata Include="AgentLocalPorts" Value="$(AgentLocalPorts)" />
+    <AssemblyMetadata Include="AgentPublisher" Value="$(AgentPublisher)" />
+    <InternalsVisibleTo Include="Erp1C.Agent.Tests" />
+  </ItemGroup>
+</Project>

@@ -39,7 +39,7 @@ from app.core.money import money, money_str
 from app.core.permissions import BranchScope
 from app.modules.access.application.approval_gate import ApprovalGate, ApprovalRefIn
 from app.modules.integrations.card_terminal.application.ports import CardRepository, TerminalRow, TxRow
-from app.modules.integrations.card_terminal.application.schemas import CardResultIn
+from app.modules.integrations.card_terminal.application.schemas import CardResultIn, parse_card_result
 from app.modules.integrations.card_terminal.domain.model import FINAL, can_transition
 
 ENTITY = "card_terminal_transactions"
@@ -309,6 +309,52 @@ class TxWriter:
         if action is not None and result.resolved_by != "manager":
             applied.audit.append((action, _audit_after(tx.amount, result, target)))
         return applied
+
+    async def resolve_from_agent(
+        self,
+        s: AsyncSession,
+        *,
+        tenant_id: UUID,
+        terminal: TerminalRow,
+        tx: TxRow,
+        card_result: Mapping[str, Any],
+        device_id: UUID | None,
+    ) -> TxRow:
+        """``card.status`` ``unresolved[]`` (21 §16): the agent's status query closed a
+        ``pending``/``unknown`` attempt. Strict ``CardResult`` (the agent mapped it), forward-only; audit
+        without a user, with the
+        agent's device (15 §6.1)."""
+        result = parse_card_result(card_result, "unresolved")
+        if result.resolved_by != "status_query" or result.attempt_id != tx.id:
+            raise invalid("unresolved.resolved_by", "validation.card_result_invalid")
+        target = result.status
+        if not can_transition(tx.status, target) or target == tx.status:
+            return tx
+        values = self._result_values(result, target)
+        mismatch: dict[str, Any] | None = None
+        if target == "approved" and tx.kind == "purchase" and result.tid and result.rrn:
+            taken = await self._repo.rrn_taken(s, result.tid, result.rrn, tx.id)
+            if taken is not None:
+                mismatch = {"reason": "duplicate_rrn", "existing_id": str(taken), "tid": result.tid,
+                            "rrn": result.rrn}  # fmt: skip
+                values["tid"] = None
+        await self._repo.update_tx(s, tx.id, values)
+        updated = await self._repo.tx(s, tx.id)
+        assert updated is not None
+        applied = Applied(updated, created=False, mismatch=mismatch)
+        await self._after_void(s, applied, result)
+        action = _audit_action(tx.kind, target, tx.doc_type)
+        if action is not None:
+            await record_audit(
+                s, tenant_id=tenant_id, user_id=None, action=action, entity=ENTITY, entity_id=tx.id,
+                after=_audit_after(updated.amount, result, target), device_id=device_id,
+            )  # fmt: skip
+        if mismatch is not None:
+            await self._repo.insert_sync_exception(
+                s, kind="card_result_mismatch", device_id=device_id, client_event_id=tx.client_event_id,
+                doc_type=ENTITY, doc_id=tx.id, details=mismatch,
+            )  # fmt: skip
+        return updated
 
     @staticmethod
     def _differs(existing: TxRow, result: CardResultIn) -> dict[str, Any] | None:

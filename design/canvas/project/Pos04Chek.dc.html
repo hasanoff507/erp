@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Chek chop etildi</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0E7C66}a:hover{color:#0A5E4D}
+</style>
+</helmet>
+<div style="width: 1366px; height: 768px; box-sizing: border-box; display: flex; flex-direction: column; background: #F4F6F8; color: #0F1B2D; font-family: 'Manrope', system-ui, sans-serif;">
+  <header style="height: 64px; flex-shrink: 0; display: flex; align-items: center; gap: 14px; padding: 0 20px; background: #FFFFFF; border-bottom: 1px solid #E7EAEE;">
+    <div style="width: 36px; height: 36px; border-radius: 10px; background: #0E7C66; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px;">E</div>
+    <div style="display: flex; flex-direction: column;">
+      <div style="font-weight: 800; font-size: 15px;">Chilonzor-3 · Kassa 1</div>
+      <div style="font-size: 12px; color: #6B7686;">Smena #214 · 08:00 dan beri</div>
+    </div>
+    <div style="flex-grow: 1;"></div>
+    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: #E5F5EC; color: #1F6B3E; font-size: 12px; font-weight: 700;">
+      <svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true"><circle cx="4" cy="4" r="4" fill="#1F8A4C"></circle></svg>Online · OFD sinxron
+    </span>
+    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: #F4F6F8; color: #3D4A5C; font-size: 12px; font-weight: 700;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9V3h10v6"></path><path d="M6 18H4v-7a2 2 0 012-2h12a2 2 0 012 2v7h-2"></path><path d="M7 14h10v7H7z"></path></svg>Printer tayyor
+    </span>
+    <button type="button" aria-label="Interfeys tili" style="height: 48px; min-width: 48px; padding: 0 12px; border: 1px solid #E7EAEE; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 13px; font-weight: 700; color: #3D4A5C;">UZ · RU</button>
+    <div style="display: flex; align-items: center; gap: 10px; padding-left: 6px;">
+      <div style="width: 36px; height: 36px; border-radius: 50%; background: #E3F2EE; color: #0A5E4D; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px;">DR</div>
+      <div style="font-size: 13px; font-weight: 700;">Dilnoza R.</div>
+    </div>
+  </header>
+  <div style="flex-grow: 1; min-height: 0; display: flex; gap: 16px; padding: 16px;">
+    <section style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 14px;">
+      <div style="background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 18px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 10px 28px rgba(15,27,45,.06); padding: 24px 28px; display: flex; flex-direction: column; gap: 18px;">
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <span style="width: 56px; height: 56px; flex-shrink: 0; border-radius: 50%; background: #E5F5EC; color: #1F8A4C; display: flex; align-items: center; justify-content: center;">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"></path></svg>
+          </span>
+          <div style="flex-grow: 1;">
+            <h1 style="margin: 0; font-size: 26px; line-height: 34px; font-weight: 800;">Chek chop etildi</h1>
+            <div style="font-size: 14px; color: #6B7686;">Chek № K-01-2026-000483 · 16.10.2026, 14:37 · Kassir Dilnoza R.</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 13px; color: #6B7686;">To'landi</div>
+            <div style="font-size: 46px; line-height: 52px; font-weight: 800; letter-spacing: -0.5px; font-variant-numeric: tabular-nums;">94 500 <span style="font-size: 18px; color: #6B7686;">so'm</span></div>
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px;">
+          <sc-for list="{{facts}}" as="f" hint-placeholder-count="4">
+            <div style="padding: 12px 14px; background: #F8FAFB; border-radius: 12px; display: flex; flex-direction: column; gap: 6px;">
+              <span style="font-size: 12px; color: #5B6675;">{{f.label}}</span>
+              <span style="align-self: flex-start; padding: 4px 10px; border-radius: 999px; background: {{f.bg}}; color: {{f.fg}}; font-size: 12px; font-weight: 700;">{{f.value}}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div aria-label="Karta to'lovi rekvizitlari" style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #F8FAFB; border-radius: 12px; font-size: 14px; font-variant-numeric: tabular-nums;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3D4A5C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18v14H3zM3 10h18M7 15h4"></path></svg>
+          <span style="color: #3D4A5C;">Bank kartasi / Банковская карта</span>
+          <b style="white-space: nowrap;">8600 **** **** 1234 · RRN 629014372815</b>
+          <div style="flex-grow: 1;"></div>
+          <span style="font-size: 13px; color: #5B6675; white-space: nowrap;">Uzcard · tasdiq kodi 482913 · terminaldan</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+          <button type="button" style="height: 56px; display: flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid #E7EAEE; border-radius: 14px; background: #FFFFFF; font: inherit; font-size: 16px; font-weight: 800; color: #0F1B2D;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9V3h10v6"></path><path d="M6 18H4v-7a2 2 0 012-2h12a2 2 0 012 2v7h-2"></path><path d="M7 14h10v7H7z"></path></svg>
+            Qayta chop etish <span style="padding: 2px 6px; border: 1px solid #DCE1E7; border-radius: 6px; font-size: 11px; font-weight: 600; color: #6B7686;">Ctrl+P</span>
+          </button>
+          <button type="button" style="height: 56px; display: flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid #E7EAEE; border-radius: 14px; background: #FFFFFF; font: inherit; font-size: 16px; font-weight: 800; color: #0F1B2D;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"></rect><rect x="14" y="4" width="6" height="6" rx="1"></rect><rect x="4" y="14" width="6" height="6" rx="1"></rect><path d="M14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2"></path></svg>
+            Elektron chek (QR, Telegram)
+          </button>
+        </div>
+        <div style="font-size: 12px; color: #6B7686;">Qayta chop etilgan chekda «NUSXA / КОПИЯ» belgisi bo'ladi, har chop etish auditga yoziladi. Karta rekvizitlari (niqob, RRN, karta turi) faqat integratsiyalangan terminal to'lovida chiqadi; terminalsiz kartada — faqat to'lov shakli va summa.</div>
+      </div>
+      <div style="flex-grow: 1; min-height: 0; display: flex; gap: 14px;">
+        <div style="flex: 1 1 0; min-width: 0; background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 16px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 6px 20px rgba(15,27,45,.05); padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;">
+          <h2 style="margin: 0; font-size: 17px; font-weight: 800;">Elektron chek (zahira)</h2>
+          <div style="font-size: 13px; color: #3D4A5C; line-height: 1.5;">Standart — bosma chek. Elektron chek faqat printer ishlamasa yoki xaridor so'rasa beriladi.</div>
+          <div role="radiogroup" aria-label="Elektron chek sababi" style="display: flex; gap: 12px;">
+            <label style="flex: 1 1 0; height: 48px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid #DCE1E7; border-radius: 12px; font-size: 13px; font-weight: 700; box-sizing: border-box;"><input type="radio" name="reason" value="printer_failure" style="accent-color: #0E7C66; margin: 0;">Printer ishlamayapti</label>
+            <label style="flex: 1 1 0; height: 48px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid #DCE1E7; border-radius: 12px; font-size: 13px; font-weight: 700; box-sizing: border-box;"><input type="radio" name="reason" value="customer_request" style="accent-color: #0E7C66; margin: 0;">Xaridor so'radi</label>
+          </div>
+          <div style="display: flex; gap: 12px; margin-top: auto;">
+            <button type="button" style="flex: 1 1 0; height: 48px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid #E7EAEE; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 13px; font-weight: 700; color: #0F1B2D;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"></rect><rect x="14" y="4" width="6" height="6" rx="1"></rect><rect x="4" y="14" width="6" height="6" rx="1"></rect><path d="M14 14h2v2h-2zM18 18h2v2h-2z"></path></svg>QR ekranda
+            </button>
+            <button type="button" style="flex: 1 1 0; height: 48px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid #E7EAEE; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 13px; font-weight: 700; color: #0F1B2D;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 4L3 11l6 2 2 6 3-4 5 4z"></path><path d="M9 13l8-6"></path></svg>Telegram havola
+            </button>
+          </div>
+        </div>
+        <div style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 10px;">
+          <div role="note" style="display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: #FDF3E1; color: #8A5A12;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0; margin-top: 1px;"><path d="M12 4l9 16H3z"></path><path d="M12 10v4M12 17v.5"></path></svg>
+            <span style="font-size: 13px; line-height: 1.45;"><b>Printer xato bersa</b> (ulanmagan yoki qog'oz tugagan) — elektron chek bering yoki uskunani sozlang. <a href="Pos16Uskunalar.dc.html" style="display: flex; width: fit-content; align-items: center; height: 48px; margin-top: 8px; padding: 0 16px; border: 1px solid #F1D7A3; border-radius: 12px; background: #FFFFFF; color: #8A5A12; font-weight: 700; text-decoration: none;">Uskunalarni sozlash</a></span>
+          </div>
+          <a href="Main.dc.html" style="margin-top: auto; display: flex; align-items: center; justify-content: center; gap: 10px; height: 64px; border-radius: 14px; background: #0E7C66; color: #FFFFFF; font-size: 19px; font-weight: 800; text-decoration: none; box-shadow: 0 8px 20px rgba(14,124,102,.28);">Yangi chek <span style="padding: 2px 7px; border: 1px solid rgba(255,255,255,.5); border-radius: 6px; font-size: 11px; font-weight: 600;">Enter</span></a>
+        </div>
+      </div>
+    </section>
+    <aside aria-label="Chek ko'rinishi, 58 mm" style="width: 400px; flex-shrink: 0; display: flex; flex-direction: column; background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 18px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 10px 28px rgba(15,27,45,.06); overflow: hidden;">
+      <div style="display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid #F0F2F5;">
+        <div style="font-size: 17px; font-weight: 800;">Chek ko'rinishi</div>
+        <div style="flex-grow: 1;"></div>
+        <span style="padding: 4px 10px; border-radius: 999px; background: #F4F6F8; color: #3D4A5C; font-size: 12px; font-weight: 700;">58 mm · UZ / RU</span>
+      </div>
+      <div style="flex-grow: 1; min-height: 0; overflow-y: auto; background: #EEF1F4; padding: 16px 0; display: flex; justify-content: center;">
+        <div style="width: 290px; box-sizing: border-box; padding: 16px 14px 20px; background: #FFFFFF; box-shadow: 0 1px 3px rgba(15,27,45,.12); font-family: ui-monospace, 'Cascadia Mono', Consolas, 'Courier New', monospace; font-size: 11px; line-height: 1.45; color: #0F1B2D; font-variant-numeric: tabular-nums; align-self: flex-start;">
+          <div style="text-align: center; font-weight: 800; font-size: 13px;">[Do'kon nomi]</div>
+          <div style="text-align: center; color: #3D4A5C;">[Manzil], [telefon]</div>
+          <div style="text-align: center; color: #3D4A5C;">STIR: [..]  Filial: Chilonzor-3</div>
+          <div style="border-top: 1px dashed #9AA5B3; margin: 8px 0;"></div>
+          <div>Chek № K-01-2026-000483</div>
+          <div style="display: flex; justify-content: space-between;"><span>16.10.2026 14:37</span><span>Smena №214</span></div>
+          <div>Kassir / Кассир: Dilnoza R.</div>
+          <div style="border-top: 1px dashed #9AA5B3; margin: 8px 0;"></div>
+          <sc-for list="{{rlines}}" as="r" hint-placeholder-count="5">
+            <div style="margin-bottom: 7px;">
+              <div style="font-weight: 700;">{{r.n}}. {{r.uz}}</div>
+              <div style="font-weight: 700; padding-left: 14px;">{{r.ru}}</div>
+              <div style="display: flex; justify-content: space-between; padding-left: 14px;"><span>{{r.calc}}</span><span>{{r.gross}}</span></div>
+              <sc-if value="{{r.hasDisc}}" hint-placeholder-val="{{false}}">
+                <div style="display: flex; justify-content: space-between; padding-left: 14px;"><span>Chegirma / Скидка</span><span>{{r.disc}}</span></div>
+              </sc-if>
+              <div style="padding-left: 14px; color: #3D4A5C; font-size: 10px;">MXIK [..] · {{r.unit}} · [shtrix kod]</div>
+              <sc-if value="{{r.hasMark}}" hint-placeholder-val="{{false}}">
+                <div style="padding-left: 14px; color: #3D4A5C; font-size: 10px;">Markirovka: [kod] ×2</div>
+              </sc-if>
+              <div style="padding-left: 14px; color: #3D4A5C; font-size: 10px;">QQS 12%: {{r.vat}}</div>
+            </div>
+          </sc-for>
+          <div style="border-top: 1px dashed #9AA5B3; margin: 8px 0;"></div>
+          <div style="display: flex; justify-content: space-between; font-weight: 800; font-size: 13px;"><span>Jami / Итого:</span><span>94 500 so'm</span></div>
+          <div style="display: flex; justify-content: space-between;"><span>Chegirma / Скидка:</span><span>2 000 so'm</span></div>
+          <div style="display: flex; justify-content: space-between;"><span>QQS / НДС (12%, ichida):</span><span>10 124,99</span></div>
+          <div style="border-top: 1px dashed #9AA5B3; margin: 8px 0;"></div>
+          <div>To'lov shakli / Форма оплаты:</div>
+          <div style="font-weight: 700;">Bank kartalari / Банковские карты</div>
+          <div>Karta turi / Тип карты: shaxsiy / личная</div>
+          <div style="display: flex; justify-content: space-between; font-weight: 700;"><span>Bank kartasi / Банковская карта</span><span>94 500</span></div>
+          <div style="padding-left: 14px;">8600 **** **** 1234 · RRN 629014372815</div>
+          <div style="padding-left: 14px;">Uzcard · Tasdiq kodi / Код авт.: 482913</div>
+          <div style="padding-left: 14px; color: #3D4A5C;">Terminal TID [........] · avtomatik</div>
+          <div style="border-top: 1px dashed #9AA5B3; margin: 8px 0;"></div>
+          <div>FM: [FM raqami]</div>
+          <div>Chek FM №: [..]</div>
+          <div>Fiskal belgi: [fiskal belgi]</div>
+          <div role="img" aria-label="OFD tekshirish QR-kodi (namuna)" style="width: 116px; height: 116px; margin: 10px auto 6px; border: 2px solid #0F1B2D; box-sizing: border-box; display: grid; grid-template-columns: repeat(7, 1fr); grid-template-rows: repeat(7, 1fr); gap: 2px; padding: 6px;">
+            <sc-for list="{{qr}}" as="q" hint-placeholder-count="49">
+              <span style="background: {{q.c}};"></span>
+            </sc-for>
+          </div>
+          <div style="text-align: center; color: #3D4A5C; font-size: 10px;">ofd.soliq.uz — chekni tekshirish</div>
+          <div style="border-top: 1px dashed #9AA5B3; margin: 8px 0;"></div>
+          <div style="text-align: center;">Rahmat! Yana kuting.</div>
+          <div style="text-align: center;">Спасибо! Ждём вас.</div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1366,"height":768}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const fmt = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    const vat = total => {
+      const v = Math.round(total * 12 / 112 * 100) / 100;
+      const [i, d] = v.toFixed(2).split(".");
+      return fmt(i) + "," + d;
+    };
+    const src = [
+      ["Non «Patir»", "Хлеб «Патир»", "2 x 4 000", 8000, 0, "dona", false],
+      ["Sut 2,5% 1 l", "Молоко 2,5% 1 л", "2 x 13 500", 27000, 0, "dona", false],
+      ["Guruch «Lazer»", "Рис «Лазер»", "1,250 kg x 18 000", 22500, 0, "kg", false],
+      ["Choy ko'k 100 g", "Чай зелёный 100 г", "1 x 21 000", 21000, 2000, "dona", false],
+      ["Gazli ichimlik 1,5 l", "Газированный напиток 1,5 л", "2 x 9 000", 18000, 0, "dona", true]
+    ];
+    const rlines = src.map(([uz, ru, calc, gross, disc, unit, mark], i) => ({
+      n: String(i + 1), uz, ru, calc, gross: fmt(gross), unit,
+      hasDisc: disc > 0, disc: "−" + fmt(disc),
+      hasMark: mark, vat: vat(gross - disc)
+    }));
+    const pattern = "1110111101010111101111000000101101011111101110111";
+    const qr = pattern.split("").map(ch => ({ c: ch === "1" ? "#0F1B2D" : "#FFFFFF" }));
+    const facts = [
+      { label: "Fiskal holat", value: "Fiskal belgi olindi", bg: "#E5F5EC", fg: "#1F6B3E" },
+      { label: "To'lov shakli", value: "Karta · integratsiyalangan", bg: "#E8F0FC", fg: "#1F4FA8" },
+      { label: "Chek berish", value: "Bosma chek", bg: "#F4F6F8", fg: "#3D4A5C" },
+      { label: "Qaytim", value: "0 so'm", bg: "#F4F6F8", fg: "#3D4A5C" }
+    ];
+    return { rlines, qr, facts };
+  }
+}
+</script>
+</body>
+</html>

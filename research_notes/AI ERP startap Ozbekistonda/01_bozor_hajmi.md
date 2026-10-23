@@ -6,14 +6,14 @@
 - **Jami kichik biznes subyektlari**: 1,208,341 (2026-04-01, stat.uz)
   - Kichik korxona va mikrofirmalar: 507,138
   - Alohida tadbirkorlar, dehkan fermerlar: 701,203
-- **Yuridik shaxslar**: 471,700 (2025-12-01)
-  - Shunga 85.1% = kichik va mikro (401,500)
+- **Yuridik shaxslar**: 471,700 (2025-12-01) — ⚠ **manbasiz (rasmiy sahifada topilmadi)** *(2026-10-14 tekshiruvida qo'shildi: aniq manba URL topilmadi; topilgan yaqin raqam — 570,400 (2024-01-01) — kattaroq va teskari yo'nalishda, shuning uchun bu raqam tasdiqlanmagan deb belgilandi)*
+  - Shunga 85.1% = kichik va mikro (401,500) — manbasi ham tasdiqlanmagan
 
 ### Sohalar bo'yicha
 
 | Saha | Soniya | Foiz | Manba |
 |------|--------|------|--------|
-| Savdo (retail + wholesale) | 150,695 | 32.2% | stat.uz Q1 2025 |
+| Savdo (retail + wholesale) | 150,695 | 32.2% | stat.uz Q1 2025 ⚠ *(2026-10-14 tekshiruvida qo'shildi: aniq URL yo'q; `04_sohalar.md` fayli xuddi shu ko'rsatkich uchun "164,481 trade businesses, 27.4%" deydi va bu raqam stat.uz WebSearch orqali tasdiqlangan — ikki fayl bir xil ko'rsatkichni turlicha beradi, sana/davr farqi aniqlashtirilmagan, hal qilinmagan ziddiyat sifatida qoldirildi)* |
 | Sanoat | 55,240 | 13.0–14.8% | stat.uz |
 | Qishloq xo'jaligi | 31,594 | 7.3–8.5% | stat.uz |
 | Qurilish | 27,094 | 6.5–7.3% | stat.uz |
@@ -63,16 +63,15 @@ Shuning uchun HoReCa jami = ~5,677 + boshqa; 27,312 soni "tijorat korxonalari" n
 ## Raqamli hisob kitobning foizlari
 
 ### Buxgalteriya dasturi
-- **1C uso'lla**: Populyar bo'ladi, lekin soniya aniq emas (30 franchayzi jamoasi, ma'lumotlar yopiq)
-- **Raqamli: 12.6%** kichik firmalar to'liq raqamli (World Bank 2022 MSME survey)
-- **51.2%** raqamli platformalarni qabul qilgan (2021)
+- **Raqamli: 12.6%** kichik firmalar to'liq raqamli ("World Bank 2022 MSME survey" deb yozilgan) — ⚠ **havola noto'g'ri** *(2026-10-14 tekshiruvida tuzatildi: keltirilgan havola aslida MDPI akademik maqolasiga (2071-1050/15/13/10696) ulanadi, World Bank hisobotining o'zi emas; to'g'ri World Bank manbasi topilmaguncha bu raqam manbasiz/tasdiqlanmagan deb qaraladi)*
+- **51.2%** raqamli platformalarni qabul qilgan (2021) — manba aniqlashtirilmagan
 - **26%** veb-sayt bor (OECD 2023)
-- **70%** startaplar SaaS ishlatiadi (2025)
-- Manba: [World Bank MSME 2022](https://www.mdpi.com/2071-1050/15/13/10696); [OECD 2023](https://www.oecd.org/content/dam/oecd/en/publications/reports/2023/05/digital-skills-for-private-sector-competitiveness-in-uzbekistan_8f1719a7/6c54f447-en.pdf)
+- **70%** startaplar SaaS ishlatiadi (2025) — ⚠ **manbasiz (rasmiy sahifada topilmadi)** *(2026-10-14 tekshiruvida qo'shildi: hech qanday aniq manbada topilmadi)*
+- Manba: [MDPI maqolasi — "World Bank 2022" deb noto'g'ri belgilangan havola](https://www.mdpi.com/2071-1050/15/13/10696) ⚠ to'g'ri World Bank hisobotiga havola emas; [OECD 2023](https://www.oecd.org/content/dam/oecd/en/publications/reports/2023/05/digital-skills-for-private-sector-competitiveness-in-uzbekistan_8f1719a7/6c54f447-en.pdf)
 
 ### Buxgalter oyiga oyiga
 - **6–7 mln so'm** (taxminan $715 USD) (2026)
-- Diapazon: 5–10 mln so'm
+- Diapazon: 5–10 mln so'm *(2026-10-14 tekshiruvida qo'shildi: Flexa.jobs "6.8 mln so'm" raqamini tasdiqlaydi va "6-7 mln" bilan mos keladi, lekin Paylab.uz ancha kengroq diapazon beradi — 4.0–16.8 mln, 5 yillik tajribali buxgalter uchun o'rtacha 12.7 mln — ikki manba o'rtasida nomuvofiqlik bor, "5-10 mln" diapazoni Paylab'ning yuqori uchini qamrab olmaydi)*
 - Manba: [Flexa.jobs](https://flexa.jobs/salaries/accountant); [Paylab.uz](https://www.paylab.com/uz/salaryinfo/economy-finance-accountancy/accountant)
 
 ---
@@ -80,15 +79,16 @@ Shuning uchun HoReCa jami = ~5,677 + boshqa; 27,312 soni "tijorat korxonalari" n
 ## Tarixiy: Savdoni hajmi, sohaning qaydlanuvchi harakati
 
 ### E-savdo (online savdo)
-- **2025**: $2,649 million (15–20% o'zgarish)
-- **2023**: $680 million
+- **2025**: $2,649 million (15–20% o'zgarish) — ⚠ **manbasiz (keltirilgan manbalarda topilmadi)**
+- **2023**: $680 million — ⚠ **manbasiz (keltirilgan manbalarda topilmadi)**
 - **2025-04-01 to'yi**: $201 million (2021)
 - Raqamli xissa: 5–10% butun savdoning (Tashkent: Tashkent shahar + Tashkent viloyati)
+- *(2026-10-14 tekshiruvida qo'shildi: Unimall.ai va WORLDEF manbalari qayta tekshirilganda bu ikki raqam ($2,649 mln / $680 mln) ikkala manbada ham topilmadi. Unimall.ai aslida $1.5 mlrd (2024) deydi, WORLDEF esa $1.3 mlrd (sanasi noaniq) keltiradi — hujjatdagi raqamlar manbaga mos yozilishi yoki olib tashlanishi kerak)*
 - Manba: [Unimall 2025](https://unimall.ai/guides/markets/uzbekistan); [WORLDEF 2026-04-10](https://worldef.com/2026/04/10/uzbekistan-ecommerce-growth-2026/)
 
 ### Daromon savdo
 - **2025-09**: $204.9 mln (ulgurji) +36.4% yilga yilga
-- **Zanjir farmatsevtika**: 40.6% savdolari (2025-Q1), 70% mustaqil
+- **Zanjir farmatsevtika**: 40.6% savdolari (2025-Q1), 70% mustaqil — ⚠ **manbasiz (rasmiy sahifada topilmadi)** *(2026-10-14 tekshiruvida qo'shildi: timesca.com maqolasida bu raqamlar umuman yo'q; $204.9 mln va +36.4% raqamlari to'g'ri, lekin "40.6%"/"70%" bandi manba bilan tasdiqlanmagan)*
 - Manba: [IQVIA / Times of Central Asia 2025](https://timesca.com/uzbekistans-pharmaceutical-market-in-2025-rapid-growth-foreign-investment-and-localization/)
 
 ---
@@ -101,7 +101,7 @@ Shuning uchun HoReCa jami = ~5,677 + boshqa; 27,312 soni "tijorat korxonalari" n
 - **Taxminan**: 1.208 mln × 300,000 so'm/yil (reja: oyligi 25k–30k)
 
 ### SAM (tavasalli bo'yicha bozor)
-**Fokus**: Savdo/HoReCa/sanoat qo'llaniladigan 1C/POS (150k + 27k + 55k = 232k)
+**Fokus**: Savdo/HoReCa/sanoat qo'llaniladigan ERP/POS (150k + 27k + 55k = 232k)
 - **Raqam**: 232,000 × 500,000 so'm/yil = 116 mld so'm/yil
 - **Asosiy shartlar**: Tashkent + katta viloyatlar, 1–20 xodim
 
@@ -109,7 +109,7 @@ Shuning uchun HoReCa jami = ~5,677 + boshqa; 27,312 soni "tijorat korxonalari" n
 **Fokus**: BILLZ/REGOS/Bito yo'nalishida (4k + 5k + 2k = 11k faqat), 12.6% raqamli bo'lgan qaytadi
 - **Raqam**: 11,000 × 500,000 = 5.5 mld so'm/yil (hozir)
 - **Raqam potentsiala**: 400,000 × 500,000 = 200 mld so'm/yil (agar 33% qabul qilingan)
-- Manba: Oldingi hujjat (BILLZ 4k, REGOS 5k, Bito 2k)
+- Manba: Oldingi hujjat (BILLZ 4k, REGOS 5k, Bito 2k) — ⚠ **kirish raqamlari bahsli** *(2026-10-14 tekshiruvida qo'shildi: `03_raqiblar_narx.md`da BILLZ do'kon soni ikki xil (1500+ vs 4k, ichki ziddiyat, hal qilinmagan) va REGOS "5k" rasmiy sahifada topilmagan — manbasiz. Shuning uchun bu SOM hisobi ham bahsli kirish ma'lumotlariga tayanadi; past variantlar olinsa natija sezilarli kamayadi (~34% past, `14-tekshiruv-xulosasi.md`ga qarang). "12.6% raqamli" ko'rsatkichi ham o'zi manbasiz deb belgilangan (yuqoriga qarang)*
 
 ---
 

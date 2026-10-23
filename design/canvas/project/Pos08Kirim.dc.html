@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Tovar qabul qilish</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0E7C66}a:hover{color:#0A5E4D}
+</style>
+</helmet>
+<div style="width: 1366px; height: 768px; box-sizing: border-box; display: flex; flex-direction: column; background: #F4F6F8; color: #0F1B2D; font-family: 'Manrope', system-ui, sans-serif;">
+  <header style="height: 64px; flex-shrink: 0; display: flex; align-items: center; gap: 14px; padding: 0 20px; background: #FFFFFF; border-bottom: 1px solid #E7EAEE;">
+    <div style="width: 36px; height: 36px; border-radius: 10px; background: #0E7C66; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px;">E</div>
+    <div style="display: flex; flex-direction: column;">
+      <div style="font-weight: 800; font-size: 15px;">Chilonzor-3 · Asosiy ombor</div>
+      <div style="font-size: 12px; color: #6B7686;">Ombor rejimi · smena ochilmagan</div>
+    </div>
+    <nav aria-label="Ombor menyusi" style="display: flex; gap: 4px; margin-left: 12px; padding: 4px; background: #F4F6F8; border-radius: 14px;">
+      <a href="Pos08Kirim.dc.html" aria-current="page" style="height: 48px; display: inline-flex; align-items: center; padding: 0 14px; border-radius: 10px; background: #0F1B2D; color: #FFFFFF; font-size: 13px; font-weight: 700; text-decoration: none;">Kirim</a>
+      <a href="Pos09Kochirish.dc.html" style="height: 48px; display: inline-flex; align-items: center; padding: 0 14px; border-radius: 10px; color: #3D4A5C; font-size: 13px; font-weight: 700; text-decoration: none;">Ko'chirish</a>
+      <a href="Pos10Inventar.dc.html" style="height: 48px; display: inline-flex; align-items: center; padding: 0 14px; border-radius: 10px; color: #3D4A5C; font-size: 13px; font-weight: 700; text-decoration: none;">Inventarizatsiya</a>
+    </nav>
+    <div style="flex-grow: 1;"></div>
+    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: #E5F5EC; color: #1F6B3E; font-size: 12px; font-weight: 700;">
+      <svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true"><circle cx="4" cy="4" r="4" fill="#1F8A4C"></circle></svg>Online
+    </span>
+    <button type="button" aria-label="Interfeys tili" style="height: 48px; min-width: 48px; padding: 0 12px; border: 1px solid #E7EAEE; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 13px; font-weight: 700; color: #3D4A5C;">UZ · RU</button>
+    <div style="display: flex; align-items: center; gap: 10px; padding-left: 6px;">
+      <div style="width: 36px; height: 36px; border-radius: 50%; background: #E8F0FC; color: #1F4FA8; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px;">JB</div>
+      <div style="display: flex; flex-direction: column;"><span style="font-size: 13px; font-weight: 700;">Jasur B.</span><span style="font-size: 12px; color: #6B7686;">Omborchi</span></div>
+    </div>
+  </header>
+  <div style="flex-grow: 1; min-height: 0; display: flex; gap: 16px; padding: 16px;">
+    <section style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 12px;">
+      <div style="display: flex; gap: 12px; align-items: flex-end;">
+        <div style="flex: 1 1 0; display: flex; flex-direction: column; gap: 6px;">
+          <label for="po" style="font-size: 13px; font-weight: 600; color: #3D4A5C;">Xaridnoma / Заказ на закупку <span style="color: #C8372D;">*</span></label>
+          <select id="po" style="height: 52px; padding: 0 14px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 15px; font-weight: 700; color: #0F1B2D;">
+            <option selected="selected">XN-0231 · «[Yetkazib beruvchi]» MChJ · 14.10.2026</option>
+            <option>XN-0234 · «[Yetkazib beruvchi 2]» MChJ · 15.10.2026</option>
+          </select>
+        </div>
+        <div style="width: 230px; display: flex; flex-direction: column; gap: 6px;">
+          <label for="poa" style="font-size: 13px; font-weight: 600; color: #3D4A5C;">E-ishonchnoma</label>
+          <input id="poa" type="text" value="EI-2026-00318" style="height: 52px; box-sizing: border-box; padding: 0 14px; border: 1px solid #DCE1E7; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 15px; font-weight: 700; color: #0F1B2D;">
+        </div>
+      </div>
+      <label style="display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 16px; background: #FFFFFF; border: 2px solid #0E7C66; border-radius: 14px; box-shadow: 0 0 0 4px #E3F2EE;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0E7C66" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3M7 12h10"></path></svg>
+        <span style="position: absolute; width: 1px; height: 1px; overflow: hidden;">Shtrix kod yoki markirovka kodini skanerlash</span>
+        <input type="text" placeholder="Shtrix kod yoki DataMatrix markirovka kodini skanerlang" style="flex-grow: 1; border: 0; outline: 0; font: inherit; font-size: 17px; background: transparent; color: #0F1B2D;">
+        <span style="font-size: 12px; font-weight: 700; color: #6D4AD8;">Oxirgi: Kungaboqar yog'i 1 l · 18/24</span>
+        <span style="padding: 2px 6px; border: 1px solid #DCE1E7; border-radius: 6px; font-size: 11px; font-weight: 600; color: #6B7686;">F1</span>
+      </label>
+      <div style="flex-grow: 1; min-height: 0; background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 16px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 6px 20px rgba(15,27,45,.05); overflow: hidden; display: flex; flex-direction: column;">
+        <div role="table" aria-label="Qabul qatorlari">
+          <div role="row" style="display: flex; align-items: center; gap: 12px; padding: 11px 18px; background: #F8FAFB; font-size: 12px; font-weight: 600; color: #5B6675;">
+            <span role="columnheader" style="flex-grow: 1;">Tovar</span>
+            <span role="columnheader" style="width: 84px; text-align: right;">Buyurtma</span>
+            <span role="columnheader" style="width: 120px; text-align: center;">Keldi</span>
+            <span role="columnheader" style="width: 110px;">Markirovka</span>
+            <span role="columnheader" style="width: 200px;">Holat / sabab</span>
+          </div>
+          <sc-for list="{{lines}}" as="l" hint-placeholder-count="6">
+            <div role="row" style="display: flex; align-items: center; gap: 12px; height: 60px; padding: 0 18px; border-bottom: 1px solid #F0F2F5; background: {{l.rowBg}};">
+              <span role="cell" style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+                <span style="font-size: 15px; font-weight: 700;">{{l.name}}</span>
+                <span style="font-size: 12px; color: #5B6675;">{{l.code}}</span>
+              </span>
+              <span role="cell" style="width: 84px; text-align: right; font-size: 14px; color: #3D4A5C; font-variant-numeric: tabular-nums;">{{l.ordered}}</span>
+              <span role="cell" style="width: 120px; display: flex; justify-content: center;">
+                <span style="min-width: 76px; height: 48px; display: flex; align-items: center; justify-content: center; border: 1px solid {{l.qtyBd}}; border-radius: 10px; background: {{l.qtyBg}}; font-size: 15px; font-weight: 800; color: {{l.qtyFg}}; font-variant-numeric: tabular-nums; box-sizing: border-box; padding: 0 10px;">{{l.received}}</span>
+              </span>
+              <span role="cell" style="width: 110px; font-size: 13px; font-weight: 700; color: {{l.markFg}}; font-variant-numeric: tabular-nums;">{{l.mark}}</span>
+              <span role="cell" style="width: 200px;"><span style="display: inline-flex; padding: 4px 10px; border-radius: 999px; background: {{l.stBg}}; color: {{l.stFg}}; font-size: 12px; font-weight: 700;">{{l.status}}</span></span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 12px 18px; background: #F8FAFB; border-top: 1px solid #E7EAEE; font-size: 12px; color: #5B6675;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"></path><path d="M8.5 16.5a5 5 0 017 0M12 20h.01"></path></svg>
+          <span>Internet uzilsa skanerlash va sanash davom etadi, lekin qabulni yakunlash faqat online.</span>
+        </div>
+      </div>
+    </section>
+    <aside style="width: 380px; flex-shrink: 0; display: flex; flex-direction: column; gap: 14px;">
+      <div style="background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 16px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 6px 20px rgba(15,27,45,.05); padding: 18px 20px; display: flex; flex-direction: column; gap: 8px;">
+        <h2 style="margin: 0 0 4px; font-size: 17px; font-weight: 800;">Qabul jamlanmasi</h2>
+        <sc-for list="{{summary}}" as="s" hint-placeholder-count="5">
+          <div style="display: flex; justify-content: space-between; font-size: 13px; color: #3D4A5C;"><span>{{s.label}}</span><span style="font-weight: 800; color: {{s.fg}}; font-variant-numeric: tabular-nums;">{{s.value}}</span></div>
+        </sc-for>
+        <div role="meter" aria-label="Markirovka kodlari skanerlandi" aria-valuemin="0" aria-valuemax="70" aria-valuenow="64" style="margin-top: 4px; height: 10px; border-radius: 999px; background: #EFEAFC; overflow: hidden;"><span style="display: block; width: {{markPct}}; height: 10px; background: #6D4AD8; border-radius: 999px;"></span></div>
+      </div>
+      <div role="status" style="display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: #FDF3E1; color: #8A5A12;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0; margin-top: 1px;"><path d="M12 4l9 16H3z"></path><path d="M12 10v4M12 17v.5"></path></svg>
+        <span style="font-size: 13px; line-height: 1.45;"><b>2 dona kam keldi</b> (Gazli ichimlik) — sabab belgilandi. Yakunlashda «Nomuvofiqlik bilan yakunlaysizmi?» so'raladi.</span>
+      </div>
+      <div style="display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: #EFEAFC; color: #6D4AD8;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0; margin-top: 1px;"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"></path></svg>
+        <span style="font-size: 13px; line-height: 1.45; color: #3D4A5C;"><b style="color: #6D4AD8;">Asl belgisi qabul xabarnomasi: 71 soat 12 daq qoldi.</b> Ichimlik va o'simlik yog'i — 72 soat, boshqa guruhlar — 3 ish kuni.</span>
+      </div>
+      <div style="display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: #E8F0FC; color: #1F4FA8;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0; margin-top: 1px;"><path d="M5 4h11a3 3 0 013 3v13H8a3 3 0 01-3-3z"></path><path d="M5 17a3 3 0 013-3h11"></path></svg>
+        <span style="font-size: 13px; line-height: 1.45; color: #3D4A5C;">Qabul <b>qoralama</b> sifatida saqlanadi. Qoldiq Buxgalter Gulnora T. kirimni o'tkazganda oshadi.</span>
+      </div>
+      <div style="flex-grow: 1;"></div>
+      <button type="button" style="height: 48px; flex-shrink: 0; border: 1px solid #E7EAEE; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 14px; font-weight: 700; color: #0F1B2D;">Keyinroq davom etish</button>
+      <button type="button" style="height: 64px; flex-shrink: 0; border: 0; border-radius: 14px; background: #0E7C66; color: #FFFFFF; font: inherit; font-size: 18px; font-weight: 800; box-shadow: 0 8px 20px rgba(14,124,102,.28); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
+        <span>Qabulni yakunlash</span>
+        <span style="font-size: 12px; font-weight: 600; opacity: .85;">qoralama Buxgalterga yuboriladi</span>
+      </button>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1366,"height":768}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const st = {
+      ok: ["#E5F5EC", "#1F6B3E"], short: ["#FDF3E1", "#8A5A12"], mark: ["#EFEAFC", "#6D4AD8"], wait: ["#F4F6F8", "#3D4A5C"]
+    };
+    const src = [
+      { name: "Gazli ichimlik 1,5 l", code: "Markirovkali · ichimlik", ordered: "48", received: "46", mark: "46 / 46", marked: true, s: "short", status: "−2 · Kam keldi" },
+      { name: "Kungaboqar yog'i 1 l", code: "Markirovkali · o'simlik yog'i", ordered: "24", received: "24", mark: "18 / 24", marked: true, s: "mark", status: "6 ta kod skanerlanmagan" },
+      { name: "Sut 2,5% 1 l", code: "dona", ordered: "30", received: "30", mark: "—", s: "ok", status: "Mos" },
+      { name: "Makaron 500 g", code: "dona", ordered: "40", received: "40", mark: "—", s: "ok", status: "Mos" },
+      { name: "Shakar", code: "kg", ordered: "50,000 kg", received: "50,000 kg", mark: "—", s: "ok", status: "Mos" },
+      { name: "Choy ko'k 100 g", code: "dona", ordered: "20", received: "—", mark: "—", s: "wait", status: "Hali skanerlanmagan" }
+    ];
+    const lines = src.map(l => ({
+      name: l.name, code: l.code, ordered: l.ordered, received: l.received, mark: l.mark, status: l.status,
+      markFg: l.marked ? "#6D4AD8" : "#6B7686",
+      stBg: st[l.s][0], stFg: st[l.s][1],
+      rowBg: l.s === "short" ? "#FFFCF6" : "#FFFFFF",
+      qtyBd: l.s === "short" ? "#F1D7A3" : "#DCE1E7", qtyBg: l.s === "short" ? "#FDF3E1" : "#FFFFFF", qtyFg: l.s === "short" ? "#8A5A12" : (l.s === "wait" ? "#6B7686" : "#0F1B2D")
+    }));
+    const markDone = 46 + 18, markNeed = 46 + 24;
+    const summary = [
+      { label: "Pozitsiyalar", value: "6 ta", fg: "#0F1B2D" },
+      { label: "To'liq mos", value: "3 ta", fg: "#1F6B3E" },
+      { label: "Farq bilan", value: "1 ta", fg: "#8A5A12" },
+      { label: "Kutilmoqda", value: "2 ta", fg: "#6B7686" },
+      { label: "Markirovka kodlari", value: markDone + " / " + markNeed, fg: "#6D4AD8" }
+    ];
+    return { lines, summary, markPct: Math.round(markDone / markNeed * 100) + "%" };
+  }
+}
+</script>
+</body>
+</html>

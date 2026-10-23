@@ -1,0 +1,32 @@
+/*
+ * G-02 — Noto Sans fallback for the glyphs Manrope lacks (24 §4.1, 08 §2, 26 #141; spike:
+ * research_notes/ochiq-savollar/spike-font.md). Self-hosted (@fontsource-variable/noto-sans, CSP
+ * font-src 'self'), stacked right after Manrope in Tailwind `fontFamily.sans`.
+ *
+ * Fontsource's own CSS is NOT imported: its faces cover whole subsets. These faces narrow
+ * `unicode-range` to the missing code points only, so the browser fetches a Noto file only when
+ * such a character is on screen, and Manrope still renders every glyph it has:
+ *  - U+02BB/U+02BC (oʻ gʻ, ʼ) — Fontsource puts them in the *latin* subset (not latin-ext);
+ *  - Uzbek Cyrillic Ғғ U+0492/3, Ққ U+049A/B, Ҳҳ U+04B2/3 — cyrillic-ext subset.
+ * One variable file per subset (wght 100–900) covers the UI's 400–800 weights. Both woff2 files
+ * land in dist/assets and are precached by the PWA (vite.config.ts workbox.globPatterns).
+ */
+@font-face {
+  font-family: "Noto Sans Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("@fontsource-variable/noto-sans/files/noto-sans-latin-wght-normal.woff2")
+    format("woff2-variations");
+  unicode-range: U+02BB-02BC;
+}
+
+@font-face {
+  font-family: "Noto Sans Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("@fontsource-variable/noto-sans/files/noto-sans-cyrillic-ext-wght-normal.woff2")
+    format("woff2-variations");
+  unicode-range: U+0492-0493, U+049A-049B, U+04B2-04B3;
+}

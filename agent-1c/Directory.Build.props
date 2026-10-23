@@ -1,0 +1,42 @@
+<Project>
+  <!-- 34 §2.4: net48, LangVersion 9, Nullable, TreatWarningsAsErrors, Deterministic; version 34 §2.6 -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <NuGetAudit>true</NuGetAudit>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <!-- Agent version (SemVer MAJOR.MINOR.PATCH, 34 §2.6); BuildNumber comes from CI -->
+    <AgentVersion>1.0.0</AgentVersion>
+    <BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
+    <Version>$(AgentVersion)</Version>
+    <InformationalVersion>$(AgentVersion)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <AssemblyVersion>$([System.Version]::Parse($(AgentVersion)).Major).0.0.0</AssemblyVersion>
+    <FileVersion>$(AgentVersion).$(BuildNumber)</FileVersion>
+    <Company>ERP</Company>
+    <Product>ERP Do'kon agenti</Product>
+    <Copyright>ERP</Copyright>
+    <!-- Agent protocol (33 §9.1) and build channel constants are compiled in (34 §6.8) -->
+    <AgentChannel Condition="'$(AgentChannel)' == ''">dev</AgentChannel>
+    <DefineConstants Condition="'$(AgentChannel)' == 'dev'">$(DefineConstants);AGENT_DEV</DefineConstants>
+    <!-- Compiled-in deploy constants (34 §6.8: the server address is never read from settings.json).
+         Release builds pass the real values: /p:AgentChannel=stable /p:AgentServerBase=https://<domen>
+         /p:AgentAppOrigins=https://app.<domen> /p:AgentLocalPorts=47110 /p:AgentPublisher="<OV noshir>" -->
+    <AgentServerBase Condition="'$(AgentServerBase)' == ''">http://localhost:8000</AgentServerBase>
+    <AgentAppOrigins Condition="'$(AgentAppOrigins)' == ''">https://app.erp.local</AgentAppOrigins>
+    <AgentLocalPorts Condition="'$(AgentLocalPorts)' == ''">47110</AgentLocalPorts>
+    <AgentPublisher Condition="'$(AgentPublisher)' == ''">ERP</AgentPublisher>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)build\Polyfills.cs" Link="Polyfills.cs" />
+  </ItemGroup>
+</Project>

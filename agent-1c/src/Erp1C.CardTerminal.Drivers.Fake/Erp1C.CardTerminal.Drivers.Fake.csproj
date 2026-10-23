@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 34 §14.4: a vendor driver depends only on Erp1C.CardTerminal. -->
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <RootNamespace>Erp1C.CardTerminal.Drivers.Fake</RootNamespace>
+    <AssemblyName>Erp1C.CardTerminal.Drivers.Fake</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Erp1C.CardTerminal\Erp1C.CardTerminal.csproj" />
+  </ItemGroup>
+</Project>

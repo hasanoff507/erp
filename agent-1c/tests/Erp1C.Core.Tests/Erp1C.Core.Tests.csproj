@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Erp1C.Core.Tests</RootNamespace>
+    <AssemblyName>Erp1C.Core.Tests</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Erp1C.Core\Erp1C.Core.csproj" />
+
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Security" />
+  </ItemGroup>
+</Project>

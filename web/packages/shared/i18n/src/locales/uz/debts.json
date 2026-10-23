@@ -1,0 +1,252 @@
+{
+  "title": "Qarzdorlar",
+  "offline": "Internet yo'q — faqat ko'rish. To'lov, boshlang'ich qarz va kechish internet qaytganda.",
+  "search": "Mijoz qidirish (ism yoki telefon)",
+  "direction": {
+    "label": "Qarz yo'nalishi",
+    "receivable": "Mijozlar qarzi",
+    "payable": "Men qarzdorman"
+  },
+  "actions": {
+    "reload": "Yangilash",
+    "cancel": "Bekor qilish",
+    "close": "Yopish"
+  },
+  "tabs": {
+    "label": "Qarzdorlar filtri",
+    "due": "Bugun/o'tgan va'da",
+    "aged": "60+ kun",
+    "over_limit": "Limitdan oshgan",
+    "all": "Barchasi",
+    "agedNote": "60 kundan oshgan qarzlar — eslatma ro'yxati. Tizim hech kimni avtomatik shubhali deb belgilamaydi."
+  },
+  "kpi": {
+    "totalReceivable": "Jami debitorlik (4010)",
+    "totalPayable": "Jami kreditorlik (6010)",
+    "count": "{{n}} ta qarzdor",
+    "asOf": "{{date}} holatiga",
+    "bucket": {
+      "0-30": "0–30 kun",
+      "31-60": "31–60 kun",
+      "60+": "60+ kun"
+    },
+    "bucketNote": "{{n}} ta · {{share}}%"
+  },
+  "table": {
+    "label": "Qarzdorlar",
+    "customer": "Mijoz",
+    "supplier": "Yetkazib beruvchi",
+    "debt": "Qarz",
+    "limit": "Limit",
+    "noLimit": "Limitsiz",
+    "over": "oshgan",
+    "overOffline": "oshgan (offline)",
+    "lastPayment": "Oxirgi to'lov",
+    "promise": {
+      "title": "Va'da sanasi",
+      "today": "Bugun · {{date}}",
+      "overdue": "O'tdi · {{date}}",
+      "future": "{{date}}"
+    },
+    "promiseNone": "Belgilanmagan",
+    "days": "Kun",
+    "doubtful": "Shubhali",
+    "empty": "Qarzdor yo'q",
+    "footer": "{{n}} ta qarzdor · ko'rsatilganlar qarzi: {{amount}}"
+  },
+  "panel": {
+    "pick": "Tafsilot uchun jadvaldan qarzdorni tanlang",
+    "debt": "Qarz",
+    "limit": "Limit",
+    "ledger": "Qarz daftari",
+    "card": "Mijoz kartasi",
+    "opening": "Boshlang'ich qarz",
+    "flag": "Shubhali deb belgilash",
+    "unflag": "Belgini olib tashlash",
+    "writeoff": "Qarzni kechish",
+    "payableNote": "Yetkazib beruvchiga to'lov — «Xaridlar» bo'limida (bank yoki kassadan naqd)."
+  },
+  "reminder": {
+    "title": "Eslatma matni · ko'rib chiqing",
+    "template": "Assalomu alaykum, {{name}}! {{store}} dan eslatma: {{amount}} qarzingiz bor. To'lov sanasi: {{date}}. Rahmat!",
+    "noDate": "belgilanmagan",
+    "copy": "Matnni nusxalash",
+    "copied": "Matn nusxalandi",
+    "note": "Matn avtomatik yuborilmaydi. AI qoralama va Telegram/SMS orqali yuborish keyingi bosqichda ulanadi."
+  },
+  "payment": {
+    "title": "To'lov qabul qilish",
+    "amount": "Summa",
+    "amountHint": "Joriy qarzdan oshmasligi kerak ({{amount}})",
+    "date": "Sana",
+    "method": "Usul",
+    "bank": "Bank o'tkazmasi",
+    "branch": "Filial",
+    "branchPick": "Filialni tanlang",
+    "promiseDate": "Yangi va'da sanasi",
+    "comment": "Izoh",
+    "note": "Kassasiz, fiskal chek chiqmaydi · Dt 5110 / Kt 4010. Naqd, karta yoki QR bilan qarz to'lovi — kassada (Qarz daftari).",
+    "submit": "To'lovni qabul qilish",
+    "done": "Bank to'lovi qabul qilindi",
+    "exceedsBalance": "To'lov joriy qarzdan oshmasligi kerak",
+    "promiseInPast": "Va'da sanasi bugundan oldin bo'lmasin"
+  },
+  "opening": {
+    "title": "Boshlang'ich qarz",
+    "titlePayable": "Yetkazib beruvchiga boshlang'ich qarz",
+    "description": "Eski qog'oz daftardagi qarz — tovarsiz, tizim ishga tushgan sanadan oldingi kun bilan yoziladi.",
+    "customer": "Mijoz",
+    "supplier": "Yetkazib beruvchi",
+    "name": "Ism",
+    "phone": "Telefon",
+    "amount": "Summa",
+    "docDate": "Hujjat sanasi",
+    "docDateHint": "Provodka tizim ishga tushgan sanadan bir kun oldin yoziladi",
+    "dueDate": "To'lash muddati",
+    "comment": "Izoh",
+    "submit": "Saqlash va o'tkazish",
+    "done": "Boshlang'ich qarz yozildi",
+    "dueBeforeDate": "Muddat hujjat sanasidan oldin bo'lmasin"
+  },
+  "writeoff": {
+    "title": "Qarzni kechish",
+    "description": "{{name}} — joriy qarz {{amount}}. Kechilgan summa eng eski ochiq hujjatlardan boshlab yopiladi.",
+    "amount": "Kechiladigan summa",
+    "reason": "Sabab",
+    "account": "Hisob",
+    "accounts": {
+      "4910": "4910 — shubhali qarzlar zaxirasi",
+      "9430": "9430 — boshqa operatsion xarajatlar"
+    },
+    "taxBasis": "Soliq uchun asos",
+    "bases": {
+      "none": "Asos yo'q",
+      "court": "Sud qarori",
+      "bankruptcy": "Bankrotlik",
+      "liquidation": "Tugatilish",
+      "death": "Vafot",
+      "limitation": "Da'vo muddati o'tgan"
+    },
+    "comment": "Izoh",
+    "posting": "Bu amal provodka yaratadi (Dt 9430/4910 · Kt 4010). Bekor qilish faqat storno bilan.",
+    "submit": "Qarzni kechish",
+    "done": "Qarz kechildi"
+  },
+  "flag": {
+    "title": "Shubhali deb belgilash",
+    "text": "{{name}} qarzi shubhali deb belgilanadi. Provodka yaratilmaydi — faqat belgi.",
+    "reason": "Sabab",
+    "confirm": "Belgilash",
+    "done": "Shubhali deb belgilandi",
+    "removeTitle": "Belgini olib tashlash",
+    "removeText": "{{name}} qarzidan «shubhali» belgisi olib tashlanadi.",
+    "removeConfirm": "Olib tashlash",
+    "removed": "Belgi olib tashlandi"
+  },
+  "card": {
+    "title": "Mijoz kartasi",
+    "name": "Ism / nomi",
+    "phone": "Telefon",
+    "kind": "Turi",
+    "kinds": {
+      "person": "Jismoniy shaxs",
+      "company": "Yuridik shaxs"
+    },
+    "stir": "STIR",
+    "legalAddress": "Yuridik manzil",
+    "bankAccount": "Hisob raqami",
+    "bankMfo": "MFO",
+    "creditLimit": "Kredit limiti",
+    "creditLimitHint": "Bo'sh — limitsiz",
+    "discount": "Doimiy chegirma",
+    "notifyConsent": "Eslatma yuborishga rozi",
+    "save": "Saqlash",
+    "saved": "Mijoz kartasi saqlandi"
+  },
+  "ledger": {
+    "title": "Qarz daftari",
+    "titlePayable": "Men qarzdorman — daftar",
+    "loading": "Yuklanmoqda…",
+    "balance": "Joriy qarz",
+    "limit": "Kredit limiti",
+    "promiseDate": "To'lash va'dasi",
+    "doubtful": "Shubhali qarz: {{reason}}",
+    "empty": "Daftarda yozuv yo'q",
+    "more": "Yana yuklash",
+    "columns": {
+      "date": "Sana",
+      "doc": "Hujjat",
+      "amount": "Summa",
+      "balance": "Qoldiq"
+    },
+    "doc": {
+      "sales": "Sotuv",
+      "returns": "Qaytarish",
+      "debt_openings": "Boshlang'ich qarz",
+      "debt_payments": "To'lov",
+      "debt_writeoffs": "Kechish",
+      "goods_receipts": "Kirim",
+      "supplier_payments": "Yetkazib beruvchiga to'lov",
+      "supplier_returns": "Yetkazib beruvchiga qaytarish",
+      "cash_movements": "Kassa harakati",
+      "payment": "To'lov",
+      "other": "Hujjat"
+    },
+    "closes": "Yopdi: {{list}}",
+    "by": "Yozdi: {{name}}",
+    "promise": "va'da {{date}}",
+    "status": {
+      "open": "ochiq",
+      "partially_paid": "qisman",
+      "paid": "to'langan",
+      "written_off": "kechilgan"
+    },
+    "openLeft": "qoldiq {{amount}}",
+    "paid": "to'landi {{amount}}"
+  },
+  "overpay": {
+    "title": "Ortiqcha to'lovlar",
+    "customer": "Mijoz",
+    "account": "offline · Kt 6310",
+    "howTo": "Qaytarish — «Qaytarish» (kassa smenasi ochiq bo'lishi kerak); yoki «Keyingi qarzga hisoblash» — ortiqcha summa mijozning qarzidan yopiladi (kassasiz).",
+    "refund": {
+      "action": "Qaytarish",
+      "title": "Ortiqcha to'lovni qaytarish",
+      "description": "{{name}} · ortiqcha to'lov {{amount}}",
+      "shift": "Kassa smenasi",
+      "shiftPlaceholder": "Ochiq smenani tanlang",
+      "shiftOption": "{{register}} · smena №{{number}}",
+      "noShift": "Ochiq kassa smenasi yo'q — qaytarish uchun avval kassada smena oching",
+      "amount": "Summa",
+      "comment": "Sabab / izoh",
+      "posting": "Kassadan naqd beriladi · Dt 6310 / Kt 5010",
+      "submit": "Qaytarish",
+      "done": "Ortiqcha to'lov qaytarildi",
+      "approval": "Summa limitdan oshdi — tasdiqlash so'rovi yuborildi",
+      "exceeds": "Summa ortiqcha to'lovdan oshmasin",
+      "noCustomer": "Mijoz aniqlanmagan — qaytarib bo'lmaydi"
+    },
+    "offset": {
+      "action": "Keyingi qarzga hisoblash",
+      "title": "Keyingi qarzga hisoblash",
+      "description": "{{name}} — ortiqcha to'lov {{amount}} mijozning ochiq qarzidan yopiladi",
+      "branch": "Filial",
+      "branchPlaceholder": "Filialni tanlang",
+      "amount": "Summa",
+      "comment": "Izoh",
+      "defaultComment": "Ortiqcha to'lov keyingi qarzga hisoblandi",
+      "confirm": "{{amount}} keyingi qarzga hisoblanadi",
+      "posting": "Kassasiz, fiskal chek chiqmaydi · Dt 6310 / Kt 4010",
+      "submit": "Hisoblash",
+      "done": "Ortiqcha to'lov keyingi qarzga hisoblandi ({{number}})",
+      "exceeds": "Summa ortiqcha to'lovdan oshmasin",
+      "available": "Ko'pi bilan {{amount}} — mijozning avans yoki qarz qoldig'i shuncha"
+    }
+  },
+  "reasons": {
+    "already_flagged": "Bu mijoz allaqachon shubhali deb belgilangan",
+    "has_allocations": "Hujjatga to'lov yoki kechish tushgan — avval ularni bekor qiling",
+    "pos_fiscal_receipt": "Kassada fiskal chek bilan qabul qilingan qarz to'lovi bekor qilinmaydi. Xato bo'lsa, Egasi yoki buxgalterga murojaat qiling.",
+    "supplier_payment_allocated": "Hujjatga yetkazib beruvchiga to'lov tushgan — avval to'lovni bekor qiling"
+  }
+}

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <RootNamespace>Erp1C.CardTerminal</RootNamespace>
+    <AssemblyName>Erp1C.CardTerminal</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Erp1C.Core\Erp1C.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Erp1C.CardTerminal.Tests" />
+  </ItemGroup>
+</Project>

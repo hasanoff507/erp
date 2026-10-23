@@ -1,0 +1,1 @@
+"""Marking integration — infrastructure layer."""

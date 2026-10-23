@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Erp1C.Agent.Tests</RootNamespace>
+    <AssemblyName>Erp1C.Agent.Tests</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Erp1C.Agent\Erp1C.Agent.csproj" />
+
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Security" />
+    <Reference Include="System.IO.Compression" />
+  </ItemGroup>
+</Project>

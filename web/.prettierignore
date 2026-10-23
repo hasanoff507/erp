@@ -1,6 +1,0 @@
-node_modules
-dist
-dev-dist
-pnpm-lock.yaml
-**/generated/**
-packages/shared/api/openapi.json

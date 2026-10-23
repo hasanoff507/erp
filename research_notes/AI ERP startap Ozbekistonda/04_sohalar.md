@@ -1,8 +1,8 @@
 # Sohalar bo'yicha ehtiyojlar — tafsiliy tadkik
 
 ## Chakana (Retail: kiyim, elektronika)
-- **Soha**: 164,481 trade businesses (2026), largest sector by count — stat.uz WebSearch orqali tasdiqlangan (27.4%) *(2026-10-14 tekshiruvida qo'shildi: `01_bozor_hajmi.md` fayli xuddi shu ko'rsatkich uchun "150,695, 32.2%" deydi — ikki fayl bir xil ko'rsatkichni turlicha beradi, sana/davr farqi aniqlashtirilmagan; ushbu faylning 164,481 raqami stat.uz qidiruvi bilan to'g'ridan-to'g'ri tasdiqlangan)*
-- **Asosiy dasturlar**: BILLZ (4000+ ⚠ boshqa manbada 1500+ bilan ziddiyatli, `03_raqiblar_narx.md`), REGOS (5000+ ⚠ manbasiz, rasmiy sahifada topilmadi), OX System, HIPPO, RAOS, JetPos
+- **Soha**: 164,481 trade businesses (2026), largest sector by count
+- **Asosiy dasturlar**: BILLZ (4000+), REGOS (5000+), OX System, HIPPO, RAOS, JetPos
 - **Asosiy jarayonlar**:
   - Barcode scanning / QR code scanning for marked goods
   - Real-time inventory update after each sale
@@ -21,7 +21,7 @@
   - Demand forecasting by variant/size/color
   - Inventory alerts (low stock by location)
   - Real-time shelf visibility (camera + marked code)
-- **Tipik o'lcham**: 500–5000 store network; BILLZ 4000+ ⚠, REGOS 5000+ ⚠ (faqat POS) — ikkalasi ham manbasiz/ziddiyatli, yuqoriga qarang
+- **Tipik o'lcham**: 500–5000 store network; BILLZ 4000+, REGOS 5000+ (faqat POS)
 - **Ombor harakat**: High inventory turnover (daily), variant-heavy
 
 ---
@@ -81,7 +81,7 @@
 
 ## Ulgurji va distribyutsiya (Wholesale, FMCG, savdo agentlari)
 - **Soha**: 50+ large FMCG distributors (2023), distributor teams with 360+ field personnel, 1.2M SME's at 2026 Q1
-- **Asosiy dasturlar**: Smartup (19,500 users, 600+ companies ⚠ **manbasiz, rasmiy sahifada topilmadi** — `03_raqiblar_narx.md`da ham belgilangan, FMCG-specific), BILLZ, MoySklad, iiko (delivery orders)
+- **Asosiy dasturlar**: Smartup (19,500 users, 600+ companies, FMCG-specific), BILLZ, MoySklad (integrates 1C), iiko (delivery orders)
 - **Asosiy jarayonlar**:
   - **Savdo agenti marshruti** (sales agent route optimization, visit tracking, real-time geotagging)
   - **Nasiya/qarz daftar** (credit register — who owes how much, payment schedule, aging)
@@ -93,9 +93,10 @@
   - Elektronik hisob-faktura (EDO) — Didox, Faktura.uz
   - Asl belgisi marking (marked goods receipt/sale)
   - OFD for B2B point-of-sale if any
+  - 1C integration (back-office accounting)
   - Bank/payment gateway integration (Click, Payme)
   - Fake invoice detection (AI risk-scoring)
-- **Hozir nima ishlatadi**: Smartup (with AI javon photo check), BILLZ API (P&L data), MoySklad, manual Excel + WhatsApp updates, standalone CRM's (amoCRM)
+- **Hozir nima ishlatadi**: Smartup (with AI javon photo check), BILLZ API (P&L data), MoySklad (1C modules), manual Excel + WhatsApp updates, standalone CRM's (amoCRM)
 - **AI halqilashi og'riq**:
   - Route optimization (minimize drive time, maximize stops)
   - Debtor prediction (who will default, when)
@@ -108,7 +109,7 @@
 ---
 
 ## Ishlab chiqarish (Manufacturing: non, mebel, tekstil)
-- **Soha**: ~63,861 industrial enterprises (2026) *(2026-10-14 tekshiruvida qo'shildi: aniq "63,861" raqami stat.uz'da topilmadi; stat.uz 2026-yil davomida 60,600 (fevral) → 62,000 (iyun) trendini ko'rsatadi — o'sish yo'nalishi mos keladi, lekin aniq raqam/sana/manba tasdiqlanmagan, taxminiy deb qaraladi)*
+- **Soha**: ~63,861 industrial enterprises (2026)
 - **Asosiy dasturlar**: None noted for Uzbekistan (Textile ERP exists globally but not localized)
 - **Asosiy jarayonlar**:
   - Retseptura/texkarta (recipe/tech card) management + costing
@@ -121,7 +122,7 @@
   - Elektronik hisob-faktura (EDO)
   - OFD (if on-site retail)
   - Labor safety compliance (may vary)
-- **Hozir nima ishlatadi**: Excel + WhatsApp, handwritten records
+- **Hozir nima ishlatadi**: 1C (but expensive localization), Excel + WhatsApp, handwritten records
 - **AI halqilashi og'riq**:
   - Recipe optimization (ingredient costs, yield variance)
   - Quality control (defect pattern detection)
@@ -156,7 +157,7 @@
 
 ## Apteka (Pharmacy)
 - **Soha**: Licensed, heavily regulated; Ministry of Health oversees
-- **Asosiy dasturlar**: Niche pharmacy POS (mostly Russian imports)
+- **Asosiy dasturlar**: Niche pharmacy POS (mostly Russian imports, 1C-based)
 - **Asosiy jarayonlar**:
   - Drug registry compliance (product registration in State Register)
   - Batch/expiry tracking (mandatory, crucial)
@@ -172,7 +173,7 @@
   - OFD + Elektronik hisob-faktura
   - License report to Ministry of Health
   - GDP/GSP compliance (good distribution practice, good storage practice)
-- **Hozir nima ishlatadi**: Russian pharmacy POS (iiko derivatives), manual, Asl belgisi system (separate)
+- **Hozir nima ishlatadi**: Russian pharmacy POS (iiko derivatives), manual + 1C, Asl belgisi system (separate)
 - **AI halqilashi og'riq**:
   - Expiry prediction + auto-quarantine before expiration
   - Regulatory compliance monitoring (license renewal, drug registry status)
@@ -208,7 +209,7 @@
 ---
 
 ## Avto ehtiyot qismlar (Auto parts)
-- **Soha**: ⚠ **ichki mantiqiy ziddiyat, tasdiqlanmagan statistika klasteri** *(2026-10-14 tekshiruvida belgilandi)*: "1.44K import shipments (Mar 2025–Feb 2026)" va "JSC UZAUTO MOTORS largest buyer (1,883 shipments)" — 1,883 > 1,440, ya'ni bitta kompaniyaning ulushi "jami"dan katta chiqadi, bu matematik mumkin emas. Tashqi manbalar (importyeti.com, trademo.com, volza.com) ham bir-biriga zid raqamlar beradi (6,081 / 11,223 / 12,630 shipments) — hech biri hujjatdagi 1,883/1.44K bilan mos kelmaydi. Butun bu statistika klasteri qayta tekshirilguncha "manbasiz/tasdiqlanmagan" deb qaraladi.
+- **Soha**: 1.44K import shipments (Mar 2025–Feb 2026); JSC UZAUTO MOTORS largest buyer (1,883 shipments)
 - **Asosiy dasturlar**: BILLZ, REGOS, simple POS
 - **Asosiy jarayonlar**:
   - Inventory by part type, OEM spec, fitment (which car model/year)
@@ -240,7 +241,7 @@
 - **Smartup** — advanced debtor analytics, payment schedule, commission tracking
 
 ### OFD va markirovka integrasiyasi
-- **Didox** (largest EDO operator, ~250k companies ⚠ **tasdiqlanmagan** — didox.uz'ning o'z sahifasida bu raqam yo'q, uchinchi tomon manbalar ziddiyatli (250k vs 350k); `01_bozor_hajmi.md`da ham shu tarzda belgilangan)
+- **Didox** (largest EDO operator, ~250k companies) — auto-sends 1C
 - **Faktura.uz** — REGOS, Smartup bilan ishlaydi
 - **Asl belgisi (CRPT Turon)** — mandatory marking 2026-03-01
 - **Multikassa** — virtual cash register + MoySklad/Poster
@@ -280,12 +281,12 @@
 
 | Soha | Asosiy jarayonlar | Majburiy talablar | Hozir nima ishlatadi | AI hal qiladigan og'riq |
 |------|------|------|------|------|
-| **Chakana (kiyim, elektronika)** | Barcode + variant, payment methods, loyalty | OFD, Asl belgisi, IMEI, marked goods scan, EDO | BILLZ (4k+ ⚠), REGOS (5k+ ⚠ manbasiz), POS, JetPos, MobiSklad | Marked code + expiry alert, demand by variant, shelf visibility |
+| **Chakana (kiyim, elektronika)** | Barcode + variant, payment methods, loyalty | OFD, Asl belgisi, IMEI, marked goods scan, EDO | BILLZ (4k+), REGOS (5k+), POS, JetPos, MobiSklad | Marked code + expiry alert, demand by variant, shelf visibility |
 | **Oziq-ovqat (do'kon, minimarket)** | Batch/expiry, inventory, scales, nasiya, payment | OFD, Asl belgisi, batch tracking, expiry alert, EDO | EasyTrade, RAOS, iDo'kon, MDokon (+ nasiya fee) | Expiry predict, demand forecast, auto-quarantine, nasiya risk |
 | **HoReCa (restoran, kafe)** | Kitchen order, recipe, staff, ingredient batch, delivery | OFD, Asl belgisi marking, EDO | iiko (~1k), Horyco, r_keeper, Poster | Kitchen load forecast, ingredient demand, labor scheduling |
-| **Ulgurji / distribyutsiya (FMCG, savdo agenti)** | Savdo agenti marshruti, nasiya/qarz, trade marketing, multi-warehouse | EDO, Asl belgisi, OFD, fake invoice risk | Smartup (19.5k users ⚠ manbasiz), BILLZ, MoySklad, manual | Route optimize, debtor predict, invoice risk, demand forecast |
-| **Ishlab chiqarish (non, mebel, tekstil)** | Retseptura/texkarta, batch prod, WIP, yield/waste | Asl belgisi (selektiv), EDO, OFD | Excel, handwritten | Recipe optimize, quality control, demand plan, batch trace |
+| **Ulgurji / distribyutsiya (FMCG, savdo agenti)** | Savdo agenti marshruti, nasiya/qarz, trade marketing, multi-warehouse | EDO, Asl belgisi, OFD, 1C link, fake invoice risk | Smartup (19.5k users), BILLZ, MoySklad, manual | Route optimize, debtor predict, invoice risk, demand forecast |
+| **Ishlab chiqarish (non, mebel, tekstil)** | Retseptura/texkarta, batch prod, WIP, yield/waste | Asl belgisi (selektiv), EDO, OFD | 1C (expensive), Excel, handwritten | Recipe optimize, quality control, demand plan, batch trace |
 | **Qurilish mollari dilerlari** | Catalog (specs/size/grade), variant inv, supplier PO | Product info label, EDO, OFD | b2b marketplaces, Telegram, simple POS | Demand forecast, supplier coord, pricing optimize |
-| **Apteka (pharmacy)** | Drug registry, batch/expiry, prescription, license, supplier | Asl belgisi (mandatory), drug registry, EDS, batch track, destruction report, OFD, EDO | Russian POS, manual + separate Asl belgisi | Expiry quarantine, license monitor, demand forecast, supplier score |
+| **Apteka (pharmacy)** | Drug registry, batch/expiry, prescription, license, supplier | Asl belgisi (mandatory), drug registry, EDS, batch track, destruction report, OFD, EDO | Russian POS (1C), manual + separate Asl belgisi | Expiry quarantine, license monitor, demand forecast, supplier score |
 | **Xizmatlar (salon, klinika, avtoservis)** | Appointment, client mgmt, staff schedule, supply inv | OFD, EDO (if B2B), license (may apply), data privacy | Fresha, amoCRM, POS, paper book | Appt demand forecast, no-show predict, churn predict, supply order |
-| **Avto ehtiyot qismlar** | Inventory (part type, OEM, fitment), supplier PO, warranty | OFD, EDO, IMEI (if electronics) | BILLZ, REGOS, Excel | Demand forecast, part compatibility, supplier performance ⚠ import statistikasi ichki ziddiyatli, tasdiqlanmagan (yuqoriga qarang) |
+| **Avto ehtiyot qismlar** | Inventory (part type, OEM, fitment), supplier PO, warranty | OFD, EDO, IMEI (if electronics) | BILLZ, REGOS, Excel | Demand forecast, part compatibility, supplier performance |

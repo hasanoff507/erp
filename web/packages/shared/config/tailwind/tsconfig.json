@@ -1,4 +1,0 @@
-{
-  "extends": "@shared/typescript-config/base.json",
-  "include": ["preset.ts"]
-}

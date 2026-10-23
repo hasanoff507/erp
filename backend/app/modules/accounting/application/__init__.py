@@ -1,1 +1,0 @@
-"""accounting application layer."""

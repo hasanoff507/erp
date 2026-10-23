@@ -1,1 +1,0 @@
-"""accounting infrastructure layer."""

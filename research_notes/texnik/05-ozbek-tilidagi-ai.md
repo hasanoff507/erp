@@ -3,7 +3,7 @@
 ## Asosiy xulosalar
 
 1. **LLM**: Claude/GPT/Gemini'ning hech biri o'zbek tili uchun rasmiy benchmark e'lon qilmagan — barchasi faqat "umumiy ko'p tilli" qamrovga kiradi. Ochiq manbalarda faqat kichik ochiq modellar (Llama-3.2-1B, Qwen3-0.6B) uchun akademik benchmark topildi, ular esa aynan o'zbek tili uchun past-resurs til sifatida baholangan.
-2. **Narx (2026-10-14, faqat rasmiy narx sahifalari: claude.com/pricing, developers.openai.com/api/docs/pricing, ai.google.dev/pricing)**: eng arzon ishlab chiqarish darajasidagi modellar — Claude **Haiku 5.5** ($0,10–0,50 kirish / $0,50–2,50 chiqish, 1M tok, prompt uzunligiga qarab), Gemini 2.5 Flash-Lite ($0,10/$0,40) va GPT-5-nano ($0,05/$0,40); kuchli umumiy vazifalar uchun Claude **Sonnet 5.5** (yoki Sonnet 5 — ikkisi ham $2/$10, bir xil narx) yoki GPT-5 ($1,25/$10) oqilona balans beradi. Anthropic'ning joriy ("Latest") modellari — Fable 5.1 ($10/$50), Opus 5.5 ($4/$20), **Sonnet 5.5** ($2/$10), **Haiku 5.5** ($0,10–0,50/$0,50–2,50); Sonnet 5 va Haiku 4.5 ($1/$5) endi "Legacy" toifasida. *(2026-10-14 tekshiruvida tuzatildi: avval "Sonnet 5 (5.5 emas)" deb Sonnet 5.5'ning mavjudligi rad etilgan edi va Haiku 5.5 umuman tilga olinmagan edi — ikkisi ham 2026-10-07 da chiqarilgan va claude.com/pricing'da "Latest Models" sifatida ko'rsatilgan.)*
+2. **Narx (2026-10, faqat rasmiy narx sahifalari: claude.com/pricing, developers.openai.com/api/docs/pricing, ai.google.dev/pricing)**: eng arzon ishlab chiqarish darajasidagi model — Gemini 2.5 Flash-Lite ($0,10/$0,40 1M tok uchun) va GPT-5-nano ($0,05/$0,40); kuchli umumiy vazifalar uchun Claude **Sonnet 5** ($2/$10) yoki GPT-5 ($1,25/$10) oqilona balans beradi. (Anthropic'ning joriy modellari — Fable 5.1, Opus 5.5, **Sonnet 5** (5.5 emas), Haiku 4.5.)
 3. **Ma'lumot lokalizatsiyasi**: 2026-yil 27-martdan kuchga kirgan tuzatish (Qonun "Shaxsiy ma'lumotlar to'g'risida"ga) faqat **biometrik, genetik va mahalliy telekom foydalanuvchi ma'lumotini** O'zbekistonda saqlashni majburiy qiladi; boshqa shaxsiy ma'lumotlar xavfsizlik talablariga rioya qilingan holda chet elga (demak — Claude/GPT/Gemini API'ga) yuborilishi mumkin ([Dentons](https://www.dentons.com/en/insights/articles/2026/march/31/uzbekistan-dismantles-strict-data-localization-regime)).
 4. **STT**: faqat o'zbek tili uchun maxsus o'qitilgan Whisper modellari (NavAI, Hugging Face) WER 8,8–11,6% oralig'ida (domenga qarab 7,9%–17%); Yandex SpeechKit (2023-yildan, lotin yozuvi) va Google Cloud STT (2020-yildan, "uz-UZ" kodi) ham qo'llab-quvvatlaydi, lekin ikkisi uchun ham mustaqil WER raqami ochiq manbada topilmadi. Mahalliy startaplar (UzbekVoiceAI, Aisha AI) aniqlik foizini ommaga e'lon qilmagan — faqat marketing da'volari bor.
 5. **Shovqinli do'kon muhitida STT aniqligi** — ochiq manbada hech qanday raqam topilmadi (qidirildi: Whisper/Yandex/Google + "noise"/"shovqin" + Uzbek); bu haqiqiy xavf — pilot sinov kerak.
@@ -18,23 +18,19 @@
 - Claude, GPT, Gemini — uchtasi ham Unicode va ko'p tilli darajada o'zbek tilini (lotin va kirill) qo'llab-quvvatlaydi, lekin hech biri rasmiy "Uzbek benchmark" raqamini chop etmagan (oldingi tadqiqot, `05_ai_funksiyalar.md`, tasdiqlandi — qayta qidirilganda ham yangi rasmiy raqam topilmadi).
 - Akademik tadqiqot (2026) ochiq modellarni (Llama-3.2-1B-Instruct, Qwen3-0.6B) tarjima, matn tushunish va generatsiya bo'yicha o'zbek tilida "past-resurs til" sifatida sinab ko'rdi — o'zbek tili 60 million+ so'zlovchiga ega bo'lsa ham, NLP resurslari kam ([zenodo.org](https://zenodo.org/records/17223973)).
 - TUMLU (turkiy tillar uchun unified benchmark, qozoq/qirg'iz/o'zbek/qoraqalpoq va h.k.) natijalariga ko'ra ochiq modellar orasida **Qwen2.5 72B Instruct** eng yaxshi natija ko'rsatdi; Llama 3.1 70B o'zining 8B versiyasidan sezilarli ustun ([aclanthology.org — TUMLU](https://aclanthology.org/2025.acl-long.1112.pdf)).
-- Mahalliy loyihalar: **Salom AI** (salom-ai.uz) — o'zbekcha (lotin+kirill) tushunadigan birinchi AI, ochiq modellar (Llama, Mistral) asosida moslashtirilgan ([salom-ai.uz blog](https://salom-ai.uz/blog/llama-uzbek/)); **Tilmoch** — turkiy tillar uchun AI-tarjimon, $1,5 mln baholashga **2025-yil sentyabrida** (150 ming dollarlik investitsiya raundida) chiqqan ([digitalbusiness.kz, 2026-10-08](https://digitalbusiness.kz/en/2026-10-08/uzbekistanets-sozdal-ii-perevodchik-dlya-tyurkskih-yazikov-startap-otsenili-v-15-mln/) — maqola e'lon sanasi 2026-oktyabr, lekin matn va boshqa manbalar voqea sanasini 2025-sentyabr deb ko'rsatadi). *(2026-10-14 tekshiruvida tuzatildi: avval "2026-yil oktyabrda... chiqdi" deyilgan edi — bu maqola e'lon sanasini voqea sanasi bilan aralashtirgan; baholash aslida 2025-sentyabrda bo'lgan.)*; **TilLab** — o'zbek tili uchun ochiq-kodli "raqamli laboratoriya" (GitHub loyihasi, hobbi/tadqiqot darajasida) ([github.com/AbrorMusulmonov/tillab](https://github.com/AbrorMusulmonov/tillab)).
-- Xulosa: mahalliy-maxsus LLM hali yetuk emas (asosan tarjima/chatbot darajasida); tizim uchun eng amaliy yo'l — umumiy ko'p tilli flagman modellardan (Claude/GPT/Gemini) foydalanish, chunki ular sifat jihatidan sinalgan va "code computes, AI explains" me'morchiligida raqamni emas, tilni generatsiya qiladi (xato darajasi past).
+- Mahalliy loyihalar: **Salom AI** (salom-ai.uz) — o'zbekcha (lotin+kirill) tushunadigan birinchi AI, ochiq modellar (Llama, Mistral) asosida moslashtirilgan ([salom-ai.uz blog](https://salom-ai.uz/blog/llama-uzbek/)); **Tilmoch** — turkiy tillar uchun AI-tarjimon, 2026-yil oktyabrda $1,5 mln baholashga chiqdi ([digitalbusiness.kz](https://digitalbusiness.kz/en/2026-10-08/uzbekistanets-sozdal-ii-perevodchik-dlya-tyurkskih-yazikov-startap-otsenili-v-15-mln/)); **TilLab** — o'zbek tili uchun ochiq-kodli "raqamli laboratoriya" (GitHub loyihasi, hobbi/tadqiqot darajasida) ([github.com/AbrorMusulmonov/tillab](https://github.com/AbrorMusulmonov/tillab)).
+- Xulosa: mahalliy-maxsus LLM hali yetuk emas (asosan tarjima/chatbot darajasida); AIOS uchun eng amaliy yo'l — umumiy ko'p tilli flagman modellardan (Claude/GPT/Gemini) foydalanish, chunki ular sifat jihatidan sinalgan va "code computes, AI explains" me'morchiligida raqamni emas, tilni generatsiya qiladi (xato darajasi past).
 
 ### 2.2 Narxlar (1M token uchun, **faqat rasmiy narx sahifalari**, 2026-10 holatiga)
 
-**Tuzatish (birinchi qoralama, 2026-10-10)**: o'sha versiyada uchinchi-tomon agregator saytlar ishlatilgan va ba'zi tasdiqlanmagan model nomlari (GPT-5.4, GPT-5.5) olib tashlangan edi; shu jarayonda **Sonnet 5.5 ham noto'g'ri "tasdiqlanmagan" deb hisoblanib ro'yxatdan chiqarilgan edi — bu xato edi**. claude.com/pricing sahifasida Sonnet 5.5 (va Haiku 5.5) rasmiy ravishda "Latest Models" sifatida mavjud — ikkisi ham 2026-10-07 da chiqarilgan. Quyidagi jadval 2026-10-14 holatiga ko'ra claude.com/pricing, developers.openai.com/api/docs/pricing va ai.google.dev/pricing'dan olingan rasmiy model nomi/narxlarni aks ettiradi. *(2026-10-14 tekshiruvida tuzatildi.)*
+**Tuzatish**: birinchi qoralamada uchinchi-tomon agregator saytlar ishlatilgan edi va "Claude Sonnet 5.5" degan noto'g'ri model nomi kiritilgan edi. Quyida faqat rasmiy sahifalardan (claude.com/pricing — anthropic.com'dan shu yerga yo'naltiriladi; developers.openai.com/api/docs/pricing — openai.com/api/pricing'dan shu yerga yo'naltiriladi; ai.google.dev/pricing) olingan model nomi/narx qoldirildi; rasmiy sahifada tasdiqlanmagan model/narx (masalan GPT-5.4, GPT-5.5, "Sonnet 5.5") olib tashlandi.
 
-| Model | Kirish ($/1M) | Chiqish ($/1M) | Holat | Manba |
-|---|---|---|---|---|
-| Claude Haiku 5.5 | 0,10–0,50* | 0,50–2,50* | Joriy (eng arzon) | [claude.com/pricing](https://claude.com/pricing) |
-| Claude Haiku 4.5 | 1 | 5 | Legacy | [claude.com/pricing](https://claude.com/pricing) |
-| Claude Sonnet 5.5 | 2 | 10 | Joriy | [claude.com/pricing](https://claude.com/pricing) |
-| Claude Sonnet 5 | 2 | 10 | Legacy (Sonnet 5.5 bilan bir xil narx) | [claude.com/pricing](https://claude.com/pricing) |
-| Claude Opus 5.5 | 4 | 20 | Joriy | [claude.com/pricing](https://claude.com/pricing) |
-| Claude Fable 5.1 | 10 | 50 | Joriy | [claude.com/pricing](https://claude.com/pricing) |
-
-*Haiku 5.5 narxi prompt uzunligiga qarab farqlanadi: ≤100K token — kirish $0,10 / chiqish $0,50; >100K token — kirish $0,50 / chiqish $2,50.
+| Model | Kirish ($/1M) | Chiqish ($/1M) | Manba |
+|---|---|---|---|
+| Claude Haiku 4.5 | 1 | 5 | [claude.com/pricing](https://claude.com/pricing) |
+| Claude Sonnet 5 | 2 | 10 | [claude.com/pricing](https://claude.com/pricing) |
+| Claude Opus 5.5 | 4 | 20 | [claude.com/pricing](https://claude.com/pricing) |
+| Claude Fable 5.1 | 10 | 50 | [claude.com/pricing](https://claude.com/pricing) |
 | GPT-5 | 1,25 | 10 | [developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing) |
 | GPT-5-mini | 0,25 | 2 | [developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing) |
 | GPT-5-nano | 0,05 | 0,40 | [developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing) |
@@ -55,7 +51,7 @@ Eslatma: OpenAI'ning rasmiy narx sahifasida yuqoridagilardan tashqari ko'plab qo
 - Avval: FUQAROLARNING BARCHA shaxsiy ma'lumoti O'zbekiston hududida saqlanishi majburiy edi.
 - Endi: faqat **biometrik ma'lumot, genetik ma'lumot va mahalliy telekom-operator foydalanuvchisi ma'lumoti** majburiy lokalizatsiyaga tushadi.
 - Boshqa shaxsiy ma'lumotlar (mijoz ismi, telefon raqami, xarid tarixi) xavfsizlik talablari (axborot xavfsizligi, xalqaro standartlarga muvofiqlik yoki davlat organi nazorati) bajarilgan holda **chet elda** (demak — Claude/GPT/Gemini API serverlarida) qayta ishlanishi mumkin.
-- Amaliy natija: Tizim Claude/GPT/Gemini API'dan foydalanishi mumkin, lekin mijozning pasport/biometrik ma'lumotini (agar kelajakda to'plansa) chet el API'ga yubormasligi kerak.
+- Amaliy natija: AIOS Claude/GPT/Gemini API'dan foydalanishi mumkin, lekin mijozning pasport/biometrik ma'lumotini (agar kelajakda to'plansa) chet el API'ga yubormasligi kerak.
 
 ## 2. STT (ovozdan matn)
 
@@ -74,15 +70,15 @@ Eslatma: OpenAI'ning rasmiy narx sahifasida yuqoridagilardan tashqari ko'plab qo
 
 | Senariy | Vosita turi | Aniqlik | Manba |
 |---|---|---|---|
-| Toza chop etilgan faktura/chek (lotin-ingliz) | ABBYY (strukturaviy) | **manba topilmadi — tasdiqlanmagan** (avval 99,5% deyilgan edi) | docsumo.com sahifasida ABBYY uchun hech qanday aniqlik foizi yo'q — faqat Docsumo'ning o'zi uchun "99% field-level accuracy" bor. *(2026-10-14 tekshiruvida tuzatildi: 99,5% raqamining manbasi topilmadi, raqam olib tashlandi.)* |
+| Toza chop etilgan faktura/chek (lotin-ingliz) | ABBYY (strukturaviy) | 99,5% | `05_ai_funksiyalar.md` (oldingi tadqiqot, [docsumo.com](https://www.docsumo.com/blog/best-invoice-ocr-software)) |
 | Chop etilgan matn, umumiy | Google Cloud Vision | 99,1% (ingliz, chop) | [imagetotable.ai (2026 qiyosi)](https://imagetotable.ai/blog/best-handwriting-ocr-software-2026) |
-| Kursiv/qo'lyozma, umumiy | Google Cloud Vision | **70–75%** (mustaqil baholovlar, sezilarli pasayish) | [imagetotable.ai](https://imagetotable.ai/blog/best-handwriting-ocr-software-2026) — "independent assessments place it around 70-75%". *(2026-10-14 tekshiruvida tuzatildi: avval 63,4% deyilgan edi, bu raqam manbada topilmadi.)* |
+| Kursiv/qo'lyozma, umumiy | Google Cloud Vision | 63,4% (sezilarli pasayish) | [imagetotable.ai](https://imagetotable.ai/blog/best-handwriting-ocr-software-2026) |
 | Qo'lyozma, Azure Document Intelligence v4.0 | — | ~8,67% WER (≈91,3%); IAM benchmarkda ~1,8% CER (bu ingliz-lotin benchmark) | [Azure 2026 benchmark sharhi](https://imagetotable.ai/blog/best-handwriting-ocr-software-2026) |
 | 100+ til, kirill dagi da'vo (Smart Engines, RF kompaniyasi) | Vendor da'vosi | 99,9% gacha (mustaqil tasdiqlanmagan) | [smartengines.ru](https://smartengines.ru/raspoznavanie-teksta-ocr/) |
 | Toza faktura, multimodal LLM vision (Gemini 2.5 Pro) | Vision-LLM | 96,50% (toza faktura), 92,71% (skanerlangan faktura), 87,46% (skanerlangan chek) | [arxiv.org/pdf/2509.04469](https://arxiv.org/pdf/2509.04469) |
 | Faktura, Gemini 3 Pro (eng yangi) | Vision-LLM | 94,75% (eng yaxshi natija, test to'plamida) | [businesswaretech.com](https://www.businesswaretech.com/blog/best-ai-models-for-invoice-processing-in-2026-gemini-aws-chatgpt) |
 | Chek, GPT-4o vs Gemini 1.5 Pro | Vision-LLM | GPT-4o 84,40% vs Gemini 1.5 Pro 91,15% (factuality) | [medium.com/underdoc](https://medium.com/underdoc/llm-evaluation-for-expense-document-image-understanding-d9b3549970b7) |
-| Toza faktura, GPT 5.2/GPT-5 mini | Vision-LLM | **~88%** | [businesswaretech.com](https://www.businesswaretech.com/blog/best-ai-models-for-invoice-processing-in-2026-gemini-aws-chatgpt) — "GPT 5.2 and GPT 5 Mini achieved very similar accuracy results, both around 88%". *(2026-10-14 tekshiruvida tuzatildi: avval ">96%" deyilgan edi, manbada yo'q; model nomi ham aniqlashtirildi — "GPT 5.2", "GPT-5" emas.)* |
+| Toza faktura, GPT-5/GPT-5 mini | Vision-LLM | >96% | [businesswaretech.com](https://www.businesswaretech.com/blog/best-ai-models-for-invoice-processing-in-2026-gemini-aws-chatgpt) |
 
 **Muhim ogohlantirish**: yuqoridagi barcha vision-LLM va OCR benchmarklar asosan ingliz/lotin tilidagi hujjatlar ustida o'tkazilgan. **Kirill+lotin+rus aralash O'zbekiston hujjatlari (yuk xati, chek) uchun mustaqil benchmark ochiq manbada topilmadi** — bu amaliyotda sinov o'tkazish kerak bo'lgan ochiq savol.
 

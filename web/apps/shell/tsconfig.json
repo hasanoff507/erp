@@ -1,4 +1,0 @@
-{
-  "extends": "@shared/typescript-config/vite-app.json",
-  "include": ["src"]
-}

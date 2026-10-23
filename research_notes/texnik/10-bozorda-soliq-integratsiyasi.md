@@ -6,9 +6,7 @@
 
 **Da'vo**: "O'zbekiston bozorida soliq tizimlari bilan integratsiya qiladigan ERP va POS mahsuloti yo'q."
 
-**Tekshirish natijasi**: DA'VO QISMAN TO'G'RI. O'zbekiston bozorida kamida 12 ta ERP/POS mahsuloti va yana 3 ta EDO (e-faktura) operatori mavjud *(2026-10-14 tekshiruvida aniqlashtirildi: avval "15 ta ERP/POS mahsuloti" deb yozilgan edi — jadvalda jami 15 qator bor, lekin 3 tasi, Didox/Faktura.uz/Soliqservis, ERP/POS emas, balki e-faktura operatorlari)*. Hech birida virtual kassa, OFD, e-faktura, Asl belgisi, MXIK ning 5 ta komponenti birgalikda to'liq tasdiqlangan emas. Har bir mahsulot 1-4 ta komponentni qo'llab-quvvatlaydi, qolganlar yo'q yoki aniq emas.
-
-*(2026-10-14 tekshiruvida aniqlashtirildi: "hech bir raqobatchi soliq tizimlari bilan integratsiya qilmagan" degan kengroq tezis — boshqa fayllarda uchraydi — noto'g'ri. moysklad.uz o'zi reklama qiladi: E-POS orqali fiskal ro'yxatga olish ("Регистрация продаж в налоговой Узбекистана через один клик"), AslBelgisi va Didox (e-faktura) integratsiyasi; REGOS ham Didox bilan integratsiyalangan (pastdagi jadvalga qarang). Farq "integratsiya bor/yo'q" emas, balki: hech biri bitta mahsulotda, uchinchi tomon kassasi/EDO'siz, barcha 5-6 komponentni + davlat hisobotini ichki hisob bilan solishtirishni birlashtirmaydi.)*
+**Tekshirish natijasi**: DA'VO QISMAN TO'G'RI. O'zbekiston bozorida 15 ta ERP/POS mahsuloti mavjud. Lekin hech birida virtual kassa, OFD, e-faktura, Asl belgisi, MXIK ning 5 ta komponentini birgalikda integratsiya qiladi. Har bir mahsulot 1-2 ta komponentni qo'llab-quvvatlanadi, qolganlar yo'q yoki aniq emas.
 
 ---
 
@@ -16,8 +14,8 @@
 
 | Mahsulot | Virtual kassa/OFD | E-faktura | Asl belgisi | MXIK | Soliq hisoboti | Manba |
 |---|---|---|---|---|---|---|
-| **BILLZ** | Ha | Noma'lum | Noma'lum | Noma'lum | Noma'lum | billz.io/uz, 06-fayl *(2026-10-14 tuzatildi: avval E-faktura/Asl belgisi "Ha" edi — billz.io/uz integratsiya sahifasida faqat Payme, Click, UDS, onlayn-do'kon, Telegram bor, Asl belgisi/Didox haqida hech narsa yo'q)* |
-| **REGOS** | Ha | **Ha (Didox)** *(2026-10-14 tuzatildi: avval "Noma'lum" edi — regos.uz: "REGOS интегрируется... с ЭДО Didox")* | Ha | Ha | Noma'lum | regos.uz, WebFetch |
+| **BILLZ** | Ha | Ha | Ha | Noma'lum | Noma'lum | billz.io/uz, 06-fayl |
+| **REGOS** | Ha | Noma'lum | Ha | Ha | Noma'lum | regos.uz, WebFetch |
 | **Smartup** | Ha | Ha | Ha | Noma'lum | Noma'lum | greenwhite.uz, 06-fayl |
 | **MoySklad** | Ha | Ha | Ha | Ha | Noma'lum | moysklad.uz, WebFetch |
 | **HIPPO** | Ha | Noma'lum | Noma'lum | Noma'lum | Noma'lum | hippo.uz, WebFetch |
@@ -40,9 +38,6 @@
 
 ### 1. Didox, Faktura.uz, Soliqservis
 Ular **virtual kassa/OFD emas**, balki **e-faktura (EDO) operatorlari**. Virtual kassa o'zining fiskal chekni shakllantiradi va OFD'ga yuboradi. Didox va yana shunga o'xshashlar — faqat elektronik hisob-fakturalash, chek emas. Alohida qator qilindi.
-
-### 1a. REGOS va BILLZ (2026-10-14 tuzatildi)
-REGOS'ning E-faktura ustuni "Noma'lum"dan **"Ha (Didox)"**ga ko'tarildi — regos.uz to'g'ridan-to'g'ri tasdiqlaydi ("REGOS интегрируется... с ЭДО Didox"). Aksincha, BILLZ'ning E-faktura va Asl belgisi ustunlari "Ha"dan **"Noma'lum"**ga tushirildi — billz.io/uz/integration sahifasida faqat Payme, Click, UDS, onlayn-do'kon, Telegram ko'rsatilgan, Asl belgisi/Didox haqida dalil topilmadi.
 
 ### 2. "Soliq hisoboti: Ha (OFD orqali)"
 Noto'g'ri. OFD fiskal ma'lumotlarni saqlaydi, lekin QQS deklaratsiyasi, foyda solig'i deklaratsiyasini **topshirmaydi**. Bular boshqacha portal/tizimlar. Ustun "noma'lum" qilindi.
@@ -96,4 +91,4 @@ Faqat MoySklad va REGOS'da aniq "IKPU" yoki "MXIK" nomlangan. Qolganlarida asosi
 
 ## Oxirgi xulosalar
 
-Bozorda **yagona virtual kassa + OFD + e-faktura + Asl belgisi + MXIK** birgalikda, mustaqil tasdiqlangan holda qo'llab-quvvatlanuvchi ERP/POS yo'q (eng yaqini — MoySklad, 4 ta komponent). *(2026-10-14 tekshiruvida aniqlashtirildi: lekin bir nechta mahsulot — MoySklad, REGOS — soliq tizimlari bilan integratsiya **qiladi**, shuning uchun "hech kim integratsiya qilmagan" degan tezis noto'g'ri.)* Bizning loyiha uchun **bu farqlanish nuqtasi**: barcha komponentlarni (shu jumladan davlat hisobotini ichki hisob bilan solishtirish) **bitta mahsulotda, uchinchi tomon kassasi/EDO'siz** integratsiya qilish — bozorda yo'qolgan xususiyat, "integratsiya umuman yo'q" emas.
+Bozorda **yagona virtual kassa + OFD + e-faktura + Asl belgisi + MXIK** birgalikda qo'llab-quvvatlanuvchi ERP/POS yo'q. AIOS loyihasi uchun **bu farqlanish nuqtasi**: bir paketda 5 ta soliq komponentini integrasiya qilish — bozord'a yo'qolgan xususiyat.

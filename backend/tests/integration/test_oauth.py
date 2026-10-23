@@ -512,6 +512,25 @@ async def test_login_post_requires_same_origin(world: World, settings) -> None: 
         assert missing.status_code == 403
 
 
+async def test_local_vite_login_origin_is_local_only(world: World, settings) -> None:  # type: ignore[no-untyped-def]
+    params = {**authorize_params(Pkce.new()), "phone": world.owner_phone, "password": PASSWORD}
+    local_settings = settings.model_copy(update={"environment": "local"})
+    async with running_app(local_settings) as (_, client):
+        proxied = await client.post(
+            "/oauth/authorize", data=params, headers={"Origin": "http://localhost:5173"}
+        )
+        assert proxied.status_code == 302 and "code" in query_of(proxied)
+        cross = await client.post("/oauth/authorize", data=params, headers={"Origin": "https://evil.example"})
+        assert cross.status_code == 403
+
+    # A Vite origin is not trusted in test, staging, or production environments.
+    async with running_app(settings) as (_, client):
+        proxied = await client.post(
+            "/oauth/authorize", data=params, headers={"Origin": "http://localhost:5173"}
+        )
+        assert proxied.status_code == 403
+
+
 # --- subscription lockout (14 §16) ------------------------------------------------------------------
 async def test_subscription_lockout_and_sync_drain(  # type: ignore[no-untyped-def]
     world: World, settings, admin_engine: AsyncEngine, clean_redis: Redis

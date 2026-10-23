@@ -72,7 +72,12 @@ def same_origin(request: Request) -> bool:
     """Login-CSRF guard for the password POST (14 §2.1 "Qo'shimcha himoya" 1)."""
     origin = request.headers.get("origin")
     if origin:
-        return origin.rstrip("/") == _issuer_origin(auth_module(request).settings.issuer)
+        module = auth_module(request)
+        if origin.rstrip("/") == _issuer_origin(module.settings.issuer):
+            return True
+        # Vite serves the first-party app from :5173 and proxies this POST to the AS. Keep
+        # the browser's origin intact; trust that exact origin only in local development.
+        return module.settings.environment == "local" and origin == "http://localhost:5173"
     return request.headers.get("sec-fetch-site") == "same-origin"
 
 

@@ -1,0 +1,36 @@
+# --- common ---
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.playwright-mcp/
+.claude/worktrees/
+.claude-scratch/
+
+# --- backend ---
+backend/.venv/
+.venv/
+__pycache__/
+*.pyc
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+backend/requirements.lock.txt
+
+# --- web ---
+node_modules/
+dist/
+dev-dist/
+.turbo/
+coverage/
+*.tsbuildinfo
+.vite/
+playwright-report/
+test-results/
+blob-report/

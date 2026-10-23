@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Nasiyaga sotish</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0E7C66}a:hover{color:#0A5E4D}
+</style>
+</helmet>
+<div style="width: 1366px; height: 768px; box-sizing: border-box; display: flex; flex-direction: column; background: #F4F6F8; color: #0F1B2D; font-family: 'Manrope', system-ui, sans-serif;">
+  <header style="height: 64px; flex-shrink: 0; display: flex; align-items: center; gap: 14px; padding: 0 20px; background: #FFFFFF; border-bottom: 1px solid #E7EAEE;">
+    <div style="width: 36px; height: 36px; border-radius: 10px; background: #0E7C66; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px;">E</div>
+    <div style="display: flex; flex-direction: column;">
+      <div style="font-weight: 800; font-size: 15px;">Chilonzor-3 · Kassa 1</div>
+      <div style="font-size: 12px; color: #6B7686;">Smena #214 · 08:00 dan beri</div>
+    </div>
+    <a href="Main.dc.html" style="margin-left: 10px; height: 48px; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; border: 1px solid #E7EAEE; border-radius: 10px; font-size: 13px; font-weight: 700; color: #3D4A5C; text-decoration: none;">Sotishga qaytish <span style="padding: 2px 6px; border: 1px solid #DCE1E7; border-radius: 6px; font-size: 11px; font-weight: 600; color: #6B7686;">Esc</span></a>
+    <div style="flex-grow: 1;"></div>
+    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: #E5F5EC; color: #1F6B3E; font-size: 12px; font-weight: 700;">
+      <svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true"><circle cx="4" cy="4" r="4" fill="#1F8A4C"></circle></svg>Online · OFD sinxron
+    </span>
+    <button type="button" aria-label="Interfeys tili" style="height: 48px; min-width: 48px; padding: 0 12px; border: 1px solid #E7EAEE; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 13px; font-weight: 700; color: #3D4A5C;">UZ · RU</button>
+    <div style="display: flex; align-items: center; gap: 10px; padding-left: 6px;">
+      <div style="width: 36px; height: 36px; border-radius: 50%; background: #E3F2EE; color: #0A5E4D; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px;">DR</div>
+      <div style="font-size: 13px; font-weight: 700;">Dilnoza R.</div>
+    </div>
+  </header>
+  <div style="flex-grow: 1; min-height: 0; display: flex; gap: 16px; padding: 16px;">
+    <section aria-labelledby="cust-title" style="width: 410px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 16px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 6px 20px rgba(15,27,45,.05); padding: 18px; box-sizing: border-box;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <h1 id="cust-title" style="margin: 0; font-size: 26px; line-height: 34px; font-weight: 800;">Nasiyaga sotish</h1>
+        <span style="padding: 2px 6px; border: 1px solid #DCE1E7; border-radius: 6px; font-size: 11px; font-weight: 600; color: #6B7686;">F5</span>
+        <div style="flex-grow: 1;"></div>
+        <button type="button" style="height: 48px; padding: 0 12px; border: 1px dashed #B9C2CD; border-radius: 10px; background: #FFFFFF; font: inherit; font-size: 13px; font-weight: 700; color: #3D4A5C;">+ Yangi mijoz</button>
+      </div>
+      <label style="display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 14px; border: 2px solid #0E7C66; border-radius: 12px; box-shadow: 0 0 0 4px #E3F2EE;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0E7C66" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        <span style="position: absolute; width: 1px; height: 1px; overflow: hidden;">Mijozni qidirish</span>
+        <input type="search" placeholder="Ism yoki telefon raqami" style="flex-grow: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 16px; color: #0F1B2D;">
+      </label>
+      <div role="listbox" aria-label="Mijozlar" style="display: flex; flex-direction: column; gap: 8px;">
+        <sc-for list="{{customers}}" as="c" hint-placeholder-count="5">
+          <button type="button" role="option" aria-selected="{{c.sel}}" style="display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: {{c.bw}} solid {{c.bd}}; border-radius: 12px; background: {{c.bg}}; font: inherit; color: #0F1B2D; text-align: left; box-sizing: border-box;">
+            <span style="width: 38px; height: 38px; flex-shrink: 0; border-radius: 50%; background: {{c.avBg}}; color: {{c.avFg}}; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800;">{{c.ini}}</span>
+            <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+              <span style="font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{c.name}}</span>
+              <span style="font-size: 12px; color: #5B6675;">{{c.phone}}</span>
+            </span>
+            <span style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px;">
+              <span style="font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; color: {{c.debtFg}};">{{c.debt}}</span>
+              <sc-if value="{{c.hasChip}}" hint-placeholder-val="{{false}}"><span style="padding: 2px 8px; border-radius: 999px; background: {{c.chipBg}}; color: {{c.chipFg}}; font-size: 12px; font-weight: 700;">{{c.chip}}</span></sc-if>
+            </span>
+          </button>
+        </sc-for>
+      </div>
+    </section>
+    <section style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 14px; background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 16px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 6px 20px rgba(15,27,45,.05); padding: 20px; box-sizing: border-box;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="width: 44px; height: 44px; border-radius: 50%; background: #FDF3E1; color: #8A5A12; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 800;">BA</span>
+        <div style="flex-grow: 1;">
+          <div style="font-size: 18px; font-weight: 800;">Botir Aliyev</div>
+          <div style="font-size: 12px; color: #6B7686;">+998 90 123 45 67 · oxirgi to'lov 02.10.2026</div>
+        </div>
+      </div>
+      <div style="padding: 14px 16px; background: #F8FAFB; border-radius: 12px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; justify-content: space-between; font-size: 13px; color: #3D4A5C;"><span>Joriy qarz</span><span style="font-weight: 700; font-variant-numeric: tabular-nums;">350 000 so'm</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 13px; color: #3D4A5C;"><span>Shu sotuv</span><span style="font-weight: 700; color: #8A5A12; font-variant-numeric: tabular-nums;">+94 500 so'm</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 15px; font-weight: 800;"><span>Sotuvdan keyin</span><span style="font-variant-numeric: tabular-nums;">444 500 so'm</span></div>
+        <div role="meter" aria-label="Kredit limitidan foydalanish" aria-valuemin="0" aria-valuemax="500000" aria-valuenow="444500" style="height: 12px; border-radius: 999px; background: #E7EAEE; overflow: hidden; display: flex;">
+          <span style="display: block; width: 70%; height: 12px; background: #B7791F;"></span>
+          <span style="display: block; width: 18.9%; height: 12px; background: #E8B865;"></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px; color: #5B6675;"><span>Kredit limiti 500 000 so'm</span><span style="font-weight: 700; color: #8A5A12;">89% · qoladi 55 500</span></div>
+      </div>
+      <div role="status" style="display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 12px; background: #FDF3E1; color: #8A5A12; font-size: 13px; font-weight: 600;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3z"></path><path d="M12 10v4M12 17v.5"></path></svg>
+        <span>Limitga yaqinlashdi. Oshsa — Menejer PIN tasdig'i kerak.</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div id="promise-label" style="font-size: 13px; font-weight: 600; color: #3D4A5C;">Va'da sanasi / Обещанная дата оплаты</div>
+        <div style="display: flex; gap: 12px;">
+          <div role="group" aria-labelledby="promise-label" style="display: flex; gap: 12px;">
+            <sc-for list="{{quick}}" as="q" hint-placeholder-count="3">
+              <button type="button" aria-pressed="{{q.sel}}" style="height: 48px; padding: 0 14px; border: {{q.bw}} solid {{q.bd}}; border-radius: 12px; background: {{q.bg}}; color: {{q.fg}}; font: inherit; font-size: 14px; font-weight: 700; box-sizing: border-box;">{{q.label}}</button>
+            </sc-for>
+          </div>
+          <label style="flex-grow: 1; display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 12px; border: 1px solid #DCE1E7; border-radius: 12px; box-sizing: border-box;">
+            <span style="position: absolute; width: 1px; height: 1px; overflow: hidden;">Sana</span>
+            <input type="text" value="30.10.2026" style="width: 100%; border: 0; outline: 0; background: transparent; font: inherit; font-size: 15px; font-weight: 700; color: #0F1B2D; font-variant-numeric: tabular-nums;">
+          </label>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px; flex-grow: 1; min-height: 0;">
+        <label for="comment" style="font-size: 13px; font-weight: 600; color: #3D4A5C;">Izoh</label>
+        <textarea id="comment" style="flex-grow: 1; min-height: 60px; resize: none; padding: 10px 14px; border: 1px solid #DCE1E7; border-radius: 12px; font: inherit; font-size: 14px; color: #0F1B2D;">Oylik maoshdan keyin to'laydi</textarea>
+      </div>
+    </section>
+    <aside style="width: 380px; flex-shrink: 0; display: flex; flex-direction: column; background: #FFFFFF; border: 1px solid #E7EAEE; border-radius: 18px; box-shadow: 0 1px 2px rgba(15,27,45,.04), 0 10px 28px rgba(15,27,45,.06); overflow: hidden;">
+      <div style="padding: 16px 18px; border-bottom: 1px solid #F0F2F5; font-size: 17px; font-weight: 800;">Chek #000483</div>
+      <div style="flex-grow: 1; min-height: 0; padding: 8px 18px; display: flex; flex-direction: column;">
+        <sc-for list="{{lines}}" as="l" hint-placeholder-count="5">
+          <div style="display: flex; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid #F0F2F5;">
+            <span style="display: flex; flex-direction: column;"><span style="font-size: 14px; font-weight: 700;">{{l.name}}</span><span style="font-size: 12px; color: #6B7686;">{{l.meta}}</span></span>
+            <span style="flex-shrink: 0; font-size: 24px; line-height: 32px; font-weight: 800; font-variant-numeric: tabular-nums;">{{l.sum}}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="padding: 14px 18px 18px; background: #F8FAFB; border-top: 1px solid #E7EAEE; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: baseline; justify-content: space-between;">
+          <span style="font-size: 14px; font-weight: 700; color: #3D4A5C;">Nasiyaga</span>
+          <span style="font-size: 46px; line-height: 52px; font-weight: 800; letter-spacing: -0.5px; font-variant-numeric: tabular-nums;">94 500 <span style="font-size: 18px; color: #5B6675;">so'm</span></span>
+        </div>
+        <div role="note" style="display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: #E8F0FC; color: #1F4FA8;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0; margin-top: 1px;"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"></path><path d="M9 8h6M9 12h6"></path></svg>
+          <span style="font-size: 12px; line-height: 1.45; color: #3D4A5C;"><b style="color: #1F4FA8;">Fiskal chek hozir chiqmaydi.</b> Chek mijoz qarzni to'laganda beriladi. Daromad va QQS bugungi sotuv sifatida hisoblanadi.</span>
+        </div>
+        <button type="button" style="height: 64px; flex-shrink: 0; border: 0; border-radius: 14px; background: #8A5A12; color: #FFFFFF; font: inherit; font-size: 19px; font-weight: 800; box-shadow: 0 8px 20px rgba(138,90,18,.28);">Nasiyaga rasmiylashtirish</button>
+      </div>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1366,"height":768}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const src = [
+      { name: "Botir Aliyev", phone: "+998 90 123 45 67", debt: "350 000", sel: true },
+      { name: "Malika Yusupova", phone: "+998 93 412 08 15", debt: "120 000" },
+      { name: "Sherzod Karimov", phone: "+998 97 705 33 21", debt: "0" },
+      { name: "«[Kafe nomi]» MChJ", phone: "+998 71 [..]", debt: "1 240 000", chip: "B2B · e-faktura", tone: "info" },
+      { name: "Nodira Qodirova", phone: "+998 99 860 14 02", debt: "485 000", chip: "Muddati o'tgan", tone: "danger" }
+    ];
+    const tones = { info: ["#E8F0FC", "#1F4FA8"], danger: ["#FBEAE8", "#A82B22"] };
+    const initials = n => n.replace(/[«»\[\]]/g, "").split(" ").filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase();
+    const customers = src.map(c => ({
+      name: c.name, phone: c.phone, debt: c.debt === "0" ? "Qarz yo'q" : c.debt,
+      debtFg: c.debt === "0" ? "#1F6B3E" : "#0F1B2D",
+      ini: initials(c.name), sel: c.sel ? "true" : "false",
+      bw: c.sel ? "2px" : "1px", bd: c.sel ? "#B7791F" : "#E7EAEE", bg: c.sel ? "#FDF3E1" : "#FFFFFF",
+      avBg: c.sel ? "#FFFFFF" : "#F4F6F8", avFg: c.sel ? "#8A5A12" : "#3D4A5C",
+      hasChip: !!c.chip, chip: c.chip || "", chipBg: c.tone ? tones[c.tone][0] : "#F4F6F8", chipFg: c.tone ? tones[c.tone][1] : "#3D4A5C"
+    }));
+    const quick = ["7 kun", "14 kun", "30 kun"].map((label, i) => ({ label, sel: i === 1 ? "true" : "false", bw: i === 1 ? "2px" : "1px", bd: i === 1 ? "#0E7C66" : "#E7EAEE", bg: i === 1 ? "#E3F2EE" : "#FFFFFF", fg: i === 1 ? "#0A5E4D" : "#0F1B2D" }));
+    const lines = [
+      { name: "Non «Patir»", meta: "4 000 × 2", sum: "8 000" },
+      { name: "Sut 2,5% 1 l", meta: "13 500 × 2", sum: "27 000" },
+      { name: "Guruch «Lazer»", meta: "1,250 kg × 18 000", sum: "22 500" },
+      { name: "Choy ko'k 100 g", meta: "21 000, chegirma −2 000", sum: "19 000" },
+      { name: "Gazli ichimlik 1,5 l", meta: "9 000 × 2", sum: "18 000" }
+    ];
+    return { customers, quick, lines };
+  }
+}
+</script>
+</body>
+</html>

@@ -15,7 +15,7 @@
 #### 2. Invoice/Receipt OCR va hujjat tanish
 - **Header accuracy**: 97-99% (vendor name, invoice number, date, total)
 - **Line items**: 95-97% accuracy
-- **Enterprise best**: ABBYY 99.5% structured, 97%+ semi-structured
+- **Enterprise best**: ABBYY — aniqlik foizi manba topilmadi, tasdiqlanmagan (avval "99.5% structured, 97%+ semi-structured" deyilgan edi; docsumo.com sahifasida ABBYY uchun hech qanday foiz yo'q, faqat Docsumo'ning o'zi uchun "99% field-level accuracy" bor) *(2026-10-14 tekshiruvida tuzatildi: avval X edi — ABBYY 99.5% structured, 97%+ semi-structured, manbasiz)*
 - **Implementations**: NetSuite Bill Capture, Xero JAX, Intuit Assist, QuickBooks email-to-bill
 - **Use case**: Photo of nakladnaya → automatic document creation
 

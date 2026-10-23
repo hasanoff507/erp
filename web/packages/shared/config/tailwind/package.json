@@ -1,0 +1,17 @@
+{
+  "name": "@shared/tailwind-config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./preset": "./preset.ts"
+  },
+  "dependencies": {
+    "tailwindcss": "catalog:",
+    "tailwindcss-animate": "catalog:"
+  },
+  "devDependencies": {
+    "@shared/typescript-config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

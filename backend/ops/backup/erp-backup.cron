@@ -1,0 +1,15 @@
+# /etc/cron.d/erp-backup — backup VM schedule (15 §7.1, qaror #51/#65). Times are UTC
+# (Asia/Tashkent = UTC+5, no DST). The env file is decrypted from
+# deploy/secrets/backup-<env>.enc.env by SOPS/age at deploy time and is never committed.
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+ERP_BACKUP_ENV_FILE=/etc/erp-backup/env
+
+# close the WAL segment every 4 min (RPO <= 5 min on a quiet database)
+*/4 * * * *  erp-backup  /opt/erp/backend/ops/backup/wal-switch.sh
+# WAL archive lag -> node_exporter textfile collector (alert > 300 s or < 0)
+* * * * *    erp-backup  /opt/erp/backend/ops/backup/wal-lag-metric.sh
+# daily full base backup 02:00 Tashkent + retention (30 full) + monthly permanent mark
+0 21 * * *   erp-backup  /opt/erp/backend/ops/backup/base-backup.sh >> /var/log/erp-backup/base-backup.log 2>&1
+# off-provider copy 04:00 Tashkent (after the base backup)
+0 23 * * *   erp-backup  /opt/erp/backend/ops/backup/offsite-copy.sh >> /var/log/erp-backup/offsite-copy.log 2>&1

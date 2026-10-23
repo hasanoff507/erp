@@ -1,0 +1,63 @@
+/*
+ * Global styles for every app: tokens (theme.css) + Tailwind layers + base element styles.
+ * Fonts are NOT imported here — apps/shell/src/main.tsx imports the self-hosted Manrope subsets
+ * (24 §4.1) so the font files are emitted by the app build.
+ */
+@import "./theme.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    @apply bg-background font-sans text-body text-foreground;
+    min-height: 100dvh;
+  }
+
+  a {
+    @apply text-primary hover:text-primary-strong;
+  }
+
+  /* 08 §10 band 3: every interactive element shows a visible focus ring. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* 08 §2: all numbers and money use tabular figures. */
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 08 §5 density: POS touch targets ≥ 48px, back-office ≥ 36px (44px on coarse pointers). */
+  [data-density="touch"] {
+    --tap-min: 48px;
+  }
+  [data-density="compact"] {
+    --tap-min: 36px;
+  }
+  @media (pointer: coarse) {
+    [data-density="compact"] {
+      --tap-min: 44px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

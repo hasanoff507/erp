@@ -1,0 +1,102 @@
+# Local dev stack (23 §7.2) — multi-tenant like production.
+#   docker compose up -d postgres redis
+#   docker compose --profile tools run --rm migrate
+#   docker compose --profile tools run --rm seed
+#   docker compose up api worker scheduler
+# Passwords below are local-dev defaults only; real ones come from SOPS (qaror #65).
+
+x-backend-env: &backend-env
+  ERP_ENVIRONMENT: local
+  ERP_DATABASE_URL: postgresql+asyncpg://erp_app:${ERP_APP_PASSWORD:-erp_app_dev}@postgres:5432/erp
+  ERP_MIGRATOR_DATABASE_URL: postgresql+asyncpg://erp_migrator:${ERP_MIGRATOR_PASSWORD:-erp_migrator_dev}@postgres:5432/erp
+  ERP_REDIS_URL: redis://redis:6379/0
+  ERP_AI_MODE: ${ERP_AI_MODE:-fake}
+  ERP_LOG_JSON: "false"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_dev}
+      ERP_DB_NAME: erp
+      ERP_MIGRATOR_PASSWORD: ${ERP_MIGRATOR_PASSWORD:-erp_migrator_dev}
+      ERP_APP_PASSWORD: ${ERP_APP_PASSWORD:-erp_app_dev}
+    ports:
+      - "${ERP_PG_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/initdb.sh:/docker-entrypoint-initdb.d/10-erp-roles.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d erp"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${ERP_REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build: .
+    profiles: ["tools"]
+    environment: *backend-env
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  seed:
+    build: .
+    profiles: ["tools"]
+    environment: *backend-env
+    command: ["python", "-m", "scripts.seed", "global"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build: .
+    environment: *backend-env
+    command: ["uvicorn", "app.main:app_factory", "--factory", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    ports:
+      - "${ERP_API_PORT:-8000}:8000"
+    volumes:
+      - ./app:/srv/app/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: .
+    healthcheck:
+      disable: true
+    environment: *backend-env
+    command: ["saq", "app.workers.worker_settings.settings"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  scheduler:
+    build: .
+    healthcheck:
+      disable: true
+    environment: *backend-env
+    command: ["saq", "app.workers.worker_settings.scheduler_settings"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:

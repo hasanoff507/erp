@@ -1,0 +1,1254 @@
+{
+ "description": "Shared debt payment allocation + debt_settlement receipt line vectors (18-api-kassa.md §12.2, 13 §2.14, 16 §1; qaror #45, #67; 32 §6.3). Backend app/shared/debt_allocation.py (tests/unit/test_debt_allocation.py) and web @shared/lib/debt-allocation (debt-allocation.test.ts) must both reproduce every `expected` exactly.",
+ "order": "sales + debt_openings ORDER BY COALESCE(due_date, doc_date), doc_date, doc_id; then debt_writeoffs ORDER BY doc_date, doc_id; rest = unallocated_amount",
+ "cases": [
+  {
+   "name": "qt_m08_11_oldest_first",
+   "amount": "100000.00",
+   "fiscal": true,
+   "open_docs": [
+    {
+     "doc_type": "sales",
+     "doc_id": "01930000-0000-7000-8000-000000000002",
+     "doc_date": "2026-10-05",
+     "due_date": null,
+     "open_amount": "200000.00",
+     "lines": [
+      {
+       "sale_line_id": "01930000-0000-7000-8000-000000000115",
+       "product_id": "01930000-0000-7000-8000-000000000915",
+       "name": "",
+       "qty": "1.000",
+       "price": "0.0000",
+       "line_total": "200000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": null
+      }
+     ]
+    },
+    {
+     "doc_type": "sales",
+     "doc_id": "01930000-0000-7000-8000-000000000001",
+     "doc_date": "2026-09-01",
+     "due_date": null,
+     "open_amount": "100000.00",
+     "lines": [
+      {
+       "sale_line_id": "01930000-0000-7000-8000-00000000010b",
+       "product_id": "01930000-0000-7000-8000-00000000090b",
+       "name": "",
+       "qty": "2.000",
+       "price": "0.0000",
+       "line_total": "100000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": null
+      }
+     ]
+    }
+   ],
+   "expected": {
+    "allocations": [
+     {
+      "target_doc_type": "sales",
+      "target_doc_id": "01930000-0000-7000-8000-000000000001",
+      "amount": "100000.00"
+     }
+    ],
+    "unallocated_amount": "0.00",
+    "fiscal_lines": [
+     {
+      "sale_id": "01930000-0000-7000-8000-000000000001",
+      "sale_line_id": "01930000-0000-7000-8000-00000000010b",
+      "product_id": "01930000-0000-7000-8000-00000000090b",
+      "qty": "2.000",
+      "amount": "100000.00",
+      "vat_rate": "12.00",
+      "vat_amount": "10714.29",
+      "marking_code": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "qt_m08_16_offline_two_sales",
+   "amount": "350000.00",
+   "fiscal": true,
+   "open_docs": [
+    {
+     "doc_type": "sales",
+     "doc_id": "01930000-0000-7000-8000-000000000003",
+     "doc_date": "2026-09-10",
+     "due_date": "2026-09-15",
+     "open_amount": "300000.00",
+     "lines": [
+      {
+       "sale_line_id": "01930000-0000-7000-8000-00000000011f",
+       "product_id": "01930000-0000-7000-8000-00000000091f",
+       "name": "",
+       "qty": "3.000",
+       "price": "0.0000",
+       "line_total": "180000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": null
+      },
+      {
+       "sale_line_id": "01930000-0000-7000-8000-000000000120",
+       "product_id": "01930000-0000-7000-8000-000000000920",
+       "name": "",
+       "qty": "2.000",
+       "price": "0.0000",
+       "line_total": "120000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": null
+      }
+     ]
+    },
+    {
+     "doc_type": "sales",
+     "doc_id": "01930000-0000-7000-8000-000000000004",
+     "doc_date": "2026-09-20",
+     "due_date": null,
+     "open_amount": "200000.00",
+     "lines": [
+      {
+       "sale_line_id": "01930000-0000-7000-8000-000000000129",
+       "product_id": "01930000-0000-7000-8000-000000000929",
+       "name": "",
+       "qty": "1.000",
+       "price": "0.0000",
+       "line_total": "70001.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": null
+      },
+      {
+       "sale_line_id": "01930000-0000-7000-8000-00000000012a",
+       "product_id": "01930000-0000-7000-8000-00000000092a",
+       "name": "",
+       "qty": "1.000",
+       "price": "0.0000",
+       "line_total": "70001.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": null
+      },
+      {
+       "sale_line_id": "01930000-0000-7000-8000-00000000012b",
+       "product_id": "01930000-0000-7000-8000-00000000092b",
+       "name": "",
+       "qty": "2.500",
+       "price": "0.0000",
+       "line_total": "59998.00",
+       "vat_rate": "0.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": null
+      }
+     ]
+    }
+   ],
+   "expected": {
+    "allocations": [
+     {
+      "target_doc_type": "sales",
+      "target_doc_id": "01930000-0000-7000-8000-000000000003",
+      "amount": "300000.00"
+     },
+     {
+      "target_doc_type": "sales",
+      "target_doc_id": "01930000-0000-7000-8000-000000000004",
+      "amount": "50000.00"
+     }
+    ],
+    "unallocated_amount": "0.00",
+    "fiscal_lines": [
+     {
+      "sale_id": "01930000-0000-7000-8000-000000000003",
+      "sale_line_id": "01930000-0000-7000-8000-00000000011f",
+      "product_id": "01930000-0000-7000-8000-00000000091f",
+      "qty": "3.000",
+      "amount": "180000.00",
+      "vat_rate": "12.00",
+      "vat_amount": "19285.71",
+      "marking_code": null
+     },
+     {
+      "sale_id": "01930000-0000-7000-8000-000000000003",
+      "sale_line_id": "01930000-0000-7000-8000-000000000120",
+      "product_id": "01930000-0000-7000-8000-000000000920",
+      "qty": "2.000",
+      "amount": "120000.00",
+      "vat_rate": "12.00",
+      "vat_amount": "12857.14",
+      "marking_code": null
+     },
+     {
+      "sale_id": "01930000-0000-7000-8000-000000000004",
+      "sale_line_id": "01930000-0000-7000-8000-000000000129",
+      "product_id": "01930000-0000-7000-8000-000000000929",
+      "qty": "0.250",
+      "amount": "17500.25",
+      "vat_rate": "12.00",
+      "vat_amount": "1875.03",
+      "marking_code": null
+     },
+     {
+      "sale_id": "01930000-0000-7000-8000-000000000004",
+      "sale_line_id": "01930000-0000-7000-8000-00000000012a",
+      "product_id": "01930000-0000-7000-8000-00000000092a",
+      "qty": "0.250",
+      "amount": "17500.25",
+      "vat_rate": "12.00",
+      "vat_amount": "1875.03",
+      "marking_code": null
+     },
+     {
+      "sale_id": "01930000-0000-7000-8000-000000000004",
+      "sale_line_id": "01930000-0000-7000-8000-00000000012b",
+      "product_id": "01930000-0000-7000-8000-00000000092b",
+      "qty": "0.625",
+      "amount": "14999.50",
+      "vat_rate": "0.00",
+      "vat_amount": "0.00",
+      "marking_code": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "qt_m08_06_07_example_31",
+   "amount": "150000.00",
+   "fiscal": true,
+   "open_docs": [
+    {
+     "doc_type": "sales",
+     "doc_id": "01930000-0000-7000-8000-000000000005",
+     "doc_date": "2026-09-01",
+     "due_date": null,
+     "open_amount": "200000.00",
+     "lines": [
+      {
+       "sale_line_id": "01930000-0000-7000-8000-000000000133",
+       "product_id": "01930000-0000-7000-8000-000000000933",
+       "name": "",
+       "qty": "4.000",
+       "price": "0.0000",
+       "line_total": "120000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": null
+      },
+      {
+       "sale_line_id": "01930000-0000-7000-8000-000000000134",
+       "product_id": "01930000-0000-7000-8000-000000000934",
+       "name": "",
+       "qty": "1.000",
+       "price": "0.0000",
+       "line_total": "80000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": null
+      }
+     ]
+    },
+    {
+     "doc_type": "sales",
+     "doc_id": "01930000-0000-7000-8000-000000000006",
+     "doc_date": "2026-09-15",
+     "due_date": null,
+     "open_amount": "100000.00",
+     "lines": [
+      {
+       "sale_line_id": "01930000-0000-7000-8000-00000000013d",
+       "product_id": "01930000-0000-7000-8000-00000000093d",
+       "name": "",
+       "qty": "1.000",
+       "price": "0.0000",
+       "line_total": "100000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": null
+      }
+     ]
+    }
+   ],
+   "expected": {
+    "allocations": [
+     {
+      "target_doc_type": "sales",
+      "target_doc_id": "01930000-0000-7000-8000-000000000005",
+      "amount": "150000.00"
+     }
+    ],
+    "unallocated_amount": "0.00",
+    "fiscal_lines": [
+     {
+      "sale_id": "01930000-0000-7000-8000-000000000005",
+      "sale_line_id": "01930000-0000-7000-8000-000000000133",
+      "product_id": "01930000-0000-7000-8000-000000000933",
+      "qty": "3.000",
+      "amount": "90000.00",
+      "vat_rate": "12.00",
+      "vat_amount": "9642.86",
+      "marking_code": null
+     },
+     {
+      "sale_id": "01930000-0000-7000-8000-000000000005",
+      "sale_line_id": "01930000-0000-7000-8000-000000000134",
+      "product_id": "01930000-0000-7000-8000-000000000934",
+      "qty": "0.750",
+      "amount": "60000.00",
+      "vat_rate": "12.00",
+      "vat_amount": "6428.57",
+      "marking_code": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "rounding_rest_to_largest_line_ties_last",
+   "amount": "100000.01",
+   "fiscal": true,
+   "open_docs": [
+    {
+     "doc_type": "sales",
+     "doc_id": "01930000-0000-7000-8000-000000000007",
+     "doc_date": "2026-09-01",
+     "due_date": null,
+     "open_amount": "300000.00",
+     "lines": [
+      {
+       "sale_line_id": "01930000-0000-7000-8000-000000000147",
+       "product_id": "01930000-0000-7000-8000-000000000947",
+       "name": "",
+       "qty": "1.000",
+       "price": "0.0000",
+       "line_total": "100000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": null
+      },
+      {
+       "sale_line_id": "01930000-0000-7000-8000-000000000148",
+       "product_id": "01930000-0000-7000-8000-000000000948",
+       "name": "",
+       "qty": "1.000",
+       "price": "0.0000",
+       "line_total": "100000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": null
+      },
+      {
+       "sale_line_id": "01930000-0000-7000-8000-000000000149",
+       "product_id": "01930000-0000-7000-8000-000000000949",
+       "name": "",
+       "qty": "1.000",
+       "price": "0.0000",
+       "line_total": "100000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": null
+      }
+     ]
+    }
+   ],
+   "expected": {
+    "allocations": [
+     {
+      "target_doc_type": "sales",
+      "target_doc_id": "01930000-0000-7000-8000-000000000007",
+      "amount": "100000.01"
+     }
+    ],
+    "unallocated_amount": "0.00",
+    "fiscal_lines": [
+     {
+      "sale_id": "01930000-0000-7000-8000-000000000007",
+      "sale_line_id": "01930000-0000-7000-8000-000000000147",
+      "product_id": "01930000-0000-7000-8000-000000000947",
+      "qty": "0.333",
+      "amount": "33333.34",
+      "vat_rate": "12.00",
+      "vat_amount": "3571.43",
+      "marking_code": null
+     },
+     {
+      "sale_id": "01930000-0000-7000-8000-000000000007",
+      "sale_line_id": "01930000-0000-7000-8000-000000000148",
+      "product_id": "01930000-0000-7000-8000-000000000948",
+      "qty": "0.333",
+      "amount": "33333.34",
+      "vat_rate": "12.00",
+      "vat_amount": "3571.43",
+      "marking_code": null
+     },
+     {
+      "sale_id": "01930000-0000-7000-8000-000000000007",
+      "sale_line_id": "01930000-0000-7000-8000-000000000149",
+      "product_id": "01930000-0000-7000-8000-000000000949",
+      "qty": "0.333",
+      "amount": "33333.33",
+      "vat_rate": "12.00",
+      "vat_amount": "3571.43",
+      "marking_code": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "mixed_sale_settled_closing",
+   "amount": "60000.00",
+   "fiscal": true,
+   "open_docs": [
+    {
+     "doc_type": "sales",
+     "doc_id": "01930000-0000-7000-8000-000000000008",
+     "doc_date": "2026-09-01",
+     "due_date": null,
+     "open_amount": "60000.00",
+     "lines": [
+      {
+       "sale_line_id": "01930000-0000-7000-8000-000000000151",
+       "product_id": "01930000-0000-7000-8000-000000000951",
+       "name": "",
+       "qty": "3.000",
+       "price": "0.0000",
+       "line_total": "60000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "24000.00",
+       "marking_code": null
+      },
+      {
+       "sale_line_id": "01930000-0000-7000-8000-000000000152",
+       "product_id": "01930000-0000-7000-8000-000000000952",
+       "name": "",
+       "qty": "2.000",
+       "price": "0.0000",
+       "line_total": "40000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "16000.00",
+       "marking_code": null
+      }
+     ]
+    }
+   ],
+   "expected": {
+    "allocations": [
+     {
+      "target_doc_type": "sales",
+      "target_doc_id": "01930000-0000-7000-8000-000000000008",
+      "amount": "60000.00"
+     }
+    ],
+    "unallocated_amount": "0.00",
+    "fiscal_lines": [
+     {
+      "sale_id": "01930000-0000-7000-8000-000000000008",
+      "sale_line_id": "01930000-0000-7000-8000-000000000151",
+      "product_id": "01930000-0000-7000-8000-000000000951",
+      "qty": "1.800",
+      "amount": "36000.00",
+      "vat_rate": "12.00",
+      "vat_amount": "3857.14",
+      "marking_code": null
+     },
+     {
+      "sale_id": "01930000-0000-7000-8000-000000000008",
+      "sale_line_id": "01930000-0000-7000-8000-000000000152",
+      "product_id": "01930000-0000-7000-8000-000000000952",
+      "qty": "1.200",
+      "amount": "24000.00",
+      "vat_rate": "12.00",
+      "vat_amount": "2571.43",
+      "marking_code": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "opening_sale_writeoff_and_overpay",
+   "amount": "120000.00",
+   "fiscal": true,
+   "open_docs": [
+    {
+     "doc_type": "debt_writeoffs",
+     "doc_id": "01930000-0000-7000-8000-000000000009",
+     "doc_date": "2026-08-01",
+     "due_date": null,
+     "open_amount": "20000.00",
+     "lines": []
+    },
+    {
+     "doc_type": "sales",
+     "doc_id": "01930000-0000-7000-8000-00000000000a",
+     "doc_date": "2026-09-01",
+     "due_date": null,
+     "open_amount": "30000.00",
+     "lines": [
+      {
+       "sale_line_id": "01930000-0000-7000-8000-000000000165",
+       "product_id": "01930000-0000-7000-8000-000000000965",
+       "name": "",
+       "qty": "1.000",
+       "price": "0.0000",
+       "line_total": "30000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": null
+      }
+     ]
+    },
+    {
+     "doc_type": "debt_openings",
+     "doc_id": "01930000-0000-7000-8000-00000000000b",
+     "doc_date": "2026-07-31",
+     "due_date": null,
+     "open_amount": "50000.00",
+     "lines": []
+    }
+   ],
+   "expected": {
+    "allocations": [
+     {
+      "target_doc_type": "debt_openings",
+      "target_doc_id": "01930000-0000-7000-8000-00000000000b",
+      "amount": "50000.00"
+     },
+     {
+      "target_doc_type": "sales",
+      "target_doc_id": "01930000-0000-7000-8000-00000000000a",
+      "amount": "30000.00"
+     },
+     {
+      "target_doc_type": "debt_writeoffs",
+      "target_doc_id": "01930000-0000-7000-8000-000000000009",
+      "amount": "20000.00"
+     }
+    ],
+    "unallocated_amount": "20000.00",
+    "fiscal_lines": [
+     {
+      "sale_id": "01930000-0000-7000-8000-00000000000a",
+      "sale_line_id": "01930000-0000-7000-8000-000000000165",
+      "product_id": "01930000-0000-7000-8000-000000000965",
+      "qty": "1.000",
+      "amount": "30000.00",
+      "vat_rate": "12.00",
+      "vat_amount": "3214.29",
+      "marking_code": null
+     },
+     {
+      "sale_id": null,
+      "sale_line_id": null,
+      "product_id": null,
+      "qty": "1.000",
+      "amount": "90000.00",
+      "vat_rate": "0.00",
+      "vat_amount": "0.00",
+      "marking_code": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "due_date_before_doc_date_order",
+   "amount": "40000.00",
+   "fiscal": true,
+   "open_docs": [
+    {
+     "doc_type": "sales",
+     "doc_id": "01930000-0000-7000-8000-00000000000c",
+     "doc_date": "2026-09-01",
+     "due_date": "2026-12-01",
+     "open_amount": "30000.00",
+     "lines": [
+      {
+       "sale_line_id": "01930000-0000-7000-8000-000000000179",
+       "product_id": "01930000-0000-7000-8000-000000000979",
+       "name": "",
+       "qty": "1.000",
+       "price": "0.0000",
+       "line_total": "30000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": null
+      }
+     ]
+    },
+    {
+     "doc_type": "sales",
+     "doc_id": "01930000-0000-7000-8000-00000000000d",
+     "doc_date": "2026-10-01",
+     "due_date": null,
+     "open_amount": "30000.00",
+     "lines": [
+      {
+       "sale_line_id": "01930000-0000-7000-8000-000000000183",
+       "product_id": "01930000-0000-7000-8000-000000000983",
+       "name": "",
+       "qty": "1.000",
+       "price": "0.0000",
+       "line_total": "30000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": null
+      }
+     ]
+    }
+   ],
+   "expected": {
+    "allocations": [
+     {
+      "target_doc_type": "sales",
+      "target_doc_id": "01930000-0000-7000-8000-00000000000d",
+      "amount": "30000.00"
+     },
+     {
+      "target_doc_type": "sales",
+      "target_doc_id": "01930000-0000-7000-8000-00000000000c",
+      "amount": "10000.00"
+     }
+    ],
+    "unallocated_amount": "0.00",
+    "fiscal_lines": [
+     {
+      "sale_id": "01930000-0000-7000-8000-00000000000d",
+      "sale_line_id": "01930000-0000-7000-8000-000000000183",
+      "product_id": "01930000-0000-7000-8000-000000000983",
+      "qty": "1.000",
+      "amount": "30000.00",
+      "vat_rate": "12.00",
+      "vat_amount": "3214.29",
+      "marking_code": null
+     },
+     {
+      "sale_id": "01930000-0000-7000-8000-00000000000c",
+      "sale_line_id": "01930000-0000-7000-8000-000000000179",
+      "product_id": "01930000-0000-7000-8000-000000000979",
+      "qty": "0.333",
+      "amount": "10000.00",
+      "vat_rate": "12.00",
+      "vat_amount": "1071.43",
+      "marking_code": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "tie_by_doc_id",
+   "amount": "15000.00",
+   "fiscal": true,
+   "open_docs": [
+    {
+     "doc_type": "sales",
+     "doc_id": "01930000-0000-7000-8000-00000000000f",
+     "doc_date": "2026-09-01",
+     "due_date": null,
+     "open_amount": "10000.00",
+     "lines": [
+      {
+       "sale_line_id": "01930000-0000-7000-8000-000000000197",
+       "product_id": "01930000-0000-7000-8000-000000000997",
+       "name": "",
+       "qty": "1.000",
+       "price": "0.0000",
+       "line_total": "10000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": null
+      }
+     ]
+    },
+    {
+     "doc_type": "sales",
+     "doc_id": "01930000-0000-7000-8000-00000000000e",
+     "doc_date": "2026-09-01",
+     "due_date": null,
+     "open_amount": "10000.00",
+     "lines": [
+      {
+       "sale_line_id": "01930000-0000-7000-8000-00000000018d",
+       "product_id": "01930000-0000-7000-8000-00000000098d",
+       "name": "",
+       "qty": "1.000",
+       "price": "0.0000",
+       "line_total": "10000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": null
+      }
+     ]
+    }
+   ],
+   "expected": {
+    "allocations": [
+     {
+      "target_doc_type": "sales",
+      "target_doc_id": "01930000-0000-7000-8000-00000000000e",
+      "amount": "10000.00"
+     },
+     {
+      "target_doc_type": "sales",
+      "target_doc_id": "01930000-0000-7000-8000-00000000000f",
+      "amount": "5000.00"
+     }
+    ],
+    "unallocated_amount": "0.00",
+    "fiscal_lines": [
+     {
+      "sale_id": "01930000-0000-7000-8000-00000000000e",
+      "sale_line_id": "01930000-0000-7000-8000-00000000018d",
+      "product_id": "01930000-0000-7000-8000-00000000098d",
+      "qty": "1.000",
+      "amount": "10000.00",
+      "vat_rate": "12.00",
+      "vat_amount": "1071.43",
+      "marking_code": null
+     },
+     {
+      "sale_id": "01930000-0000-7000-8000-00000000000f",
+      "sale_line_id": "01930000-0000-7000-8000-000000000197",
+      "product_id": "01930000-0000-7000-8000-000000000997",
+      "qty": "0.500",
+      "amount": "5000.00",
+      "vat_rate": "12.00",
+      "vat_amount": "535.71",
+      "marking_code": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "bank_payment_no_receipt",
+   "amount": "25000.00",
+   "fiscal": false,
+   "open_docs": [
+    {
+     "doc_type": "sales",
+     "doc_id": "01930000-0000-7000-8000-000000000010",
+     "doc_date": "2026-09-01",
+     "due_date": null,
+     "open_amount": "20000.00",
+     "lines": [
+      {
+       "sale_line_id": "01930000-0000-7000-8000-0000000001a1",
+       "product_id": "01930000-0000-7000-8000-0000000009a1",
+       "name": "",
+       "qty": "1.000",
+       "price": "0.0000",
+       "line_total": "20000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": null
+      }
+     ]
+    },
+    {
+     "doc_type": "debt_openings",
+     "doc_id": "01930000-0000-7000-8000-000000000011",
+     "doc_date": "2026-08-01",
+     "due_date": null,
+     "open_amount": "10000.00",
+     "lines": []
+    }
+   ],
+   "expected": {
+    "allocations": [
+     {
+      "target_doc_type": "debt_openings",
+      "target_doc_id": "01930000-0000-7000-8000-000000000011",
+      "amount": "10000.00"
+     },
+     {
+      "target_doc_type": "sales",
+      "target_doc_id": "01930000-0000-7000-8000-000000000010",
+      "amount": "15000.00"
+     }
+    ],
+    "unallocated_amount": "0.00",
+    "fiscal_lines": []
+   }
+  },
+  {
+   "name": "marking_code_only_on_closing_line",
+   "amount": "8000.00",
+   "fiscal": true,
+   "open_docs": [
+    {
+     "doc_type": "sales",
+     "doc_id": "01930000-0000-7000-8000-000000000012",
+     "doc_date": "2026-09-01",
+     "due_date": null,
+     "open_amount": "16000.00",
+     "lines": [
+      {
+       "sale_line_id": "01930000-0000-7000-8000-0000000001b5",
+       "product_id": "01930000-0000-7000-8000-0000000009b5",
+       "name": "",
+       "qty": "1.000",
+       "price": "0.0000",
+       "line_total": "8000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": "0104600000000000215ABC\u001d93XYZ"
+      },
+      {
+       "sale_line_id": "01930000-0000-7000-8000-0000000001b6",
+       "product_id": "01930000-0000-7000-8000-0000000009b6",
+       "name": "",
+       "qty": "1.000",
+       "price": "0.0000",
+       "line_total": "8000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": "0104600000000000215DEF\u001d93UVW"
+      }
+     ]
+    }
+   ],
+   "expected": {
+    "allocations": [
+     {
+      "target_doc_type": "sales",
+      "target_doc_id": "01930000-0000-7000-8000-000000000012",
+      "amount": "8000.00"
+     }
+    ],
+    "unallocated_amount": "0.00",
+    "fiscal_lines": [
+     {
+      "sale_id": "01930000-0000-7000-8000-000000000012",
+      "sale_line_id": "01930000-0000-7000-8000-0000000001b5",
+      "product_id": "01930000-0000-7000-8000-0000000009b5",
+      "qty": "0.500",
+      "amount": "4000.00",
+      "vat_rate": "12.00",
+      "vat_amount": "428.57",
+      "marking_code": null
+     },
+     {
+      "sale_id": "01930000-0000-7000-8000-000000000012",
+      "sale_line_id": "01930000-0000-7000-8000-0000000001b6",
+      "product_id": "01930000-0000-7000-8000-0000000009b6",
+      "qty": "0.500",
+      "amount": "4000.00",
+      "vat_rate": "12.00",
+      "vat_amount": "428.57",
+      "marking_code": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "marking_code_on_closing_receipt",
+   "amount": "8000.00",
+   "fiscal": true,
+   "open_docs": [
+    {
+     "doc_type": "sales",
+     "doc_id": "01930000-0000-7000-8000-000000000017",
+     "doc_date": "2026-09-01",
+     "due_date": null,
+     "open_amount": "8000.00",
+     "lines": [
+      {
+       "sale_line_id": "01930000-0000-7000-8000-0000000001e7",
+       "product_id": "01930000-0000-7000-8000-0000000009e7",
+       "name": "",
+       "qty": "1.000",
+       "price": "0.0000",
+       "line_total": "8000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "4000.00",
+       "marking_code": "0104600000000000215ABC\u001d93XYZ"
+      },
+      {
+       "sale_line_id": "01930000-0000-7000-8000-0000000001e8",
+       "product_id": "01930000-0000-7000-8000-0000000009e8",
+       "name": "",
+       "qty": "1.000",
+       "price": "0.0000",
+       "line_total": "8000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "4000.00",
+       "marking_code": "0104600000000000215DEF\u001d93UVW"
+      }
+     ]
+    }
+   ],
+   "expected": {
+    "allocations": [
+     {
+      "target_doc_type": "sales",
+      "target_doc_id": "01930000-0000-7000-8000-000000000017",
+      "amount": "8000.00"
+     }
+    ],
+    "unallocated_amount": "0.00",
+    "fiscal_lines": [
+     {
+      "sale_id": "01930000-0000-7000-8000-000000000017",
+      "sale_line_id": "01930000-0000-7000-8000-0000000001e7",
+      "product_id": "01930000-0000-7000-8000-0000000009e7",
+      "qty": "0.500",
+      "amount": "4000.00",
+      "vat_rate": "12.00",
+      "vat_amount": "428.57",
+      "marking_code": "0104600000000000215ABC\u001d93XYZ"
+     },
+     {
+      "sale_id": "01930000-0000-7000-8000-000000000017",
+      "sale_line_id": "01930000-0000-7000-8000-0000000001e8",
+      "product_id": "01930000-0000-7000-8000-0000000009e8",
+      "qty": "0.500",
+      "amount": "4000.00",
+      "vat_rate": "12.00",
+      "vat_amount": "428.57",
+      "marking_code": "0104600000000000215DEF\u001d93UVW"
+     }
+    ]
+   }
+  },
+  {
+   "name": "second_partial_then_close_after_bank",
+   "amount": "30000.00",
+   "fiscal": true,
+   "open_docs": [
+    {
+     "doc_type": "sales",
+     "doc_id": "01930000-0000-7000-8000-000000000013",
+     "doc_date": "2026-09-01",
+     "due_date": null,
+     "open_amount": "30000.00",
+     "lines": [
+      {
+       "sale_line_id": "01930000-0000-7000-8000-0000000001bf",
+       "product_id": "01930000-0000-7000-8000-0000000009bf",
+       "name": "",
+       "qty": "2.000",
+       "price": "0.0000",
+       "line_total": "50000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "25000.00",
+       "marking_code": null
+      },
+      {
+       "sale_line_id": "01930000-0000-7000-8000-0000000001c0",
+       "product_id": "01930000-0000-7000-8000-0000000009c0",
+       "name": "",
+       "qty": "1.000",
+       "price": "0.0000",
+       "line_total": "50000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "25000.00",
+       "marking_code": null
+      }
+     ]
+    }
+   ],
+   "expected": {
+    "allocations": [
+     {
+      "target_doc_type": "sales",
+      "target_doc_id": "01930000-0000-7000-8000-000000000013",
+      "amount": "30000.00"
+     }
+    ],
+    "unallocated_amount": "0.00",
+    "fiscal_lines": [
+     {
+      "sale_id": "01930000-0000-7000-8000-000000000013",
+      "sale_line_id": "01930000-0000-7000-8000-0000000001bf",
+      "product_id": "01930000-0000-7000-8000-0000000009bf",
+      "qty": "0.600",
+      "amount": "15000.00",
+      "vat_rate": "12.00",
+      "vat_amount": "1607.14",
+      "marking_code": null
+     },
+     {
+      "sale_id": "01930000-0000-7000-8000-000000000013",
+      "sale_line_id": "01930000-0000-7000-8000-0000000001c0",
+      "product_id": "01930000-0000-7000-8000-0000000009c0",
+      "qty": "0.300",
+      "amount": "15000.00",
+      "vat_rate": "12.00",
+      "vat_amount": "1607.14",
+      "marking_code": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "zero_and_vat_exempt_lines",
+   "amount": "10000.00",
+   "fiscal": true,
+   "open_docs": [
+    {
+     "doc_type": "sales",
+     "doc_id": "01930000-0000-7000-8000-000000000014",
+     "doc_date": "2026-09-01",
+     "due_date": null,
+     "open_amount": "30000.00",
+     "lines": [
+      {
+       "sale_line_id": "01930000-0000-7000-8000-0000000001c9",
+       "product_id": "01930000-0000-7000-8000-0000000009c9",
+       "name": "",
+       "qty": "1.250",
+       "price": "0.0000",
+       "line_total": "20000.00",
+       "vat_rate": "0.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": null
+      },
+      {
+       "sale_line_id": "01930000-0000-7000-8000-0000000001ca",
+       "product_id": "01930000-0000-7000-8000-0000000009ca",
+       "name": "",
+       "qty": "0.500",
+       "price": "0.0000",
+       "line_total": "10000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": null
+      }
+     ]
+    }
+   ],
+   "expected": {
+    "allocations": [
+     {
+      "target_doc_type": "sales",
+      "target_doc_id": "01930000-0000-7000-8000-000000000014",
+      "amount": "10000.00"
+     }
+    ],
+    "unallocated_amount": "0.00",
+    "fiscal_lines": [
+     {
+      "sale_id": "01930000-0000-7000-8000-000000000014",
+      "sale_line_id": "01930000-0000-7000-8000-0000000001c9",
+      "product_id": "01930000-0000-7000-8000-0000000009c9",
+      "qty": "0.417",
+      "amount": "6666.67",
+      "vat_rate": "0.00",
+      "vat_amount": "0.00",
+      "marking_code": null
+     },
+     {
+      "sale_id": "01930000-0000-7000-8000-000000000014",
+      "sale_line_id": "01930000-0000-7000-8000-0000000001ca",
+      "product_id": "01930000-0000-7000-8000-0000000009ca",
+      "qty": "0.167",
+      "amount": "3333.33",
+      "vat_rate": "12.00",
+      "vat_amount": "357.14",
+      "marking_code": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "open_less_than_fiscal_room_after_bank",
+   "amount": "20000.00",
+   "fiscal": true,
+   "open_docs": [
+    {
+     "doc_type": "sales",
+     "doc_id": "01930000-0000-7000-8000-000000000016",
+     "doc_date": "2026-09-01",
+     "due_date": null,
+     "open_amount": "20000.00",
+     "lines": [
+      {
+       "sale_line_id": "01930000-0000-7000-8000-0000000001dd",
+       "product_id": "01930000-0000-7000-8000-0000000009dd",
+       "name": "",
+       "qty": "1.000",
+       "price": "0.0000",
+       "line_total": "50000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": null
+      }
+     ]
+    }
+   ],
+   "expected": {
+    "allocations": [
+     {
+      "target_doc_type": "sales",
+      "target_doc_id": "01930000-0000-7000-8000-000000000016",
+      "amount": "20000.00"
+     }
+    ],
+    "unallocated_amount": "0.00",
+    "fiscal_lines": [
+     {
+      "sale_id": "01930000-0000-7000-8000-000000000016",
+      "sale_line_id": "01930000-0000-7000-8000-0000000001dd",
+      "product_id": "01930000-0000-7000-8000-0000000009dd",
+      "qty": "0.400",
+      "amount": "20000.00",
+      "vat_rate": "12.00",
+      "vat_amount": "2142.86",
+      "marking_code": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "returned_line_debt_sale",
+   "note": "ACC-01: A 60000 + B 40000 on debt, B returned (debt_part 40000): payment 60000 fiscalizes A only",
+   "amount": "60000.00",
+   "fiscal": true,
+   "open_docs": [
+    {
+     "doc_type": "sales",
+     "doc_id": "01930000-0000-7000-8000-000000000041",
+     "doc_date": "2026-10-01",
+     "due_date": null,
+     "open_amount": "60000.00",
+     "lines": [
+      {
+       "sale_line_id": "01930000-0000-7000-8000-000000000141",
+       "product_id": "01930000-0000-7000-8000-000000000941",
+       "name": "",
+       "qty": "1.000",
+       "price": "0.0000",
+       "line_total": "60000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": "MC-A-0001",
+       "returned_qty": "0.000",
+       "returned_amount": "0.00"
+      },
+      {
+       "sale_line_id": "01930000-0000-7000-8000-000000000142",
+       "product_id": "01930000-0000-7000-8000-000000000942",
+       "name": "",
+       "qty": "1.000",
+       "price": "0.0000",
+       "line_total": "40000.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "0.00",
+       "marking_code": null,
+       "returned_qty": "1.000",
+       "returned_amount": "40000.00"
+      }
+     ]
+    }
+   ],
+   "expected": {
+    "allocations": [
+     {
+      "target_doc_type": "sales",
+      "target_doc_id": "01930000-0000-7000-8000-000000000041",
+      "amount": "60000.00"
+     }
+    ],
+    "unallocated_amount": "0.00",
+    "fiscal_lines": [
+     {
+      "sale_id": "01930000-0000-7000-8000-000000000041",
+      "sale_line_id": "01930000-0000-7000-8000-000000000141",
+      "product_id": "01930000-0000-7000-8000-000000000941",
+      "qty": "1.000",
+      "amount": "60000.00",
+      "vat_rate": "12.00",
+      "vat_amount": "6428.57",
+      "marking_code": "MC-A-0001"
+     }
+    ]
+   }
+  },
+  {
+   "name": "three_partials_qty_sums_to_line_qty",
+   "note": "ACC-10: 1.000 for 300.00 paid 100 + 100 + 100 → qty 0.333 + 0.334 + 0.333 = 1.000; this is the 2nd payment (settled 100.00)",
+   "amount": "100.00",
+   "fiscal": true,
+   "open_docs": [
+    {
+     "doc_type": "sales",
+     "doc_id": "01930000-0000-7000-8000-000000000051",
+     "doc_date": "2026-10-01",
+     "due_date": null,
+     "open_amount": "200.00",
+     "lines": [
+      {
+       "sale_line_id": "01930000-0000-7000-8000-000000000151",
+       "product_id": "01930000-0000-7000-8000-000000000951",
+       "name": "",
+       "qty": "1.000",
+       "price": "0.0000",
+       "line_total": "300.00",
+       "vat_rate": "12.00",
+       "vat_exemption_code": null,
+       "settled_amount": "100.00",
+       "marking_code": null
+      }
+     ]
+    }
+   ],
+   "expected": {
+    "allocations": [
+     {
+      "target_doc_type": "sales",
+      "target_doc_id": "01930000-0000-7000-8000-000000000051",
+      "amount": "100.00"
+     }
+    ],
+    "unallocated_amount": "0.00",
+    "fiscal_lines": [
+     {
+      "sale_id": "01930000-0000-7000-8000-000000000051",
+      "sale_line_id": "01930000-0000-7000-8000-000000000151",
+      "product_id": "01930000-0000-7000-8000-000000000951",
+      "qty": "0.334",
+      "amount": "100.00",
+      "vat_rate": "12.00",
+      "vat_amount": "10.71",
+      "marking_code": null
+     }
+    ]
+   }
+  }
+ ]
+}

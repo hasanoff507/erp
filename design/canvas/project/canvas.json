@@ -1,0 +1,420 @@
+{
+  "v": 3,
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-10-16T12:00:00Z"
+  },
+  "title": "ERP+POS ekranlari",
+  "launch": {
+    "view": "canvas"
+  },
+  "pages": [
+    {
+      "id": "pos",
+      "name": "Kassa (POS)"
+    },
+    {
+      "id": "bo",
+      "name": "Back-office"
+    }
+  ],
+  "boards": {
+    "Pos01Kirish.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1366,
+      "h": 768,
+      "title": "POS-01 · Kassaga kirish",
+      "page": "pos"
+    },
+    "Main.dc.html": {
+      "x": 1446,
+      "y": 0,
+      "w": 1366,
+      "h": 768,
+      "title": "POS-02 · Sotish paneli",
+      "page": "pos"
+    },
+    "Pos03Tolov.dc.html": {
+      "x": 2892,
+      "y": 0,
+      "w": 1366,
+      "h": 952,
+      "title": "POS-03 · To'lov",
+      "page": "pos"
+    },
+    "Pos04Chek.dc.html": {
+      "x": 4338,
+      "y": 0,
+      "w": 1366,
+      "h": 768,
+      "title": "POS-04 · Chek chop etildi",
+      "page": "pos"
+    },
+    "Pos05Qaytarish.dc.html": {
+      "x": 0,
+      "y": 968,
+      "w": 1366,
+      "h": 768,
+      "title": "POS-05 · Tovar qaytarish",
+      "page": "pos"
+    },
+    "Pos06Nasiya.dc.html": {
+      "x": 1446,
+      "y": 968,
+      "w": 1366,
+      "h": 768,
+      "title": "POS-06 · Nasiyaga sotish",
+      "page": "pos"
+    },
+    "Pos07Smena.dc.html": {
+      "x": 2892,
+      "y": 968,
+      "w": 1366,
+      "h": 768,
+      "title": "POS-07 · Smenani yopish",
+      "page": "pos"
+    },
+    "Pos08Kirim.dc.html": {
+      "x": 4338,
+      "y": 968,
+      "w": 1366,
+      "h": 768,
+      "title": "POS-08 · Tovar qabul qilish",
+      "page": "pos"
+    },
+    "Pos09Kochirish.dc.html": {
+      "x": 0,
+      "y": 1936,
+      "w": 1366,
+      "h": 768,
+      "title": "POS-09 · Tovar ko'chirish",
+      "page": "pos"
+    },
+    "Pos10Inventar.dc.html": {
+      "x": 1446,
+      "y": 1936,
+      "w": 1366,
+      "h": 768,
+      "title": "POS-10 · Inventarizatsiya",
+      "page": "pos"
+    },
+    "Pos11Qidiruv.dc.html": {
+      "x": 2892,
+      "y": 1936,
+      "w": 1366,
+      "h": 768,
+      "title": "POS-11 · Narx va qoldiq",
+      "page": "pos"
+    },
+    "Pos12Offline.dc.html": {
+      "x": 4338,
+      "y": 1936,
+      "w": 1366,
+      "h": 768,
+      "title": "POS-12 · Sinxronizatsiya holati",
+      "page": "pos"
+    },
+    "Pos13Qarz.dc.html": {
+      "x": 0,
+      "y": 2904,
+      "w": 1366,
+      "h": 768,
+      "title": "POS-13 · Qarz daftari",
+      "page": "pos"
+    },
+    "Pos14KassaPul.dc.html": {
+      "x": 1446,
+      "y": 2904,
+      "w": 1366,
+      "h": 768,
+      "title": "POS-14 · Kassa puli harakati",
+      "page": "pos"
+    },
+    "Pos15Sanash.dc.html": {
+      "x": 2892,
+      "y": 2904,
+      "w": 1366,
+      "h": 768,
+      "title": "POS-15 · Naqdni sanash",
+      "page": "pos"
+    },
+    "Pos16Uskunalar.dc.html": {
+      "x": 4338,
+      "y": 2904,
+      "w": 1366,
+      "h": 988,
+      "title": "POS-16 · Uskunalar sozlamasi",
+      "page": "pos"
+    },
+    "Bo01Kirish.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "BO-01 · Kirish",
+      "page": "bo"
+    },
+    "Bo21Royxat.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "BO-21 · Ro'yxatdan o'tish",
+      "page": "bo"
+    },
+    "Bo02Dashboard.dc.html": {
+      "x": 3040,
+      "y": 0,
+      "w": 1440,
+      "h": 1104,
+      "title": "BO-02 · Dashboard",
+      "page": "bo",
+      "expand": "fill"
+    },
+    "Bo03Ombor.dc.html": {
+      "x": 4560,
+      "y": 0,
+      "w": 1440,
+      "h": 1720,
+      "title": "BO-03 · Ombor qoldig'i",
+      "page": "bo",
+      "expand": "fill"
+    },
+    "Bo04Xarid.dc.html": {
+      "x": 6080,
+      "y": 0,
+      "w": 1440,
+      "h": 1420,
+      "title": "BO-04 · Xaridlar",
+      "page": "bo",
+      "expand": "fill"
+    },
+    "Bo05Narxlar.dc.html": {
+      "x": 0,
+      "y": 1920,
+      "w": 1440,
+      "h": 1180,
+      "title": "BO-05 · Tovarlar va narxlar",
+      "page": "bo",
+      "expand": "fill"
+    },
+    "Bo06Qarzdorlar.dc.html": {
+      "x": 1520,
+      "y": 1920,
+      "w": 1440,
+      "h": 1240,
+      "title": "BO-06 · Qarzdorlar",
+      "page": "bo",
+      "expand": "fill"
+    },
+    "Bo07Qqs.dc.html": {
+      "x": 3040,
+      "y": 1920,
+      "w": 1440,
+      "h": 1160,
+      "title": "BO-07 · QQS ichki hisobi",
+      "page": "bo",
+      "expand": "fill"
+    },
+    "Bo08Jurnal.dc.html": {
+      "x": 4560,
+      "y": 1920,
+      "w": 1440,
+      "h": 1540,
+      "title": "BO-08 · Buxgalteriya jurnali",
+      "page": "bo",
+      "expand": "fill"
+    },
+    "Bo09Hisobotlar.dc.html": {
+      "x": 6080,
+      "y": 1920,
+      "w": 1440,
+      "h": 1450,
+      "title": "BO-09 · Hisobotlar markazi",
+      "page": "bo",
+      "expand": "fill"
+    },
+    "Bo10DavlatHisobot.dc.html": {
+      "x": 0,
+      "y": 3660,
+      "w": 1440,
+      "h": 1780,
+      "title": "BO-10 · Davlat hisobotini solishtirish",
+      "page": "bo",
+      "expand": "fill"
+    },
+    "Bo11Xodimlar.dc.html": {
+      "x": 1520,
+      "y": 3660,
+      "w": 1440,
+      "h": 1140,
+      "title": "BO-11 · Xodimlar va huquqlar",
+      "page": "bo",
+      "expand": "fill"
+    },
+    "Bo12Filiallar.dc.html": {
+      "x": 3040,
+      "y": 3660,
+      "w": 1440,
+      "h": 1565,
+      "title": "BO-12 · Filiallar",
+      "page": "bo",
+      "expand": "fill"
+    },
+    "Bo13Ai.dc.html": {
+      "x": 4560,
+      "y": 3660,
+      "w": 1440,
+      "h": 1480,
+      "title": "BO-13 · AI yordamchi",
+      "page": "bo",
+      "expand": "fill"
+    },
+    "Bo14Sozlamalar.dc.html": {
+      "x": 6080,
+      "y": 3660,
+      "w": 1440,
+      "h": 1330,
+      "title": "BO-14 · Do'kon sozlamalari",
+      "page": "bo",
+      "expand": "fill"
+    },
+    "Bo15Efaktura.dc.html": {
+      "x": 0,
+      "y": 5640,
+      "w": 1440,
+      "h": 1340,
+      "title": "BO-15 · E-faktura markazi",
+      "page": "bo",
+      "expand": "fill"
+    },
+    "Bo16Tasdiqlash.dc.html": {
+      "x": 1520,
+      "y": 5640,
+      "w": 1440,
+      "h": 1250,
+      "title": "BO-16 · Tasdiqlash navbati",
+      "page": "bo",
+      "expand": "fill"
+    },
+    "Bo17Xarajatlar.dc.html": {
+      "x": 3040,
+      "y": 5640,
+      "w": 1440,
+      "h": 1540,
+      "title": "BO-17 · Xarajatlar",
+      "page": "bo",
+      "expand": "fill"
+    },
+    "Bo18Yorliq.dc.html": {
+      "x": 4560,
+      "y": 5640,
+      "w": 1440,
+      "h": 1240,
+      "title": "BO-18 · Yorliqlar va shtrix-kodlar",
+      "page": "bo",
+      "expand": "fill"
+    },
+    "Bo19Obuna.dc.html": {
+      "x": 6080,
+      "y": 5640,
+      "w": 1440,
+      "h": 1540,
+      "title": "BO-19 · Obuna va to'lov",
+      "page": "bo",
+      "expand": "fill"
+    },
+    "Bo20Telegram.dc.html": {
+      "x": 0,
+      "y": 7380,
+      "w": 1440,
+      "h": 1523,
+      "title": "BO-20 · Telegram va bildirishnomalar",
+      "page": "bo",
+      "expand": "fill"
+    },
+    "Bo22OneCSozlama.dc.html": {
+      "x": 1520,
+      "y": 7380,
+      "w": 1440,
+      "h": 3607,
+      "title": "BO-22 · 1C integratsiyasi sozlamalari",
+      "page": "bo",
+      "expand": "fill"
+    },
+    "Bo23OneC.dc.html": {
+      "x": 3040,
+      "y": 7380,
+      "w": 1440,
+      "h": 1906,
+      "title": "BO-23 · 1C ga yuborish",
+      "page": "bo",
+      "expand": "fill"
+    },
+    "Bo24Bank.dc.html": {
+      "x": 4560,
+      "y": 7380,
+      "w": 1440,
+      "h": 2128,
+      "title": "BO-24 · Bank tushumi",
+      "page": "bo",
+      "expand": "fill"
+    },
+    "Adm01Admin.dc.html": {
+      "x": 6080,
+      "y": 7380,
+      "w": 1440,
+      "h": 1240,
+      "title": "ADM-01 · Tenantlar",
+      "page": "bo",
+      "expand": "fill"
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "Pos01Kirish.dc.html",
+    "Pos03Tolov.dc.html",
+    "Pos04Chek.dc.html",
+    "Pos05Qaytarish.dc.html",
+    "Pos06Nasiya.dc.html",
+    "Pos07Smena.dc.html",
+    "Pos08Kirim.dc.html",
+    "Pos09Kochirish.dc.html",
+    "Pos10Inventar.dc.html",
+    "Pos11Qidiruv.dc.html",
+    "Pos12Offline.dc.html",
+    "Pos13Qarz.dc.html",
+    "Pos14KassaPul.dc.html",
+    "Pos15Sanash.dc.html",
+    "Pos16Uskunalar.dc.html",
+    "Bo01Kirish.dc.html",
+    "Bo21Royxat.dc.html",
+    "Bo02Dashboard.dc.html",
+    "Bo03Ombor.dc.html",
+    "Bo04Xarid.dc.html",
+    "Bo05Narxlar.dc.html",
+    "Bo06Qarzdorlar.dc.html",
+    "Bo07Qqs.dc.html",
+    "Bo08Jurnal.dc.html",
+    "Bo09Hisobotlar.dc.html",
+    "Bo10DavlatHisobot.dc.html",
+    "Bo11Xodimlar.dc.html",
+    "Bo12Filiallar.dc.html",
+    "Bo13Ai.dc.html",
+    "Bo14Sozlamalar.dc.html",
+    "Bo15Efaktura.dc.html",
+    "Bo16Tasdiqlash.dc.html",
+    "Bo17Xarajatlar.dc.html",
+    "Bo18Yorliq.dc.html",
+    "Bo19Obuna.dc.html",
+    "Bo20Telegram.dc.html",
+    "Bo22OneCSozlama.dc.html",
+    "Bo23OneC.dc.html",
+    "Bo24Bank.dc.html",
+    "Adm01Admin.dc.html"
+  ],
+  "notes": {},
+  "designSystems": [],
+  "attachments": {}
+}
